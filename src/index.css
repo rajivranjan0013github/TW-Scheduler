@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme {
+  --color-apple-blue: #0071e3;
+  --color-apple-blue-hover: #147ce5;
+  --color-apple-gray: #f5f5f7;
+  --color-apple-dark-card: #ffffff;
+  --color-apple-dark-bg: #f5f5f7;
+  --color-apple-dark-border: #e5e5ea;
+  --color-apple-light-border: #d2d2d7;
+  
+  --color-brand-50: #f5f5f7;
+  --color-brand-100: #e5e5ea;
+  --color-brand-200: #d1d1d6;
+  --color-brand-300: #c7c7cc;
+  --color-brand-400: #8e8e93;
+  --color-brand-500: #0071e3;
+  --color-brand-600: #0071e3;
+  --color-brand-700: #0071e3;
+  --color-brand-800: #0071e3;
+  --color-brand-900: #ffffff;
+  --color-brand-950: #f5f5f7;
+  
+  --color-darkBg: #f5f5f7;
+  --color-darkCard: #ffffff;
+  --color-darkBorder: #e5e5ea;
+}
+
+body {
+  margin: 0;
+  background-color: #f5f5f7;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  letter-spacing: -0.015em;
+  color: #1d1d1f;
+}
+
+/* Custom minimal scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d2d2d7;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8e8e93;
+}
