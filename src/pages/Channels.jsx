@@ -86,8 +86,23 @@ export const Channels = () => {
   const connectMetaOAuth = () => {
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
     const redirectUri = encodeURIComponent('http://localhost:5173/auth/facebook/callback');
-    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights,instagram_manage_comments');
+    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights,instagram_manage_comments');
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
+    window.location.href = oauthUrl;
+  };
+
+  const connectInstagramOAuth = () => {
+    const appId = import.meta.env.VITE_INSTAGRAM_APP_ID;
+    const facebookAppId = import.meta.env.VITE_META_APP_ID;
+    if (!appId || appId === facebookAppId) {
+      alert('Set VITE_INSTAGRAM_APP_ID to the Instagram App ID from Meta Dashboard > Instagram > API setup with Instagram login. It cannot be the Facebook App ID.');
+      return;
+    }
+    const rawRedirectUri = import.meta.env.VITE_INSTAGRAM_REDIRECT_URI || `${window.location.origin}/auth/instagram/callback`;
+    sessionStorage.setItem('instagram_oauth_redirect_uri', rawRedirectUri);
+    const redirectUri = encodeURIComponent(rawRedirectUri);
+    const scope = encodeURIComponent('instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights');
+    const oauthUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
     window.location.href = oauthUrl;
   };
 
@@ -121,13 +136,22 @@ export const Channels = () => {
         <div className="bg-white border border-[#e5e5ea] rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-[#e5e5ea] flex justify-between items-center">
             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Connected Accounts ({channels.length})</span>
-            <button
-              onClick={connectMetaOAuth}
-              className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm"
-            >
-              <Link2 className="w-3.5 h-3.5" />
-              <span>Connect Facebook & Instagram</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={connectInstagramOAuth}
+                className="flex items-center gap-1.5 bg-black hover:bg-gray-800 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                <span>Connect Instagram</span>
+              </button>
+              <button
+                onClick={connectMetaOAuth}
+                className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                <span>Connect Facebook & Instagram</span>
+              </button>
+            </div>
           </div>
 
           <div className="divide-y divide-[#e5e5ea]">
@@ -258,6 +282,10 @@ export const Channels = () => {
                         
                         <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-3">
                           <div className="flex items-center gap-4 text-[10px] text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Eye className="w-3.5 h-3.5 text-gray-500" />
+                              <span>{post.views || 0}</span>
+                            </span>
                             <span className="flex items-center gap-1">
                               <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
                               <span>{post.likes}</span>

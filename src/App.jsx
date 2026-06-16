@@ -11,6 +11,7 @@ import CalendarView from './pages/CalendarView';
 import Comments from './pages/Comments';
 import Channels from './pages/Channels';
 import FacebookCallback from './pages/FacebookCallback';
+import InstagramCallback from './pages/InstagramCallback';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -27,41 +28,48 @@ function AppContent() {
     );
   }
 
-  // Auth Guard
-  if (!user) {
-    return <Login />;
-  }
-
   return (
     <Router>
-      <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-hidden font-sans">
-        
-        {/* Navigation Sidebar */}
-        <Sidebar />
+      <Routes>
+        <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
+        <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
+        <Route
+          path="*"
+          element={
+            !user ? (
+              <Login />
+            ) : (
+              <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-hidden font-sans">
+                
+                {/* Navigation Sidebar */}
+                <Sidebar />
 
-        {/* Right Content Panel */}
-        <div className="flex-1 flex flex-col h-screen overflow-hidden">
-          
-          {/* Header Controls */}
-          <Header 
-            selectedAccounts={selectedAccounts} 
-            setSelectedAccounts={setSelectedAccounts} 
-          />
+                {/* Right Content Panel */}
+                <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                  
+                  {/* Header Controls */}
+                  <Header 
+                    selectedAccounts={selectedAccounts} 
+                    setSelectedAccounts={setSelectedAccounts} 
+                  />
 
-          {/* Main Dashboard Pages router container */}
-          <main className="flex-1 overflow-y-auto">
-            <Routes>
-              <Route path="/" element={<Dashboard selectedAccounts={selectedAccounts} />} />
-              <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
-              <Route path="/media" element={<MediaLibrary />} />
-              <Route path="/channels" element={<Channels />} />
-              <Route path="/comments" element={<Comments />} />
-              <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </main>
-        </div>
-      </div>
+                  {/* Main Dashboard Pages router container */}
+                  <main className="flex-1 overflow-y-auto">
+                    <Routes>
+                      <Route path="/" element={<Dashboard selectedAccounts={selectedAccounts} />} />
+                      <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
+                      <Route path="/media" element={<MediaLibrary />} />
+                      <Route path="/channels" element={<Channels />} />
+                      <Route path="/comments" element={<Comments />} />
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                  </main>
+                </div>
+              </div>
+            )
+          }
+        />
+      </Routes>
     </Router>
   );
 }
