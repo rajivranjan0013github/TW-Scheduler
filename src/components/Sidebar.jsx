@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Clock, FolderHeart, MessageSquare, Link2 } from 'lucide-react';
+import { LayoutDashboard, Clock, FolderHeart, Link2, Settings as SettingsIcon } from 'lucide-react';
 
 export const Sidebar = () => {
   const navItems = [
@@ -8,7 +8,7 @@ export const Sidebar = () => {
     { name: 'Scheduled Queue', path: '/scheduler', icon: Clock },
     { name: 'Media Library', path: '/media', icon: FolderHeart },
     { name: 'Connected Channels', path: '/channels', icon: Link2 },
-    { name: 'Comment Inbox', path: '/comments', icon: MessageSquare },
+    { name: 'Settings', path: '/settings', icon: SettingsIcon },
   ];
 
   return (
@@ -16,8 +16,8 @@ export const Sidebar = () => {
       
       {/* App Store Connect style header */}
       <div className="p-6 border-b border-[#e5e5ea] flex flex-col justify-center bg-white">
-        <h1 className="text-base font-semibold text-[#1d1d1f] tracking-tight leading-none m-0">Creator Suite</h1>
-        <span className="text-[10px] text-[#8e8e93] font-medium tracking-wider uppercase mt-1">Management Hub</span>
+        <h1 className="text-base font-semibold text-[#1d1d1f] tracking-tight leading-none m-0">EasyPost</h1>
+        <span className="text-[10px] text-[#8e8e93] font-medium tracking-wider uppercase mt-1">Publishing Hub</span>
       </div>
 
       {/* Navigation */}
@@ -39,6 +39,16 @@ export const Sidebar = () => {
           </NavLink>
         ))}
       </nav>
+
+      {/* Sidebar Footer */}
+      <div className="p-6 border-t border-[#e5e5ea] text-[10px] text-[#8e8e93] bg-white">
+        <p className="m-0">
+          This product is powered by{' '}
+          <a href="https://thethousandways.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#1d1d1f]">
+            thousandway to make
+          </a>
+        </p>
+      </div>
     </aside>
   );
 };

@@ -37,15 +37,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (credential) => {
+  const login = async (credential, accessToken) => {
     setLoading(true);
     try {
+      const body = credential ? { credential } : { accessToken };
       const response = await fetch('http://localhost:5001/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ credential }),
+        body: JSON.stringify(body),
       });
 
       if (response.ok) {
@@ -71,8 +72,50 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   };
 
+  const updateProfile = async (userData) => {
+    try {
+      const response = await fetch('http://localhost:5001/api/auth/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        setUser(updatedUser);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to update user profile:', error);
+      return false;
+    }
+  };
+
+  const deleteAccount = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/auth/me', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        logout();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to delete account:', error);
+      return false;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, updateProfile, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

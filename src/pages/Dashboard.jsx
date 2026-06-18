@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Eye, TrendingUp, Calendar, Heart, MessageSquare } from 'lucide-react';
+import { Eye, TrendingUp, Calendar, Heart, RefreshCw } from 'lucide-react';
 
 const Instagram = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -29,11 +30,14 @@ const mockChartData = [
 
 export const Dashboard = ({ selectedAccounts }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [period, setPeriod] = useState('7d');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
     accountsCount: 0,
     upcomingCount: 0,
-    mediaCount: 0,
-    commentsCount: 0
+    mediaCount: 0
   });
   const [channels, setChannels] = useState([]);
   const [upcomingPosts, setUpcomingPosts] = useState([]);
@@ -41,11 +45,16 @@ export const Dashboard = ({ selectedAccounts }) => {
   const [errorInsights, setErrorInsights] = useState(null);
 
   useEffect(() => {
-    fetchStats();
-  }, [selectedAccounts]);
+    fetchStats(period);
+  }, [selectedAccounts, period]);
 
-  const fetchStats = async () => {
+  const fetchStats = async (selectedPeriod = '7d', forceRefresh = false) => {
     try {
+      if (forceRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const token = localStorage.getItem('tw_token');
       const headers = { 'Authorization': `Bearer ${token}` };
 
@@ -63,12 +72,9 @@ export const Dashboard = ({ selectedAccounts }) => {
       const medResponse = await fetch('http://localhost:5001/api/media', { headers });
       const mediaList = await medResponse.json();
 
-      const commResponse = await fetch('http://localhost:5001/api/comments', { headers });
-      const commentsList = await commResponse.json();
-
       setErrorInsights(null);
       try {
-        const insResponse = await fetch('http://localhost:5001/api/accounts/insights', { headers });
+        const insResponse = await fetch(`http://localhost:5001/api/accounts/insights?period=${selectedPeriod}${forceRefresh ? '&refresh=true' : ''}`, { headers });
         if (insResponse.ok) {
           const insightsList = await insResponse.json();
           setChartData(insightsList);
@@ -84,13 +90,28 @@ export const Dashboard = ({ selectedAccounts }) => {
       setStats({
         accountsCount: accountsList.length,
         upcomingCount: upcoming.length,
-        mediaCount: mediaList.length,
-        commentsCount: commentsList.filter(c => !c.isReplied).length
+        mediaCount: mediaList.length
       });
     } catch (error) {
       console.error('Failed to load dashboard metrics:', error);
+    } finally {
+      if (forceRefresh) setRefreshing(false);
+      setLoading(false);
     }
   };
+
+  const totalViews = chartData.reduce((acc, curr) => acc + (curr.Instagram || 0) + (curr.Facebook || 0), 0);
+
+  if (loading && !refreshing) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px] w-full bg-[#f5f5f7]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xs text-[#8e8e93] font-semibold tracking-wide">Loading Dashboard...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-8 text-[#1d1d1f] min-h-screen bg-[#f5f5f7]">
@@ -99,7 +120,34 @@ export const Dashboard = ({ selectedAccounts }) => {
       <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">
         <div>
           <h2 className="text-xl font-semibold text-[#1d1d1f] tracking-tight m-0">Overview</h2>
-          <p className="text-[#8e8e93] text-xs mt-1">Creator Suite campaign monitor</p>
+          <p className="text-[#8e8e93] text-xs mt-1">EasyPost campaign monitor</p>
+        </div>
+        
+        {/* Period Selector & Refresh Controls */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Period:</label>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="bg-white border border-[#e5e5ea] rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none text-[#1d1d1f] cursor-pointer shadow-sm hover:border-[#d2d2d7] transition-all"
+            >
+              <option value="7d">Last 7 Days</option>
+              <option value="this_month">This Month</option>
+              <option value="30d">Last 30 Days</option>
+            </select>
+          </div>
+          
+          <button
+            type="button"
+            onClick={() => fetchStats(period, true)}
+            disabled={refreshing}
+            title="Refresh views and insight metrics from Meta Graph API"
+            className="flex items-center justify-center gap-1.5 bg-white border border-[#e5e5ea] hover:bg-[#f5f5f7] active:bg-[#e5e5ea] rounded-lg px-3 py-1.5 text-xs font-semibold text-[#1d1d1f] transition-all shadow-sm outline-none disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
         </div>
       </div>
 
@@ -133,12 +181,12 @@ export const Dashboard = ({ selectedAccounts }) => {
           </div>
         </div>
 
-        {/* Unread Comments */}
+        {/* Total Views Card */}
         <div className="bg-white border border-[#e5e5ea] rounded-xl p-6 shadow-sm">
-          <span className="text-[#8e8e93] text-[10px] font-bold uppercase tracking-wider">Open Comments</span>
+          <span className="text-[#8e8e93] text-[10px] font-bold uppercase tracking-wider">Total Views</span>
           <div className="mt-2">
-            <h3 className="text-2xl font-semibold text-black leading-none">{stats.commentsCount}</h3>
-            <p className="text-[11px] text-[#8e8e93] mt-1.5">Awaiting replies in inbox</p>
+            <h3 className="text-2xl font-semibold text-black leading-none">{totalViews.toLocaleString()}</h3>
+            <p className="text-[11px] text-[#8e8e93] mt-1.5">Views in selected period</p>
           </div>
         </div>
 
@@ -152,7 +200,9 @@ export const Dashboard = ({ selectedAccounts }) => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-sm font-semibold text-black m-0">Performance Insights</h3>
-              <p className="text-[11px] text-[#8e8e93] mt-0.5">Weekly channel reach growth</p>
+              <p className="text-[11px] text-[#8e8e93] mt-0.5">
+                {period === '7d' ? 'Weekly' : period === 'this_month' ? 'Monthly' : '30-day'} channel reach growth
+              </p>
             </div>
             <div className="flex items-center gap-4 text-[10px]">
               <div className="flex items-center gap-1.5 text-black">
@@ -201,11 +251,15 @@ export const Dashboard = ({ selectedAccounts }) => {
             <h3 className="text-xs font-semibold text-gray-500 mb-4 uppercase tracking-wider">Connected Channels</h3>
             <div className="space-y-3">
               {channels.map((chan) => (
-                <div key={chan._id} className="flex items-center justify-between py-2 border-b border-[#e5e5ea] last:border-b-0">
+                <div 
+                  key={chan._id} 
+                  onClick={() => navigate(`/channels/${chan._id}/feed`)}
+                  className="flex items-center justify-between py-2 px-1.5 border-b border-[#e5e5ea] last:border-b-0 cursor-pointer hover:bg-gray-50 rounded-lg transition-all"
+                >
                   <div className="flex items-center gap-3">
                     <img src={chan.avatarUrl} className="w-6 h-6 rounded-full object-cover border border-black/10" alt="" />
                     <div>
-                      <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">{chan.name}</p>
+                      <p className="text-xs font-semibold text-[#1d1d1f] leading-tight hover:text-[#0071e3] transition-colors">{chan.name}</p>
                       <p className="text-[10px] text-gray-500">@{chan.username}</p>
                     </div>
                   </div>
