@@ -106,6 +106,32 @@ export const Channels = () => {
     window.location.href = oauthUrl;
   };
 
+  const connectYoutubeOAuth = async () => {
+    try {
+      const token = localStorage.getItem('tw_token');
+      const response = await fetch('http://localhost:5001/api/accounts/youtube/auth-url', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.url) {
+        alert(data.message || 'Failed to start YouTube connection.');
+        return;
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      console.error('Failed to start YouTube OAuth:', error);
+      alert('Failed to connect to the backend for YouTube OAuth.');
+    }
+  };
+
+  const getPlatformBadgeClasses = (platform) => {
+    if (platform === 'instagram') return 'bg-purple-50 text-purple-600 border-purple-200';
+    if (platform === 'youtube') return 'bg-red-50 text-red-600 border-red-200';
+    return 'bg-blue-50 text-blue-600 border-blue-200';
+  };
+
   return (
     <div className="p-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f] space-y-8">
       
@@ -113,7 +139,7 @@ export const Channels = () => {
       <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">
         <div>
           <h2 className="text-xl font-semibold text-black tracking-tight m-0">Connected Channels</h2>
-          <p className="text-[#8e8e93] text-xs mt-1">Manage Facebook Pages and Instagram Business Accounts</p>
+          <p className="text-[#8e8e93] text-xs mt-1">Manage Facebook, Instagram, and YouTube publishing channels</p>
         </div>
       </div>
 
@@ -125,9 +151,9 @@ export const Channels = () => {
             <Share2 className="w-5 h-5" />
           </div>
           <div className="space-y-1.5">
-            <h4 className="text-xs font-semibold text-black m-0">Meta Integration</h4>
+            <h4 className="text-xs font-semibold text-black m-0">Publishing Integrations</h4>
             <p className="text-[11px] text-gray-500 leading-relaxed m-0">
-              Users connect their Facebook Pages. If a Page is linked to an Instagram Business account, both channels are automatically synced to our publisher queue engine.
+              Users can connect Meta accounts and YouTube channels. Connected channels are available in the scheduled publishing queue.
             </p>
           </div>
         </div>
@@ -143,6 +169,13 @@ export const Channels = () => {
               >
                 <Link2 className="w-3.5 h-3.5" />
                 <span>Connect Instagram</span>
+              </button>
+              <button
+                onClick={connectYoutubeOAuth}
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                <span>Connect YouTube</span>
               </button>
               <button
                 onClick={connectMetaOAuth}
@@ -161,7 +194,7 @@ export const Channels = () => {
               </div>
             ) : channels.length === 0 ? (
               <div className="text-center py-16 text-xs text-gray-400 font-medium">
-                No active social channels connected yet. Click the button above to authorize your Facebook page.
+                No active social channels connected yet. Use the buttons above to authorize a publishing channel.
               </div>
             ) : (
               channels.map(chan => (
@@ -175,11 +208,7 @@ export const Channels = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-black">{chan.name}</span>
-                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border uppercase ${
-                          chan.platform === 'instagram' 
-                            ? 'bg-purple-50 text-purple-600 border-purple-200' 
-                            : 'bg-blue-50 text-blue-600 border-blue-200'
-                        }`}>
+                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border uppercase ${getPlatformBadgeClasses(chan.platform)}`}>
                           {chan.platform}
                         </span>
                       </div>

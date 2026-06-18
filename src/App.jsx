@@ -12,6 +12,7 @@ import Comments from './pages/Comments';
 import Channels from './pages/Channels';
 import FacebookCallback from './pages/FacebookCallback';
 import InstagramCallback from './pages/InstagramCallback';
+import YoutubeCallback from './pages/YoutubeCallback';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -33,6 +34,7 @@ function AppContent() {
       <Routes>
         <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
         <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
+        <Route path="/auth/youtube/callback" element={<YoutubeCallback />} />
         <Route
           path="*"
           element={

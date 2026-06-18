@@ -20,12 +20,18 @@ export const CalendarView = ({ selectedAccounts }) => {
   const [scheduleTime, setScheduleTime] = useState('');
   const [postType, setPostType] = useState('reels');
   const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [youtubeTitle, setYoutubeTitle] = useState('');
+  const [youtubePrivacy, setYoutubePrivacy] = useState('private');
+  const [youtubeTags, setYoutubeTags] = useState('');
+  const [youtubeMadeForKids, setYoutubeMadeForKids] = useState(false);
   
   // Bulk Scheduling states
   const [isBulk, setIsBulk] = useState(false);
   const [bulkInterval, setBulkInterval] = useState('2');
 
   const isViewer = user?.role === 'viewer';
+  const selectedChannelObjects = channels.filter(chan => selectedChannels.includes(chan._id));
+  const hasYoutubeSelected = selectedChannelObjects.some(chan => chan.platform === 'youtube');
 
   useEffect(() => {
     fetchPosts();
@@ -117,15 +123,39 @@ export const CalendarView = ({ selectedAccounts }) => {
       alert('Pick a scheduling date and time');
       return;
     }
+    if (hasYoutubeSelected) {
+      const hasVideo = selectedMedia.some(medId => mediaList.find(item => item._id === medId)?.type === 'video');
+      if (!hasVideo) {
+        alert('YouTube uploads require a video media asset');
+        return;
+      }
+      if (!youtubeTitle.trim()) {
+        alert('Add a YouTube title before scheduling');
+        return;
+      }
+    }
 
     try {
       const token = localStorage.getItem('tw_token');
+      const platformSpecifics = {
+        type: postType,
+        ...(hasYoutubeSelected ? {
+          youtube: {
+            title: youtubeTitle.trim(),
+            description: caption,
+            privacyStatus: youtubePrivacy,
+            tags: youtubeTags,
+            categoryId: '22',
+            selfDeclaredMadeForKids: youtubeMadeForKids,
+          }
+        } : {}),
+      };
       const body = {
         socialAccountIds: selectedChannels,
         mediaIds: selectedMedia,
         caption,
         scheduledAt: new Date(scheduleTime),
-        platformSpecifics: { type: postType }
+        platformSpecifics
       };
 
       let url = 'http://localhost:5001/api/scheduler';
@@ -152,6 +182,10 @@ export const CalendarView = ({ selectedAccounts }) => {
         setSelectedMedia([]);
         setCaption('');
         setScheduleTime('');
+        setYoutubeTitle('');
+        setYoutubePrivacy('private');
+        setYoutubeTags('');
+        setYoutubeMadeForKids(false);
         setIsBulk(false);
         fetchPosts();
       }
@@ -385,6 +419,55 @@ export const CalendarView = ({ selectedAccounts }) => {
                   className="w-full bg-[#f5f5f7] border border-[#e5e5ea] p-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black min-h-[80px] resize-y"
                 />
               </div>
+
+              {hasYoutubeSelected && (
+                <div className="space-y-4 border border-red-100 bg-red-50/30 rounded-xl p-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-red-500 font-bold uppercase tracking-wider">YouTube Title</label>
+                    <input
+                      value={youtubeTitle}
+                      onChange={(e) => setYoutubeTitle(e.target.value)}
+                      maxLength={100}
+                      placeholder="Video title"
+                      className="w-full bg-white border border-red-100 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Privacy</label>
+                      <select
+                        value={youtubePrivacy}
+                        onChange={(e) => setYoutubePrivacy(e.target.value)}
+                        className="w-full bg-white border border-red-100 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
+                      >
+                        <option value="private">Private</option>
+                        <option value="unlisted">Unlisted</option>
+                        <option value="public">Public</option>
+                      </select>
+                    </div>
+
+                    <label className="flex items-center gap-2 bg-white border border-red-100 px-3 py-2 rounded-lg text-xs text-black mt-5">
+                      <input
+                        type="checkbox"
+                        checked={youtubeMadeForKids}
+                        onChange={(e) => setYoutubeMadeForKids(e.target.checked)}
+                      />
+                      <span>Made for kids</span>
+                    </label>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Tags</label>
+                    <input
+                      value={youtubeTags}
+                      onChange={(e) => setYoutubeTags(e.target.value)}
+                      placeholder="travel, vlog, shorts"
+                      className="w-full bg-white border border-red-100 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Media Picker */}
               <div className="space-y-2">
