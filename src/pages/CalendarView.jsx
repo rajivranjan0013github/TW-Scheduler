@@ -53,6 +53,18 @@ export const CalendarView = ({ selectedAccounts }) => {
     }
   }, [location.state, mediaList]);
 
+  useEffect(() => {
+    if (hasYoutubeSelected) {
+      if (postType !== 'video' && postType !== 'short') {
+        setPostType('video');
+      }
+    } else {
+      if (postType !== 'reels' && postType !== 'post' && postType !== 'story') {
+        setPostType('reels');
+      }
+    }
+  }, [hasYoutubeSelected]);
+
   const fetchPosts = async () => {
     try {
       const response = await fetch('http://localhost:5001/api/scheduler', {
@@ -391,8 +403,8 @@ export const CalendarView = ({ selectedAccounts }) => {
               {/* Format */}
               <div className="space-y-2">
                 <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Format</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['reels', 'post', 'story'].map(t => (
+                <div className={`grid ${hasYoutubeSelected ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
+                  {(hasYoutubeSelected ? ['video', 'short'] : ['reels', 'post', 'story']).map(t => (
                     <button
                       key={t}
                       type="button"
