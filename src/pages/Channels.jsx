@@ -1,23 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Share2, Trash2, ShieldCheck, Link2, Eye, X, Heart, MessageSquare } from 'lucide-react';
+import { Share2, Trash2, ShieldCheck, Link2, Eye, Trash } from 'lucide-react';
 
 export const Channels = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Feed Modal States
-  const [selectedChannel, setSelectedChannel] = useState(null);
-  const [publishedPosts, setPublishedPosts] = useState([]);
-  const [loadingPosts, setLoadingPosts] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [errorPosts, setErrorPosts] = useState(null);
 
   useEffect(() => {
     fetchChannels();
   }, []);
-
   const fetchChannels = async () => {
     try {
       const token = localStorage.getItem('tw_token');
@@ -53,33 +47,6 @@ export const Channels = () => {
       }
     } catch (error) {
       console.error('Error disconnecting channel:', error);
-    }
-  };
-
-  const openFeedModal = async (channel) => {
-    setSelectedChannel(channel);
-    setIsModalOpen(true);
-    setLoadingPosts(true);
-    setPublishedPosts([]);
-    setErrorPosts(null);
-
-    try {
-      const token = localStorage.getItem('tw_token');
-      const response = await fetch(`http://localhost:5001/api/accounts/${channel._id}/posts`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setPublishedPosts(data);
-      } else {
-        const errData = await response.json();
-        setErrorPosts(errData.message || 'Failed to retrieve published posts.');
-      }
-    } catch (error) {
-      console.error('Failed to fetch published posts:', error);
-      setErrorPosts('Network error: Failed to connect to server.');
-    } finally {
-      setLoadingPosts(false);
     }
   };
 
@@ -220,7 +187,7 @@ export const Channels = () => {
 
                   <div className="flex items-center gap-4">
                     <button
-                      onClick={() => openFeedModal(chan)}
+                      onClick={() => navigate(`/channels/${chan._id}/feed`)}
                       className="flex items-center gap-1.5 text-[10px] text-[#0071e3] hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 transition-all font-semibold active:scale-95"
                     >
                       <Eye className="w-3 h-3" />
@@ -245,104 +212,6 @@ export const Channels = () => {
         </div>
 
       </div>
-
-      {/* Published Feed Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[#e5e5ea] w-full max-w-2xl rounded-2xl shadow-xl flex flex-col max-h-[85vh] overflow-hidden">
-            
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-[#e5e5ea] flex items-center justify-between bg-[#f5f5f7]">
-              <div className="flex items-center gap-3">
-                <img 
-                  src={selectedChannel?.avatarUrl || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=150'} 
-                  className="w-8 h-8 rounded-full object-cover border border-[#d2d2d7]" 
-                  alt="" 
-                />
-                <div>
-                  <h3 className="text-sm font-semibold text-black leading-tight">
-                    {selectedChannel?.name}'s Published Feed
-                  </h3>
-                  <p className="text-[10px] text-gray-500">@{selectedChannel?.username || 'unspecified'}</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="p-1.5 hover:bg-gray-200 text-gray-500 rounded-full transition-all"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {loadingPosts ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-3">
-                  <div className="w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-xs text-gray-400 font-medium">Fetching published posts from Meta...</span>
-                </div>
-              ) : errorPosts ? (
-                <div className="text-center py-16 px-4 space-y-2">
-                  <p className="text-xs text-red-500 font-bold m-0">⚠️ Error Fetching Feed</p>
-                  <p className="text-[11px] text-gray-500 max-w-md mx-auto leading-relaxed m-0">{errorPosts}</p>
-                </div>
-              ) : publishedPosts.length === 0 ? (
-                <div className="text-center py-20 text-xs text-gray-400 font-medium">
-                  No published posts found on this channel.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {publishedPosts.map(post => (
-                    <div key={post.id} className="bg-white border border-[#e5e5ea] rounded-xl p-4 flex gap-4 hover:shadow-sm transition-shadow">
-                      {post.mediaUrl && (
-                        <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-[#e5e5ea]">
-                          <img src={post.mediaUrl} className="w-full h-full object-cover" alt="" />
-                        </div>
-                      )}
-                      <div className="flex-1 flex flex-col justify-between min-w-0">
-                        <div className="space-y-1">
-                          <p className="text-xs text-black font-normal line-clamp-3 leading-relaxed whitespace-pre-wrap">
-                            {post.content}
-                          </p>
-                          <p className="text-[9px] text-[#8e8e93] mt-1">
-                            {new Date(post.createdAt).toLocaleDateString([], { dateStyle: 'medium' })}
-                          </p>
-                        </div>
-                        
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-3">
-                          <div className="flex items-center gap-4 text-[10px] text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <Eye className="w-3.5 h-3.5 text-gray-500" />
-                              <span>{post.views || 0}</span>
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
-                              <span>{post.likes}</span>
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <MessageSquare className="w-3.5 h-3.5 text-blue-500 fill-blue-500" />
-                              <span>{post.comments}</span>
-                            </span>
-                          </div>
-                          <a 
-                            href={post.permalink} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-[10px] text-blue-600 font-semibold hover:underline"
-                          >
-                            View Live Post →
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-          </div>
-        </div>
-      )}
 
     </div>
   );
