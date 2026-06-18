@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Eye, TrendingUp, Calendar, Heart, RefreshCw } from 'lucide-react';
+import { Eye, TrendingUp, Calendar, Heart, RefreshCw, MessageSquare } from 'lucide-react';
 
 const Instagram = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -43,6 +43,7 @@ export const Dashboard = ({ selectedAccounts }) => {
   const [upcomingPosts, setUpcomingPosts] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [errorInsights, setErrorInsights] = useState(null);
+  const [recentPosts, setRecentPosts] = useState([]);
 
   useEffect(() => {
     fetchStats(period);
@@ -92,6 +93,17 @@ export const Dashboard = ({ selectedAccounts }) => {
         upcomingCount: upcoming.length,
         mediaCount: mediaList.length
       });
+
+      // Fetch recent 25 published posts
+      try {
+        const recentResponse = await fetch('http://localhost:5001/api/accounts/posts/recent', { headers });
+        if (recentResponse.ok) {
+          const recentData = await recentResponse.json();
+          setRecentPosts(recentData);
+        }
+      } catch (err) {
+        console.error('Failed to fetch recent published posts:', err);
+      }
     } catch (error) {
       console.error('Failed to load dashboard metrics:', error);
     } finally {
@@ -101,6 +113,25 @@ export const Dashboard = ({ selectedAccounts }) => {
   };
 
   const totalViews = chartData.reduce((acc, curr) => acc + (curr.Instagram || 0) + (curr.Facebook || 0), 0);
+
+  const getGroupedPosts = (posts) => {
+    const groups = [];
+    posts.forEach(post => {
+      const dateStr = new Date(post.createdAt).toLocaleDateString([], {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      let group = groups.find(g => g.dateStr === dateStr);
+      if (!group) {
+        group = { dateStr, posts: [] };
+        groups.push(group);
+      }
+      group.posts.push(post);
+    });
+    return groups;
+  };
 
   if (loading && !refreshing) {
     return (
@@ -303,6 +334,73 @@ export const Dashboard = ({ selectedAccounts }) => {
 
         </div>
 
+      </div>
+
+      {/* Recent Published Posts Section */}
+      <div className="bg-white border border-[#e5e5ea] rounded-xl p-6 shadow-sm space-y-6">
+        <h3 className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Recent Published Posts</h3>
+        {recentPosts.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-8">No published posts found. Ensure your channels are synced.</p>
+        ) : (
+          <div className="space-y-6">
+            {getGroupedPosts(recentPosts).map(group => (
+              <div key={group.dateStr} className="space-y-3">
+                {/* Date Separator */}
+                <div className="flex items-center gap-3 pt-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#0071e3]"></div>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    {group.dateStr}
+                  </span>
+                  <div className="flex-grow border-t border-dashed border-gray-200"></div>
+                </div>
+
+                {/* Group Table */}
+                <div className="overflow-x-auto border border-[#e5e5ea] rounded-xl bg-white shadow-sm">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-[#e5e5ea] bg-gray-50 text-gray-500 uppercase tracking-wider text-[9px] font-bold">
+                        <th className="px-4 py-3">Post</th>
+                        <th className="px-4 py-3">Time</th>
+                        <th className="px-4 py-3 text-right">Views</th>
+                        <th className="px-4 py-3 text-right">Likes</th>
+                        <th className="px-4 py-3 text-right">Comments</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#e5e5ea]">
+                      {group.posts.map((post) => (
+                        <tr 
+                          key={post.id} 
+                          onClick={() => navigate(`/channels/${post.accountId}/posts/${post.id}`)}
+                          className="hover:bg-gray-50/40 cursor-pointer transition-colors font-medium"
+                        >
+                          <td className="px-4 py-3 max-w-xs md:max-w-md">
+                            <div className="flex items-center gap-3">
+                              {post.mediaUrl && (
+                                <img src={post.mediaUrl} className="w-8 h-8 rounded object-cover border border-[#e5e5ea]" alt="" />
+                              )}
+                              <span className="truncate block font-semibold text-black">
+                                {post.content && post.content.length > 15 
+                                  ? post.content.slice(0, 15) + '...' 
+                                  : (post.content || 'No text content')
+                                }
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                            {new Date(post.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="px-4 py-3 text-right text-blue-600 font-semibold">{post.views || 0}</td>
+                          <td className="px-4 py-3 text-right text-red-500 font-semibold">{post.likes || 0}</td>
+                          <td className="px-4 py-3 text-right text-purple-600 font-semibold">{post.comments || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
     </div>

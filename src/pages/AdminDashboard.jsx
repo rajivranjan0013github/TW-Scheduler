@@ -11,10 +11,15 @@ const emptyMetrics = {
   last7DaysPosts: 0,
   thisMonthPosts: 0,
   lifetimeViews: 0,
+  lifetimeAccountInsight: 0,
   todayViews: 0,
+  todayAccountInsight: 0,
   yesterdayViews: 0,
+  yesterdayAccountInsight: 0,
   last7DaysViews: 0,
+  last7DaysAccountInsight: 0,
   thisMonthViews: 0,
+  thisMonthAccountInsight: 0,
   latestLikes: 0,
   latestComments: 0,
   todayLikes: 0,
@@ -32,6 +37,7 @@ const timeRanges = {
   today: {
     label: 'Today',
     viewsKey: 'todayViews',
+    accountInsightKey: 'todayAccountInsight',
     postsKey: 'todayPosts',
     likesKey: 'todayLikes',
     commentsKey: 'todayComments',
@@ -39,6 +45,7 @@ const timeRanges = {
   yesterday: {
     label: 'Yesterday',
     viewsKey: 'yesterdayViews',
+    accountInsightKey: 'yesterdayAccountInsight',
     postsKey: 'yesterdayPosts',
     likesKey: 'yesterdayLikes',
     commentsKey: 'yesterdayComments',
@@ -46,6 +53,7 @@ const timeRanges = {
   last7Days: {
     label: 'Last 7 days',
     viewsKey: 'last7DaysViews',
+    accountInsightKey: 'last7DaysAccountInsight',
     postsKey: 'last7DaysPosts',
     likesKey: 'last7DaysLikes',
     commentsKey: 'last7DaysComments',
@@ -53,6 +61,7 @@ const timeRanges = {
   thisMonth: {
     label: 'This month',
     viewsKey: 'thisMonthViews',
+    accountInsightKey: 'thisMonthAccountInsight',
     postsKey: 'thisMonthPosts',
     likesKey: 'thisMonthLikes',
     commentsKey: 'thisMonthComments',
@@ -60,6 +69,7 @@ const timeRanges = {
   lifetime: {
     label: 'Lifetime',
     viewsKey: 'lifetimeViews',
+    accountInsightKey: 'lifetimeAccountInsight',
     postsKey: 'posts',
     likesKey: 'latestLikes',
     commentsKey: 'latestComments',
@@ -186,6 +196,7 @@ export const AdminDashboard = () => {
   const activeMetrics = selectedCampaign?.metrics || emptyMetrics;
   const selectedRange = timeRanges[selectedTimeRange];
   const selectedViews = activeMetrics[selectedRange.viewsKey] || 0;
+  const selectedAccountInsight = activeMetrics[selectedRange.accountInsightKey] || 0;
   const selectedPosts = activeMetrics[selectedRange.postsKey] || 0;
   const selectedLikes = activeMetrics[selectedRange.likesKey] || 0;
   const selectedComments = activeMetrics[selectedRange.commentsKey] || 0;
@@ -266,12 +277,18 @@ export const AdminDashboard = () => {
         </div>
       ) : (
         <>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               icon={Eye}
               label={`${selectedTimeLabel} views`}
               value={numberFormat.format(selectedViews)}
               note={selectedTimeRange === 'lifetimeViews' ? 'Current total on cached posts' : 'Based on daily snapshots when available'}
+            />
+            <MetricCard
+              icon={Eye}
+              label={`${selectedTimeLabel} account insight`}
+              value={numberFormat.format(selectedAccountInsight)}
+              note="Account-level cached insight total"
             />
             <MetricCard
               icon={Megaphone}
@@ -288,11 +305,13 @@ export const AdminDashboard = () => {
           </div>
 
           <div className="mt-6 overflow-hidden rounded-xl border border-[#d2d2d7] bg-white">
-            <div className="grid grid-cols-[1.25fr_1.25fr_0.45fr_0.75fr_0.75fr] gap-5 border-b border-[#e5e5ea] bg-[#fbfbfd] px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+            <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr] gap-5 border-b border-[#e5e5ea] bg-[#fbfbfd] px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">
               <span>Account</span>
+              <span>User</span>
               <span>Activity</span>
               <span>Posts</span>
               <span>{selectedTimeLabel} views</span>
+              <span>Account insight</span>
               <span>Engagement</span>
             </div>
             {(activeMetrics.accountRows || []).length === 0 ? (
@@ -302,7 +321,7 @@ export const AdminDashboard = () => {
             ) : activeMetrics.accountRows.map((account) => (
               <div
                 key={account._id}
-                className="grid grid-cols-[1.25fr_1.25fr_0.45fr_0.75fr_0.75fr] items-center gap-5 border-b border-[#e5e5ea] px-5 py-4 text-sm last:border-b-0"
+                className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr] items-center gap-5 border-b border-[#e5e5ea] px-5 py-4 text-sm last:border-b-0"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <img
@@ -317,9 +336,14 @@ export const AdminDashboard = () => {
                     </p>
                   </div>
                 </div>
+                <div className="min-w-0">
+                  <p className="m-0 truncate font-semibold text-[#1d1d1f]">{account.user?.name || 'Unknown user'}</p>
+                  <p className="m-0 mt-0.5 truncate text-xs text-[#6e6e73]">{account.user?.email || 'No email'}</p>
+                </div>
                 <ActivityCell account={account} selectedTimeRange={selectedTimeRange} selectedRange={selectedRange} />
                 <span className="text-[#515154]">{account[selectedRange.postsKey] || 0}</span>
                 <span className="text-[#515154]">{numberFormat.format(account[selectedRange.viewsKey] || 0)}</span>
+                <span className="text-[#515154]">{numberFormat.format(account[selectedRange.accountInsightKey] || 0)}</span>
                 <span className="text-[#515154]">
                   {numberFormat.format(account[selectedRange.likesKey] || 0)} / {numberFormat.format(account[selectedRange.commentsKey] || 0)}
                 </span>
