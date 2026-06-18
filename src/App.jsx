@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
+import AdminSidebar from './components/AdminSidebar';
 import Header from './components/Header';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -13,15 +14,33 @@ import Channels from './pages/Channels';
 import PublishedFeed from './pages/PublishedFeed';
 import PostDetails from './pages/PostDetails';
 import Settings from './pages/Settings';
+import AdminUsers from './pages/AdminUsers';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminCampaigns from './pages/AdminCampaigns';
 import FacebookCallback from './pages/FacebookCallback';
 import InstagramCallback from './pages/InstagramCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import YoutubeCallback from './pages/YoutubeCallback';
 
+const AdminShell = () => (
+  <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-hidden font-sans">
+    <AdminSidebar />
+    <main className="flex-1 overflow-y-auto">
+      <Routes>
+        <Route path="/" element={<AdminDashboard />} />
+        <Route path="/users" element={<AdminUsers />} />
+        <Route path="/campaign" element={<AdminCampaigns />} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
+      </Routes>
+    </main>
+  </div>
+);
+
 function AppContent() {
   const { user, loading } = useAuth();
   const [selectedAccounts, setSelectedAccounts] = useState([]);
+  const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
 
   if (loading) {
     return (
@@ -50,6 +69,7 @@ function AppContent() {
         ) : (
           <>
             <Route path="/auth/youtube/callback" element={<YoutubeCallback />} />
+            {canViewAdmin && <Route path="/admin/*" element={<AdminShell />} />}
             <Route
               path="*"
               element={

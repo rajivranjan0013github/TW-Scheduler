@@ -5,7 +5,7 @@ import { ArrowLeft, Eye, Heart, MessageSquare, RefreshCw } from 'lucide-react';
 export const PublishedFeed = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   const [channel, setChannel] = useState(null);
   const [publishedPosts, setPublishedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +58,7 @@ export const PublishedFeed = () => {
 
     try {
       const token = localStorage.getItem('tw_token');
-      
+
       // 1. Fetch channel metadata if not already loaded
       if (!channel) {
         const chanRes = await fetch('http://localhost:5001/api/accounts', {
@@ -82,7 +82,7 @@ export const PublishedFeed = () => {
       const response = await fetch(`http://localhost:5001/api/accounts/${id}/posts${refreshParam}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setPublishedPosts(data);
@@ -118,10 +118,10 @@ export const PublishedFeed = () => {
         ) : channel ? (
           <div className="bg-white border border-[#e5e5ea] rounded-xl p-5 shadow-sm flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <img 
-                src={channel.avatarUrl || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=150'} 
-                className="w-12 h-12 rounded-full object-cover border border-[#d2d2d7]" 
-                alt="" 
+              <img
+                src={channel.avatarUrl || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=150'}
+                className="w-12 h-12 rounded-full object-cover border border-[#d2d2d7]"
+                alt=""
               />
               <div>
                 <h2 className="text-base font-semibold text-black leading-tight">
@@ -183,8 +183,8 @@ export const PublishedFeed = () => {
                 {/* Group Posts */}
                 <div className="space-y-3">
                   {group.posts.map(post => (
-                    <div 
-                      key={post.id} 
+                    <div
+                      key={post.id}
                       onClick={() => navigate(`/channels/${id}/posts/${post.id}`)}
                       className="bg-white border border-[#e5e5ea] rounded-xl p-4 flex gap-4 hover:shadow-sm hover:border-[#0071e3]/40 cursor-pointer transition-all"
                     >
@@ -202,7 +202,7 @@ export const PublishedFeed = () => {
                             {new Date(post.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
-                        
+
                         <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-3">
                           <div className="flex items-center gap-4 text-[10px] text-gray-500">
                             <span className="flex items-center gap-1">
@@ -219,9 +219,9 @@ export const PublishedFeed = () => {
                             </span>
                           </div>
                           <div className="flex items-center gap-3 text-[10px] font-semibold">
-                            <a 
-                              href={post.permalink} 
-                              target="_blank" 
+                            <a
+                              href={post.permalink}
+                              target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => e.stopPropagation()}
                               className="text-blue-600 hover:underline"
