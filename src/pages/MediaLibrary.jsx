@@ -384,13 +384,23 @@ export const MediaLibrary = () => {
           <p className="text-[#8e8e93] text-xs mt-1">Store R2 assets and attach them to connected social accounts</p>
         </div>
 
-        <button 
-          onClick={() => setShowNewFolderModal(true)}
-          className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>New Folder</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate('/media/editor')}
+            className="flex items-center gap-1.5 bg-white border border-[#e5e5ea] hover:bg-[#f5f5f7] text-[#1d1d1f] px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
+          >
+            <Film className="w-3.5 h-3.5 text-blue-600" />
+            <span>Video Editor</span>
+          </button>
+
+          <button 
+            onClick={() => setShowNewFolderModal(true)}
+            className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Folder</span>
+          </button>
+        </div>
       </div>
 
       {/* Directory Breadcrumbs */}

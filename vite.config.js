@@ -6,5 +6,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     allowedHosts: ['.trycloudflare.com'],
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
   },
 })

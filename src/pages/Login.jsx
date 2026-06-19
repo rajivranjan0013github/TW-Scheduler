@@ -19,6 +19,26 @@ export const Login = () => {
     },
   });
 
+  const handleFacebookLogin = () => {
+    const appId = import.meta.env.VITE_META_APP_ID;
+    if (!appId) {
+      alert('Set VITE_META_APP_ID in tw-frontend/.env to enable Facebook login.');
+      return;
+    }
+
+    const rawRedirectUri = `${window.location.origin}/auth/facebook-login/callback`;
+    sessionStorage.setItem('facebook_login_redirect_uri', rawRedirectUri);
+    const params = new URLSearchParams({
+      client_id: appId,
+      redirect_uri: rawRedirectUri,
+      scope: 'pages_show_list',
+      response_type: 'code',
+      auth_type: 'rerequest',
+    });
+
+    window.location.href = `https://www.facebook.com/v20.0/dialog/oauth?${params.toString()}`;
+  };
+
   return (
     <div className="min-h-screen bg-[#fbfbfd] text-[#1d1d1f] font-sans">
       <header className="border-b border-[#d2d2d7] bg-white px-5 py-4">
@@ -75,6 +95,14 @@ export const Login = () => {
                 />
               </svg>
               Sign in with Google
+            </button>
+
+            <button
+              onClick={handleFacebookLogin}
+              className="mt-3 flex w-full items-center justify-center gap-3 rounded-lg border border-[#1877f2] bg-[#1877f2] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#166fe5]"
+            >
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-xs font-bold text-[#1877f2]">f</span>
+              Sign in with Facebook
             </button>
 
             <p className="m-0 mt-4 text-center text-xs leading-5 text-[#6e6e73]">

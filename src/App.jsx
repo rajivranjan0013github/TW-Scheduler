@@ -17,10 +17,12 @@ import AdminUsers from './pages/AdminUsers';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminCampaigns from './pages/AdminCampaigns';
 import FacebookCallback from './pages/FacebookCallback';
+import FacebookLoginCallback from './pages/FacebookLoginCallback';
 import InstagramCallback from './pages/InstagramCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import YoutubeCallback from './pages/YoutubeCallback';
+import { VideoEditor } from './pages/VideoEditor';
 
 const AdminShell = () => (
   <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-hidden font-sans">
@@ -56,6 +58,7 @@ function AppContent() {
     <Router>
       <Routes>
         <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
+        <Route path="/auth/facebook-login/callback" element={<FacebookLoginCallback />} />
         <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
@@ -78,19 +81,20 @@ function AppContent() {
                     setSelectedAccounts={setSelectedAccounts}
                   />
 
-                  <main className="flex-1 overflow-y-auto">
-                    <Routes>
-                      <Route path="/" element={<Dashboard selectedAccounts={selectedAccounts} />} />
-                      <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
-                      <Route path="/media" element={<MediaLibrary />} />
-                      <Route path="/channels" element={<Channels />} />
-                      <Route path="/channels/:id/feed" element={<PublishedFeed />} />
-                      <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
-                      <Route path="/settings" element={<Settings />} />
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                  </main>
-                </div>
+                    <main className="flex-1 overflow-y-auto">
+                      <Routes>
+                        <Route path="/" element={<Dashboard selectedAccounts={selectedAccounts} />} />
+                        <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
+                        <Route path="/media" element={<MediaLibrary />} />
+                        <Route path="/media/editor" element={<VideoEditor />} />
+                        <Route path="/channels" element={<Channels />} />
+                        <Route path="/channels/:id/feed" element={<PublishedFeed />} />
+                        <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
+                        <Route path="/settings" element={<Settings />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </Routes>
+                    </main>
+                  </div>
               }
             />
           </>
