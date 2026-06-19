@@ -23,6 +23,7 @@ import InstagramCallback from './pages/InstagramCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import YoutubeCallback from './pages/YoutubeCallback';
+import { VideoEditor } from './pages/VideoEditor';
 
 const AdminShell = () => (
   <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-hidden font-sans">
@@ -89,6 +90,7 @@ function AppContent() {
                         <Route path="/" element={<Dashboard selectedAccounts={selectedAccounts} />} />
                         <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
                         <Route path="/media" element={<MediaLibrary />} />
+                        <Route path="/media/editor" element={<VideoEditor />} />
                         <Route path="/channels" element={<Channels />} />
                         <Route path="/channels/:id/feed" element={<PublishedFeed />} />
                         <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />

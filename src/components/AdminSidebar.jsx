@@ -36,7 +36,7 @@ export const AdminSidebar = () => {
               <ShieldCheck className="h-4 w-4" />
             </div>
             <div>
-              <h1 className="text-base font-semibold tracking-tight leading-none m-0 text-white" style={{ color: '#ffffff' }}>Admin Panel</h1>
+              <h1 className="text-base font-semibold tracking-tight leading-none m-0 !text-white">Admin Panel</h1>
               <span className="text-[10px] text-[#9ca3af] font-semibold tracking-wider uppercase mt-1 block">EasyPost control</span>
             </div>
           </div>
