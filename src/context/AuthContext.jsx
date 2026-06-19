@@ -65,6 +65,33 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const facebookLogin = async (code, redirectUri) => {
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:5001/api/auth/facebook-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code, redirectUri }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('tw_token', data.token);
+        setToken(data.token);
+        setUser(data.user);
+        return true;
+      }
+      setLoading(false);
+      return false;
+    } catch (error) {
+      console.error('Facebook authentication request failed:', error);
+      setLoading(false);
+      return false;
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('tw_token');
     setToken(null);
@@ -115,7 +142,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, updateProfile, deleteAccount }}>
+    <AuthContext.Provider value={{ user, token, loading, login, facebookLogin, logout, updateProfile, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

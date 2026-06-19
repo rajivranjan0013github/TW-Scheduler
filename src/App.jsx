@@ -18,6 +18,7 @@ import AdminUsers from './pages/AdminUsers';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminCampaigns from './pages/AdminCampaigns';
 import FacebookCallback from './pages/FacebookCallback';
+import FacebookLoginCallback from './pages/FacebookLoginCallback';
 import InstagramCallback from './pages/InstagramCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
@@ -57,6 +58,7 @@ function AppContent() {
     <Router>
       <Routes>
         <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
+        <Route path="/auth/facebook-login/callback" element={<FacebookLoginCallback />} />
         <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
