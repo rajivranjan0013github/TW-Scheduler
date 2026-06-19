@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Plus, Check, Trash2, Clock, AlertCircle, Folder } from 'lucide-react';
+import { Plus, Check, Trash2, Clock, AlertCircle, Folder, Users, Layers, CalendarDays, Save, FileText, ChevronRight, ArrowDown } from 'lucide-react';
 
 export const CalendarView = ({ selectedAccounts }) => {
   const { user } = useAuth();
@@ -24,6 +24,8 @@ export const CalendarView = ({ selectedAccounts }) => {
   const [youtubePrivacy, setYoutubePrivacy] = useState('private');
   const [youtubeTags, setYoutubeTags] = useState('');
   const [youtubeMadeForKids, setYoutubeMadeForKids] = useState(false);
+  const [captionDrafts, setCaptionDrafts] = useState({});
+  const [savingCaptionId, setSavingCaptionId] = useState(null);
   
   const [bulkInterval, setBulkInterval] = useState('2');
   const [activeFolderId, setActiveFolderId] = useState('root');
@@ -39,7 +41,15 @@ export const CalendarView = ({ selectedAccounts }) => {
   };
   const getMediaLabel = (item) => item?.name || 'Untitled media';
   const getMediaLocationLabel = (item) => getFolderName(item?.folderId);
-  const getPlannedCaption = (item) => item?.caption?.trim() || caption.trim();
+  const getAssetCaptionDraft = (item) => (
+    item ? (captionDrafts[item._id] ?? item.caption ?? '') : ''
+  );
+  const getPlannedCaption = (item) => getAssetCaptionDraft(item).trim() || caption.trim();
+  const getCaptionSource = (item) => {
+    if (getAssetCaptionDraft(item).trim()) return 'Saved on asset';
+    if (caption.trim()) return 'Fallback composer';
+    return 'No caption';
+  };
   const formatScheduleDate = (value) => {
     if (!value) return 'Not set';
     const date = new Date(value);
@@ -72,6 +82,19 @@ export const CalendarView = ({ selectedAccounts }) => {
     });
   }, [mediaList, selectedChannels, activeFolderId]);
   const isBulk = availableMediaList.length > 1;
+  const activeFolderName = activeFolderId === 'root'
+    ? 'Library Root'
+    : folders.find(folder => folder._id === activeFolderId)?.name || 'Selected Folder';
+  const folderOptions = useMemo(() => [
+    { _id: 'root', name: 'Library Root' },
+    ...folders,
+  ], [folders]);
+  const getFolderAssetCount = (folderId) => mediaList.filter(item => {
+    if (!isMediaAvailableForChannels(item, selectedChannels)) return false;
+    if (folderId === 'root') return !item.folderId;
+    const itemFolderId = item.folderId?._id || item.folderId;
+    return itemFolderId === folderId;
+  }).length;
   const selectedMediaItems = useMemo(
     () => selectedMedia
       .map(mediaId => mediaList.find(item => item._id === mediaId))
@@ -113,7 +136,7 @@ export const CalendarView = ({ selectedAccounts }) => {
         return aTime - bTime;
       })
       .map((row, index) => ({ ...row, index: index + 1 }));
-  }, [bulkInterval, caption, isBulk, scheduleTime, selectedChannelObjects, selectedChannels.length, selectedMediaItems]);
+  }, [bulkInterval, caption, captionDrafts, isBulk, scheduleTime, selectedChannelObjects, selectedChannels.length, selectedMediaItems]);
   useEffect(() => {
     fetchPosts();
     fetchComposerData();
@@ -260,6 +283,63 @@ export const CalendarView = ({ selectedAccounts }) => {
     }
   };
 
+  const saveMediaCaption = async (item, nextCaption, { silent = false } = {}) => {
+    if (!item) return null;
+    setSavingCaptionId(item._id);
+
+    try {
+      const response = await fetch(`http://localhost:5001/api/media/${item._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+        },
+        body: JSON.stringify({ caption: nextCaption }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        if (!silent) {
+          alert(`Caption save failed: ${error.message || 'Unable to update media caption'}`);
+        }
+        return null;
+      }
+
+      const updated = await response.json();
+      setMediaList((current) => current.map(mediaItem => (
+        mediaItem._id === updated._id ? updated : mediaItem
+      )));
+      setCaptionDrafts((current) => {
+        const next = { ...current };
+        delete next[updated._id];
+        return next;
+      });
+      return updated;
+    } catch (error) {
+      console.error('Failed saving caption:', error);
+      if (!silent) alert('Caption save failed.');
+      return null;
+    } finally {
+      setSavingCaptionId(null);
+    }
+  };
+
+  const saveDirtyCaptionDrafts = async () => {
+    const dirtyItems = selectedMediaItems.filter(item => (
+      captionDrafts[item._id] !== undefined && captionDrafts[item._id] !== (item.caption || '')
+    ));
+
+    for (const item of dirtyItems) {
+      const updated = await saveMediaCaption(item, captionDrafts[item._id], { silent: true });
+      if (!updated) {
+        alert(`Could not save caption for ${getMediaLabel(item)}. Please try again before scheduling.`);
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const handleComposeSubmit = async (e) => {
     e.preventDefault();
 
@@ -296,13 +376,16 @@ export const CalendarView = ({ selectedAccounts }) => {
     }
 
     try {
+      const captionsSaved = await saveDirtyCaptionDrafts();
+      if (!captionsSaved) return;
+
       const token = localStorage.getItem('tw_token');
       const platformSpecifics = {
         type: postType,
         ...(hasYoutubeSelected ? {
           youtube: {
             title: youtubeTitle.trim(),
-            description: caption || selectedMediaItems[0]?.caption || '',
+            description: caption.trim(),
             privacyStatus: youtubePrivacy,
             tags: youtubeTags,
             categoryId: '22',
@@ -313,7 +396,7 @@ export const CalendarView = ({ selectedAccounts }) => {
       const body = {
         socialAccountIds: selectedChannels,
         mediaIds: selectedMedia,
-        caption: caption || selectedMediaItems[0]?.caption || '',
+        caption: caption.trim(),
         scheduledAt: new Date(scheduleTime),
         platformSpecifics
       };
@@ -365,15 +448,6 @@ export const CalendarView = ({ selectedAccounts }) => {
     }
   };
 
-  const selectMediaItem = (medId) => {
-    if (!availableMediaList.some(item => item._id === medId)) return;
-    setSelectedMedia(availableMediaList.map(item => item._id));
-  };
-
-  const handleRemoveMedia = (mediaId) => {
-    setSelectedMedia((current) => current.filter(id => id !== mediaId));
-  };
-
   const toggleChannel = (channelId) => {
     setSelectedChannels((current) => (
       current.includes(channelId)
@@ -383,7 +457,7 @@ export const CalendarView = ({ selectedAccounts }) => {
   };
 
   return (
-    <div className="py-4 px-0 bg-[#f5f5f7] h-[calc(100vh-4rem)] text-[#1d1d1f] font-sans flex flex-col overflow-hidden">
+    <div className="py-4 px-0 bg-[#f5f5f7] h-screen text-[#1d1d1f] font-sans flex flex-col overflow-hidden">
       
       {/* Page Header */}
       <div className="flex items-center justify-between pb-3 border-b border-[#e5e5ea] px-3 flex-shrink-0">
@@ -405,11 +479,11 @@ export const CalendarView = ({ selectedAccounts }) => {
 
       {/* In-page Composer */}
       {showComposer && (
-        <section className="flex-1 min-h-0 mt-3 mx-3 mb-4 bg-white border border-[#e5e5ea] py-3 px-3 rounded-xl text-black shadow-sm flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between gap-4 border-b border-[#e5e5ea] pb-2 flex-shrink-0">
+        <section className="flex-1 min-h-0 mt-3 mx-3 mb-4 bg-white border border-[#d8e0f4] py-3 px-3 rounded-xl text-black shadow-sm flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between gap-4 border-b border-[#e5e5ea] pb-3 flex-shrink-0">
             <div>
-              <h3 className="text-sm font-semibold text-black uppercase tracking-wider m-0">Schedule Content</h3>
-              <p className="m-0 mt-1 text-[10px] text-gray-500">Pick portals, pick files, confirm the exact posting order.</p>
+              <h3 className="text-sm font-semibold text-[#0b1645] tracking-tight m-0">Folder Driven Scheduling Flow</h3>
+              <p className="m-0 mt-1 text-[10px] text-[#536079]">Folder and asset count drive the mode. Captions belong to individual media assets.</p>
             </div>
             <button
               type="button"
@@ -420,336 +494,434 @@ export const CalendarView = ({ selectedAccounts }) => {
             </button>
           </div>
 
-          <form onSubmit={handleComposeSubmit} className="flex-1 min-h-0 pt-3 grid grid-cols-[280px_minmax(0,1fr)_340px] gap-3 overflow-hidden">
-            {/* Column 1: Setup Details */}
-            <section className="min-h-0 rounded-xl border border-[#e5e5ea] p-3 flex flex-col gap-3 overflow-hidden bg-white">
-              <h3 className="text-xs font-bold text-black uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-[#e5e5ea]">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0071e3] text-white text-[10px] font-bold">1</span>
-                Setup Details
-              </h3>
+          <form onSubmit={handleComposeSubmit} className="flex-1 min-h-0 overflow-y-auto py-4 pr-1 space-y-4">
+          
 
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
-                {/* Portals */}
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Target Portals</label>
-                  <div className="grid grid-cols-1 gap-1.5">
-                    {channels.map(chan => {
-                      const isSelected = selectedChannels.includes(chan._id);
-                      return (
-                        <button
-                          key={chan._id}
-                          type="button"
-                          onClick={() => toggleChannel(chan._id)}
-                          className={`flex items-center gap-2.5 rounded-xl border p-2 text-left text-xs transition-all duration-150 ${
-                            isSelected
-                              ? 'bg-black text-white border-black shadow-sm'
-                              : 'bg-[#f5f5f7] border-[#e5e5ea] text-[#1d1d1f] hover:text-black hover:bg-gray-100 hover:border-gray-300'
-                          }`}
-                        >
-                          <img src={chan.avatarUrl} className="w-5 h-5 rounded-full object-cover border border-black/10" alt="" />
-                          <span className="min-w-0 flex-1 truncate font-medium">{chan.name}</span>
-                          <span className="text-[8px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-black/5 text-[#8e8e93] border border-black/10">
-                            {chan.platform}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+            <section className="grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr_auto_1.25fr_auto_1.15fr] gap-0 xl:gap-0 items-stretch">
+              {/* Flow Arrow CSS */}
+              <style>{`
+                @keyframes flowPulse {
+                  0%, 100% { opacity: 0.4; transform: translateX(0); }
+                  50% { opacity: 1; transform: translateX(3px); }
+                }
+                .flow-arrow-connector {
+                  display: none;
+                }
+                @media (min-width: 1280px) {
+                  .flow-arrow-connector {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0 2px;
+                  }
+                }
+                .flow-arrow-icon {
+                  animation: flowPulse 2s ease-in-out infinite;
+                  filter: drop-shadow(0 0 4px rgba(79, 70, 229, 0.3));
+                }
+                .flow-arrow-icon:nth-child(1) { animation-delay: 0s; }
+                .flow-arrow-icon:nth-child(2) { animation-delay: 0.15s; }
+                .flow-arrow-icon:nth-child(3) { animation-delay: 0.3s; }
+                @keyframes flowDownPulse {
+                  0%, 100% { opacity: 0.4; transform: translateY(0); }
+                  50% { opacity: 1; transform: translateY(3px); }
+                }
+                .flow-down-arrow {
+                  animation: flowDownPulse 2s ease-in-out infinite;
+                  filter: drop-shadow(0 0 4px rgba(79, 70, 229, 0.3));
+                }
+                .flow-down-arrow:nth-child(1) { animation-delay: 0s; }
+                .flow-down-arrow:nth-child(2) { animation-delay: 0.15s; }
+                .flow-down-arrow:nth-child(3) { animation-delay: 0.3s; }
+              `}</style>
+              <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
+                <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2">
+                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">1. Select Accounts</h4>
                 </div>
-
-                {/* Format */}
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Post Format</label>
-                  <div className={`grid ${hasYoutubeSelected ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5`}>
-                    {(hasYoutubeSelected ? ['video', 'short'] : ['reels', 'post', 'story']).map(t => (
+                <div className="p-3 space-y-2 max-h-[360px] overflow-y-auto">
+                  {channels.map(chan => {
+                    const isSelected = selectedChannels.includes(chan._id);
+                    return (
                       <button
-                        key={t}
+                        key={chan._id}
                         type="button"
-                        onClick={() => setPostType(t)}
-                        className={`py-1.5 rounded-xl text-xs font-semibold capitalize transition-all border ${
-                          postType === t 
-                            ? 'bg-black text-white border-black font-semibold shadow-sm' 
-                            : 'bg-[#f5f5f7] text-[#8e8e93] border-[#e5e5ea] hover:text-black hover:bg-gray-100'
+                        onClick={() => toggleChannel(chan._id)}
+                        className={`w-full flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all ${
+                          isSelected
+                            ? 'border-[#4f46e5] bg-[#eef2ff] text-[#0b1645]'
+                            : 'border-[#e5e5ea] bg-white text-[#1d1d1f] hover:border-[#b8c4e8]'
                         }`}
                       >
-                        {t}
+                        <span className={`flex h-4 w-4 items-center justify-center rounded border ${isSelected ? 'bg-[#2563eb] border-[#2563eb]' : 'border-[#c7c7cc]'}`}>
+                          {isSelected && <Check className="h-3 w-3 text-white" />}
+                        </span>
+                        <img src={chan.avatarUrl} className="w-6 h-6 rounded-full object-cover border border-black/10" alt="" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-semibold">{chan.name}</span>
+                          <span className="block truncate text-[10px] capitalize text-[#6b7280]">{chan.platform}</span>
+                        </span>
                       </button>
+                    );
+                  })}
+                </div>
+                <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">{selectedChannels.length} account{selectedChannels.length === 1 ? '' : 's'} selected</div>
+              </div>
+
+              {/* Arrow: Step 1 → Step 2 */}
+              <div className="flow-arrow-connector">
+                <div className="flex flex-col items-center gap-0">
+                  <ChevronRight className="w-4 h-4 text-indigo-500 flow-arrow-icon" />
+                  <ChevronRight className="w-4 h-4 text-indigo-400 flow-arrow-icon -mt-2" />
+                  <ChevronRight className="w-4 h-4 text-indigo-300 flow-arrow-icon -mt-2" />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
+                <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2">
+                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">2. Select / Switch Folder</h4>
+                </div>
+                <div className="p-3 space-y-2 max-h-[360px] overflow-y-auto">
+                  {folderOptions.map(folder => {
+                    const count = getFolderAssetCount(folder._id);
+                    const isActive = activeFolderId === folder._id;
+                    return (
+                      <button
+                        key={folder._id}
+                        type="button"
+                        onClick={() => setActiveFolderId(folder._id)}
+                        className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all ${
+                          isActive
+                            ? 'border-[#2563eb] bg-[#eff6ff] text-[#0b1645]'
+                            : 'border-[#e5e5ea] bg-white hover:border-[#b8c4e8]'
+                        }`}
+                      >
+                        <Folder className={`h-4 w-4 ${isActive ? 'text-[#2563eb]' : 'text-[#6b7280]'}`} />
+                        <span className="min-w-0 flex-1 truncate text-xs font-semibold">{folder.name}</span>
+                        <span className="text-[10px] text-[#536079]">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">Selected folder: {activeFolderName}</div>
+              </div>
+
+              {/* Arrow: Step 2 → Step 3 */}
+              <div className="flow-arrow-connector">
+                <div className="flex flex-col items-center gap-0">
+                  <ChevronRight className="w-4 h-4 text-indigo-500 flow-arrow-icon" />
+                  <ChevronRight className="w-4 h-4 text-indigo-400 flow-arrow-icon -mt-2" />
+                  <ChevronRight className="w-4 h-4 text-indigo-300 flow-arrow-icon -mt-2" />
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
+                <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2 flex items-center justify-between">
+                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">3. Auto Select Matching Assets</h4>
+                  <span className="text-[10px] font-semibold text-[#15803d]">{availableMediaList.length} matching</span>
+                </div>
+                <div className="p-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[308px] overflow-y-auto pr-1">
+                    {selectedChannels.length > 0 && availableMediaList.map(item => (
+                      <div key={item._id} className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
+                        <div className="relative aspect-video bg-[#f5f5f7]">
+                          {item.type === 'video' ? (
+                            <video src={item.url} className="h-full w-full object-cover" />
+                          ) : (
+                            <img src={item.url} className="h-full w-full object-cover" alt="" />
+                          )}
+                          <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded bg-[#2563eb] text-white">
+                            <Check className="h-3 w-3" />
+                          </span>
+                        </div>
+                        <div className="px-2 py-1.5">
+                          <p className="m-0 truncate text-[10px] font-semibold text-[#1d1d1f]" title={getMediaLabel(item)}>{getMediaLabel(item)}</p>
+                          <p className={`m-0 mt-0.5 text-[9px] font-semibold ${getAssetCaptionDraft(item).trim() ? 'text-[#15803d]' : 'text-[#b45309]'}`}>{getAssetCaptionDraft(item).trim() ? 'Caption saved' : 'No caption'}</p>
+                        </div>
+                      </div>
                     ))}
+                    {selectedChannels.length === 0 && (
+                      <div className="col-span-full h-32 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] flex items-center justify-center text-xs text-[#6b7280] text-center p-4">
+                        Select accounts to reveal matching assets.
+                      </div>
+                    )}
+                    {selectedChannels.length > 0 && availableMediaList.length === 0 && (
+                      <div className="col-span-full h-32 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] flex items-center justify-center text-xs text-[#6b7280] text-center p-4">
+                        No matching assets in this folder.
+                      </div>
+                    )}
                   </div>
                 </div>
+                <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">All matching assets are selected automatically.</div>
+              </div>
 
-                {/* Time Configuration */}
-                <div className="space-y-3 pt-2 border-t border-[#e5e5ea]">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
-                    {isBulk ? 'Start time' : 'Post time'}
-                    <input
-                      type="datetime-local"
-                      value={scheduleTime}
-                      onChange={(e) => setScheduleTime(e.target.value)}
-                      className="mt-1.5 w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black"
-                    />
-                  </label>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <div
-                      className={`py-1.5 border rounded-xl text-xs font-semibold text-center ${
-                        isBulk
-                          ? 'bg-black text-white border-black shadow-sm'
-                          : 'bg-[#f5f5f7] border-[#e5e5ea] text-gray-500'
-                      }`}
-                    >
-                      {isBulk ? 'Bulk Mode' : 'Single Post'}
+              {/* Arrow: Step 3 → Step 4 */}
+              <div className="flow-arrow-connector">
+                <div className="flex flex-col items-center gap-0">
+                  <ChevronRight className="w-4 h-4 text-indigo-500 flow-arrow-icon" />
+                  <ChevronRight className="w-4 h-4 text-indigo-400 flow-arrow-icon -mt-2" />
+                  <ChevronRight className="w-4 h-4 text-indigo-300 flow-arrow-icon -mt-2" />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className={`rounded-lg border bg-white overflow-hidden ${isBulk ? 'border-[#bdd0f4]' : 'border-[#bfe4ca]'}`}>
+                  <div className={`${isBulk ? 'bg-[#f8fbff]' : 'bg-[#f8fff9]'} border-b border-[#e5e5ea] px-3 py-2`}>
+                    <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">{isBulk ? '4B. Set Start Time & Interval' : '4A. Set Post Time'}</h4>
+                  </div>
+                  <div className="p-3 space-y-3">
+                    <div className={`rounded-lg border px-3 py-2 text-xs font-bold ${isBulk ? 'border-[#bdd0f4] bg-[#eff6ff] text-[#1d4ed8]' : 'border-[#bfe4ca] bg-[#f0fdf4] text-[#166534]'}`}>
+                      {isBulk ? 'Bulk Mode (2+ matching assets)' : 'Single Mode (1 matching asset)'}
                     </div>
-                    <select
-                      value={bulkInterval}
-                      onChange={(e) => setBulkInterval(e.target.value)}
-                      disabled={!isBulk}
-                      className={`border border-[#e5e5ea] px-2 py-1.5 rounded-xl text-xs focus:outline-none transition-all ${isBulk ? 'bg-[#f5f5f7] text-black' : 'bg-[#f5f5f7] text-gray-300'}`}
-                    >
-                      <option value="1">1h gap</option>
-                      <option value="2">2h gap</option>
-                      <option value="4">4h gap</option>
-                      <option value="12">12h gap</option>
-                      <option value="24">24h gap</option>
-                    </select>
+                    <label className="block">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">{isBulk ? 'Start Time' : 'Post Time'}</span>
+                      <input
+                        type="datetime-local"
+                        value={scheduleTime}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                        className="w-full rounded-lg border border-[#d8e0f4] bg-white px-3 py-2 text-xs text-black focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+                      />
+                    </label>
+                    {isBulk && (
+                      <label className="block">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">Interval</span>
+                        <select
+                          value={bulkInterval}
+                          onChange={(e) => setBulkInterval(e.target.value)}
+                          className="w-full rounded-lg border border-[#d8e0f4] bg-white px-3 py-2 text-xs text-black focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+                        >
+                          <option value="1">Every 1 hour</option>
+                          <option value="2">Every 2 hours</option>
+                          <option value="4">Every 4 hours</option>
+                          <option value="12">Every 12 hours</option>
+                          <option value="24">Every 1 day</option>
+                        </select>
+                      </label>
+                    )}
+                    <div>
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">Post Format</span>
+                      <div className={`grid ${hasYoutubeSelected ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5`}>
+                        {(hasYoutubeSelected ? ['video', 'short'] : ['reels', 'post', 'story']).map(t => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setPostType(t)}
+                            className={`py-1.5 rounded-lg text-xs font-semibold capitalize border transition-all ${
+                              postType === t
+                                ? 'bg-[#0b1645] text-white border-[#0b1645]'
+                                : 'bg-white text-[#536079] border-[#d8e0f4] hover:text-[#0b1645]'
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Caption */}
-                <div className="pt-2 border-t border-[#e5e5ea]">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Fallback Caption</label>
+                {hasYoutubeSelected && (
+                  <div className="rounded-lg border border-[#f1c6c6] bg-white overflow-hidden">
+                    <div className="bg-[#fff8f8] border-b border-[#f1c6c6] px-3 py-2">
+                      <h4 className="m-0 text-[11px] font-bold text-[#991b1b]">YouTube Upload Options</h4>
+                    </div>
+                    <div className="p-3 space-y-2">
+                      <input
+                        value={youtubeTitle}
+                        onChange={(e) => setYoutubeTitle(e.target.value)}
+                        maxLength={100}
+                        placeholder="YouTube video title"
+                        className="w-full bg-white border border-[#f1c6c6] px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
+                      />
+                      <div className="grid grid-cols-[1fr_110px] gap-2">
+                        <input
+                          value={youtubeTags}
+                          onChange={(e) => setYoutubeTags(e.target.value)}
+                          placeholder="Tags"
+                          className="w-full bg-white border border-[#f1c6c6] px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
+                        />
+                        <select
+                          value={youtubePrivacy}
+                          onChange={(e) => setYoutubePrivacy(e.target.value)}
+                          className="w-full bg-white border border-[#f1c6c6] px-2 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
+                        >
+                          <option value="private">Private</option>
+                          <option value="unlisted">Unlisted</option>
+                          <option value="public">Public</option>
+                        </select>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs text-black">
+                        <input
+                          type="checkbox"
+                          checked={youtubeMadeForKids}
+                          onChange={(e) => setYoutubeMadeForKids(e.target.checked)}
+                          className="rounded"
+                        />
+                        <span>This video is Made for Kids</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Down Arrow: Top flow → Media & Caption section */}
+            <div className="flex justify-center py-1">
+              <div className="flex items-center gap-0">
+                <ArrowDown className="w-4 h-4 text-indigo-500 flow-down-arrow" />
+                <ArrowDown className="w-4 h-4 text-indigo-400 flow-down-arrow -ml-1" />
+                <ArrowDown className="w-4 h-4 text-indigo-300 flow-down-arrow -ml-1" />
+              </div>
+            </div>
+
+            <section className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-4">
+              <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
+                <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2 flex items-center justify-between">
+                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">Media & Caption Management</h4>
+                  <span className="text-[10px] font-semibold text-[#536079]">Per-asset captions</span>
+                </div>
+                <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto">
+                  {selectedMediaItems.map(item => {
+                    const draft = getAssetCaptionDraft(item);
+                    const isDirty = captionDrafts[item._id] !== undefined && captionDrafts[item._id] !== (item.caption || '');
+                    return (
+                      <div key={item._id} className="rounded-lg border border-[#d8e0f4] bg-white p-2">
+                        <div className="flex gap-2">
+                          <div className="h-16 w-20 overflow-hidden rounded-md border border-[#e5e5ea] bg-[#f5f5f7] flex-shrink-0">
+                            {item.type === 'video' ? (
+                              <video src={item.url} className="h-full w-full object-cover" />
+                            ) : (
+                              <img src={item.url} className="h-full w-full object-cover" alt="" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="m-0 truncate text-xs font-semibold text-[#0b1645]" title={getMediaLabel(item)}>{getMediaLabel(item)}</p>
+                            <p className={`m-0 mt-1 text-[9px] font-semibold ${draft.trim() ? 'text-[#15803d]' : 'text-[#b45309]'}`}>{draft.trim() ? 'Caption saved' : 'No caption'}</p>
+                          </div>
+                        </div>
+                        <textarea
+                          value={draft}
+                          onChange={(e) => setCaptionDrafts((current) => ({
+                            ...current,
+                            [item._id]: e.target.value,
+                          }))}
+                          placeholder="Caption for this asset..."
+                          className="mt-2 h-20 w-full rounded-lg border border-[#d8e0f4] bg-[#f8fafc] p-2 text-[10px] leading-relaxed text-black placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#2563eb] resize-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => saveMediaCaption(item, draft)}
+                          disabled={!isDirty || savingCaptionId === item._id}
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#4f46e5] px-3 py-1.5 text-[10px] font-semibold text-white transition-all hover:bg-[#4338ca] disabled:bg-[#e5e7eb] disabled:text-[#9ca3af]"
+                        >
+                          <Save className="h-3 w-3" />
+                          <span>{savingCaptionId === item._id ? 'Saving...' : 'Save Caption'}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {selectedMediaItems.length === 0 && (
+                    <div className="md:col-span-2 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] p-6 text-center text-xs text-[#6b7280]">
+                      Matching assets will appear here after selecting accounts and a folder.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
+                <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2">
+                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">Composer Fallback Caption</h4>
+                </div>
+                <div className="p-3">
                   <textarea
-                    placeholder="Used only when an asset has no saved caption..."
+                    placeholder="Default caption for assets without a saved caption..."
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
-                    className="h-24 w-full bg-[#f5f5f7] border border-[#e5e5ea] p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black resize-none"
+                    className="h-32 w-full rounded-lg border border-[#d8e0f4] bg-white p-3 text-xs text-black placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#2563eb] resize-none"
                   />
+                  <p className="m-0 mt-2 text-[10px] leading-relaxed text-[#536079]">Used only when an asset has no saved caption. YouTube descriptions follow the same caption source.</p>
                 </div>
               </div>
             </section>
 
-            {/* Column 2: Choose Folder & Media */}
-            <section className="min-h-0 rounded-xl border border-[#e5e5ea] p-3 flex flex-col gap-3 overflow-hidden bg-white">
-              <h3 className="text-xs font-bold text-black uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-[#e5e5ea]">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0071e3] text-white text-[10px] font-bold">2</span>
-                Browse Media
-              </h3>
-
-              {/* Campaign Folders Tab Selector */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-[#e5e5ea] min-h-[38px] scrollbar-thin">
-                <button
-                  type="button"
-                  onClick={() => setActiveFolderId('root')}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1 border ${
-                    activeFolderId === 'root'
-                      ? 'bg-black text-white border-black'
-                      : 'bg-[#f5f5f7] text-[#8e8e93] border-[#e5e5ea] hover:text-black hover:bg-[#e5e5ea]'
-                  }`}
-                >
-                  <Folder className="w-3.5 h-3.5" />
-                  <span>Root Library</span>
-                </button>
-                {folders.map(folder => (
-                  <button
-                    key={folder._id}
-                    type="button"
-                    onClick={() => setActiveFolderId(folder._id)}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1 border ${
-                      activeFolderId === folder._id
-                        ? 'bg-black text-white border-black'
-                        : 'bg-[#f5f5f7] text-[#8e8e93] border-[#e5e5ea] hover:text-black hover:bg-[#e5e5ea]'
-                    }`}
-                  >
-                    <Folder className="w-3.5 h-3.5" />
-                    <span>{folder.name}</span>
-                  </button>
-                ))}
+            {/* Down Arrow: Media section → Review section */}
+            <div className="flex justify-center py-1">
+              <div className="flex items-center gap-0">
+                <ArrowDown className="w-4 h-4 text-indigo-500 flow-down-arrow" />
+                <ArrowDown className="w-4 h-4 text-indigo-400 flow-down-arrow -ml-1" />
+                <ArrowDown className="w-4 h-4 text-indigo-300 flow-down-arrow -ml-1" />
               </div>
+            </div>
 
-              <div className="flex items-center justify-between text-[10px] text-gray-400 font-semibold px-1">
-                <span>{selectedChannels.length === 0 ? 'Select a portal first' : `${availableMediaList.length} assets available`}</span>
-                <span>{isBulk ? 'Auto bulk' : 'Auto single'}</span>
+            <section className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
+              <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2 flex items-center justify-between">
+                <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">5. Review & Confirm</h4>
+                <span className="text-[10px] font-semibold text-[#536079]">{schedulePlan.length} post{schedulePlan.length === 1 ? '' : 's'} will be scheduled</span>
               </div>
-
-              {/* Grid of Files */}
-              <div className="min-h-0 flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 pr-1 content-start">
-                {selectedChannels.length > 0 && availableMediaList.map(item => {
-                  const isSelected = selectedMedia.includes(item._id);
-                  return (
-                    <button
-                      key={item._id}
-                      onClick={() => selectMediaItem(item._id)}
-                      type="button"
-                      className={`group relative aspect-square rounded-xl overflow-hidden border transition-all duration-150 flex flex-col bg-gray-50 ${
-                        isSelected
-                          ? 'border-[#0071e3] ring-2 ring-[#0071e3]/30 scale-[0.98]'
-                          : 'border-[#e5e5ea] hover:border-gray-400'
-                      }`}
-                    >
-                      {item.type === 'video' ? (
-                        <video src={item.url} className="h-full w-full object-cover" />
-                      ) : (
-                        <img src={item.url} className="h-full w-full object-cover" alt="" />
-                      )}
-                      
-                      {/* Name Overlay */}
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-left opacity-0 group-hover:opacity-100 transition-opacity">
-                        <p className="m-0 truncate text-[9px] font-semibold text-white">{getMediaLabel(item)}</p>
-                        <p className="m-0 text-[8px] text-gray-300 capitalize">{item.type}</p>
-                      </div>
-
-                      {/* Selected Badge */}
-                      {isSelected ? (
-                        <div className="absolute top-2 right-2 rounded-full bg-[#0071e3] p-1 text-white shadow-md">
-                          <Check className="h-2.5 w-2.5" />
-                        </div>
-                      ) : (
-                        <div className="absolute top-2 right-2 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Plus className="h-2.5 w-2.5" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-                {selectedChannels.length === 0 && (
-                  <div className="col-span-full h-32 rounded-xl border border-dashed border-[#e5e5ea] bg-gray-50 flex items-center justify-center text-xs text-gray-400 text-center p-4">
-                    Please select a target portal to browse matching media files.
-                  </div>
-                )}
-                {selectedChannels.length > 0 && availableMediaList.length === 0 && (
-                  <div className="col-span-full h-32 rounded-xl border border-dashed border-[#e5e5ea] bg-gray-50 flex items-center justify-center text-xs text-gray-400 text-center p-4">
-                    No files matching target format and channels in this folder.
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Column 3: Posting Timeline & Review */}
-            <section className="min-h-0 rounded-xl border border-[#e5e5ea] p-3 flex flex-col gap-3 overflow-hidden bg-white">
-              <h3 className="text-xs font-bold text-black uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-[#e5e5ea]">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0071e3] text-white text-[10px] font-bold">3</span>
-                Posting Timeline
-              </h3>
-
-              {/* Timeline Container */}
-              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                {schedulePlan.length > 0 ? (
-                  <div className="relative border-l border-dashed border-gray-300 ml-3 pl-5 space-y-4 py-2">
-                    {schedulePlan.map((row) => (
-                      <div key={`${row.channel?._id || 'multi'}-${row.mediaItem?._id}-${row.index}`} className="relative">
-                        {/* Dot */}
-                        <span className="absolute -left-[30px] top-3.5 flex h-5 w-5 items-center justify-center rounded-full border border-black bg-white text-[9px] font-semibold text-black shadow-sm">
-                          {row.index}
-                        </span>
-
-                        {/* Post Card */}
-                        <div className="bg-white border border-[#e5e5ea] rounded-xl p-2.5 flex items-center justify-between gap-3 shadow-sm hover:border-gray-400 transition-all">
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="h-10 w-12 overflow-hidden rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] flex-shrink-0">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] border-collapse text-left text-[10px]">
+                  <thead className="bg-[#f8fafc] text-[#0b1645]">
+                    <tr>
+                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">#</th>
+                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Asset</th>
+                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Account</th>
+                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Caption Source</th>
+                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Scheduled Time</th>
+                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Caption</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {schedulePlan.map(row => (
+                      <tr key={`${row.channel?._id || 'multi'}-${row.mediaItem?._id}-${row.index}`} className="border-b border-[#f0f2f7] last:border-b-0">
+                        <td className="px-3 py-2 font-semibold text-[#0b1645]">{row.index}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="h-8 w-10 overflow-hidden rounded border border-[#e5e5ea] bg-[#f5f5f7] flex-shrink-0">
                               {row.mediaItem?.type === 'video' ? (
                                 <video src={row.mediaItem?.url} className="h-full w-full object-cover" />
                               ) : (
                                 <img src={row.mediaItem?.url} className="h-full w-full object-cover" alt="" />
                               )}
                             </div>
-                            <div className="min-w-0">
-                              <p className="m-0 truncate text-xs font-semibold text-black leading-tight" title={getMediaLabel(row.mediaItem)}>
-                                {getMediaLabel(row.mediaItem)}
-                              </p>
-                              <div className="flex items-center gap-1 mt-1">
-                                <img src={row.channel?.avatarUrl} className="w-3.5 h-3.5 rounded-full object-cover border border-black/10" alt="" />
-                                <span className="text-[10px] text-gray-500 truncate">{row.channel?.name || 'Selected portal'}</span>
-                              </div>
-                              <p className="m-0 mt-1 truncate text-[10px] text-gray-500" title={row.caption}>
-                                {row.caption || 'No caption drafted'}
-                              </p>
-                            </div>
+                            <span className="truncate font-semibold text-[#1d1d1f]">{getMediaLabel(row.mediaItem)}</span>
                           </div>
-                          
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <div className="text-right">
-                              <span className="inline-flex items-center gap-1 bg-[#0071e3]/10 text-[#0071e3] px-2 py-0.5 rounded-full text-[9px] font-semibold">
-                                <Clock className="w-2.5 h-2.5" />
-                                {formatScheduleDate(row.scheduledAt)} {formatScheduleTime(row.scheduledAt)}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveMedia(row.mediaItem?._id)}
-                              className="p-1 hover:bg-[#f5f5f7] rounded-lg text-gray-400 hover:text-red-500 transition-colors"
-                              title="Remove item"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                        </td>
+                        <td className="px-3 py-2 text-[#536079]">{row.channel?.name || 'Selected portal'}</td>
+                        <td className="px-3 py-2 text-[#536079]">{getCaptionSource(row.mediaItem)}</td>
+                        <td className="px-3 py-2 text-[#536079]">{formatScheduleDate(row.scheduledAt)} {formatScheduleTime(row.scheduledAt)}</td>
+                        <td className="px-3 py-2 max-w-[240px] truncate text-[#536079]" title={row.caption}>{row.caption || 'No caption drafted'}</td>
+                      </tr>
                     ))}
-                  </div>
-                ) : (
-                  <div className="h-full rounded-xl border border-dashed border-[#e5e5ea] bg-gray-50 p-4 text-center text-xs text-gray-400 flex items-center justify-center">
-                    Your scheduled sequence timeline will appear here once channels and media are selected.
-                  </div>
-                )}
+                    {schedulePlan.length === 0 && (
+                      <tr>
+                        <td colSpan="6" className="px-3 py-8 text-center text-xs text-[#6b7280]">Select accounts, a folder, and a time to preview the schedule.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-
-              {/* YouTube Metadata Sub-Form */}
-              {hasYoutubeSelected && (
-                <div className="grid grid-cols-1 gap-2 border-t border-[#e5e5ea] pt-3">
-                  <p className="m-0 text-[10px] font-bold uppercase tracking-wider text-red-500">YouTube Upload Options</p>
-                  <input
-                    value={youtubeTitle}
-                    onChange={(e) => setYoutubeTitle(e.target.value)}
-                    maxLength={100}
-                    placeholder="YouTube video title"
-                    className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
-                  />
-                  <div className="grid grid-cols-[1fr_110px] gap-2">
-                    <input
-                      value={youtubeTags}
-                      onChange={(e) => setYoutubeTags(e.target.value)}
-                      placeholder="Tags (comma separated)"
-                      className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
-                    />
-                    <select
-                      value={youtubePrivacy}
-                      onChange={(e) => setYoutubePrivacy(e.target.value)}
-                      className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-2 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
-                    >
-                      <option value="private">Private</option>
-                      <option value="unlisted">Unlisted</option>
-                      <option value="public">Public</option>
-                    </select>
-                  </div>
-                  <label className="flex items-center gap-2 text-xs text-black px-1">
-                    <input
-                      type="checkbox"
-                      checked={youtubeMadeForKids}
-                      onChange={(e) => setYoutubeMadeForKids(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span>This video is Made for Kids</span>
-                  </label>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-t border-[#e5e5ea] bg-[#fbfaff] px-3 py-3">
+                <div className="flex flex-wrap gap-4 text-[10px] font-semibold text-[#536079]">
+                  <span>{selectedChannels.length} account{selectedChannels.length === 1 ? '' : 's'}</span>
+                  <span>{activeFolderName}</span>
+                  <span>{isBulk ? `${availableMediaList.length} asset sequence` : 'single asset post'}</span>
                 </div>
-              )}
-
-              {/* Actions Footer */}
-              <div className="flex justify-end gap-2 border-t border-[#e5e5ea] pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowComposer(false)}
-                  className="px-3.5 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-xl text-xs font-semibold border border-[#e5e5ea] transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-[#0071e3] hover:bg-[#147ce5] text-white rounded-xl text-xs font-semibold transition-all shadow-sm"
-                >
-                  {schedulePlan.length > 0
-                    ? `Schedule ${schedulePlan.length} Post${schedulePlan.length === 1 ? '' : 's'}`
-                    : 'Schedule Posts'}
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowComposer(false)}
+                    className="px-3.5 py-2 bg-white hover:bg-[#f5f5f7] rounded-lg text-xs font-semibold border border-[#d8e0f4] transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-lg text-xs font-semibold transition-all shadow-sm"
+                  >
+                    {schedulePlan.length > 0
+                      ? `Schedule ${schedulePlan.length} Post${schedulePlan.length === 1 ? '' : 's'}`
+                      : 'Schedule Posts'}
+                  </button>
+                </div>
               </div>
             </section>
           </form>
