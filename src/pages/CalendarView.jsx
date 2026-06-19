@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Plus, Film, Image as ImageIcon, Check, Trash2, Clock, AlertCircle } from 'lucide-react';
+import { Plus, Check, Trash2, Clock, AlertCircle, Folder } from 'lucide-react';
 
 export const CalendarView = ({ selectedAccounts }) => {
   const { user } = useAuth();
   const location = useLocation();
   const [posts, setPosts] = useState([]);
   
-  // Modal states
+  // Composer data
   const [showComposer, setShowComposer] = useState(false);
   const [mediaList, setMediaList] = useState([]);
+  const [folders, setFolders] = useState([]);
   const [channels, setChannels] = useState([]);
   
   // Post Composer form states
@@ -19,20 +20,100 @@ export const CalendarView = ({ selectedAccounts }) => {
   const [caption, setCaption] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
   const [postType, setPostType] = useState('reels');
-  const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [youtubeTitle, setYoutubeTitle] = useState('');
   const [youtubePrivacy, setYoutubePrivacy] = useState('private');
   const [youtubeTags, setYoutubeTags] = useState('');
   const [youtubeMadeForKids, setYoutubeMadeForKids] = useState(false);
   
-  // Bulk Scheduling states
-  const [isBulk, setIsBulk] = useState(false);
   const [bulkInterval, setBulkInterval] = useState('2');
+  const [activeFolderId, setActiveFolderId] = useState('root');
 
   const isViewer = user?.role === 'viewer';
   const selectedChannelObjects = channels.filter(chan => selectedChannels.includes(chan._id));
   const hasYoutubeSelected = selectedChannelObjects.some(chan => chan.platform === 'youtube');
+  const getMediaAccountIds = (item) => (item?.socialAccountIds || []).map(account => account._id || account);
+  const getFolderName = (folderId) => {
+    if (!folderId) return 'Library Root';
+    const id = folderId._id || folderId;
+    return folders.find(folder => folder._id === id)?.name || 'Unknown folder';
+  };
+  const getMediaLabel = (item) => item?.name || 'Untitled media';
+  const getMediaLocationLabel = (item) => getFolderName(item?.folderId);
+  const getPlannedCaption = (item) => item?.caption?.trim() || caption.trim();
+  const formatScheduleDate = (value) => {
+    if (!value) return 'Not set';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Not set';
+    return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+  const formatScheduleTime = (value) => {
+    if (!value) return '--:--';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '--:--';
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  const isMediaAvailableForChannels = (item, channelIds) => {
+    if (channelIds.length === 0) return true;
+    const mediaAccountIds = getMediaAccountIds(item);
+    return channelIds.every(channelId => mediaAccountIds.includes(channelId));
+  };
+  const availableMediaList = useMemo(() => {
+    return mediaList.filter(item => {
+      // 1. Must match target channel
+      const matchesChannel = isMediaAvailableForChannels(item, selectedChannels);
+      if (!matchesChannel) return false;
+      
+      // 2. Must match selected folder
+      if (activeFolderId === 'root') {
+        return !item.folderId;
+      }
+      const itemFolderId = item.folderId?._id || item.folderId;
+      return itemFolderId === activeFolderId;
+    });
+  }, [mediaList, selectedChannels, activeFolderId]);
+  const isBulk = availableMediaList.length > 1;
+  const selectedMediaItems = useMemo(
+    () => selectedMedia
+      .map(mediaId => mediaList.find(item => item._id === mediaId))
+      .filter(Boolean),
+    [mediaList, selectedMedia]
+  );
+  const schedulePlan = useMemo(() => {
+    const baseDate = scheduleTime ? new Date(scheduleTime) : null;
+    const hasValidDate = baseDate && !Number.isNaN(baseDate.getTime());
+    const intervalMs = (parseFloat(bulkInterval) || 2) * 60 * 60 * 1000;
+    const rows = [];
 
+    if (isBulk) {
+      selectedChannelObjects.forEach((channel) => {
+        selectedMediaItems.forEach((mediaItem, mediaIndex) => {
+          rows.push({
+            channel,
+            mediaItem,
+            caption: getPlannedCaption(mediaItem),
+            scheduledAt: hasValidDate ? new Date(baseDate.getTime() + (mediaIndex * intervalMs)) : null,
+          });
+        });
+      });
+    } else if (selectedChannels.length > 0 && selectedMediaItems.length > 0) {
+      rows.push({
+        channel: selectedChannelObjects.length === 1
+          ? selectedChannelObjects[0]
+          : { name: `${selectedChannelObjects.length} portals`, platform: 'multi' },
+        mediaItem: selectedMediaItems[0],
+        caption: getPlannedCaption(selectedMediaItems[0]),
+        scheduledAt: hasValidDate ? baseDate : null,
+      });
+    }
+
+    return rows
+      .sort((a, b) => {
+        const aTime = a.scheduledAt?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+        const bTime = b.scheduledAt?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
+        return aTime - bTime;
+      })
+      .map((row, index) => ({ ...row, index: index + 1 }));
+  }, [bulkInterval, caption, isBulk, scheduleTime, selectedChannelObjects, selectedChannels.length, selectedMediaItems]);
   useEffect(() => {
     fetchPosts();
     fetchComposerData();
@@ -45,6 +126,12 @@ export const CalendarView = ({ selectedAccounts }) => {
       
       const mediaItem = mediaList.find(m => m._id === location.state.preselectedMediaId);
       if (mediaItem) {
+        const mediaFolderId = mediaItem.folderId?._id || mediaItem.folderId || 'root';
+        setActiveFolderId(mediaFolderId);
+        const mediaAccountIds = getMediaAccountIds(mediaItem);
+        if (mediaAccountIds.length > 0) {
+          setSelectedChannels(mediaAccountIds);
+        }
         setPostType(mediaItem.type === 'video' ? 'reels' : 'post');
       }
       
@@ -52,6 +139,26 @@ export const CalendarView = ({ selectedAccounts }) => {
       window.history.replaceState({}, document.title);
     }
   }, [location.state, mediaList]);
+
+  const hasAutoSelected = useRef(false);
+
+  useEffect(() => {
+    if (showComposer) {
+      if (!hasAutoSelected.current && channels.length > 0) {
+        if (!location.state?.preselectedMediaId && selectedAccounts.length === 1) {
+          const selectedId = selectedAccounts[0];
+          const isValidChannel = channels.some(chan => chan._id === selectedId);
+          if (isValidChannel) {
+            setSelectedChannels([selectedId]);
+          }
+        }
+        hasAutoSelected.current = true;
+      }
+    } else {
+      hasAutoSelected.current = false;
+      setActiveFolderId('root');
+    }
+  }, [showComposer, selectedAccounts, channels, location.state]);
 
   useEffect(() => {
     if (hasYoutubeSelected) {
@@ -64,6 +171,33 @@ export const CalendarView = ({ selectedAccounts }) => {
       }
     }
   }, [hasYoutubeSelected]);
+
+  useEffect(() => {
+    setSelectedMedia((current) => (
+      current.filter(mediaId => {
+        const item = mediaList.find(media => media._id === mediaId);
+        return item && isMediaAvailableForChannels(item, selectedChannels);
+      })
+    ));
+  }, [selectedChannels, mediaList]);
+
+  useEffect(() => {
+    if (selectedChannels.length === 0) {
+      setSelectedMedia([]);
+      return;
+    }
+
+    const folderMediaIds = availableMediaList.map(item => item._id);
+    setSelectedMedia((current) => {
+      if (
+        current.length === folderMediaIds.length &&
+        current.every((mediaId, index) => mediaId === folderMediaIds[index])
+      ) {
+        return current;
+      }
+      return folderMediaIds;
+    });
+  }, [availableMediaList, selectedChannels.length]);
 
   const fetchPosts = async () => {
     try {
@@ -97,6 +231,12 @@ export const CalendarView = ({ selectedAccounts }) => {
       const medResponse = await fetch('http://localhost:5001/api/media', { headers });
       const medData = await medResponse.json();
       setMediaList(medData);
+
+      const folderResponse = await fetch('http://localhost:5001/api/media/folders', { headers });
+      if (folderResponse.ok) {
+        const folderData = await folderResponse.json();
+        setFolders(folderData);
+      }
     } catch (error) {
       console.error('Failed to fetch composer data:', error);
     }
@@ -131,6 +271,14 @@ export const CalendarView = ({ selectedAccounts }) => {
       alert('Select at least one media asset');
       return;
     }
+    const unavailableMedia = selectedMedia.some((mediaId) => {
+      const item = mediaList.find(media => media._id === mediaId);
+      return !item || !isMediaAvailableForChannels(item, selectedChannels);
+    });
+    if (unavailableMedia) {
+      alert('Selected media is not available for one or more selected social accounts.');
+      return;
+    }
     if (!scheduleTime) {
       alert('Pick a scheduling date and time');
       return;
@@ -154,7 +302,7 @@ export const CalendarView = ({ selectedAccounts }) => {
         ...(hasYoutubeSelected ? {
           youtube: {
             title: youtubeTitle.trim(),
-            description: caption,
+            description: caption || selectedMediaItems[0]?.caption || '',
             privacyStatus: youtubePrivacy,
             tags: youtubeTags,
             categoryId: '22',
@@ -165,7 +313,7 @@ export const CalendarView = ({ selectedAccounts }) => {
       const body = {
         socialAccountIds: selectedChannels,
         mediaIds: selectedMedia,
-        caption,
+        caption: caption || selectedMediaItems[0]?.caption || '',
         scheduledAt: new Date(scheduleTime),
         platformSpecifics
       };
@@ -198,8 +346,10 @@ export const CalendarView = ({ selectedAccounts }) => {
         setYoutubePrivacy('private');
         setYoutubeTags('');
         setYoutubeMadeForKids(false);
-        setIsBulk(false);
         fetchPosts();
+      } else {
+        const error = await response.json();
+        alert(`Scheduling failed: ${error.message || 'Unable to save scheduled post'}`);
       }
     } catch (error) {
       console.error('Failed to save scheduled post:', error);
@@ -216,23 +366,27 @@ export const CalendarView = ({ selectedAccounts }) => {
   };
 
   const selectMediaItem = (medId) => {
-    if (isBulk) {
-      if (selectedMedia.includes(medId)) {
-        setSelectedMedia(selectedMedia.filter(id => id !== medId));
-      } else {
-        setSelectedMedia([...selectedMedia, medId]);
-      }
-    } else {
-      setSelectedMedia([medId]);
-      setShowMediaPicker(false);
-    }
+    if (!availableMediaList.some(item => item._id === medId)) return;
+    setSelectedMedia(availableMediaList.map(item => item._id));
+  };
+
+  const handleRemoveMedia = (mediaId) => {
+    setSelectedMedia((current) => current.filter(id => id !== mediaId));
+  };
+
+  const toggleChannel = (channelId) => {
+    setSelectedChannels((current) => (
+      current.includes(channelId)
+        ? current.filter(id => id !== channelId)
+        : [...current, channelId]
+    ));
   };
 
   return (
-    <div className="p-8 space-y-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f] font-sans">
+    <div className="py-4 px-0 bg-[#f5f5f7] h-[calc(100vh-4rem)] text-[#1d1d1f] font-sans flex flex-col overflow-hidden">
       
       {/* Page Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">
+      <div className="flex items-center justify-between pb-3 border-b border-[#e5e5ea] px-3 flex-shrink-0">
         <div>
           <h2 className="text-xl font-semibold text-black tracking-tight m-0">Scheduled Queue</h2>
           <p className="text-[#8e8e93] text-xs mt-1">Review and manage the publication sequence of your posts</p>
@@ -249,24 +403,380 @@ export const CalendarView = ({ selectedAccounts }) => {
         )}
       </div>
 
-      {/* Queue Feed List */}
-      <div className="max-w-4xl mx-auto space-y-4">
-        {posts.length === 0 ? (
-          <div className="border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm flex flex-col items-center gap-2">
-            <Clock className="w-8 h-8 text-gray-300 animate-pulse" />
-            <span className="font-semibold text-gray-400">No scheduled posts in the queue.</span>
+      {/* In-page Composer */}
+      {showComposer && (
+        <section className="flex-1 min-h-0 mt-3 mx-3 mb-4 bg-white border border-[#e5e5ea] py-3 px-3 rounded-xl text-black shadow-sm flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between gap-4 border-b border-[#e5e5ea] pb-2 flex-shrink-0">
+            <div>
+              <h3 className="text-sm font-semibold text-black uppercase tracking-wider m-0">Schedule Content</h3>
+              <p className="m-0 mt-1 text-[10px] text-gray-500">Pick portals, pick files, confirm the exact posting order.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowComposer(false)}
+              className="px-3 py-1.5 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs font-semibold border border-[#e5e5ea] transition-all"
+            >
+              Hide Composer
+            </button>
           </div>
-        ) : (
-          posts.map(post => {
-            const firstMedia = post.mediaIds?.[0];
-            const postDate = new Date(post.scheduledAt);
-            const isOverdue = postDate < new Date() && post.status === 'scheduled';
 
-            return (
-              <div 
-                key={post._id}
-                className="bg-white border border-[#e5e5ea] rounded-xl p-5 flex flex-col md:flex-row gap-5 items-start md:items-center justify-between hover:border-gray-400 transition-all duration-150 shadow-sm"
-              >
+          <form onSubmit={handleComposeSubmit} className="flex-1 min-h-0 pt-3 grid grid-cols-[280px_minmax(0,1fr)_340px] gap-3 overflow-hidden">
+            {/* Column 1: Setup Details */}
+            <section className="min-h-0 rounded-xl border border-[#e5e5ea] p-3 flex flex-col gap-3 overflow-hidden bg-white">
+              <h3 className="text-xs font-bold text-black uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-[#e5e5ea]">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0071e3] text-white text-[10px] font-bold">1</span>
+                Setup Details
+              </h3>
+
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
+                {/* Portals */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Target Portals</label>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {channels.map(chan => {
+                      const isSelected = selectedChannels.includes(chan._id);
+                      return (
+                        <button
+                          key={chan._id}
+                          type="button"
+                          onClick={() => toggleChannel(chan._id)}
+                          className={`flex items-center gap-2.5 rounded-xl border p-2 text-left text-xs transition-all duration-150 ${
+                            isSelected
+                              ? 'bg-black text-white border-black shadow-sm'
+                              : 'bg-[#f5f5f7] border-[#e5e5ea] text-[#1d1d1f] hover:text-black hover:bg-gray-100 hover:border-gray-300'
+                          }`}
+                        >
+                          <img src={chan.avatarUrl} className="w-5 h-5 rounded-full object-cover border border-black/10" alt="" />
+                          <span className="min-w-0 flex-1 truncate font-medium">{chan.name}</span>
+                          <span className="text-[8px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-black/5 text-[#8e8e93] border border-black/10">
+                            {chan.platform}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Format */}
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Post Format</label>
+                  <div className={`grid ${hasYoutubeSelected ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5`}>
+                    {(hasYoutubeSelected ? ['video', 'short'] : ['reels', 'post', 'story']).map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setPostType(t)}
+                        className={`py-1.5 rounded-xl text-xs font-semibold capitalize transition-all border ${
+                          postType === t 
+                            ? 'bg-black text-white border-black font-semibold shadow-sm' 
+                            : 'bg-[#f5f5f7] text-[#8e8e93] border-[#e5e5ea] hover:text-black hover:bg-gray-100'
+                        }`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Time Configuration */}
+                <div className="space-y-3 pt-2 border-t border-[#e5e5ea]">
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                    {isBulk ? 'Start time' : 'Post time'}
+                    <input
+                      type="datetime-local"
+                      value={scheduleTime}
+                      onChange={(e) => setScheduleTime(e.target.value)}
+                      className="mt-1.5 w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black"
+                    />
+                  </label>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div
+                      className={`py-1.5 border rounded-xl text-xs font-semibold text-center ${
+                        isBulk
+                          ? 'bg-black text-white border-black shadow-sm'
+                          : 'bg-[#f5f5f7] border-[#e5e5ea] text-gray-500'
+                      }`}
+                    >
+                      {isBulk ? 'Bulk Mode' : 'Single Post'}
+                    </div>
+                    <select
+                      value={bulkInterval}
+                      onChange={(e) => setBulkInterval(e.target.value)}
+                      disabled={!isBulk}
+                      className={`border border-[#e5e5ea] px-2 py-1.5 rounded-xl text-xs focus:outline-none transition-all ${isBulk ? 'bg-[#f5f5f7] text-black' : 'bg-[#f5f5f7] text-gray-300'}`}
+                    >
+                      <option value="1">1h gap</option>
+                      <option value="2">2h gap</option>
+                      <option value="4">4h gap</option>
+                      <option value="12">12h gap</option>
+                      <option value="24">24h gap</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Caption */}
+                <div className="pt-2 border-t border-[#e5e5ea]">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Fallback Caption</label>
+                  <textarea
+                    placeholder="Used only when an asset has no saved caption..."
+                    value={caption}
+                    onChange={(e) => setCaption(e.target.value)}
+                    className="h-24 w-full bg-[#f5f5f7] border border-[#e5e5ea] p-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black resize-none"
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* Column 2: Choose Folder & Media */}
+            <section className="min-h-0 rounded-xl border border-[#e5e5ea] p-3 flex flex-col gap-3 overflow-hidden bg-white">
+              <h3 className="text-xs font-bold text-black uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-[#e5e5ea]">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0071e3] text-white text-[10px] font-bold">2</span>
+                Browse Media
+              </h3>
+
+              {/* Campaign Folders Tab Selector */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-[#e5e5ea] min-h-[38px] scrollbar-thin">
+                <button
+                  type="button"
+                  onClick={() => setActiveFolderId('root')}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1 border ${
+                    activeFolderId === 'root'
+                      ? 'bg-black text-white border-black'
+                      : 'bg-[#f5f5f7] text-[#8e8e93] border-[#e5e5ea] hover:text-black hover:bg-[#e5e5ea]'
+                  }`}
+                >
+                  <Folder className="w-3.5 h-3.5" />
+                  <span>Root Library</span>
+                </button>
+                {folders.map(folder => (
+                  <button
+                    key={folder._id}
+                    type="button"
+                    onClick={() => setActiveFolderId(folder._id)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-1 border ${
+                      activeFolderId === folder._id
+                        ? 'bg-black text-white border-black'
+                        : 'bg-[#f5f5f7] text-[#8e8e93] border-[#e5e5ea] hover:text-black hover:bg-[#e5e5ea]'
+                    }`}
+                  >
+                    <Folder className="w-3.5 h-3.5" />
+                    <span>{folder.name}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] text-gray-400 font-semibold px-1">
+                <span>{selectedChannels.length === 0 ? 'Select a portal first' : `${availableMediaList.length} assets available`}</span>
+                <span>{isBulk ? 'Auto bulk' : 'Auto single'}</span>
+              </div>
+
+              {/* Grid of Files */}
+              <div className="min-h-0 flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 pr-1 content-start">
+                {selectedChannels.length > 0 && availableMediaList.map(item => {
+                  const isSelected = selectedMedia.includes(item._id);
+                  return (
+                    <button
+                      key={item._id}
+                      onClick={() => selectMediaItem(item._id)}
+                      type="button"
+                      className={`group relative aspect-square rounded-xl overflow-hidden border transition-all duration-150 flex flex-col bg-gray-50 ${
+                        isSelected
+                          ? 'border-[#0071e3] ring-2 ring-[#0071e3]/30 scale-[0.98]'
+                          : 'border-[#e5e5ea] hover:border-gray-400'
+                      }`}
+                    >
+                      {item.type === 'video' ? (
+                        <video src={item.url} className="h-full w-full object-cover" />
+                      ) : (
+                        <img src={item.url} className="h-full w-full object-cover" alt="" />
+                      )}
+                      
+                      {/* Name Overlay */}
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-left opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p className="m-0 truncate text-[9px] font-semibold text-white">{getMediaLabel(item)}</p>
+                        <p className="m-0 text-[8px] text-gray-300 capitalize">{item.type}</p>
+                      </div>
+
+                      {/* Selected Badge */}
+                      {isSelected ? (
+                        <div className="absolute top-2 right-2 rounded-full bg-[#0071e3] p-1 text-white shadow-md">
+                          <Check className="h-2.5 w-2.5" />
+                        </div>
+                      ) : (
+                        <div className="absolute top-2 right-2 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Plus className="h-2.5 w-2.5" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+                {selectedChannels.length === 0 && (
+                  <div className="col-span-full h-32 rounded-xl border border-dashed border-[#e5e5ea] bg-gray-50 flex items-center justify-center text-xs text-gray-400 text-center p-4">
+                    Please select a target portal to browse matching media files.
+                  </div>
+                )}
+                {selectedChannels.length > 0 && availableMediaList.length === 0 && (
+                  <div className="col-span-full h-32 rounded-xl border border-dashed border-[#e5e5ea] bg-gray-50 flex items-center justify-center text-xs text-gray-400 text-center p-4">
+                    No files matching target format and channels in this folder.
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Column 3: Posting Timeline & Review */}
+            <section className="min-h-0 rounded-xl border border-[#e5e5ea] p-3 flex flex-col gap-3 overflow-hidden bg-white">
+              <h3 className="text-xs font-bold text-black uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-[#e5e5ea]">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0071e3] text-white text-[10px] font-bold">3</span>
+                Posting Timeline
+              </h3>
+
+              {/* Timeline Container */}
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                {schedulePlan.length > 0 ? (
+                  <div className="relative border-l border-dashed border-gray-300 ml-3 pl-5 space-y-4 py-2">
+                    {schedulePlan.map((row) => (
+                      <div key={`${row.channel?._id || 'multi'}-${row.mediaItem?._id}-${row.index}`} className="relative">
+                        {/* Dot */}
+                        <span className="absolute -left-[30px] top-3.5 flex h-5 w-5 items-center justify-center rounded-full border border-black bg-white text-[9px] font-semibold text-black shadow-sm">
+                          {row.index}
+                        </span>
+
+                        {/* Post Card */}
+                        <div className="bg-white border border-[#e5e5ea] rounded-xl p-2.5 flex items-center justify-between gap-3 shadow-sm hover:border-gray-400 transition-all">
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="h-10 w-12 overflow-hidden rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] flex-shrink-0">
+                              {row.mediaItem?.type === 'video' ? (
+                                <video src={row.mediaItem?.url} className="h-full w-full object-cover" />
+                              ) : (
+                                <img src={row.mediaItem?.url} className="h-full w-full object-cover" alt="" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="m-0 truncate text-xs font-semibold text-black leading-tight" title={getMediaLabel(row.mediaItem)}>
+                                {getMediaLabel(row.mediaItem)}
+                              </p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <img src={row.channel?.avatarUrl} className="w-3.5 h-3.5 rounded-full object-cover border border-black/10" alt="" />
+                                <span className="text-[10px] text-gray-500 truncate">{row.channel?.name || 'Selected portal'}</span>
+                              </div>
+                              <p className="m-0 mt-1 truncate text-[10px] text-gray-500" title={row.caption}>
+                                {row.caption || 'No caption drafted'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="text-right">
+                              <span className="inline-flex items-center gap-1 bg-[#0071e3]/10 text-[#0071e3] px-2 py-0.5 rounded-full text-[9px] font-semibold">
+                                <Clock className="w-2.5 h-2.5" />
+                                {formatScheduleDate(row.scheduledAt)} {formatScheduleTime(row.scheduledAt)}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMedia(row.mediaItem?._id)}
+                              className="p-1 hover:bg-[#f5f5f7] rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                              title="Remove item"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-full rounded-xl border border-dashed border-[#e5e5ea] bg-gray-50 p-4 text-center text-xs text-gray-400 flex items-center justify-center">
+                    Your scheduled sequence timeline will appear here once channels and media are selected.
+                  </div>
+                )}
+              </div>
+
+              {/* YouTube Metadata Sub-Form */}
+              {hasYoutubeSelected && (
+                <div className="grid grid-cols-1 gap-2 border-t border-[#e5e5ea] pt-3">
+                  <p className="m-0 text-[10px] font-bold uppercase tracking-wider text-red-500">YouTube Upload Options</p>
+                  <input
+                    value={youtubeTitle}
+                    onChange={(e) => setYoutubeTitle(e.target.value)}
+                    maxLength={100}
+                    placeholder="YouTube video title"
+                    className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
+                  />
+                  <div className="grid grid-cols-[1fr_110px] gap-2">
+                    <input
+                      value={youtubeTags}
+                      onChange={(e) => setYoutubeTags(e.target.value)}
+                      placeholder="Tags (comma separated)"
+                      className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
+                    />
+                    <select
+                      value={youtubePrivacy}
+                      onChange={(e) => setYoutubePrivacy(e.target.value)}
+                      className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-2 py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
+                    >
+                      <option value="private">Private</option>
+                      <option value="unlisted">Unlisted</option>
+                      <option value="public">Public</option>
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs text-black px-1">
+                    <input
+                      type="checkbox"
+                      checked={youtubeMadeForKids}
+                      onChange={(e) => setYoutubeMadeForKids(e.target.checked)}
+                      className="rounded"
+                    />
+                    <span>This video is Made for Kids</span>
+                  </label>
+                </div>
+              )}
+
+              {/* Actions Footer */}
+              <div className="flex justify-end gap-2 border-t border-[#e5e5ea] pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowComposer(false)}
+                  className="px-3.5 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-xl text-xs font-semibold border border-[#e5e5ea] transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#0071e3] hover:bg-[#147ce5] text-white rounded-xl text-xs font-semibold transition-all shadow-sm"
+                >
+                  {schedulePlan.length > 0
+                    ? `Schedule ${schedulePlan.length} Post${schedulePlan.length === 1 ? '' : 's'}`
+                    : 'Schedule Posts'}
+                </button>
+              </div>
+            </section>
+          </form>
+        </section>
+      )}
+
+      {/* Queue Feed List */}
+      {!showComposer && (
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-4">
+          <div className="max-w-4xl mx-auto space-y-3 pt-1">
+            {posts.length === 0 ? (
+              <div className="border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm flex flex-col items-center gap-2">
+                <Clock className="w-8 h-8 text-gray-300 animate-pulse" />
+                <span className="font-semibold text-gray-400">No scheduled posts in the queue.</span>
+              </div>
+            ) : (
+              posts.map(post => {
+                const firstMedia = post.mediaIds?.[0];
+                const mediaCount = post.mediaIds?.length || 0;
+                const postDate = new Date(post.scheduledAt);
+                const isOverdue = postDate < new Date() && post.status === 'scheduled';
+
+                return (
+                  <div 
+                    key={post._id}
+                    className="bg-white border border-[#e5e5ea] rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between hover:border-gray-400 transition-all duration-150 shadow-sm"
+                  >
                 {/* Left: Execute Time Details */}
                 <div className="flex items-start gap-3 min-w-[200px]">
                   <div className="p-2 bg-[#f5f5f7] rounded-lg text-gray-500 flex-shrink-0">
@@ -310,6 +820,15 @@ export const CalendarView = ({ selectedAccounts }) => {
 
                   {/* Caption & Metadata */}
                   <div className="space-y-2 min-w-0 flex-1">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-black truncate m-0" title={getMediaLabel(firstMedia)}>
+                        {getMediaLabel(firstMedia)}
+                        {mediaCount > 1 ? ` + ${mediaCount - 1} more` : ''}
+                      </p>
+                      <p className="text-[10px] text-gray-500 truncate mt-0.5" title={getMediaLocationLabel(firstMedia)}>
+                        Folder: {getMediaLocationLabel(firstMedia)}
+                      </p>
+                    </div>
                     <p className="text-xs text-[#1d1d1f] font-normal leading-relaxed truncate" title={post.caption}>
                       {post.caption || <span className="text-gray-300 italic">No caption drafted</span>}
                     </p>
@@ -362,280 +881,6 @@ export const CalendarView = ({ selectedAccounts }) => {
             );
           })
         )}
-      </div>
-
-      {/* Main Composer Modal */}
-      {showComposer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6 overflow-y-auto">
-          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-xl text-black max-h-[90vh] overflow-y-auto relative shadow-2xl">
-            <h3 className="text-sm font-semibold text-black mb-6 uppercase tracking-wider">Compose Social Post</h3>
-
-            <form onSubmit={handleComposeSubmit} className="space-y-6">
-              
-              {/* Channel Selector */}
-              <div className="space-y-2">
-                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Select Portals</label>
-                <div className="flex flex-wrap gap-2">
-                  {channels.map(chan => (
-                    <button
-                      key={chan._id}
-                      type="button"
-                      onClick={() => {
-                        if (selectedChannels.includes(chan._id)) {
-                          setSelectedChannels(selectedChannels.filter(id => id !== chan._id));
-                        } else {
-                          setSelectedChannels([...selectedChannels, chan._id]);
-                        }
-                      }}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border transition-all ${
-                        selectedChannels.includes(chan._id)
-                          ? 'bg-black text-white font-semibold border-black'
-                          : 'bg-[#f5f5f7] border-[#e5e5ea] text-gray-500 hover:text-black'
-                      }`}
-                    >
-                      <img src={chan.avatarUrl} className="w-4 h-4 rounded-full object-cover border border-black/10" alt="" />
-                      <span>{chan.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Format */}
-              <div className="space-y-2">
-                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Format</label>
-                <div className={`grid ${hasYoutubeSelected ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
-                  {(hasYoutubeSelected ? ['video', 'short'] : ['reels', 'post', 'story']).map(t => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setPostType(t)}
-                      className={`py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${
-                        postType === t 
-                          ? 'bg-black text-white font-semibold' 
-                          : 'bg-[#f5f5f7] text-gray-500 border border-[#e5e5ea] hover:text-black'
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Caption */}
-              <div className="space-y-2">
-                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Write Caption</label>
-                <textarea
-                  placeholder="Draft caption here..."
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  className="w-full bg-[#f5f5f7] border border-[#e5e5ea] p-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black min-h-[80px] resize-y"
-                />
-              </div>
-
-              {hasYoutubeSelected && (
-                <div className="space-y-4 border border-red-100 bg-red-50/30 rounded-xl p-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-red-500 font-bold uppercase tracking-wider">YouTube Title</label>
-                    <input
-                      value={youtubeTitle}
-                      onChange={(e) => setYoutubeTitle(e.target.value)}
-                      maxLength={100}
-                      placeholder="Video title"
-                      className="w-full bg-white border border-red-100 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <label className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Privacy</label>
-                      <select
-                        value={youtubePrivacy}
-                        onChange={(e) => setYoutubePrivacy(e.target.value)}
-                        className="w-full bg-white border border-red-100 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
-                      >
-                        <option value="private">Private</option>
-                        <option value="unlisted">Unlisted</option>
-                        <option value="public">Public</option>
-                      </select>
-                    </div>
-
-                    <label className="flex items-center gap-2 bg-white border border-red-100 px-3 py-2 rounded-lg text-xs text-black mt-5">
-                      <input
-                        type="checkbox"
-                        checked={youtubeMadeForKids}
-                        onChange={(e) => setYoutubeMadeForKids(e.target.checked)}
-                      />
-                      <span>Made for kids</span>
-                    </label>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-red-500 font-bold uppercase tracking-wider">Tags</label>
-                    <input
-                      value={youtubeTags}
-                      onChange={(e) => setYoutubeTags(e.target.value)}
-                      placeholder="travel, vlog, shorts"
-                      className="w-full bg-white border border-red-100 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-500 text-xs text-black"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Media Picker */}
-              <div className="space-y-2">
-                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Attach Media</label>
-                
-                <div className="flex flex-wrap gap-3 items-center">
-                  {selectedMedia.map(medId => {
-                    const file = mediaList.find(m => m._id === medId);
-                    return file ? (
-                      <div key={medId} className="w-12 h-12 rounded border border-[#e5e5ea] bg-[#f5f5f7] overflow-hidden relative group">
-                        {file.type === 'video' ? (
-                          <video src={file.url} className="w-full h-full object-cover" />
-                        ) : (
-                          <img src={file.url} className="w-full h-full object-cover" alt="" />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedMedia(selectedMedia.filter(id => id !== medId))}
-                          className="absolute inset-0 bg-red-600/80 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[8px] text-white font-bold transition-opacity"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : null;
-                  })}
-                  
-                  <button
-                    type="button"
-                    onClick={() => setShowMediaPicker(true)}
-                    className="w-12 h-12 rounded border border-dashed border-[#e5e5ea] hover:border-gray-400 flex flex-col items-center justify-center text-gray-500 hover:text-black transition-all bg-[#f5f5f7]"
-                  >
-                    <Plus className="w-4 h-4 text-gray-400" />
-                    <span className="text-[8px] mt-0.5">Add</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Scheduling Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[#e5e5ea] pt-4">
-                
-                <div className="space-y-2">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                    {isBulk ? 'Start Date & Time' : 'Date & Time'}
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={scheduleTime}
-                    onChange={(e) => setScheduleTime(e.target.value)}
-                    className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Schedule Mode</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsBulk(!isBulk);
-                      setSelectedMedia([]);
-                    }}
-                    className={`w-full py-2 border rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                      isBulk 
-                        ? 'bg-black text-white border-black font-semibold' 
-                        : 'bg-[#f5f5f7] border-[#e5e5ea] text-gray-500 hover:text-black'
-                    }`}
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>{isBulk ? 'Bulk Mode: ON' : 'Bulk Mode: OFF'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {isBulk && (
-                <div className="bg-[#f5f5f7] border border-[#e5e5ea] p-4 rounded-xl space-y-3">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase m-0">Bulk Posting Gap</p>
-                  <div className="flex items-center gap-4 text-xs">
-                    <span>Interval gap:</span>
-                    <select
-                      value={bulkInterval}
-                      onChange={(e) => setBulkInterval(e.target.value)}
-                      className="bg-white border border-[#e5e5ea] text-black px-2 py-1 rounded focus:outline-none"
-                    >
-                      <option value="1">1 Hour</option>
-                      <option value="2">2 Hours</option>
-                      <option value="4">4 Hours</option>
-                      <option value="12">12 Hours</option>
-                      <option value="24">24 Hours (Daily)</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-[#e5e5ea]">
-                <button
-                  type="button"
-                  onClick={() => setShowComposer(false)}
-                  className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs font-semibold border border-[#e5e5ea] transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-[#0071e3] hover:bg-[#147ce5] text-white rounded-lg text-xs font-semibold transition-all shadow-sm"
-                >
-                  Confirm Posting
-                </button>
-              </div>
-
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Media Picker */}
-      {showMediaPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="bg-white border border-[#e5e5ea] p-5 rounded-2xl w-full max-w-md text-black max-h-[70vh] overflow-y-auto shadow-2xl">
-            <div className="flex justify-between items-center mb-4 pb-2 border-b border-[#e5e5ea]">
-              <h3 className="text-xs font-bold text-black uppercase tracking-wider">Select Media</h3>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-3">
-              {mediaList.map(item => (
-                <div
-                  key={item._id}
-                  onClick={() => selectMediaItem(item._id)}
-                  className={`aspect-square rounded-lg overflow-hidden cursor-pointer border relative transition-all ${
-                    selectedMedia.includes(item._id) 
-                      ? 'border-black ring-1 ring-black/50 opacity-100' 
-                      : 'border-[#e5e5ea] opacity-65 hover:opacity-100'
-                  }`}
-                >
-                  {item.type === 'video' ? (
-                    <video src={item.url} className="w-full h-full object-cover" />
-                  ) : (
-                    <img src={item.url} className="w-full h-full object-cover" alt="" />
-                  )}
-                  {selectedMedia.includes(item._id) && (
-                    <div className="absolute inset-0 bg-black/5 flex items-center justify-center">
-                      <Check className="w-4 h-4 text-white bg-black rounded-full p-0.5" />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            
-            <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-[#e5e5ea]">
-              <button
-                type="button"
-                onClick={() => setShowMediaPicker(false)}
-                className="px-4 py-1.5 bg-[#0071e3] hover:bg-[#147ce5] rounded-lg text-xs font-bold text-white"
-              >
-                Done
-              </button>
-            </div>
           </div>
         </div>
       )}

@@ -90,7 +90,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
   // Header component helper logic
 
   return (
-    <header className="h-16 border-b border-[#e5e5ea] bg-white px-8 flex items-center justify-between sticky top-0 z-30 text-[#1d1d1f]">
+    <header className="h-16 border-b border-[#e5e5ea] bg-white px-3 flex items-center justify-between sticky top-0 z-30 text-[#1d1d1f]">
       
       {/* Social Account Selector Dropdown */}
       <div className="relative">

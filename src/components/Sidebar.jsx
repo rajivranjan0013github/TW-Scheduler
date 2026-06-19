@@ -35,7 +35,7 @@ export const Sidebar = () => {
   ];
 
   return (
-    <aside className={`${isCollapsed ? 'w-16' : 'w-64'} ${isAdminViewingUser ? 'bg-[#111827] border-black/10 text-[#cbd5e1]' : 'bg-white border-[#e5e5ea] text-[#8e8e93]'} border-r flex flex-col h-screen sticky top-0 transition-all duration-300`}>
+    <aside className={`${isCollapsed ? 'w-16' : 'w-52'} ${isAdminViewingUser ? 'bg-[#111827] border-black/10 text-[#cbd5e1]' : 'bg-white border-[#e5e5ea] text-[#8e8e93]'} border-r flex flex-col h-screen sticky top-0 transition-all duration-300`}>
       
       {/* App Store Connect style header */}
       <div className={`p-4 border-b flex items-center justify-between h-[73px] flex-shrink-0 ${isAdminViewingUser ? 'border-white/10 bg-[#111827]' : 'border-[#e5e5ea] bg-white'}`}>
@@ -59,7 +59,7 @@ export const Sidebar = () => {
       </div>
 
       {/* Navigation */}
-      <nav className={`flex-1 p-4 space-y-1 ${isAdminViewingUser ? 'bg-[#111827]' : 'bg-white'}`}>
+      <nav className={`flex-1 p-2.5 space-y-1 ${isAdminViewingUser ? 'bg-[#111827]' : 'bg-white'}`}>
         {navItems.map((item) => (
           <NavLink
             key={item.name}
@@ -67,7 +67,7 @@ export const Sidebar = () => {
             end
             title={isCollapsed ? item.name : undefined}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-normal transition-all duration-150 ${
+              `flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-normal transition-all duration-150 ${
                 isCollapsed ? 'justify-center px-0' : ''
               } ${
                 isActive
@@ -83,12 +83,12 @@ export const Sidebar = () => {
       </nav>
 
       {/* Sidebar Footer */}
-      <div className={`p-4 border-t text-[10px] flex-shrink-0 ${isAdminViewingUser ? 'border-white/10 bg-[#111827] text-[#9ca3af]' : 'border-[#e5e5ea] bg-white text-[#8e8e93]'}`}>
+      <div className={`p-3 border-t text-[10px] flex-shrink-0 ${isAdminViewingUser ? 'border-white/10 bg-[#111827] text-[#9ca3af]' : 'border-[#e5e5ea] bg-white text-[#8e8e93]'}`}>
         {canViewAdmin && (
           <Link
             to="/admin"
             title={isCollapsed ? "Go to Admin" : undefined}
-            className={`mb-4 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold transition ${isCollapsed ? 'px-0' : ''} ${isAdminViewingUser ? 'bg-white text-[#111827] hover:bg-[#f3f4f6]' : 'bg-[#1d1d1f] text-white hover:bg-black'}`}
+            className={`mb-3 flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${isCollapsed ? 'px-0' : ''} ${isAdminViewingUser ? 'bg-white text-[#111827] hover:bg-[#f3f4f6]' : 'bg-[#1d1d1f] text-white hover:bg-black'}`}
           >
             <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0" />
             {!isCollapsed && <span>Go to Admin</span>}
