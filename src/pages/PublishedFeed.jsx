@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Eye, Heart, MessageSquare, RefreshCw } from 'lucide-react';
 
 export const PublishedFeed = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [channel, setChannel] = useState(null);
   const [publishedPosts, setPublishedPosts] = useState([]);
@@ -61,12 +62,20 @@ export const PublishedFeed = () => {
 
       // 1. Fetch channel metadata if not already loaded
       if (!channel) {
-        const chanRes = await fetch('http://localhost:5001/api/accounts', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (chanRes.ok) {
-          const channels = await chanRes.json();
-          const targetChan = channels.find(c => c._id === id);
+        if (location.state?.channel?._id === id) {
+          setChannel(location.state.channel);
+        } else {
+          const headers = { 'Authorization': `Bearer ${token}` };
+          const chanRes = await fetch('http://localhost:5001/api/accounts', { headers });
+          let channels = chanRes.ok ? await chanRes.json() : [];
+          let targetChan = channels.find(c => c._id === id);
+
+          if (!targetChan) {
+            const adminRes = await fetch('http://localhost:5001/api/admin/social-accounts', { headers });
+            channels = adminRes.ok ? await adminRes.json() : [];
+            targetChan = channels.find(c => c._id === id);
+          }
+
           if (targetChan) {
             setChannel(targetChan);
           } else {
@@ -104,11 +113,11 @@ export const PublishedFeed = () => {
       {/* Header Container */}
       <div className="max-w-4xl mx-auto w-full mb-6">
         <button
-          onClick={() => navigate('/channels')}
+          onClick={() => navigate(location.state?.fromAdmin ? '/admin' : '/channels')}
           className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-black transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Channels</span>
+          <span>{location.state?.fromAdmin ? 'Back to Admin' : 'Back to Channels'}</span>
         </button>
 
         {loading ? (
@@ -185,7 +194,9 @@ export const PublishedFeed = () => {
                   {group.posts.map(post => (
                     <div
                       key={post.id}
-                      onClick={() => navigate(`/channels/${id}/posts/${post.id}`)}
+                      onClick={() => navigate(`/channels/${id}/posts/${post.id}`, {
+                        state: { fromAdmin: location.state?.fromAdmin, channel },
+                      })}
                       className="bg-white border border-[#e5e5ea] rounded-xl p-4 flex gap-4 hover:shadow-sm hover:border-[#0071e3]/40 cursor-pointer transition-all"
                     >
                       {post.mediaUrl && (

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, Megaphone, RefreshCw, Rows3 } from 'lucide-react';
 
 const numberFormat = new Intl.NumberFormat();
@@ -153,6 +154,7 @@ const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
 };
 
 export const AdminDashboard = () => {
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [selectedTimeRange, setSelectedTimeRange] = useState('today');
@@ -321,7 +323,36 @@ export const AdminDashboard = () => {
             ) : activeMetrics.accountRows.map((account) => (
               <div
                 key={account._id}
-                className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr] items-center gap-5 border-b border-[#e5e5ea] px-5 py-4 text-sm last:border-b-0"
+                onClick={() => {
+                  sessionStorage.setItem('admin_view_context', JSON.stringify({
+                    userId: account.user?._id || account.userId?._id || account.userId || '',
+                    userName: account.user?.name || '',
+                    userEmail: account.user?.email || '',
+                    channelId: account._id,
+                    channel: account,
+                  }));
+                  navigate(`/channels/${account._id}/feed`, {
+                    state: { fromAdmin: true, channel: account },
+                  });
+                }}
+                className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr] items-center gap-5 border-b border-[#e5e5ea] px-5 py-4 text-sm transition hover:bg-[#f5f5f7] last:border-b-0"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    sessionStorage.setItem('admin_view_context', JSON.stringify({
+                      userId: account.user?._id || account.userId?._id || account.userId || '',
+                      userName: account.user?.name || '',
+                      userEmail: account.user?.email || '',
+                      channelId: account._id,
+                      channel: account,
+                    }));
+                    navigate(`/channels/${account._id}/feed`, {
+                      state: { fromAdmin: true, channel: account },
+                    });
+                  }
+                }}
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <img

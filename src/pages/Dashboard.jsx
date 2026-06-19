@@ -31,6 +31,14 @@ const mockChartData = [
 export const Dashboard = ({ selectedAccounts }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const adminViewContext = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('admin_view_context') || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const adminViewUserId = adminViewContext?.userId || '';
   const [period, setPeriod] = useState('7d');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,7 +55,7 @@ export const Dashboard = ({ selectedAccounts }) => {
 
   useEffect(() => {
     fetchStats(period);
-  }, [selectedAccounts, period]);
+  }, [selectedAccounts, period, adminViewUserId]);
 
   const fetchStats = async (selectedPeriod = '7d', forceRefresh = false) => {
     try {
@@ -58,24 +66,29 @@ export const Dashboard = ({ selectedAccounts }) => {
       }
       const token = localStorage.getItem('tw_token');
       const headers = { 'Authorization': `Bearer ${token}` };
+      const scopedQuery = adminViewUserId ? `userId=${adminViewUserId}` : '';
+      const scopedSuffix = scopedQuery ? `?${scopedQuery}` : '';
 
-      const accResponse = await fetch('http://localhost:5001/api/accounts', { headers });
+      const accResponse = await fetch(`http://localhost:5001/api/accounts${scopedSuffix}`, { headers });
       const accountsList = await accResponse.json();
       setChannels(accountsList);
 
-      const schedResponse = await fetch('http://localhost:5001/api/scheduler', { headers });
+      const schedResponse = await fetch(`http://localhost:5001/api/scheduler${scopedSuffix}`, { headers });
       const posts = await schedResponse.json();
       const filteredPosts = posts.filter(p => selectedAccounts.includes(p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0]));
       
       const upcoming = filteredPosts.filter(p => p.status === 'scheduled' || p.status === 'publishing');
       setUpcomingPosts(upcoming.slice(0, 3));
 
-      const medResponse = await fetch('http://localhost:5001/api/media', { headers });
+      const medResponse = await fetch(`http://localhost:5001/api/media${scopedSuffix}`, { headers });
       const mediaList = await medResponse.json();
 
       setErrorInsights(null);
       try {
-        const insResponse = await fetch(`http://localhost:5001/api/accounts/insights?period=${selectedPeriod}${forceRefresh ? '&refresh=true' : ''}`, { headers });
+        const insightParams = new URLSearchParams({ period: selectedPeriod });
+        if (forceRefresh) insightParams.set('refresh', 'true');
+        if (adminViewUserId) insightParams.set('userId', adminViewUserId);
+        const insResponse = await fetch(`http://localhost:5001/api/accounts/insights?${insightParams.toString()}`, { headers });
         if (insResponse.ok) {
           const insightsList = await insResponse.json();
           setChartData(insightsList);
@@ -96,7 +109,7 @@ export const Dashboard = ({ selectedAccounts }) => {
 
       // Fetch recent 25 published posts
       try {
-        const recentResponse = await fetch('http://localhost:5001/api/accounts/posts/recent', { headers });
+        const recentResponse = await fetch(`http://localhost:5001/api/accounts/posts/recent${scopedSuffix}`, { headers });
         if (recentResponse.ok) {
           const recentData = await recentResponse.json();
           setRecentPosts(recentData);
@@ -284,7 +297,9 @@ export const Dashboard = ({ selectedAccounts }) => {
               {channels.map((chan) => (
                 <div 
                   key={chan._id} 
-                  onClick={() => navigate(`/channels/${chan._id}/feed`)}
+                  onClick={() => navigate(`/channels/${chan._id}/feed`, {
+                    state: adminViewUserId ? { fromAdmin: true, channel: chan } : undefined,
+                  })}
                   className="flex items-center justify-between py-2 px-1.5 border-b border-[#e5e5ea] last:border-b-0 cursor-pointer hover:bg-gray-50 rounded-lg transition-all"
                 >
                   <div className="flex items-center gap-3">
@@ -370,7 +385,9 @@ export const Dashboard = ({ selectedAccounts }) => {
                       {group.posts.map((post) => (
                         <tr 
                           key={post.id} 
-                          onClick={() => navigate(`/channels/${post.accountId}/posts/${post.id}`)}
+                          onClick={() => navigate(`/channels/${post.accountId}/posts/${post.id}`, {
+                            state: adminViewUserId ? { fromAdmin: true, channel: channels.find(chan => chan._id === post.accountId) } : undefined,
+                          })}
                           className="hover:bg-gray-50/40 cursor-pointer transition-colors font-medium"
                         >
                           <td className="px-4 py-3 max-w-xs md:max-w-md">

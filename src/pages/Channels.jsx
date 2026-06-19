@@ -6,16 +6,24 @@ import { Share2, Trash2, ShieldCheck, Link2, Eye, Trash } from 'lucide-react';
 export const Channels = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const adminViewContext = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('admin_view_context') || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const adminViewUserId = adminViewContext?.userId || '';
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchChannels();
-  }, []);
+  }, [adminViewUserId]);
   const fetchChannels = async () => {
     try {
       const token = localStorage.getItem('tw_token');
-      const response = await fetch('http://localhost:5001/api/accounts', {
+      const response = await fetch(`http://localhost:5001/api/accounts${adminViewUserId ? `?userId=${adminViewUserId}` : ''}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -106,7 +114,11 @@ export const Channels = () => {
       <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">
         <div>
           <h2 className="text-xl font-semibold text-black tracking-tight m-0">Connected Channels</h2>
-          <p className="text-[#8e8e93] text-xs mt-1">Manage Facebook, Instagram, and YouTube publishing channels</p>
+          <p className="text-[#8e8e93] text-xs mt-1">
+            {adminViewUserId
+              ? `Viewing channels for ${adminViewContext?.userName || 'selected user'}`
+              : 'Manage Facebook, Instagram, and YouTube publishing channels'}
+          </p>
         </div>
       </div>
 
@@ -187,7 +199,9 @@ export const Channels = () => {
 
                   <div className="flex items-center gap-4">
                     <button
-                      onClick={() => navigate(`/channels/${chan._id}/feed`)}
+                      onClick={() => navigate(`/channels/${chan._id}/feed`, {
+                        state: adminViewUserId ? { fromAdmin: true, channel: chan } : undefined,
+                      })}
                       className="flex items-center gap-1.5 text-[10px] text-[#0071e3] hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 transition-all font-semibold active:scale-95"
                     >
                       <Eye className="w-3 h-3" />

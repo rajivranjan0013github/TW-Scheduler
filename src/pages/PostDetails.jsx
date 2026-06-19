@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Eye, Heart, MessageSquare, ExternalLink, Calendar } from 'lucide-react';
 
 export const PostDetails = () => {
   const { id: accountId, metaPostId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [channel, setChannel] = useState(null);
   const [post, setPost] = useState(null);
@@ -23,12 +24,20 @@ export const PostDetails = () => {
       const token = localStorage.getItem('tw_token');
 
       // 1. Fetch channel details
-      const chanRes = await fetch('http://localhost:5001/api/accounts', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (chanRes.ok) {
-        const channels = await chanRes.json();
-        const targetChan = channels.find(c => c._id === accountId);
+      if (location.state?.channel?._id === accountId) {
+        setChannel(location.state.channel);
+      } else {
+        const headers = { 'Authorization': `Bearer ${token}` };
+        const chanRes = await fetch('http://localhost:5001/api/accounts', { headers });
+        let channels = chanRes.ok ? await chanRes.json() : [];
+        let targetChan = channels.find(c => c._id === accountId);
+
+        if (!targetChan) {
+          const adminRes = await fetch('http://localhost:5001/api/admin/social-accounts', { headers });
+          channels = adminRes.ok ? await adminRes.json() : [];
+          targetChan = channels.find(c => c._id === accountId);
+        }
+
         if (targetChan) {
           setChannel(targetChan);
         }
@@ -60,7 +69,9 @@ export const PostDetails = () => {
       {/* Header Navigation */}
       <div className="max-w-6xl mx-auto w-full mb-6 flex items-center justify-between">
         <button
-          onClick={() => navigate(`/channels/${accountId}/feed`)}
+          onClick={() => navigate(`/channels/${accountId}/feed`, {
+            state: { fromAdmin: location.state?.fromAdmin, channel },
+          })}
           className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-black transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />

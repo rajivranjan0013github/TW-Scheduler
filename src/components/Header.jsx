@@ -1,28 +1,62 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, ChevronDown, Check, Globe } from 'lucide-react';
+import { LogOut, ChevronDown, Check, Globe, X } from 'lucide-react';
 
 export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState([]);
   const [showAccountDropdown, setShowAccountDropdown] = useState(false);
+  const [viewContextVersion, setViewContextVersion] = useState(0);
+  const storedAdminView = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('admin_view_context') || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const adminViewChannel = (location.state?.fromAdmin ? location.state.channel : null) || storedAdminView?.channel || null;
+  const adminViewUserId = adminViewChannel?.user?._id || adminViewChannel?.userId?._id || adminViewChannel?.userId || storedAdminView?.userId || '';
+  const isAdminViewingUser = Boolean(adminViewUserId);
+  const displayedUserName = isAdminViewingUser
+    ? (storedAdminView?.userName || adminViewChannel?.user?.name || adminViewChannel?.userId?.name || 'Selected user')
+    : user?.name;
+  const displayedUserEmail = isAdminViewingUser
+    ? (storedAdminView?.userEmail || adminViewChannel?.user?.email || adminViewChannel?.userId?.email || '')
+    : user?.email;
+  const displayedAvatar = isAdminViewingUser
+    ? (adminViewChannel?.avatarUrl || user?.avatar)
+    : user?.avatar;
 
   useEffect(() => {
     fetchAccounts();
-  }, []);
+  }, [adminViewChannel?._id, adminViewUserId]);
 
   const fetchAccounts = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/accounts', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
-        }
-      });
+      const headers = {
+        'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+      };
+      const response = await fetch(
+        adminViewUserId ? `http://localhost:5001/api/accounts?userId=${adminViewUserId}` : 'http://localhost:5001/api/accounts',
+        { headers }
+      );
       if (response.ok) {
         const data = await response.json();
-        setAccounts(data);
-        if (selectedAccounts.length === 0) {
-          setSelectedAccounts(data.map(acc => acc._id));
+        const visibleAccounts = data;
+        const nextAccounts = visibleAccounts.length > 0 ? visibleAccounts : (adminViewChannel ? [adminViewChannel] : []);
+
+        setAccounts(nextAccounts);
+        if (adminViewUserId) {
+          setSelectedAccounts(nextAccounts.map(acc => acc._id));
+        } else {
+          const nextAccountIds = nextAccounts.map(acc => acc._id);
+          const hasOutsideSelection = selectedAccounts.some(id => !nextAccountIds.includes(id));
+          if (selectedAccounts.length === 0 || hasOutsideSelection) {
+            setSelectedAccounts(nextAccountIds);
+          }
         }
       }
     } catch (error) {
@@ -46,6 +80,13 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
     setSelectedAccounts([]);
   };
 
+  const exitAdminUserView = () => {
+    sessionStorage.removeItem('admin_view_context');
+    setSelectedAccounts([]);
+    setViewContextVersion(version => version + 1);
+    navigate('/', { replace: true, state: {} });
+  };
+
   // Header component helper logic
 
   return (
@@ -67,7 +108,9 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
         {showAccountDropdown && (
           <div className="absolute left-0 mt-2 w-72 bg-white border border-[#d2d2d7] rounded-xl shadow-xl p-3 z-50 animate-in fade-in duration-150 text-[#1d1d1f]">
             <div className="flex justify-between items-center pb-2 border-b border-[#e5e5ea] mb-2">
-              <span className="text-[10px] text-gray-500 font-semibold uppercase">Channel Filter</span>
+              <span className="text-[10px] text-gray-500 font-semibold uppercase">
+                {adminViewChannel ? `${adminViewChannel.user?.name || adminViewChannel.userId?.name || 'User'} Channels` : 'Channel Filter'}
+              </span>
               <div className="flex gap-2">
                 <button onClick={selectAllAccounts} className="text-[10px] text-gray-500 hover:text-black">All</button>
                 <span className="text-[10px] text-gray-300">|</span>
@@ -107,13 +150,28 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
         {user && (
           <div className="flex items-center gap-3 border-l border-[#e5e5ea] pl-6">
             <img 
-              src={user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
+              src={displayedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
               className="w-7 h-7 rounded-full object-cover border border-black/10" 
               alt="Avatar" 
             />
             <div className="hidden md:block">
-              <p className="text-xs font-semibold text-[#1d1d1f] leading-none">{user.name}</p>
+              <p className="text-xs font-semibold text-[#1d1d1f] leading-none">{displayedUserName}</p>
+              {isAdminViewingUser && (
+                <p className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-[#0071e3]">
+                  Viewing user{displayedUserEmail ? ` · ${displayedUserEmail}` : ''}
+                </p>
+              )}
             </div>
+            {isAdminViewingUser && (
+              <button
+                onClick={exitAdminUserView}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-[#f5f5f7] px-2.5 py-1.5 text-[10px] font-semibold text-[#1d1d1f] transition hover:bg-[#e5e5ea]"
+                title="Exit user view"
+              >
+                <X className="h-3 w-3" />
+                <span className="hidden lg:inline">Exit view</span>
+              </button>
+            )}
             <button 
               onClick={logout}
               className="p-1 hover:text-[#0071e3] text-gray-400 rounded-lg transition-all"

@@ -23,6 +23,10 @@ export const AdminSidebar = () => {
     });
   };
 
+  const exitAdminUserView = () => {
+    sessionStorage.removeItem('admin_view_context');
+  };
+
   return (
     <aside className={`${isCollapsed ? 'w-16' : 'w-64'} bg-[#111827] border-r border-black/10 flex flex-col h-screen sticky top-0 text-[#cbd5e1] transition-all duration-300`}>
       <div className="p-4 border-b border-white/10 h-[73px] flex items-center justify-between flex-shrink-0">
@@ -32,7 +36,7 @@ export const AdminSidebar = () => {
               <ShieldCheck className="h-4 w-4" />
             </div>
             <div>
-              <h1 className="text-base font-semibold tracking-tight leading-none m-0 text-white">Admin Panel</h1>
+              <h1 className="text-base font-semibold tracking-tight leading-none m-0 text-white" style={{ color: '#ffffff' }}>Admin Panel</h1>
               <span className="text-[10px] text-[#9ca3af] font-semibold tracking-wider uppercase mt-1 block">EasyPost control</span>
             </div>
           </div>
@@ -64,6 +68,7 @@ export const AdminSidebar = () => {
             <NavLink
               key={item.name}
               to={item.path}
+              end
               title={isCollapsed ? item.name : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all duration-150 ${
@@ -93,6 +98,7 @@ export const AdminSidebar = () => {
 
         <Link
           to="/"
+          onClick={exitAdminUserView}
           title={isCollapsed ? "Back to App" : undefined}
           className={`flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-xs font-semibold text-[#111827] transition hover:bg-[#f3f4f6] ${isCollapsed ? 'px-0' : ''}`}
         >
