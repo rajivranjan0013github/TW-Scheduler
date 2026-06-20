@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
 import { fetchFile } from '@ffmpeg/util';
 import { useAuth } from '../context/AuthContext';
 import { OUTPUT_WIDTH, OUTPUT_HEIGHT, OUTPUT_FPS, API_BASE_URL } from './videoEditor/videoEditorConstants';
@@ -13,6 +12,7 @@ import { VideoPreview } from './videoEditor/VideoPreview';
 import { ExportPanel } from './videoEditor/ExportPanel';
 import { TextSettingsPanel } from './videoEditor/TextSettingsPanel';
 import { AudioDialog } from './videoEditor/AudioDialog';
+import { VideoLibraryPickerDialog } from './videoEditor/VideoLibraryPickerDialog';
 
 export const VideoEditor = () => {
   const navigate = useNavigate();
@@ -23,6 +23,7 @@ export const VideoEditor = () => {
   const [video2, setVideo2] = useState(null);
   const [video1Url, setVideo1Url] = useState('');
   const [video2Url, setVideo2Url] = useState('');
+  const [videoPickerSlot, setVideoPickerSlot] = useState(null);
 
   // Processing state
   const [processing, setProcessing] = useState(false);
@@ -72,30 +73,27 @@ export const VideoEditor = () => {
   }, []);
 
   // --- Video file handlers ---
-  const handleVideo1Change = useCallback((e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (objectUrlsRef.current.video1) URL.revokeObjectURL(objectUrlsRef.current.video1);
-      const nextUrl = URL.createObjectURL(file);
-      objectUrlsRef.current.video1 = nextUrl;
-      setVideo1(file);
-      setVideo1Url(nextUrl);
+  const handleSelectLibraryVideo = useCallback((selectedVideo) => {
+    if (videoPickerSlot === 1) {
+      if (objectUrlsRef.current.video1) {
+        URL.revokeObjectURL(objectUrlsRef.current.video1);
+        objectUrlsRef.current.video1 = '';
+      }
+      setVideo1(selectedVideo);
+      setVideo1Url(selectedVideo.url);
       preview.setActiveVideo(1);
-      preview.resetPlayback();
+    } else if (videoPickerSlot === 2) {
+      if (objectUrlsRef.current.video2) {
+        URL.revokeObjectURL(objectUrlsRef.current.video2);
+        objectUrlsRef.current.video2 = '';
+      }
+      setVideo2(selectedVideo);
+      setVideo2Url(selectedVideo.url);
     }
-  }, [preview]);
 
-  const handleVideo2Change = useCallback((e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (objectUrlsRef.current.video2) URL.revokeObjectURL(objectUrlsRef.current.video2);
-      const nextUrl = URL.createObjectURL(file);
-      objectUrlsRef.current.video2 = nextUrl;
-      setVideo2(file);
-      setVideo2Url(nextUrl);
-      preview.resetPlayback();
-    }
-  }, [preview]);
+    preview.resetPlayback();
+    setVideoPickerSlot(null);
+  }, [preview, videoPickerSlot]);
 
   // --- Audio dialog wrappers ---
   const handleSelectAudioTrack = useCallback((track) => {
@@ -138,7 +136,10 @@ export const VideoEditor = () => {
       ]);
 
       setProgressMsg('Reading video files...');
-      const [v1Data, v2Data] = await Promise.all([fetchFile(video1), fetchFile(video2)]);
+      const [v1Data, v2Data] = await Promise.all([
+        fetchFile(video1.file || video1.url || video1),
+        fetchFile(video2.file || video2.url || video2),
+      ]);
 
       await ffmpeg.writeFile('input1.mp4', v1Data);
       await ffmpeg.writeFile('input2.mp4', v2Data);
@@ -314,15 +315,15 @@ export const VideoEditor = () => {
     <div className="min-h-screen bg-[#f8f9fa] p-6 flex flex-col items-center">
       {/* Header */}
       <div className="max-w-7xl w-full flex items-center justify-between mb-6">
+        <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Video Editor</h2>
         <button
-          onClick={() => navigate('/media')}
-          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-black transition-colors"
+          type="button"
+          disabled={processing || !video1 || !video2 || !ffmpegLoaded || Boolean(engineError)}
+          onClick={processVideo}
+          className="rounded-lg bg-[#0071e3] px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-blue-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Library</span>
+          {processing ? 'Processing...' : 'Export Video'}
         </button>
-        <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Video Clip Merger</h2>
-        <div className="w-20"></div>
       </div>
 
       <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -331,15 +332,13 @@ export const VideoEditor = () => {
         <VideoUploadPanel
           video1={video1}
           video2={video2}
-          onVideo1Change={handleVideo1Change}
-          onVideo2Change={handleVideo2Change}
+          onChooseVideo1={() => setVideoPickerSlot(1)}
+          onChooseVideo2={() => setVideoPickerSlot(2)}
           text={overlay.text}
           onTextChange={overlay.setText}
           ffmpegLoaded={ffmpegLoaded}
           ffmpegLoading={ffmpegLoading}
           engineError={engineError}
-          processing={processing}
-          onProcess={processVideo}
         />
 
         {/* Center Columns */}
@@ -430,11 +429,18 @@ export const VideoEditor = () => {
           platformAudioError={audio.platformAudioError}
           myAudioTracks={audio.myAudioTracks}
           onSelectTrack={handleSelectAudioTrack}
-          onSavePlatformTrack={audio.savePlatformAudioToMyAudio}
-          onRefreshPlatformAudio={audio.refreshPlatformAudioTracks}
           onUploadAudio={handleAudioUpload}
           onClearAudio={audio.clearSelectedAudio}
           onClose={() => audio.setShowAudioDialog(false)}
+        />
+      )}
+
+      {videoPickerSlot && (
+        <VideoLibraryPickerDialog
+          slotLabel={videoPickerSlot === 1 ? 'First Video (Clip Starts)' : 'Second Video (Appended)'}
+          token={token}
+          onClose={() => setVideoPickerSlot(null)}
+          onSelectVideo={handleSelectLibraryVideo}
         />
       )}
     </div>
