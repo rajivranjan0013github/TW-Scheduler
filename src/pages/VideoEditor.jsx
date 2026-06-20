@@ -13,6 +13,7 @@ import { ExportPanel } from './videoEditor/ExportPanel';
 import { TextSettingsPanel } from './videoEditor/TextSettingsPanel';
 import { AudioDialog } from './videoEditor/AudioDialog';
 import { VideoLibraryPickerDialog } from './videoEditor/VideoLibraryPickerDialog';
+import { TextGeneratorDialog } from './videoEditor/TextGeneratorDialog';
 
 export const VideoEditor = () => {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ export const VideoEditor = () => {
   const [resultVideoUrl, setResultVideoUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null); // { type: 'success'|'error', text: '' }
+  const [showTextGenerator, setShowTextGenerator] = useState(false);
 
   // Object URL tracking
   const objectUrlsRef = useRef({ video1: '', video2: '', result: '' });
@@ -339,6 +341,7 @@ export const VideoEditor = () => {
           ffmpegLoaded={ffmpegLoaded}
           ffmpegLoading={ffmpegLoading}
           engineError={engineError}
+          onOpenTextGenerator={() => setShowTextGenerator(true)}
         />
 
         {/* Center Columns */}
@@ -441,6 +444,14 @@ export const VideoEditor = () => {
           token={token}
           onClose={() => setVideoPickerSlot(null)}
           onSelectVideo={handleSelectLibraryVideo}
+        />
+      )}
+
+      {showTextGenerator && (
+        <TextGeneratorDialog
+          token={token}
+          onClose={() => setShowTextGenerator(false)}
+          onSelectText={overlay.setText}
         />
       )}
     </div>
