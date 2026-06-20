@@ -357,6 +357,7 @@ export const AdminDashboard = () => {
                 <div className="flex min-w-0 items-center gap-3">
                   <img
                     src={account.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                    crossOrigin="anonymous"
                     alt=""
                     className="h-9 w-9 rounded-full border border-black/10 object-cover"
                   />

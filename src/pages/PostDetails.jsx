@@ -80,7 +80,7 @@ export const PostDetails = () => {
 
         {channel && (
           <div className="flex items-center gap-2 text-[10px] text-gray-500 font-semibold bg-white border border-[#e5e5ea] px-3 py-1 rounded-full shadow-sm">
-            <img src={channel.avatarUrl} className="w-4 h-4 rounded-full object-cover" alt="" />
+            <img src={channel.avatarUrl} crossOrigin="anonymous" className="w-4 h-4 rounded-full object-cover" alt="" />
             <span>{channel.name} ({channel.platform})</span>
           </div>
         )}
@@ -103,7 +103,7 @@ export const PostDetails = () => {
           <div className="md:col-span-1 bg-white border border-[#e5e5ea] rounded-xl overflow-hidden shadow-sm flex flex-col">
             {post.mediaUrl && (
               <div className="w-full aspect-square bg-gray-50 border-b border-[#e5e5ea] overflow-hidden flex items-center justify-center">
-                <img src={post.mediaUrl} className="w-full h-full object-cover" alt="Post Media" />
+                <img src={post.mediaUrl} crossOrigin="anonymous" className="w-full h-full object-cover" alt="Post Media" />
               </div>
             )}
             <div className="p-5 space-y-4">

@@ -16,8 +16,11 @@ import Settings from './pages/Settings';
 import AdminUsers from './pages/AdminUsers';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminCampaigns from './pages/AdminCampaigns';
+import AdminFolders from './pages/AdminFolders';
+import AdminFolderDetails from './pages/AdminFolderDetails';
 import FacebookCallback from './pages/FacebookCallback';
 import FacebookLoginCallback from './pages/FacebookLoginCallback';
+import GoogleLoginCallback from './pages/GoogleLoginCallback';
 import InstagramCallback from './pages/InstagramCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
@@ -32,6 +35,8 @@ const AdminShell = () => (
         <Route path="/" element={<AdminDashboard />} />
         <Route path="/users" element={<AdminUsers />} />
         <Route path="/campaign" element={<AdminCampaigns />} />
+        <Route path="/folders" element={<AdminFolders />} />
+        <Route path="/folders/:id" element={<AdminFolderDetails />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </main>
@@ -59,6 +64,7 @@ function AppContent() {
       <Routes>
         <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
         <Route path="/auth/facebook-login/callback" element={<FacebookLoginCallback />} />
+        <Route path="/auth/google/callback" element={<GoogleLoginCallback />} />
         <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-and-conditions" element={<TermsAndConditions />} />

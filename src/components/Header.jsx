@@ -125,7 +125,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
                   className="flex items-center justify-between p-2 rounded-lg hover:bg-[#f5f5f7] cursor-pointer transition-all"
                 >
                   <div className="flex items-center gap-3">
-                    <img src={acc.avatarUrl} className="w-6 h-6 rounded-full object-cover border border-black/10" alt="" />
+                    <img src={acc.avatarUrl} crossOrigin="anonymous" className="w-6 h-6 rounded-full object-cover border border-black/10" alt="" />
                     <div>
                       <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">{acc.name}</p>
                       <p className="text-[9px] text-gray-500">@{acc.username} ({acc.platform})</p>
@@ -151,6 +151,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
           <div className="flex items-center gap-3 border-l border-[#e5e5ea] pl-6">
             <img 
               src={displayedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
+              crossOrigin="anonymous"
               className="w-7 h-7 rounded-full object-cover border border-black/10" 
               alt="Avatar" 
             />
