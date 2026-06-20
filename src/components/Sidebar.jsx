@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Clock, FolderHeart, Film, Link2, Settings as SettingsIcon, ChevronLeft, ChevronRight, Globe, Check, X, LogOut, Megaphone, Users, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Clock, FolderHeart, Film, Link2, Settings as SettingsIcon, ChevronLeft, ChevronRight, X, LogOut, Megaphone, Users, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [accounts, setAccounts] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [activeCampaignId, setActiveCampaignId] = useState(() => localStorage.getItem('active-campaign-id') || '');
   const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
@@ -57,7 +56,6 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     } else {
       localStorage.removeItem('active-campaign-id');
     }
-    setAccounts(nextAccounts);
     setSelectedAccounts(nextAccounts.map(account => account._id));
   };
 
@@ -84,7 +82,6 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
       if (response.ok) {
         const data = await response.json();
         const nextAccounts = data.length > 0 ? data : (adminViewChannel ? [adminViewChannel] : []);
-        setAccounts(nextAccounts);
 
         if (adminViewUserId) {
           setSelectedAccounts(nextAccounts.map(acc => acc._id));
@@ -110,22 +107,6 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
 
   const handleCampaignChange = (campaignId) => {
     applyCampaign(campaigns, campaignId);
-  };
-
-  const toggleAccountSelection = (accountId) => {
-    setSelectedAccounts((current) => (
-      current.includes(accountId)
-        ? current.filter(id => id !== accountId)
-        : [...current, accountId]
-    ));
-  };
-
-  const selectAllAccounts = () => {
-    setSelectedAccounts(accounts.map(acc => acc._id));
-  };
-
-  const clearAllAccounts = () => {
-    setSelectedAccounts([]);
   };
 
   const exitAdminUserView = () => {
@@ -246,64 +227,6 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
           </div>
         )}
 
-        <div className={`mt-3 pt-3 border-t ${isAdminViewingUser ? 'border-white/10' : 'border-[#e5e5ea]'}`}>
-          <div
-            title={isCollapsed ? `Publishing Channels (${selectedAccounts.length})` : undefined}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold ${isCollapsed ? 'justify-center px-0' : ''} ${isAdminViewingUser ? 'text-[#cbd5e1]' : 'text-[#1d1d1f]'}`}
-          >
-            <Globe className="w-4 h-4 flex-shrink-0" />
-            {!isCollapsed && (
-              <>
-                <span className="flex-1">Publishing Channels</span>
-                <span className={`text-[10px] rounded px-1.5 py-0.5 ${isAdminViewingUser ? 'bg-white/10 text-[#cbd5e1]' : 'bg-[#f5f5f7] text-[#6e6e73]'}`}>
-                  {selectedAccounts.length}
-                </span>
-              </>
-            )}
-          </div>
-
-          {!isCollapsed && (
-            <div className="mt-1 space-y-1">
-              <div className="flex items-center justify-between px-3 pb-1 text-[10px]">
-                <button type="button" onClick={selectAllAccounts} className={`${isAdminViewingUser ? 'text-[#93c5fd] hover:text-white' : 'text-[#0071e3] hover:text-[#147ce5]'} font-semibold`}>
-                  All
-                </button>
-                <button type="button" onClick={clearAllAccounts} className={`${isAdminViewingUser ? 'text-[#9ca3af] hover:text-white' : 'text-[#8e8e93] hover:text-[#1d1d1f]'} font-semibold`}>
-                  Clear
-                </button>
-              </div>
-
-              <div className="max-h-44 overflow-y-auto space-y-1 pr-0.5">
-                {accounts.map(account => {
-                  const isSelected = selectedAccounts.includes(account._id);
-                  return (
-                    <button
-                      key={account._id}
-                      type="button"
-                      onClick={() => toggleAccountSelection(account._id)}
-                      className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left transition-all ${
-                        isSelected
-                          ? (isAdminViewingUser ? 'bg-white text-[#111827]' : 'bg-[#f5f5f7] text-[#1d1d1f]')
-                          : (isAdminViewingUser ? 'text-[#cbd5e1] hover:bg-white/10 hover:text-white' : 'text-[#8e8e93] hover:bg-[#f5f5f7]/50 hover:text-[#1d1d1f]')
-                      }`}
-                    >
-                      <img src={account.avatarUrl} crossOrigin="anonymous" className="w-5 h-5 rounded-full object-cover border border-black/10 flex-shrink-0" alt="" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[11px] font-semibold">{account.name}</span>
-                        <span className="block truncate text-[9px] opacity-70 capitalize">{account.platform}</span>
-                      </span>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-[#0071e3] flex-shrink-0" />}
-                    </button>
-                  );
-                })}
-
-                {accounts.length === 0 && (
-                  <p className={`px-3 py-2 text-[10px] ${isAdminViewingUser ? 'text-[#9ca3af]' : 'text-[#8e8e93]'}`}>No publishing channels.</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
       </nav>
 
       {/* Sidebar Footer */}

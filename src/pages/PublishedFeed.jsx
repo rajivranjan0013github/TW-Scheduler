@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Eye, Heart, MessageSquare, RefreshCw } from 'lucide-react';
+import { ArrowLeft, BarChart3, ChevronDown, ChevronUp, ExternalLink, Eye, Heart, MessageSquare, Play, RefreshCw } from 'lucide-react';
 
 export const PublishedFeed = () => {
   const { id } = useParams();
@@ -12,6 +12,7 @@ export const PublishedFeed = () => {
   const [loading, setLoading] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [errorPosts, setErrorPosts] = useState(null);
+  const [expandedPostId, setExpandedPostId] = useState(null);
 
   useEffect(() => {
     fetchChannelAndPosts();
@@ -30,23 +31,162 @@ export const PublishedFeed = () => {
     return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
   };
 
-  const getGroupedPosts = (posts) => {
-    const groups = [];
-    posts.forEach(post => {
-      const dateStr = new Date(post.createdAt).toLocaleDateString([], {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-      let group = groups.find(g => g.dateStr === dateStr);
-      if (!group) {
-        group = { dateStr, posts: [] };
-        groups.push(group);
-      }
-      group.posts.push(post);
+  const compactNumber = (value = 0) => (
+    Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value) || 0)
+  );
+
+  const openLivePost = (post) => {
+    if (post.permalink) {
+      window.open(post.permalink, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const openInsights = (post) => {
+    navigate(`/channels/${id}/posts/${post.id}`, {
+      state: { fromAdmin: location.state?.fromAdmin, channel },
     });
-    return groups;
+  };
+
+  const PostMedia = ({ post }) => {
+    const isVideo = post.mediaType === 'VIDEO' || Boolean(post.videoUrl);
+    const mediaSrc = isVideo ? (post.videoUrl || post.mediaUrl) : post.mediaUrl;
+
+    if (!mediaSrc) {
+      return (
+        <div className="flex aspect-square items-center justify-center bg-[#f5f5f7] text-xs font-semibold text-[#8e8e93]">
+          No media preview
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative aspect-square bg-black">
+        {isVideo ? (
+          <video
+            src={mediaSrc}
+            poster={post.mediaUrl || undefined}
+            crossOrigin="anonymous"
+            className="h-full w-full object-cover"
+            controls
+            playsInline
+            preload="metadata"
+            onClick={(event) => event.stopPropagation()}
+          />
+        ) : (
+          <img src={mediaSrc} crossOrigin="anonymous" className="h-full w-full object-cover" alt="" />
+        )}
+        {isVideo && (
+          <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
+            <Play className="h-3 w-3 fill-white" />
+            Video
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const PostTile = ({ post }) => {
+    const isExpanded = expandedPostId === post.id;
+
+    return (
+      <div className="overflow-hidden rounded-xl border border-[#e5e5ea] bg-white shadow-sm">
+        <div
+          onClick={() => openLivePost(post)}
+          className="group relative cursor-pointer bg-black"
+        >
+          <PostMedia post={post} />
+          <div className="absolute inset-0 flex items-center justify-center gap-5 bg-black/0 text-white opacity-0 transition-all group-hover:bg-black/35 group-hover:opacity-100">
+            <span className="flex items-center gap-1.5 text-sm font-semibold">
+              <Heart className="h-5 w-5 fill-white" />
+              {compactNumber(post.likes)}
+            </span>
+            <span className="flex items-center gap-1.5 text-sm font-semibold">
+              <MessageSquare className="h-5 w-5 fill-white" />
+              {compactNumber(post.comments)}
+            </span>
+          </div>
+          <div className="absolute bottom-2 right-2 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                openLivePost(post);
+              }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white transition hover:bg-black"
+              title="Open live post"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                openInsights(post);
+              }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#0071e3] text-white transition hover:bg-[#147ce5]"
+              title="Open insights"
+            >
+              <BarChart3 className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 text-[11px] font-semibold text-[#515154]">
+              <span className="flex items-center gap-1">
+                <Eye className="h-3.5 w-3.5 text-[#6e6e73]" />
+                {compactNumber(post.views)}
+              </span>
+              <span className="flex items-center gap-1">
+                <Heart className="h-3.5 w-3.5 fill-red-500 text-red-500" />
+                {compactNumber(post.likes)}
+              </span>
+              <span className="flex items-center gap-1">
+                <MessageSquare className="h-3.5 w-3.5 text-[#0071e3]" />
+                {compactNumber(post.comments)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExpandedPostId(isExpanded ? null : post.id)}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
+            >
+              <span>Details</span>
+              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+
+          {isExpanded && (
+            <div className="mt-2 space-y-2 border-t border-[#e5e5ea] pt-2">
+              <p className="m-0 max-h-28 overflow-y-auto whitespace-pre-wrap text-[11px] leading-relaxed text-[#1d1d1f]">
+                {post.content || 'No caption'}
+              </p>
+              <div className="rounded-lg bg-[#f5f5f7] px-3 py-2">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#6e6e73]">Comments</span>
+                  <span className="text-[9px] font-semibold text-[#8e8e93]">{compactNumber(post.comments)} total</span>
+                </div>
+                {(post.commentsPreview || []).length > 0 ? (
+                  <div className="max-h-24 space-y-1 overflow-y-auto">
+                    {post.commentsPreview.map((comment, index) => (
+                      <p key={comment.id || `${post.id}-comment-${index}`} className="m-0 text-[10px] leading-relaxed text-[#1d1d1f]">
+                        <span className="font-semibold">{comment.username || 'User'}</span>{' '}
+                        <span className="text-[#515154]">{comment.text}</span>
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="m-0 text-[10px] text-[#8e8e93]">
+                    {post.comments > 0 ? 'Refresh from Meta to load comment previews.' : 'No comments yet.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const fetchChannelAndPosts = async (forceRefresh = false) => {
@@ -162,7 +302,7 @@ export const PublishedFeed = () => {
       </div>
 
       {/* Body Container */}
-      <div className="max-w-4xl mx-auto w-full flex-1">
+      <div className="mx-auto w-full max-w-6xl flex-1">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-32 gap-3">
             <div className="w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
@@ -178,79 +318,9 @@ export const PublishedFeed = () => {
             No published posts found on this channel.
           </div>
         ) : (
-          <div className="space-y-6 pb-12">
-            {getGroupedPosts(publishedPosts).map(group => (
-              <div key={group.dateStr} className="space-y-3">
-                {/* Date Separator */}
-                <div className="flex items-center gap-3 pt-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#0071e3]"></div>
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                    {group.dateStr}
-                  </span>
-                  <div className="flex-grow border-t border-dashed border-gray-200"></div>
-                </div>
-
-                {/* Group Posts */}
-                <div className="space-y-3">
-                  {group.posts.map(post => (
-                    <div
-                      key={post.id}
-                      onClick={() => navigate(`/channels/${id}/posts/${post.id}`, {
-                        state: { fromAdmin: location.state?.fromAdmin, channel },
-                      })}
-                      className="bg-white border border-[#e5e5ea] rounded-xl p-4 flex gap-4 hover:shadow-sm hover:border-[#0071e3]/40 cursor-pointer transition-all"
-                    >
-                      {post.mediaUrl && (
-                        <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-[#e5e5ea]">
-                          <img src={post.mediaUrl} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
-                        </div>
-                      )}
-                      <div className="flex-1 flex flex-col justify-between min-w-0">
-                        <div className="space-y-1">
-                          <p className="text-xs text-black font-normal line-clamp-1 leading-relaxed whitespace-pre-wrap">
-                            {post.content}
-                          </p>
-                          <p className="text-[9px] text-[#8e8e93] mt-1">
-                            {new Date(post.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-3">
-                          <div className="flex items-center gap-4 text-[10px] text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <Eye className="w-3.5 h-3.5 text-gray-500" />
-                              <span>{post.views || 0}</span>
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500" />
-                              <span>{post.likes}</span>
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <MessageSquare className="w-3.5 h-3.5 text-blue-500 fill-blue-500" />
-                              <span>{post.comments}</span>
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 text-[10px] font-semibold">
-                            <a
-                              href={post.permalink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-blue-600 hover:underline"
-                            >
-                              View Live Post
-                            </a>
-                            <span className="text-gray-300">•</span>
-                            <span className="text-[#0071e3] hover:underline">
-                              Insights →
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          <div className="grid grid-cols-2 gap-3 pb-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {publishedPosts.map(post => (
+              <PostTile key={post.id} post={post} />
             ))}
           </div>
         )}
