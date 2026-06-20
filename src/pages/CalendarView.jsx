@@ -3,6 +3,114 @@ import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { Plus, Check, Trash2, Clock, AlertCircle, Folder, Users, Layers, CalendarDays, Save, FileText } from 'lucide-react';
 
+const getProxyUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('https://pub-') || url.includes('r2.cloudflarestorage.com')) {
+    return `http://localhost:5001/api/media/proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
+
+const VideoThumbnail = ({ url, className }) => {
+  const [poster, setPoster] = useState('');
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!url) return undefined;
+
+    let cancelled = false;
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    let timeoutId;
+
+    const finishFailed = () => {
+      if (!cancelled) setFailed(true);
+    };
+
+    const captureFrame = () => {
+      if (cancelled || !video.videoWidth || !video.videoHeight) return;
+
+      try {
+        const width = 360;
+        const height = Math.round((video.videoHeight / video.videoWidth) * width);
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, width, height);
+        setPoster(canvas.toDataURL('image/jpeg', 0.82));
+        setFailed(false);
+      } catch (error) {
+        finishFailed();
+      }
+    };
+
+    const seekIntoVideo = () => {
+      if (cancelled) return;
+      try {
+        const seekTime = Number.isFinite(video.duration) && video.duration > 0
+          ? Math.min(0.5, Math.max(0.08, video.duration * 0.05))
+          : 0.1;
+        video.currentTime = seekTime;
+      } catch (error) {
+        captureFrame();
+      }
+    };
+
+    setPoster('');
+    setFailed(false);
+    video.crossOrigin = 'anonymous';
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.addEventListener('loadedmetadata', seekIntoVideo, { once: true });
+    video.addEventListener('loadeddata', seekIntoVideo, { once: true });
+    video.addEventListener('seeked', captureFrame, { once: true });
+    video.addEventListener('error', finishFailed, { once: true });
+    video.src = url;
+    video.load();
+    timeoutId = window.setTimeout(finishFailed, 7000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      video.removeAttribute('src');
+      video.load();
+    };
+  }, [url]);
+
+  if (poster) {
+    return <img src={poster} className={className} alt="" />;
+  }
+
+  return (
+    <div className={`${className} flex items-center justify-center bg-[#eef2ff] text-[9px] font-bold uppercase tracking-wider text-[#536079]`}>
+      {failed ? 'Video' : 'Loading'}
+    </div>
+  );
+};
+
+const MediaPreview = ({ item, className = 'h-full w-full object-cover block' }) => {
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const thumbnailUrl = getProxyUrl(item?.thumbnailUrl);
+  const url = getProxyUrl(item?.url);
+
+  useEffect(() => {
+    setThumbnailFailed(false);
+  }, [thumbnailUrl]);
+
+  if (!thumbnailUrl && !url) return null;
+
+  if (thumbnailUrl && !thumbnailFailed) {
+    return <img src={thumbnailUrl} className={className} alt="" onError={() => setThumbnailFailed(true)} />;
+  }
+
+  if (item?.type === 'video') {
+    return <VideoThumbnail url={url} className={className} />;
+  }
+
+  return <img src={url} className={className} alt="" />;
+};
+
 export const CalendarView = ({ selectedAccounts }) => {
   const { user } = useAuth();
   const location = useLocation();
@@ -35,7 +143,7 @@ export const CalendarView = ({ selectedAccounts }) => {
   const hasYoutubeSelected = selectedChannelObjects.some(chan => chan.platform === 'youtube');
   const getMediaAccountIds = (item) => (item?.socialAccountIds || []).map(account => account._id || account);
   const getFolderName = (folderId) => {
-    if (!folderId) return 'Library Root';
+    if (!folderId) return 'Campaign Library';
     const id = folderId._id || folderId;
     return folders.find(folder => folder._id === id)?.name || 'Unknown folder';
   };
@@ -65,6 +173,7 @@ export const CalendarView = ({ selectedAccounts }) => {
   const isMediaAvailableForChannels = (item, channelIds) => {
     if (channelIds.length === 0) return true;
     const mediaAccountIds = getMediaAccountIds(item);
+    if (mediaAccountIds.length === 0) return true;
     return channelIds.every(channelId => mediaAccountIds.includes(channelId));
   };
   const availableMediaList = useMemo(() => {
@@ -81,12 +190,12 @@ export const CalendarView = ({ selectedAccounts }) => {
       return itemFolderId === activeFolderId;
     });
   }, [mediaList, selectedChannels, activeFolderId]);
-  const isBulk = availableMediaList.length > 1;
+  const isBulk = selectedMedia.length > 1;
   const activeFolderName = activeFolderId === 'root'
-    ? 'Library Root'
+    ? 'Campaign Library'
     : folders.find(folder => folder._id === activeFolderId)?.name || 'Selected Folder';
   const folderOptions = useMemo(() => [
-    { _id: 'root', name: 'Library Root' },
+    { _id: 'root', name: 'Campaign Library' },
     ...folders,
   ], [folders]);
   const getFolderAssetCount = (folderId) => mediaList.filter(item => {
@@ -199,10 +308,13 @@ export const CalendarView = ({ selectedAccounts }) => {
     setSelectedMedia((current) => (
       current.filter(mediaId => {
         const item = mediaList.find(media => media._id === mediaId);
-        return item && isMediaAvailableForChannels(item, selectedChannels);
+        if (!item || !isMediaAvailableForChannels(item, selectedChannels)) return false;
+        if (activeFolderId === 'root') return !item.folderId;
+        const itemFolderId = item.folderId?._id || item.folderId;
+        return itemFolderId === activeFolderId;
       })
     ));
-  }, [selectedChannels, mediaList]);
+  }, [selectedChannels, mediaList, activeFolderId]);
 
   useEffect(() => {
     if (selectedChannels.length === 0) {
@@ -210,16 +322,7 @@ export const CalendarView = ({ selectedAccounts }) => {
       return;
     }
 
-    const folderMediaIds = availableMediaList.map(item => item._id);
-    setSelectedMedia((current) => {
-      if (
-        current.length === folderMediaIds.length &&
-        current.every((mediaId, index) => mediaId === folderMediaIds[index])
-      ) {
-        return current;
-      }
-      return folderMediaIds;
-    });
+    setSelectedMedia(availableMediaList.map(item => item._id));
   }, [availableMediaList, selectedChannels.length]);
 
   const fetchPosts = async () => {
@@ -344,7 +447,7 @@ export const CalendarView = ({ selectedAccounts }) => {
     e.preventDefault();
 
     if (selectedChannels.length === 0) {
-      alert('Select at least one social account');
+      alert('Select at least one publishing channel');
       return;
     }
     if (selectedMedia.length === 0) {
@@ -356,7 +459,7 @@ export const CalendarView = ({ selectedAccounts }) => {
       return !item || !isMediaAvailableForChannels(item, selectedChannels);
     });
     if (unavailableMedia) {
-      alert('Selected media is not available for one or more selected social accounts.');
+      alert('Selected media is restricted away from one or more selected publishing channels.');
       return;
     }
     if (!scheduleTime) {
@@ -453,6 +556,14 @@ export const CalendarView = ({ selectedAccounts }) => {
       current.includes(channelId)
         ? current.filter(id => id !== channelId)
         : [...current, channelId]
+    ));
+  };
+
+  const toggleMedia = (mediaId) => {
+    setSelectedMedia((current) => (
+      current.includes(mediaId)
+        ? current.filter(id => id !== mediaId)
+        : [...current, mediaId]
     ));
   };
 
@@ -560,29 +671,36 @@ export const CalendarView = ({ selectedAccounts }) => {
 
               <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
                 <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2 flex items-center justify-between">
-                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">3. Auto Select Matching Assets</h4>
-                  <span className="text-[10px] font-semibold text-[#15803d]">{availableMediaList.length} matching</span>
+                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">3. Select Matching Assets</h4>
+                  <span className="text-[10px] font-semibold text-[#15803d]">{selectedMedia.length}/{availableMediaList.length} selected</span>
                 </div>
                 <div className="p-3">
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[308px] overflow-y-auto pr-1">
-                    {selectedChannels.length > 0 && availableMediaList.map(item => (
-                      <div key={item._id} className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
-                        <div className="relative aspect-video bg-[#f5f5f7]">
-                          {item.type === 'video' ? (
-                            <video src={item.url} crossOrigin="anonymous" className="h-full w-full object-cover" />
-                          ) : (
-                            <img src={item.url} crossOrigin="anonymous" className="h-full w-full object-cover" alt="" />
-                          )}
-                          <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded bg-[#2563eb] text-white">
-                            <Check className="h-3 w-3" />
-                          </span>
-                        </div>
-                        <div className="px-2 py-1.5">
-                          <p className="m-0 truncate text-[10px] font-semibold text-[#1d1d1f]" title={getMediaLabel(item)}>{getMediaLabel(item)}</p>
-                          <p className={`m-0 mt-0.5 text-[9px] font-semibold ${getAssetCaptionDraft(item).trim() ? 'text-[#15803d]' : 'text-[#b45309]'}`}>{getAssetCaptionDraft(item).trim() ? 'Caption saved' : 'No caption'}</p>
-                        </div>
-                      </div>
-                    ))}
+                    {selectedChannels.length > 0 && availableMediaList.map(item => {
+                      const isSelected = selectedMedia.includes(item._id);
+                      return (
+                        <button
+                          key={item._id}
+                          type="button"
+                          onClick={() => toggleMedia(item._id)}
+                          className={`block w-full rounded-lg border overflow-hidden p-0 text-left transition-all ${isSelected
+                              ? 'border-[#2563eb] bg-white ring-1 ring-[#2563eb]/30'
+                              : 'border-[#d8e0f4] bg-[#f8fafc] opacity-65 hover:opacity-95 hover:border-[#9aaee8]'
+                            }`}
+                        >
+                          <div className="relative aspect-video overflow-hidden bg-[#eef2ff]">
+                            <MediaPreview item={item} />
+                            <span className={`absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded text-[9px] font-bold ${isSelected ? 'bg-[#2563eb] text-white' : 'bg-white/90 text-[#536079] border border-[#d8e0f4]'}`}>
+                              {isSelected ? <Check className="h-3 w-3" /> : ''}
+                            </span>
+                          </div>
+                          <div className="bg-white px-2 py-1.5">
+                            <p className="m-0 truncate text-[10px] font-semibold text-[#1d1d1f]" title={getMediaLabel(item)}>{getMediaLabel(item)}</p>
+                            
+                          </div>
+                        </button>
+                      );
+                    })}
                     {selectedChannels.length === 0 && (
                       <div className="col-span-full h-32 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] flex items-center justify-center text-xs text-[#6b7280] text-center p-4">
                         Select accounts to reveal matching assets.
@@ -595,7 +713,7 @@ export const CalendarView = ({ selectedAccounts }) => {
                     )}
                   </div>
                 </div>
-                <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">All matching assets are selected automatically.</div>
+                <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">Click assets to include or remove them from this schedule.</div>
               </div>
 
               <div className="space-y-4">
@@ -712,11 +830,7 @@ export const CalendarView = ({ selectedAccounts }) => {
                       <div key={item._id} className="rounded-lg border border-[#d8e0f4] bg-white p-2">
                         <div className="flex gap-2">
                           <div className="h-16 w-20 overflow-hidden rounded-md border border-[#e5e5ea] bg-[#f5f5f7] flex-shrink-0">
-                            {item.type === 'video' ? (
-                              <video src={item.url} crossOrigin="anonymous" className="h-full w-full object-cover" />
-                            ) : (
-                              <img src={item.url} crossOrigin="anonymous" className="h-full w-full object-cover" alt="" />
-                            )}
+                            <MediaPreview item={item} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="m-0 truncate text-xs font-semibold text-[#0b1645]" title={getMediaLabel(item)}>{getMediaLabel(item)}</p>
@@ -792,11 +906,7 @@ export const CalendarView = ({ selectedAccounts }) => {
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <div className="h-8 w-10 overflow-hidden rounded border border-[#e5e5ea] bg-[#f5f5f7] flex-shrink-0">
-                              {row.mediaItem?.type === 'video' ? (
-                                <video src={row.mediaItem?.url} crossOrigin="anonymous" className="h-full w-full object-cover" />
-                              ) : (
-                                <img src={row.mediaItem?.url} crossOrigin="anonymous" className="h-full w-full object-cover" alt="" />
-                              )}
+                              <MediaPreview item={row.mediaItem} />
                             </div>
                             <span className="truncate font-semibold text-[#1d1d1f]">{getMediaLabel(row.mediaItem)}</span>
                           </div>
@@ -819,7 +929,7 @@ export const CalendarView = ({ selectedAccounts }) => {
                 <div className="flex flex-wrap gap-4 text-[10px] font-semibold text-[#536079]">
                   <span>{selectedChannels.length} account{selectedChannels.length === 1 ? '' : 's'}</span>
                   <span>{activeFolderName}</span>
-                  <span>{isBulk ? `${availableMediaList.length} asset sequence` : 'single asset post'}</span>
+                  <span>{isBulk ? `${selectedMedia.length} asset sequence` : 'single asset post'}</span>
                 </div>
                 <div className="flex justify-end gap-2">
                   <button
@@ -891,11 +1001,7 @@ export const CalendarView = ({ selectedAccounts }) => {
                   {/* Thumbnail */}
                   <div className="w-16 h-16 bg-[#f5f5f7] rounded-lg border border-[#e5e5ea] overflow-hidden flex-shrink-0 flex items-center justify-center relative">
                     {firstMedia ? (
-                      firstMedia.type === 'video' ? (
-                        <video src={firstMedia.url} crossOrigin="anonymous" className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={firstMedia.url} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
-                      )
+                      <MediaPreview item={firstMedia} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-[9px] text-gray-300">No media</span>
                     )}

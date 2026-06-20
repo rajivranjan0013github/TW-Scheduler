@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Folder, Search, Tag, Upload, Plus, Trash2, ChevronRight, Clock, Users, Save, Film } from 'lucide-react';
+import { Folder, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Film } from 'lucide-react';
 
 const getProxyUrl = (url) => {
   if (!url) return '';
@@ -11,13 +10,22 @@ const getProxyUrl = (url) => {
   return url;
 };
 
+const getPathWithoutExtension = (filePath) => (
+  String(filePath || '')
+    .replace(/\\/g, '/')
+    .replace(/\.[^/.]+$/, '')
+    .toLowerCase()
+);
+
+const getFileNameWithoutExtension = (filePath) => (
+  getPathWithoutExtension(filePath).split('/').pop()
+);
+
 export const MediaLibrary = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [folders, setFolders] = useState([]);
   const [media, setMedia] = useState([]);
-  const [accounts, setAccounts] = useState([]);
   const [activeFolderId, setActiveFolderId] = useState(() => {
     return location.state?.preselectedFolderId || 'root';
   });
@@ -27,14 +35,11 @@ export const MediaLibrary = () => {
       setActiveFolderId(location.state.preselectedFolderId);
     }
   }, [location.state?.preselectedFolderId]);
-  const [searchTag, setSearchTag] = useState('');
-  const [accountFilter, setAccountFilter] = useState('all');
-  const [uploadAccountIds, setUploadAccountIds] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [tagsInput, setTagsInput] = useState('');
   const [uploadCaption, setUploadCaption] = useState('');
   const [captionDrafts, setCaptionDrafts] = useState({});
   const [savingCaptionId, setSavingCaptionId] = useState(null);
@@ -44,12 +49,11 @@ export const MediaLibrary = () => {
 
   useEffect(() => {
     fetchFolders();
-    fetchAccounts();
   }, []);
 
   useEffect(() => {
     fetchMedia();
-  }, [activeFolderId, searchTag, accountFilter]);
+  }, [activeFolderId]);
 
   const fetchFolders = async () => {
     try {
@@ -67,35 +71,10 @@ export const MediaLibrary = () => {
     }
   };
 
-  const fetchAccounts = async () => {
-    try {
-      const response = await fetch('http://localhost:5001/api/accounts', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const connectedAccounts = data.filter(account => account.isConnected !== false);
-        setAccounts(connectedAccounts);
-        setUploadAccountIds((current) => current.length > 0 ? current : connectedAccounts.map(account => account._id));
-      }
-    } catch (error) {
-      console.error('Failed to load social accounts:', error);
-    }
-  };
-
   const fetchMedia = async () => {
     try {
       const params = new URLSearchParams();
       if (activeFolderId) params.set('folderId', activeFolderId);
-      if (searchTag) {
-        params.delete('folderId');
-        params.set('tag', searchTag);
-      }
-      if (accountFilter !== 'all') {
-        params.set('accountId', accountFilter);
-      }
       const url = `http://localhost:5001/api/media?${params.toString()}`;
 
       const response = await fetch(url, {
@@ -116,20 +95,14 @@ export const MediaLibrary = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (uploadAccountIds.length === 0) {
-      alert('Select at least one connected social account before uploading media.');
-      e.target.value = '';
-      return;
-    }
-
     setUploading(true);
     setUploadProgress('');
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folderId', activeFolderId === 'root' ? 'null' : activeFolderId);
-    formData.append('tags', tagsInput);
+    formData.append('tags', '');
     formData.append('caption', uploadCaption);
-    formData.append('socialAccountIds', uploadAccountIds.join(','));
+    formData.append('socialAccountIds', '');
 
     try {
       const response = await fetch('http://localhost:5001/api/media/upload', {
@@ -141,7 +114,6 @@ export const MediaLibrary = () => {
       });
 
       if (response.ok) {
-        setTagsInput('');
         setUploadCaption('');
         fetchMedia();
       } else {
@@ -163,13 +135,12 @@ export const MediaLibrary = () => {
         url: fakeUrl,
         storageKey: `mock-${Date.now()}`,
         caption: uploadCaption,
-        tags: tagsInput ? tagsInput.split(',').map(t => t.trim().toLowerCase()) : [],
-        socialAccountIds: accounts.filter(account => uploadAccountIds.includes(account._id)),
+        tags: [],
+        socialAccountIds: [],
         size: file.size,
         createdAt: new Date()
       };
       setMedia([newMockItem, ...media]);
-      setTagsInput('');
       setUploadCaption('');
     } finally {
       setUploading(false);
@@ -182,14 +153,11 @@ export const MediaLibrary = () => {
     const selectedFiles = Array.from(e.target.files || []);
     if (selectedFiles.length === 0) return;
 
-    if (uploadAccountIds.length === 0) {
-      alert('Select at least one connected social account before uploading a folder.');
-      e.target.value = '';
-      return;
-    }
-
     const mediaFiles = selectedFiles.filter(file => (
       file.type.startsWith('image/') || file.type.startsWith('video/')
+    ));
+    const captionFiles = selectedFiles.filter(file => (
+      file.type === 'text/plain' || /\.txt$/i.test(file.name)
     ));
 
     if (mediaFiles.length === 0) {
@@ -223,17 +191,28 @@ export const MediaLibrary = () => {
 
       const createdFolder = await folderResponse.json();
       const targetFolderId = createdFolder._id;
+      const captionsByPath = new Map();
+
+      for (const captionFile of captionFiles) {
+        const relativePath = captionFile.webkitRelativePath || captionFile.name;
+        const captionText = await captionFile.text();
+        captionsByPath.set(getPathWithoutExtension(relativePath), captionText);
+        captionsByPath.set(getFileNameWithoutExtension(relativePath), captionText);
+      }
 
       for (let index = 0; index < mediaFiles.length; index += 1) {
         const file = mediaFiles[index];
+        const relativePath = file.webkitRelativePath || file.name;
+        const sidecarCaption = captionsByPath.get(getPathWithoutExtension(relativePath))
+          ?? captionsByPath.get(getFileNameWithoutExtension(relativePath));
         setUploadProgress(`Uploading ${index + 1}/${mediaFiles.length}: ${file.webkitRelativePath || file.name}`);
 
         const formData = new FormData();
         formData.append('file', file);
         formData.append('folderId', targetFolderId);
-        formData.append('tags', tagsInput);
-        formData.append('caption', '');
-        formData.append('socialAccountIds', uploadAccountIds.join(','));
+        formData.append('tags', '');
+        formData.append('caption', sidecarCaption ?? uploadCaption);
+        formData.append('socialAccountIds', '');
 
         const response = await fetch('http://localhost:5001/api/media/upload', {
           method: 'POST',
@@ -248,7 +227,6 @@ export const MediaLibrary = () => {
         }
       }
 
-      setTagsInput('');
       setUploadCaption('');
       await fetchFolders();
       setActiveFolderId(targetFolderId);
@@ -264,19 +242,6 @@ export const MediaLibrary = () => {
       setUploadProgress('');
       e.target.value = '';
     }
-  };
-
-  const toggleUploadAccount = (accountId) => {
-    setUploadAccountIds((current) => (
-      current.includes(accountId)
-        ? current.filter(id => id !== accountId)
-        : [...current, accountId]
-    ));
-  };
-
-  const getMediaAccounts = (item) => {
-    const itemAccountIds = (item.socialAccountIds || []).map(account => account._id || account);
-    return accounts.filter(account => itemAccountIds.includes(account._id));
   };
 
   const getCaptionDraft = (item) => (
@@ -345,7 +310,7 @@ export const MediaLibrary = () => {
 
   const handleDeleteFolder = async (folderId, e) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this folder? Files inside will be moved to root.')) return;
+    if (!window.confirm('Are you sure you want to delete this campaign folder? Files inside will be moved to the campaign library.')) return;
 
     try {
       const response = await fetch(`http://localhost:5001/api/media/folders/${folderId}`, {
@@ -386,9 +351,18 @@ export const MediaLibrary = () => {
     }
   };
 
+  const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredMedia = media.filter(m => {
     if (filterType === 'all') return true;
     return m.type === filterType;
+  }).filter(m => {
+    if (!normalizedSearch) return true;
+    const searchable = [
+      m.name,
+      m.caption,
+      ...(m.tags || []),
+    ].filter(Boolean).join(' ').toLowerCase();
+    return searchable.includes(normalizedSearch);
   });
 
   return (
@@ -398,7 +372,7 @@ export const MediaLibrary = () => {
       <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">
         <div>
           <h2 className="text-xl font-semibold text-black tracking-tight m-0">Media Library</h2>
-          <p className="text-[#8e8e93] text-xs mt-1">Store R2 assets and attach them to connected social accounts</p>
+          <p className="text-[#8e8e93] text-xs mt-1">Store campaign media, thumbnails, and captions in R2</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -415,7 +389,7 @@ export const MediaLibrary = () => {
             className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>New Folder</span>
+            <span>New Campaign</span>
           </button>
         </div>
       </div>
@@ -423,23 +397,23 @@ export const MediaLibrary = () => {
       {/* Directory Breadcrumbs */}
       <div className="flex items-center gap-2 text-[11px] text-[#8e8e93] bg-white px-3 py-1.5 rounded-lg border border-[#e5e5ea] shadow-sm">
         <span 
-          onClick={() => { setActiveFolderId('root'); setSearchTag(''); }}
+          onClick={() => { setActiveFolderId('root'); setSearchQuery(''); }}
           className={`cursor-pointer hover:text-black ${activeFolderId === 'root' ? 'text-black font-semibold' : ''}`}
         >
-          Library Root
+          Campaign Library
         </span>
         {activeFolderId !== 'root' && (
           <>
             <ChevronRight className="w-3 h-3 text-gray-300" />
             <span className="text-black font-semibold">
-              {folders.find(f => f._id === activeFolderId)?.name || 'Folder View'}
+              {folders.find(f => f._id === activeFolderId)?.name || 'Campaign View'}
             </span>
           </>
         )}
       </div>
 
       {/* Folders List Grid */}
-      {activeFolderId === 'root' && !searchTag && (
+      {activeFolderId === 'root' && !searchQuery && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {folders.map(folder => (
             <div 
@@ -461,7 +435,7 @@ export const MediaLibrary = () => {
           ))}
           {folders.length === 0 && (
             <div className="col-span-full border border-dashed border-[#e5e5ea] p-6 rounded-xl text-center text-[#8e8e93] text-xs">
-              No folders created.
+              No campaigns created.
             </div>
           )}
         </div>
@@ -476,9 +450,9 @@ export const MediaLibrary = () => {
             <Search className="absolute left-3 top-3 w-3.5 h-3.5 text-gray-400" />
             <input 
               type="text"
-              placeholder="Search by tag..."
-              value={searchTag}
-              onChange={(e) => setSearchTag(e.target.value)}
+              placeholder="Search media..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#f5f5f7] border border-[#e5e5ea] pl-9 pr-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black placeholder:text-gray-400"
             />
           </div>
@@ -502,84 +476,18 @@ export const MediaLibrary = () => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Account Filter</label>
-            <select
-              value={accountFilter}
-              onChange={(e) => setAccountFilter(e.target.value)}
-              className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black"
-            >
-              <option value="all">All connected accounts</option>
-              {accounts.map(account => (
-                <option key={account._id} value={account._id}>
-                  {account.name} · {account.platform}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {/* Upload Widget */}
           {canUpload && (
             <div className="space-y-4 border-t border-[#e5e5ea] pt-6">
-              <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Upload Asset</label>
+              <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Campaign Assets</label>
               
               <div className="space-y-2">
-                <div className="relative">
-                  <Tag className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Tags..."
-                    value={tagsInput}
-                    onChange={(e) => setTagsInput(e.target.value)}
-                    className="w-full bg-[#f5f5f7] border border-[#e5e5ea] pl-9 pr-3 py-2 rounded-lg focus:outline-none text-xs text-black placeholder:text-gray-400"
-                  />
-                </div>
                 <textarea
-                  placeholder="Default caption for single upload..."
+                  placeholder="Caption for single upload or folder fallback..."
                   value={uploadCaption}
                   onChange={(e) => setUploadCaption(e.target.value)}
                   className="h-20 w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3 py-2 rounded-lg focus:outline-none text-xs text-black placeholder:text-gray-400 resize-none"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Available For</label>
-                  <button
-                    type="button"
-                    onClick={() => setUploadAccountIds(accounts.map(account => account._id))}
-                    className="text-[10px] font-semibold text-[#0071e3] hover:text-[#147ce5]"
-                  >
-                    Select all
-                  </button>
-                </div>
-                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                  {accounts.map(account => (
-                    <button
-                      key={account._id}
-                      type="button"
-                      onClick={() => toggleUploadAccount(account._id)}
-                      className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all ${
-                        uploadAccountIds.includes(account._id)
-                          ? 'border-black bg-black text-white'
-                          : 'border-[#e5e5ea] bg-[#f5f5f7] text-[#1d1d1f] hover:border-gray-400'
-                      }`}
-                    >
-                      <img src={account.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} crossOrigin="anonymous" className="h-5 w-5 rounded-full object-cover border border-black/10" alt="" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs font-semibold">{account.name}</span>
-                        <span className={`block truncate text-[9px] capitalize ${uploadAccountIds.includes(account._id) ? 'text-white/70' : 'text-gray-500'}`}>
-                          {account.platform}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                  {accounts.length === 0 && (
-                    <div className="rounded-lg border border-dashed border-[#e5e5ea] p-4 text-center text-[10px] text-gray-500">
-                      Connect a social account before uploading media.
-                    </div>
-                  )}
-                </div>
               </div>
 
               <div className="border border-dashed border-[#e5e5ea] rounded-xl p-6 text-center hover:border-gray-400 cursor-pointer relative group transition-all bg-[#f5f5f7]">
@@ -607,7 +515,7 @@ export const MediaLibrary = () => {
               <div className="border border-dashed border-[#d2d2d7] rounded-xl p-5 text-center hover:border-gray-400 cursor-pointer relative group transition-all bg-white">
                 <input
                   type="file"
-                  accept="image/*,video/*"
+                  accept="image/*,video/*,.txt,text/plain"
                   multiple
                   webkitdirectory="true"
                   directory="true"
@@ -617,8 +525,8 @@ export const MediaLibrary = () => {
                 />
                 <div className="space-y-2 text-gray-400">
                   <Folder className="w-6 h-6 mx-auto text-gray-400" />
-                  <p className="text-xs font-semibold text-black">Upload folder</p>
-                  <p className="text-[10px] text-gray-500">Adds supported images/videos from a local folder</p>
+                  <p className="text-xs font-semibold text-black">Import campaign folder</p>
+                  <p className="text-[10px] text-gray-500">Use matching .txt files for per-video captions</p>
                 </div>
               </div>
             </div>
@@ -634,15 +542,16 @@ export const MediaLibrary = () => {
                 className="bg-white border border-[#e5e5ea] rounded-xl overflow-hidden group hover:border-gray-400 transition-all flex flex-col relative shadow-sm"
               >
                 {(() => {
-                  const mediaAccounts = getMediaAccounts(item);
                   return (
                     <>
                       {/* Media Preview Box */}
                       <div className="aspect-video bg-[#f5f5f7] relative overflow-hidden flex items-center justify-center border-b border-[#e5e5ea]">
-                        {item.type === 'video' ? (
+                        {item.type === 'video' && item.thumbnailUrl ? (
+                          <img src={getProxyUrl(item.thumbnailUrl)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                        ) : item.type === 'video' ? (
                           <video src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" controls preload="metadata" />
                         ) : (
-                          <img src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                          <img src={getProxyUrl(item.thumbnailUrl || item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                         )}
                         <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm">
                           {item.type}
@@ -654,31 +563,6 @@ export const MediaLibrary = () => {
                         <div>
                           <h4 className="text-xs font-semibold text-[#1d1d1f] truncate m-0" title={item.name}>{item.name}</h4>
                           <p className="text-[10px] text-gray-500 mt-1">{(item.size / (1024 * 1024)).toFixed(2)} MB</p>
-                        </div>
-
-                        <div className="mt-3 flex items-center gap-1.5 text-[9px] text-gray-500">
-                          <Users className="h-3 w-3 text-gray-400" />
-                          <span className="font-semibold">{mediaAccounts.length || 0} account{mediaAccounts.length === 1 ? '' : 's'}</span>
-                          <div className="ml-1 flex -space-x-1">
-                            {mediaAccounts.slice(0, 4).map(account => (
-                              <img
-                                key={account._id}
-                                src={account.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-                                crossOrigin="anonymous"
-                                title={account.name}
-                                className="h-4 w-4 rounded-full border border-white object-cover"
-                                alt=""
-                              />
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-1 mt-3">
-                          {item.tags?.map(tag => (
-                            <span key={tag} className="text-[9px] bg-[#f5f5f7] text-gray-500 px-1.5 py-0.5 rounded border border-[#e5e5ea]">
-                              #{tag}
-                            </span>
-                          ))}
                         </div>
 
                         <div className="mt-3 space-y-2">
@@ -746,7 +630,7 @@ export const MediaLibrary = () => {
             <form onSubmit={handleCreateFolder} className="space-y-4">
               <input
                 type="text"
-                placeholder="Folder name"
+                placeholder="Campaign folder name"
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black"

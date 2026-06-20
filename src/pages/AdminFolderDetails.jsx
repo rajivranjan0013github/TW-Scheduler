@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Folder, Upload, X, Tag, MessageSquare, AlertTriangle, Music, Trash2 } from 'lucide-react';
+import { ArrowLeft, Folder, Upload, X, Tag, AlertTriangle, Music, Save, Trash2 } from 'lucide-react';
 
 const getProxyUrl = (url) => {
   if (!url) return '';
@@ -27,6 +27,8 @@ export const AdminFolderDetails = () => {
   const [selectedAccountIds, setSelectedAccountIds] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [captionDrafts, setCaptionDrafts] = useState({});
+  const [savingCaptionId, setSavingCaptionId] = useState(null);
 
   const fetchAccounts = async () => {
     try {
@@ -136,7 +138,43 @@ export const AdminFolderDetails = () => {
     fetchAccounts();
   }, [id]);
 
+  const getCaptionDraft = (item) => (
+    captionDrafts[item._id] !== undefined ? captionDrafts[item._id] : (item.caption || '')
+  );
 
+  const handleSaveCaption = async (item) => {
+    const nextCaption = getCaptionDraft(item);
+    setSavingCaptionId(item._id);
+
+    try {
+      const response = await fetch(`http://localhost:5001/api/media/${item._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
+        },
+        body: JSON.stringify({ caption: nextCaption }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to update media caption');
+      }
+
+      setMedia((current) => current.map((mediaItem) => (
+        mediaItem._id === item._id ? data : mediaItem
+      )));
+      setCaptionDrafts((current) => {
+        const next = { ...current };
+        delete next[item._id];
+        return next;
+      });
+    } catch (err) {
+      alert(`Caption save failed: ${err.message}`);
+    } finally {
+      setSavingCaptionId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] p-8 text-[#1d1d1f]">
@@ -216,7 +254,9 @@ export const AdminFolderDetails = () => {
                   >
                     {/* Media Preview */}
                     <div className="aspect-video bg-[#f5f5f7] relative overflow-hidden flex items-center justify-center border-b border-[#e5e5ea]">
-                      {item.type === 'video' ? (
+                      {item.type === 'video' && item.thumbnailUrl ? (
+                        <img src={getProxyUrl(item.thumbnailUrl)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                      ) : item.type === 'video' ? (
                         <video src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" controls preload="none" />
                       ) : item.type === 'audio' ? (
                         <div className="flex flex-col items-center justify-center w-full h-full p-3 gap-1 bg-[#f5f5f7]">
@@ -224,7 +264,7 @@ export const AdminFolderDetails = () => {
                           <audio src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full max-w-[95%] scale-90" controls preload="metadata" />
                         </div>
                       ) : (
-                        <img src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                        <img src={getProxyUrl(item.thumbnailUrl || item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                       )}
                       <span className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea]">
                         {item.type}
@@ -238,12 +278,27 @@ export const AdminFolderDetails = () => {
                         <p className="text-[10px] text-gray-500 mt-1">{(item.size / (1024 * 1024)).toFixed(2)} MB</p>
                       </div>
 
-                      {item.caption && (
-                        <div className="mt-3 bg-[#f5f5f7]/60 border border-[#e5e5ea] rounded-lg p-2.5">
-                          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider block">Caption</span>
-                          <p className="m-0 mt-0.5 text-[10px] text-[#1d1d1f] line-clamp-2 leading-relaxed">{item.caption}</p>
-                        </div>
-                      )}
+                      <div className="mt-3 space-y-2">
+                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider block">Caption stored on this asset</span>
+                        <textarea
+                          value={getCaptionDraft(item)}
+                          onChange={(e) => setCaptionDrafts((current) => ({
+                            ...current,
+                            [item._id]: e.target.value,
+                          }))}
+                          placeholder="Caption for this video..."
+                          className="h-20 w-full rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] p-2 text-[10px] leading-relaxed text-black placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#0071e3] resize-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveCaption(item)}
+                          disabled={savingCaptionId === item._id || getCaptionDraft(item) === (item.caption || '')}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5ea] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#1d1d1f] transition-all hover:border-gray-400 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:border-[#e5e5ea]"
+                        >
+                          <Save className="h-3 w-3" />
+                          <span>{savingCaptionId === item._id ? 'Saving...' : 'Save caption'}</span>
+                        </button>
+                      </div>
 
                       {/* Targeted Accounts Avatars */}
                       {item.socialAccountIds && item.socialAccountIds.length > 0 && (
