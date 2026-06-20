@@ -5,11 +5,11 @@ import { ArrowLeft, Sparkles } from 'lucide-react';
 const sections = [
   {
     title: 'Use of EasyPost',
-    body: 'You may use EasyPost to connect supported social accounts, manage media assets, schedule content, view insights, and moderate comments. You are responsible for ensuring your use complies with applicable laws and platform policies.',
+    body: 'You may use EasyPost to connect supported publishing channels, manage media assets, schedule content, view insights, and moderate comments. You are responsible for ensuring your use complies with applicable laws and platform policies.',
   },
   {
     title: 'Account Access',
-    body: 'You are responsible for maintaining access to your Google account and connected social accounts. Do not share credentials, tokens, or workspace access with unauthorized users.',
+    body: 'You are responsible for maintaining access to your Google account and connected publishing channels. Do not share credentials, tokens, or workspace access with unauthorized users.',
   },
   {
     title: 'Connected Social Platforms',
@@ -65,7 +65,7 @@ export const TermsAndConditions = () => (
       </div>
 
       <p className="m-0 mt-8 text-sm leading-7 text-[#6e6e73]">
-        If you do not agree with these terms, do not use EasyPost or connect social accounts to the workspace.
+        If you do not agree with these terms, do not use EasyPost or connect publishing channels to the workspace.
       </p>
       <p className="m-0 mt-4 text-xs text-[#8e8e93]">
         This product is powered by{' '}

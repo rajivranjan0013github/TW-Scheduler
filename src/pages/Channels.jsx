@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Share2, Trash2, ShieldCheck, Link2, Eye, Trash } from 'lucide-react';
 
-export const Channels = () => {
+export const Channels = ({ selectedAccounts = [] }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const adminViewContext = (() => {
@@ -106,6 +106,12 @@ export const Channels = () => {
     if (platform === 'youtube') return 'bg-red-50 text-red-600 border-red-200';
     return 'bg-blue-50 text-blue-600 border-blue-200';
   };
+  const hasCampaignScope = Boolean(localStorage.getItem('active-campaign-id'));
+  const visibleChannels = selectedAccounts.length > 0
+    ? channels.filter(channel => selectedAccounts.includes(channel._id))
+    : hasCampaignScope
+      ? []
+    : channels;
 
   return (
     <div className="p-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f] space-y-8">
@@ -113,7 +119,7 @@ export const Channels = () => {
       {/* Title */}
       <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">
         <div>
-          <h2 className="text-xl font-semibold text-black tracking-tight m-0">Connected Channels</h2>
+          <h2 className="text-xl font-semibold text-black tracking-tight m-0">Publishing Channels</h2>
           <p className="text-[#8e8e93] text-xs mt-1">
             {adminViewUserId
               ? `Viewing channels for ${adminViewContext?.userName || 'selected user'}`
@@ -140,7 +146,7 @@ export const Channels = () => {
         {/* Channels Listing */}
         <div className="bg-white border border-[#e5e5ea] rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-[#e5e5ea] flex justify-between items-center">
-            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Connected Accounts ({channels.length})</span>
+            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Campaign Publishing Channels ({visibleChannels.length})</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={connectInstagramOAuth}
@@ -171,12 +177,12 @@ export const Channels = () => {
               <div className="text-center py-12 text-xs text-gray-400 font-medium">
                 Fetching connected channels...
               </div>
-            ) : channels.length === 0 ? (
+            ) : visibleChannels.length === 0 ? (
               <div className="text-center py-16 text-xs text-gray-400 font-medium">
-                No active social channels connected yet. Use the buttons above to authorize a publishing channel.
+                No publishing channels are assigned to this campaign yet. Add them in Campaign Setup.
               </div>
             ) : (
-              channels.map(chan => (
+              visibleChannels.map(chan => (
                 <div key={chan._id} className="px-6 py-5 flex items-center justify-between hover:bg-[#f5f5f7]/40 transition-colors">
                   <div className="flex items-center gap-4">
                     <img 

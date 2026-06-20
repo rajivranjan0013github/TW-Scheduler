@@ -352,7 +352,14 @@ export const CalendarView = ({ selectedAccounts }) => {
 
       const accResponse = await fetch('http://localhost:5001/api/accounts', { headers });
       const accData = await accResponse.json();
-      setChannels(accData);
+      const hasCampaignScope = Boolean(localStorage.getItem('active-campaign-id'));
+      setChannels(
+        selectedAccounts.length > 0
+          ? accData.filter(account => selectedAccounts.includes(account._id))
+          : hasCampaignScope
+            ? []
+          : accData
+      );
 
       const medResponse = await fetch('http://localhost:5001/api/media', { headers });
       const medData = await medResponse.json();

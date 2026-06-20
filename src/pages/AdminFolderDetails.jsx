@@ -186,10 +186,10 @@ export const AdminFolderDetails = () => {
             className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-black transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Folders</span>
+            <span>Back to Media Folders</span>
           </button>
           <div>
-            <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Administration</p>
+            <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
             <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f] flex items-center gap-2">
               <Folder className="h-5 w-5 text-[#3478f6]" />
               {folder ? folder.name : 'Folder Details'}
@@ -422,11 +422,11 @@ export const AdminFolderDetails = () => {
               />
             </div>
 
-            {/* Social Accounts Warning (Hidden list but populated automatically in background) */}
+            {/* Publishing channels warning */}
             {accounts.length === 0 && (
               <div className="mt-4 flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-[11px] text-yellow-800">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-600 animate-pulse" />
-                <span>No connected accounts found. Connect channels in the sidebar channels tab first to allow uploads.</span>
+                <span>No publishing channels found. Connect channels before using this campaign folder for publishing.</span>
               </div>
             )}
 

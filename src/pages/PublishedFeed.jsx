@@ -117,7 +117,7 @@ export const PublishedFeed = () => {
           className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-black transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>{location.state?.fromAdmin ? 'Back to Admin' : 'Back to Channels'}</span>
+          <span>{location.state?.fromAdmin ? 'Back to Campaign Manager' : 'Back to Channels'}</span>
         </button>
 
         {loading ? (

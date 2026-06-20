@@ -25,7 +25,7 @@ const sections = [
   },
   {
     title: 'Your Choices',
-    body: 'You may stop using EasyPost, disconnect social accounts, request deletion of workspace data, or revoke platform permissions through Facebook, Instagram, or Google account settings.',
+    body: 'You may stop using EasyPost, disconnect publishing channels, request deletion of workspace data, or revoke platform permissions through Facebook, Instagram, or Google account settings.',
   },
   {
     title: 'Data Deletion Instructions',

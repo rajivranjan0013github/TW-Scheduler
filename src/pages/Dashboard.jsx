@@ -71,7 +71,13 @@ export const Dashboard = ({ selectedAccounts }) => {
 
       const accResponse = await fetch(`http://localhost:5001/api/accounts${scopedSuffix}`, { headers });
       const accountsList = await accResponse.json();
-      setChannels(accountsList);
+      const hasCampaignScope = Boolean(localStorage.getItem('active-campaign-id'));
+      const campaignAccounts = selectedAccounts.length > 0
+        ? accountsList.filter(account => selectedAccounts.includes(account._id))
+        : hasCampaignScope
+          ? []
+        : accountsList;
+      setChannels(campaignAccounts);
 
       const schedResponse = await fetch(`http://localhost:5001/api/scheduler${scopedSuffix}`, { headers });
       const posts = await schedResponse.json();
@@ -102,7 +108,7 @@ export const Dashboard = ({ selectedAccounts }) => {
       }
 
       setStats({
-        accountsCount: accountsList.length,
+        accountsCount: campaignAccounts.length,
         upcomingCount: upcoming.length,
         mediaCount: mediaList.length
       });
@@ -112,7 +118,13 @@ export const Dashboard = ({ selectedAccounts }) => {
         const recentResponse = await fetch(`http://localhost:5001/api/accounts/posts/recent${scopedSuffix}`, { headers });
         if (recentResponse.ok) {
           const recentData = await recentResponse.json();
-          setRecentPosts(recentData);
+          setRecentPosts(
+            selectedAccounts.length > 0
+              ? recentData.filter(post => selectedAccounts.includes(post.accountId))
+              : hasCampaignScope
+                ? []
+              : recentData
+          );
         }
       } catch (err) {
         console.error('Failed to fetch recent published posts:', err);
@@ -198,12 +210,12 @@ export const Dashboard = ({ selectedAccounts }) => {
       {/* Stats Summary Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         
-        {/* Connected accounts */}
+        {/* Publishing channels */}
         <div className="bg-white border border-[#e5e5ea] rounded-xl p-6 shadow-sm">
-          <span className="text-[#8e8e93] text-[10px] font-bold uppercase tracking-wider">Connected Accounts</span>
+          <span className="text-[#8e8e93] text-[10px] font-bold uppercase tracking-wider">Publishing Channels</span>
           <div className="mt-2">
             <h3 className="text-2xl font-semibold text-black leading-none">{stats.accountsCount}</h3>
-            <p className="text-[11px] text-[#8e8e93] mt-1.5">Social channels mapped</p>
+            <p className="text-[11px] text-[#8e8e93] mt-1.5">Channels mapped to this workspace</p>
           </div>
         </div>
 
@@ -292,7 +304,7 @@ export const Dashboard = ({ selectedAccounts }) => {
           
           {/* Linked Portals */}
           <div className="bg-white border border-[#e5e5ea] rounded-xl p-6 shadow-sm">
-            <h3 className="text-xs font-semibold text-gray-500 mb-4 uppercase tracking-wider">Connected Channels</h3>
+            <h3 className="text-xs font-semibold text-gray-500 mb-4 uppercase tracking-wider">Publishing Channels</h3>
             <div className="space-y-3">
               {channels.map((chan) => (
                 <div 

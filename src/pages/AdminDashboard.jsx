@@ -208,8 +208,8 @@ export const AdminDashboard = () => {
     <div className="min-h-screen bg-[#f5f5f7] p-8 text-[#1d1d1f]">
       <div className="mb-6 flex flex-col gap-4 border-b border-[#e5e5ea] pb-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Administration</p>
-          <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">Dashboard</h2>
+          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
+          <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">Campaign Overview</h2>
           <p className="m-0 mt-1 text-xs text-[#8e8e93]">Campaign performance totals from cached published-post insights.</p>
         </div>
 
@@ -275,7 +275,7 @@ export const AdminDashboard = () => {
         <div className="mt-6 rounded-xl border border-[#d2d2d7] bg-white p-10 text-center">
           <Megaphone className="mx-auto h-8 w-8 text-[#c7c7cc]" />
           <p className="m-0 mt-3 text-sm font-semibold text-[#1d1d1f]">No campaigns yet</p>
-          <p className="m-0 mt-1 text-xs text-[#6e6e73]">Create campaigns from the Campaign section and attach social accounts.</p>
+          <p className="m-0 mt-1 text-xs text-[#6e6e73]">Create campaigns from Campaign Setup and attach publishing channels.</p>
         </div>
       ) : (
         <>
@@ -288,9 +288,9 @@ export const AdminDashboard = () => {
             />
             <MetricCard
               icon={Eye}
-              label={`${selectedTimeLabel} account insight`}
+              label={`${selectedTimeLabel} channel insight`}
               value={numberFormat.format(selectedAccountInsight)}
-              note="Account-level cached insight total"
+              note="Publishing-channel cached insight total"
             />
             <MetricCard
               icon={Megaphone}
@@ -302,23 +302,23 @@ export const AdminDashboard = () => {
               icon={Rows3}
               label="Posts"
               value={numberFormat.format(selectedPosts)}
-              note={`${activeMetrics.accounts || 0} associated accounts`}
+              note={`${activeMetrics.accounts || 0} associated channels`}
             />
           </div>
 
           <div className="mt-6 overflow-hidden rounded-xl border border-[#d2d2d7] bg-white">
             <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr] gap-5 border-b border-[#e5e5ea] bg-[#fbfbfd] px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">
-              <span>Account</span>
+              <span>Channel</span>
               <span>User</span>
               <span>Activity</span>
               <span>Posts</span>
               <span>{selectedTimeLabel} views</span>
-              <span>Account insight</span>
+              <span>Channel insight</span>
               <span>Engagement</span>
             </div>
             {(activeMetrics.accountRows || []).length === 0 ? (
               <div className="px-5 py-8 text-center text-sm text-[#6e6e73]">
-                No social accounts are associated with this campaign.
+                No publishing channels are associated with this campaign.
               </div>
             ) : activeMetrics.accountRows.map((account) => (
               <div

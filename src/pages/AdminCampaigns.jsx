@@ -47,7 +47,7 @@ export const AdminCampaigns = () => {
       ]);
 
       if (!campaignRes.ok) throw new Error(campaignData.message || 'Failed to load campaigns.');
-      if (!accountRes.ok) throw new Error(accountData.message || 'Failed to load social accounts.');
+      if (!accountRes.ok) throw new Error(accountData.message || 'Failed to load publishing channels.');
 
       setCampaigns(campaignData);
       setAccounts(accountData);
@@ -138,7 +138,7 @@ export const AdminCampaigns = () => {
   const deleteCampaign = async () => {
     if (!selectedCampaign || !canDelete) return;
 
-    const confirmed = window.confirm(`Delete campaign "${selectedCampaign.name}"? This will not delete posts or social accounts.`);
+    const confirmed = window.confirm(`Delete campaign "${selectedCampaign.name}"? This will not delete posts or publishing channels.`);
     if (!confirmed) return;
 
     setSaving(true);
@@ -167,9 +167,9 @@ export const AdminCampaigns = () => {
     <div className="min-h-screen bg-[#f5f5f7] p-8 text-[#1d1d1f]">
       <div className="mb-6 flex flex-col gap-4 border-b border-[#e5e5ea] pb-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Administration</p>
-          <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">Campaign</h2>
-          <p className="m-0 mt-1 text-xs text-[#8e8e93]">Create campaign groups and attach social media accounts to them.</p>
+          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
+          <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">Campaign Setup</h2>
+          <p className="m-0 mt-1 text-xs text-[#8e8e93]">Create campaigns and attach publishing channels to them.</p>
         </div>
         <button
           onClick={fetchData}
@@ -256,7 +256,7 @@ export const AdminCampaigns = () => {
           <div className="flex items-start justify-between gap-4 border-b border-[#e5e5ea] px-5 py-4">
             <div>
               <h3 className="m-0 text-sm font-semibold">{selectedCampaignId ? 'Edit campaign' : 'Create campaign'}</h3>
-              <p className="m-0 mt-1 text-xs text-[#6e6e73]">Assign social accounts so admin dashboard can group views by campaign.</p>
+              <p className="m-0 mt-1 text-xs text-[#6e6e73]">Assign publishing channels so the campaign workspace can group views correctly.</p>
             </div>
             <button
               type="button"
@@ -305,12 +305,12 @@ export const AdminCampaigns = () => {
 
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-[#515154]">Social accounts</span>
+                <span className="text-xs font-semibold text-[#515154]">Publishing channels</span>
                 <span className="text-[10px] font-semibold text-[#8e8e93]">{form.accountIds.length} selected</span>
               </div>
               <div className="mt-2 max-h-80 overflow-y-auto rounded-lg border border-[#d2d2d7]">
                 {accounts.length === 0 ? (
-                  <div className="p-5 text-center text-xs text-[#6e6e73]">No social accounts available.</div>
+                  <div className="p-5 text-center text-xs text-[#6e6e73]">No publishing channels available.</div>
                 ) : accounts.map((account) => (
                   <label key={account._id} className="flex cursor-pointer items-center gap-3 border-b border-[#e5e5ea] p-3 last:border-b-0 hover:bg-[#f5f5f7]">
                     <input

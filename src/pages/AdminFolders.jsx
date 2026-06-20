@@ -106,9 +106,9 @@ export const AdminFolders = () => {
     <div className="min-h-screen bg-[#f5f5f7] p-8 text-[#1d1d1f]">
       <div className="mb-6 flex flex-col gap-4 border-b border-[#e5e5ea] pb-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Administration</p>
-          <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">Folders</h2>
-          <p className="m-0 mt-1 text-xs text-[#8e8e93]">View and audit folders created across all workspaces.</p>
+          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
+          <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">Media Folders</h2>
+          <p className="m-0 mt-1 text-xs text-[#8e8e93]">View and audit campaign media folders across workspaces.</p>
         </div>
         
         {/* Search & Create Actions */}

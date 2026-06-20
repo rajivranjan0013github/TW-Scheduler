@@ -79,7 +79,7 @@ export const Home = () => (
               EasyPost
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-[#515154] sm:text-lg">
-              A calm command center to connect social accounts, schedule content, and track performance without losing the thread.
+              A calm command center to connect publishing channels, schedule content, and track performance without losing the thread.
             </p>
 
             <div className="mt-8 rounded-lg border border-[#d2d2d7] bg-white p-4 shadow-sm sm:inline-flex sm:items-center sm:gap-5">

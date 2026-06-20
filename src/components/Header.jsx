@@ -101,7 +101,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
           className="flex items-center gap-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] px-3.5 py-1.5 rounded-lg text-xs font-medium border border-[#e5e5ea] transition-all text-[#1d1d1f]"
         >
           <Globe className="w-3.5 h-3.5 text-gray-500" />
-          <span>Accounts ({selectedAccounts.length})</span>
+          <span>Channels ({selectedAccounts.length})</span>
           <ChevronDown className="w-3 h-3 opacity-50 text-[#1d1d1f]" />
         </button>
 
@@ -109,7 +109,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
           <div className="absolute left-0 mt-2 w-72 bg-white border border-[#d2d2d7] rounded-xl shadow-xl p-3 z-50 animate-in fade-in duration-150 text-[#1d1d1f]">
             <div className="flex justify-between items-center pb-2 border-b border-[#e5e5ea] mb-2">
               <span className="text-[10px] text-gray-500 font-semibold uppercase">
-                {adminViewChannel ? `${adminViewChannel.user?.name || adminViewChannel.userId?.name || 'User'} Channels` : 'Channel Filter'}
+                {adminViewChannel ? `${adminViewChannel.user?.name || adminViewChannel.userId?.name || 'User'} Channels` : 'Publishing Channel Filter'}
               </span>
               <div className="flex gap-2">
                 <button onClick={selectAllAccounts} className="text-[10px] text-gray-500 hover:text-black">All</button>
@@ -137,7 +137,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
                 </div>
               ))}
               {accounts.length === 0 && (
-                <p className="text-xs text-gray-400 text-center py-4">No connected accounts.</p>
+                <p className="text-xs text-gray-400 text-center py-4">No publishing channels.</p>
               )}
             </div>
           </div>
@@ -159,7 +159,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
               <p className="text-xs font-semibold text-[#1d1d1f] leading-none">{displayedUserName}</p>
               {isAdminViewingUser && (
                 <p className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-[#0071e3]">
-                  Viewing user{displayedUserEmail ? ` · ${displayedUserEmail}` : ''}
+                  Manager view{displayedUserEmail ? ` · ${displayedUserEmail}` : ''}
                 </p>
               )}
             </div>
@@ -167,7 +167,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
               <button
                 onClick={exitAdminUserView}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-[#f5f5f7] px-2.5 py-1.5 text-[10px] font-semibold text-[#1d1d1f] transition hover:bg-[#e5e5ea]"
-                title="Exit user view"
+                title="Exit manager view"
               >
                 <X className="h-3 w-3" />
                 <span className="hidden lg:inline">Exit view</span>

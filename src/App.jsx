@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
-import AdminSidebar from './components/AdminSidebar';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -26,22 +25,6 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import YoutubeCallback from './pages/YoutubeCallback';
 import { VideoEditor } from './pages/VideoEditor';
-
-const AdminShell = () => (
-  <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-hidden font-sans">
-    <AdminSidebar />
-    <main className="flex-1 overflow-y-auto">
-      <Routes>
-        <Route path="/" element={<AdminDashboard />} />
-        <Route path="/users" element={<AdminUsers />} />
-        <Route path="/campaign" element={<AdminCampaigns />} />
-        <Route path="/folders" element={<AdminFolders />} />
-        <Route path="/folders/:id" element={<AdminFolderDetails />} />
-        <Route path="*" element={<Navigate to="/admin" replace />} />
-      </Routes>
-    </main>
-  </div>
-);
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -77,7 +60,6 @@ function AppContent() {
         ) : (
           <>
             <Route path="/auth/youtube/callback" element={<YoutubeCallback />} />
-            {canViewAdmin && <Route path="/admin/*" element={<AdminShell />} />}
             <Route
               path="*"
               element={
@@ -93,10 +75,15 @@ function AppContent() {
                       <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
                       <Route path="/media" element={<MediaLibrary />} />
                       <Route path="/media/editor" element={<VideoEditor />} />
-                      <Route path="/channels" element={<Channels />} />
+                      <Route path="/channels" element={<Channels selectedAccounts={selectedAccounts} />} />
                       <Route path="/channels/:id/feed" element={<PublishedFeed />} />
                       <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
                       <Route path="/settings" element={<Settings />} />
+                      {canViewAdmin && <Route path="/admin" element={<AdminDashboard />} />}
+                      {canViewAdmin && <Route path="/admin/users" element={<AdminUsers />} />}
+                      {canViewAdmin && <Route path="/admin/campaign" element={<AdminCampaigns />} />}
+                      {canViewAdmin && <Route path="/admin/folders" element={<AdminFolders />} />}
+                      {canViewAdmin && <Route path="/admin/folders/:id" element={<AdminFolderDetails />} />}
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   </main>
