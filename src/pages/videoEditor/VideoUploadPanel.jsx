@@ -1,20 +1,18 @@
 import { Video, AlertCircle } from 'lucide-react';
 
 /**
- * Left column panel — video file imports, overlay text, FFmpeg status, and merge button.
+ * Left column panel — video file imports, overlay text, and FFmpeg status.
  */
 export const VideoUploadPanel = ({
   video1,
   video2,
-  onVideo1Change,
-  onVideo2Change,
+  onChooseVideo1,
+  onChooseVideo2,
   text,
   onTextChange,
   ffmpegLoaded,
   ffmpegLoading,
   engineError,
-  processing,
-  onProcess,
 }) => {
   return (
     <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-6">
@@ -27,23 +25,25 @@ export const VideoUploadPanel = ({
       <div className="space-y-4">
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">First Video (Clips Starts)</label>
-          <input
-            type="file"
-            accept="video/*"
-            onChange={onVideo1Change}
-            className="w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-gray-200 rounded-lg p-2"
-          />
+          <button
+            type="button"
+            onClick={onChooseVideo1}
+            className="w-full rounded-lg border border-gray-200 p-2 text-left text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+          >
+            Choose file
+          </button>
           {video1 && <p className="text-[10px] text-gray-500 mt-1 truncate">Selected: {video1.name}</p>}
         </div>
 
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Second Video (Appended)</label>
-          <input
-            type="file"
-            accept="video/*"
-            onChange={onVideo2Change}
-            className="w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-gray-200 rounded-lg p-2"
-          />
+          <button
+            type="button"
+            onClick={onChooseVideo2}
+            className="w-full rounded-lg border border-gray-200 p-2 text-left text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+          >
+            Choose file
+          </button>
           {video2 && <p className="text-[10px] text-gray-500 mt-1 truncate">Selected: {video2.name}</p>}
         </div>
       </div>
@@ -74,15 +74,7 @@ export const VideoUploadPanel = ({
               {ffmpegLoading ? 'Downloading editor engine core (~30MB)...' : 'Initializing engine...'}
             </p>
           </div>
-        ) : (
-          <button
-            disabled={processing || !video1 || !video2}
-            onClick={onProcess}
-            className="w-full py-3 bg-[#0071e3] text-white rounded-lg text-xs font-semibold hover:bg-blue-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {processing ? 'Processing...' : 'Merge & Add Text'}
-          </button>
-        )}
+        ) : null}
       </div>
     </div>
   );
