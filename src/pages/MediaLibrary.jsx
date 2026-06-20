@@ -1,15 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { Folder, Search, Tag, Upload, Plus, Trash2, ChevronRight, Clock, Users, Save } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Folder, Search, Tag, Upload, Plus, Trash2, ChevronRight, Clock, Users, Save, Film } from 'lucide-react';
+
+const getProxyUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('https://pub-') || url.includes('r2.cloudflarestorage.com')) {
+    return `http://localhost:5001/api/media/proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
 
 export const MediaLibrary = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [folders, setFolders] = useState([]);
   const [media, setMedia] = useState([]);
   const [accounts, setAccounts] = useState([]);
-  const [activeFolderId, setActiveFolderId] = useState('root');
+  const [activeFolderId, setActiveFolderId] = useState(() => {
+    return location.state?.preselectedFolderId || 'root';
+  });
+
+  useEffect(() => {
+    if (location.state?.preselectedFolderId) {
+      setActiveFolderId(location.state.preselectedFolderId);
+    }
+  }, [location.state?.preselectedFolderId]);
   const [searchTag, setSearchTag] = useState('');
   const [accountFilter, setAccountFilter] = useState('all');
   const [uploadAccountIds, setUploadAccountIds] = useState([]);
@@ -548,7 +565,7 @@ export const MediaLibrary = () => {
                           : 'border-[#e5e5ea] bg-[#f5f5f7] text-[#1d1d1f] hover:border-gray-400'
                       }`}
                     >
-                      <img src={account.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} className="h-5 w-5 rounded-full object-cover border border-black/10" alt="" />
+                      <img src={account.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} crossOrigin="anonymous" className="h-5 w-5 rounded-full object-cover border border-black/10" alt="" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-xs font-semibold">{account.name}</span>
                         <span className={`block truncate text-[9px] capitalize ${uploadAccountIds.includes(account._id) ? 'text-white/70' : 'text-gray-500'}`}>
@@ -623,9 +640,9 @@ export const MediaLibrary = () => {
                       {/* Media Preview Box */}
                       <div className="aspect-video bg-[#f5f5f7] relative overflow-hidden flex items-center justify-center border-b border-[#e5e5ea]">
                         {item.type === 'video' ? (
-                          <video src={item.url} className="w-full h-full object-cover" controls preload="metadata" />
+                          <video src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" controls preload="metadata" />
                         ) : (
-                          <img src={item.url} className="w-full h-full object-cover" alt="" />
+                          <img src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                         )}
                         <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm">
                           {item.type}
@@ -647,6 +664,7 @@ export const MediaLibrary = () => {
                               <img
                                 key={account._id}
                                 src={account.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                                crossOrigin="anonymous"
                                 title={account.name}
                                 className="h-4 w-4 rounded-full border border-white object-cover"
                                 alt=""

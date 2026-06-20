@@ -129,6 +129,7 @@ export const PublishedFeed = () => {
             <div className="flex items-center gap-4">
               <img
                 src={channel.avatarUrl || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=150'}
+                crossOrigin="anonymous"
                 className="w-12 h-12 rounded-full object-cover border border-[#d2d2d7]"
                 alt=""
               />
@@ -201,7 +202,7 @@ export const PublishedFeed = () => {
                     >
                       {post.mediaUrl && (
                         <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-[#e5e5ea]">
-                          <img src={post.mediaUrl} className="w-full h-full object-cover" alt="" />
+                          <img src={post.mediaUrl} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                         </div>
                       )}
                       <div className="flex-1 flex flex-col justify-between min-w-0">

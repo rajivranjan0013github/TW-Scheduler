@@ -273,7 +273,7 @@ export const Dashboard = ({ selectedAccounts }) => {
                 <p className="text-[10px] text-gray-400 mt-0.5 m-0">Connect channels to start monitoring performance insights.</p>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e5ea" />
                   <XAxis dataKey="name" stroke="#8e8e93" />
@@ -303,7 +303,7 @@ export const Dashboard = ({ selectedAccounts }) => {
                   className="flex items-center justify-between py-2 px-1.5 border-b border-[#e5e5ea] last:border-b-0 cursor-pointer hover:bg-gray-50 rounded-lg transition-all"
                 >
                   <div className="flex items-center gap-3">
-                    <img src={chan.avatarUrl} className="w-6 h-6 rounded-full object-cover border border-black/10" alt="" />
+                    <img src={chan.avatarUrl} crossOrigin="anonymous" className="w-6 h-6 rounded-full object-cover border border-black/10" alt="" />
                     <div>
                       <p className="text-xs font-semibold text-[#1d1d1f] leading-tight hover:text-[#0071e3] transition-colors">{chan.name}</p>
                       <p className="text-[10px] text-gray-500">@{chan.username}</p>
@@ -328,7 +328,7 @@ export const Dashboard = ({ selectedAccounts }) => {
                 <div key={post._id} className="flex items-center gap-3 py-2 border-b border-[#e5e5ea] last:border-b-0">
                   <div className="w-8 h-8 rounded bg-[#f5f5f7] flex-shrink-0 flex items-center justify-center text-xs overflow-hidden border border-[#e5e5ea]">
                     {post.mediaIds?.[0]?.url ? (
-                      <img src={post.mediaIds[0].url} className="w-full h-full object-cover" alt="" />
+                      <img src={post.mediaIds[0].url} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                     ) : (
                       <span>🎥</span>
                     )}
@@ -393,7 +393,7 @@ export const Dashboard = ({ selectedAccounts }) => {
                           <td className="px-4 py-3 max-w-xs md:max-w-md">
                             <div className="flex items-center gap-3">
                               {post.mediaUrl && (
-                                <img src={post.mediaUrl} className="w-8 h-8 rounded object-cover border border-[#e5e5ea]" alt="" />
+                                <img src={post.mediaUrl} crossOrigin="anonymous" className="w-8 h-8 rounded object-cover border border-[#e5e5ea]" alt="" />
                               )}
                               <span className="truncate block font-semibold text-black">
                                 {post.content && post.content.length > 15 

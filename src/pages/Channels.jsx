@@ -181,6 +181,7 @@ export const Channels = () => {
                   <div className="flex items-center gap-4">
                     <img 
                       src={chan.avatarUrl || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=150'} 
+                      crossOrigin="anonymous"
                       className="w-10 h-10 rounded-full object-cover border border-[#d2d2d7]" 
                       alt="" 
                     />

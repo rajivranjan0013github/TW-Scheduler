@@ -1,23 +1,27 @@
-import React from 'react';
-import { useGoogleLogin } from '@react-oauth/google';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, LockKeyhole, Sparkles } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 
 export const Login = () => {
-  const { login } = useAuth();
+  const handleGoogleLogin = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      alert('Set VITE_GOOGLE_CLIENT_ID in tw-frontend/.env to enable Google login.');
+      return;
+    }
 
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      const success = await login(null, tokenResponse.access_token);
-      if (!success) {
-        alert('Workspace authentication failed. Please verify database connection or credentials.');
-      }
-    },
-    onError: () => {
-      alert('Google Authentication Failed');
-    },
-  });
+    const rawRedirectUri = `${window.location.origin}/auth/google/callback`;
+    sessionStorage.setItem('google_login_redirect_uri', rawRedirectUri);
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: rawRedirectUri,
+      response_type: 'token',
+      scope: 'openid email profile',
+      include_granted_scopes: 'true',
+      prompt: 'select_account',
+    });
+
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  };
 
   const handleFacebookLogin = () => {
     const appId = import.meta.env.VITE_META_APP_ID;
@@ -73,7 +77,7 @@ export const Login = () => {
             </div>
 
             <button
-              onClick={() => handleGoogleLogin()}
+              onClick={handleGoogleLogin}
               className="mt-6 flex w-full items-center justify-center gap-3 rounded-lg border border-[#d2d2d7] bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7]"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">

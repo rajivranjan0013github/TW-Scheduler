@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { ArrowLeft, BarChart3, Megaphone, ShieldCheck, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, BarChart3, Megaphone, ShieldCheck, Users, ChevronLeft, ChevronRight, Folder, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { name: 'Dashboard', path: '/admin', icon: BarChart3 },
   { name: 'Users', path: '/admin/users', icon: Users },
   { name: 'Campaign', path: '/admin/campaign', icon: Megaphone },
+  { name: 'Folders', path: '/admin/folders', icon: Folder },
 ];
 
 export const AdminSidebar = () => {
@@ -50,7 +51,7 @@ export const AdminSidebar = () => {
         </button>
       </div>
 
-      <nav className="flex-1 p-2.5 space-y-1">
+      <nav className="flex-1 p-2.5 space-y-1 overflow-y-auto">
         {navItems.map((item) => (
           item.disabled ? (
             <div

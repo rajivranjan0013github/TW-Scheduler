@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Clock, FolderHeart, Link2, Settings as SettingsIcon, ShieldCheck, ChevronLeft, ChevronRight, Globe, Check, X, LogOut } from 'lucide-react';
+import { LayoutDashboard, Clock, FolderHeart, Film, Link2, Settings as SettingsIcon, ShieldCheck, ChevronLeft, ChevronRight, Globe, Check, X, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} }) => {
@@ -103,6 +103,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Scheduled Queue', path: '/scheduler', icon: Clock },
     { name: 'Media Library', path: '/media', icon: FolderHeart },
+    { name: 'Video Editor', path: '/media/editor', icon: Film },
     { name: 'Connected Channels', path: '/channels', icon: Link2 },
     { name: 'Settings', path: '/settings', icon: SettingsIcon },
   ];
@@ -195,7 +196,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                           : (isAdminViewingUser ? 'text-[#cbd5e1] hover:bg-white/10 hover:text-white' : 'text-[#8e8e93] hover:bg-[#f5f5f7]/50 hover:text-[#1d1d1f]')
                       }`}
                     >
-                      <img src={account.avatarUrl} className="w-5 h-5 rounded-full object-cover border border-black/10 flex-shrink-0" alt="" />
+                      <img src={account.avatarUrl} crossOrigin="anonymous" className="w-5 h-5 rounded-full object-cover border border-black/10 flex-shrink-0" alt="" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[11px] font-semibold">{account.name}</span>
                         <span className="block truncate text-[9px] opacity-70 capitalize">{account.platform}</span>
@@ -236,6 +237,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
             >
               <img
                 src={displayedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                crossOrigin="anonymous"
                 className="h-7 w-7 rounded-full object-cover border border-black/10"
                 alt=""
               />
@@ -244,6 +246,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
             <>
               <img
                 src={displayedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                crossOrigin="anonymous"
                 className="h-7 w-7 rounded-full object-cover border border-black/10 flex-shrink-0"
                 alt=""
               />

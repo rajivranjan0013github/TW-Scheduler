@@ -518,7 +518,7 @@ export const CalendarView = ({ selectedAccounts }) => {
                         <span className={`flex h-4 w-4 items-center justify-center rounded border ${isSelected ? 'bg-[#2563eb] border-[#2563eb]' : 'border-[#c7c7cc]'}`}>
                           {isSelected && <Check className="h-3 w-3 text-white" />}
                         </span>
-                        <img src={chan.avatarUrl} className="w-6 h-6 rounded-full object-cover border border-black/10" alt="" />
+                        <img src={chan.avatarUrl} crossOrigin="anonymous" className="w-6 h-6 rounded-full object-cover border border-black/10" alt="" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-xs font-semibold">{chan.name}</span>
                           <span className="block truncate text-[10px] capitalize text-[#6b7280]">{chan.platform}</span>
@@ -569,9 +569,9 @@ export const CalendarView = ({ selectedAccounts }) => {
                       <div key={item._id} className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
                         <div className="relative aspect-video bg-[#f5f5f7]">
                           {item.type === 'video' ? (
-                            <video src={item.url} className="h-full w-full object-cover" />
+                            <video src={item.url} crossOrigin="anonymous" className="h-full w-full object-cover" />
                           ) : (
-                            <img src={item.url} className="h-full w-full object-cover" alt="" />
+                            <img src={item.url} crossOrigin="anonymous" className="h-full w-full object-cover" alt="" />
                           )}
                           <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded bg-[#2563eb] text-white">
                             <Check className="h-3 w-3" />
@@ -713,9 +713,9 @@ export const CalendarView = ({ selectedAccounts }) => {
                         <div className="flex gap-2">
                           <div className="h-16 w-20 overflow-hidden rounded-md border border-[#e5e5ea] bg-[#f5f5f7] flex-shrink-0">
                             {item.type === 'video' ? (
-                              <video src={item.url} className="h-full w-full object-cover" />
+                              <video src={item.url} crossOrigin="anonymous" className="h-full w-full object-cover" />
                             ) : (
-                              <img src={item.url} className="h-full w-full object-cover" alt="" />
+                              <img src={item.url} crossOrigin="anonymous" className="h-full w-full object-cover" alt="" />
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -793,9 +793,9 @@ export const CalendarView = ({ selectedAccounts }) => {
                           <div className="flex items-center gap-2 min-w-0">
                             <div className="h-8 w-10 overflow-hidden rounded border border-[#e5e5ea] bg-[#f5f5f7] flex-shrink-0">
                               {row.mediaItem?.type === 'video' ? (
-                                <video src={row.mediaItem?.url} className="h-full w-full object-cover" />
+                                <video src={row.mediaItem?.url} crossOrigin="anonymous" className="h-full w-full object-cover" />
                               ) : (
-                                <img src={row.mediaItem?.url} className="h-full w-full object-cover" alt="" />
+                                <img src={row.mediaItem?.url} crossOrigin="anonymous" className="h-full w-full object-cover" alt="" />
                               )}
                             </div>
                             <span className="truncate font-semibold text-[#1d1d1f]">{getMediaLabel(row.mediaItem)}</span>
@@ -886,25 +886,25 @@ export const CalendarView = ({ selectedAccounts }) => {
                       </div>
                     </div>
 
-                    {/* Center: Media & Caption Card */}
-                    <div className="flex-1 flex items-center gap-4 min-w-0">
-                      {/* Thumbnail */}
-                      <div className="w-16 h-16 bg-[#f5f5f7] rounded-lg border border-[#e5e5ea] overflow-hidden flex-shrink-0 flex items-center justify-center relative">
-                        {firstMedia ? (
-                          firstMedia.type === 'video' ? (
-                            <video src={firstMedia.url} className="w-full h-full object-cover" />
-                          ) : (
-                            <img src={firstMedia.url} className="w-full h-full object-cover" alt="" />
-                          )
-                        ) : (
-                          <span className="text-[9px] text-gray-300">No media</span>
-                        )}
-                        {firstMedia && (
-                          <div className="absolute bottom-1 right-1 bg-black/75 px-1 py-0.5 rounded text-[7px] text-white uppercase font-bold">
-                            {firstMedia.type}
-                          </div>
-                        )}
+                {/* Center: Media & Caption Card */}
+                <div className="flex-1 flex items-center gap-4 min-w-0">
+                  {/* Thumbnail */}
+                  <div className="w-16 h-16 bg-[#f5f5f7] rounded-lg border border-[#e5e5ea] overflow-hidden flex-shrink-0 flex items-center justify-center relative">
+                    {firstMedia ? (
+                      firstMedia.type === 'video' ? (
+                        <video src={firstMedia.url} crossOrigin="anonymous" className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={firstMedia.url} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                      )
+                    ) : (
+                      <span className="text-[9px] text-gray-300">No media</span>
+                    )}
+                    {firstMedia && (
+                      <div className="absolute bottom-1 right-1 bg-black/75 px-1 py-0.5 rounded text-[7px] text-white uppercase font-bold">
+                        {firstMedia.type}
                       </div>
+                    )}
+                  </div>
 
                       {/* Caption & Metadata */}
                       <div className="space-y-2 min-w-0 flex-1">
@@ -927,27 +927,28 @@ export const CalendarView = ({ selectedAccounts }) => {
                             {(post.platformSpecifics?.type || 'reels').toUpperCase()}
                           </span>
 
-                          {/* Targeted Channels */}
-                          <div className="flex items-center gap-1 pl-2 border-l border-[#e5e5ea]">
-                            <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mr-1">Channels:</span>
-                            <div className="flex -space-x-1.5">
-                              {post.socialAccountIds?.map((accId, accIdx) => {
-                                const acc = channels.find(c => c._id === (accId._id || accId));
-                                return acc ? (
-                                  <img
-                                    key={accIdx}
-                                    src={acc.avatarUrl}
-                                    className="w-4 h-4 rounded-full object-cover border border-white"
-                                    title={acc.name}
-                                    alt=""
-                                  />
-                                ) : null;
-                              })}
-                            </div>
-                          </div>
+                      {/* Targeted Channels */}
+                      <div className="flex items-center gap-1 pl-2 border-l border-[#e5e5ea]">
+                        <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mr-1">Channels:</span>
+                        <div className="flex -space-x-1.5">
+                          {post.socialAccountIds?.map((accId, accIdx) => {
+                            const acc = channels.find(c => c._id === (accId._id || accId));
+                            return acc ? (
+                              <img 
+                                key={accIdx}
+                                src={acc.avatarUrl} 
+                                crossOrigin="anonymous"
+                                className="w-4 h-4 rounded-full object-cover border border-white" 
+                                title={acc.name} 
+                                alt="" 
+                              />
+                            ) : null;
+                          })}
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
 
                     {/* Right: Status Pill & Delete Button */}
                     <div className="flex items-center gap-4 flex-shrink-0">

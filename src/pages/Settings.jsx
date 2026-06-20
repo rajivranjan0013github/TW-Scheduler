@@ -86,6 +86,7 @@ export const Settings = () => {
             <div className="flex flex-col sm:flex-row items-center gap-5 bg-[#f5f5f7]/55 p-4 rounded-xl border border-[#e5e5ea]">
               <img 
                 src={avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
+                crossOrigin="anonymous"
                 className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
                 alt="Avatar Preview" 
               />

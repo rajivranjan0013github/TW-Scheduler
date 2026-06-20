@@ -215,6 +215,7 @@ export const AdminUsers = () => {
                 <div className="flex min-w-0 items-center gap-3">
                   <img
                     src={item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                    crossOrigin="anonymous"
                     alt=""
                     className="h-10 w-10 rounded-full border border-black/10 object-cover"
                   />
