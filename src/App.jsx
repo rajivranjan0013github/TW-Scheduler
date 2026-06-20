@@ -81,26 +81,26 @@ function AppContent() {
                     setSelectedAccounts={setSelectedAccounts}
                   />
 
-                    <main className="flex-1 overflow-y-auto">
-                      <Routes>
-                        <Route path="/" element={<Dashboard selectedAccounts={selectedAccounts} />} />
-                        <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
-                        <Route path="/media" element={<MediaLibrary />} />
-                        <Route path="/media/editor" element={<VideoEditor />} />
-                        <Route path="/channels" element={<Channels />} />
-                        <Route path="/channels/:id/feed" element={<PublishedFeed />} />
-                        <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
-                        <Route path="/settings" element={<Settings />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                      </Routes>
-                    </main>
-                  </div>
+                  <main className="flex-1 overflow-y-auto">
+                    <Routes>
+                      <Route path="/" element={<Dashboard selectedAccounts={selectedAccounts} />} />
+                      <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
+                      <Route path="/media" element={<MediaLibrary />} />
+                      <Route path="/media/editor" element={<VideoEditor />} />
+                      <Route path="/channels" element={<Channels />} />
+                      <Route path="/channels/:id/feed" element={<PublishedFeed />} />
+                      <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                  </main>
+                </div>
               }
             />
-          </>
+      </>
         )}
-      </Routes>
-    </Router>
+    </Routes>
+    </Router >
   );
 }
 

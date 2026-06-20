@@ -1,19 +1,19 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Plus, Check, Trash2, Clock, AlertCircle, Folder, Users, Layers, CalendarDays, Save, FileText, ChevronRight, ArrowDown } from 'lucide-react';
+import { Plus, Check, Trash2, Clock, AlertCircle, Folder, Users, Layers, CalendarDays, Save, FileText } from 'lucide-react';
 
 export const CalendarView = ({ selectedAccounts }) => {
   const { user } = useAuth();
   const location = useLocation();
   const [posts, setPosts] = useState([]);
-  
+
   // Composer data
   const [showComposer, setShowComposer] = useState(false);
   const [mediaList, setMediaList] = useState([]);
   const [folders, setFolders] = useState([]);
   const [channels, setChannels] = useState([]);
-  
+
   // Post Composer form states
   const [selectedChannels, setSelectedChannels] = useState([]);
   const [selectedMedia, setSelectedMedia] = useState([]);
@@ -26,7 +26,7 @@ export const CalendarView = ({ selectedAccounts }) => {
   const [youtubeMadeForKids, setYoutubeMadeForKids] = useState(false);
   const [captionDrafts, setCaptionDrafts] = useState({});
   const [savingCaptionId, setSavingCaptionId] = useState(null);
-  
+
   const [bulkInterval, setBulkInterval] = useState('2');
   const [activeFolderId, setActiveFolderId] = useState('root');
 
@@ -72,7 +72,7 @@ export const CalendarView = ({ selectedAccounts }) => {
       // 1. Must match target channel
       const matchesChannel = isMediaAvailableForChannels(item, selectedChannels);
       if (!matchesChannel) return false;
-      
+
       // 2. Must match selected folder
       if (activeFolderId === 'root') {
         return !item.folderId;
@@ -146,7 +146,7 @@ export const CalendarView = ({ selectedAccounts }) => {
     if (location.state?.preselectedMediaId && mediaList.length > 0) {
       setSelectedMedia([location.state.preselectedMediaId]);
       setShowComposer(true);
-      
+
       const mediaItem = mediaList.find(m => m._id === location.state.preselectedMediaId);
       if (mediaItem) {
         const mediaFolderId = mediaItem.folderId?._id || mediaItem.folderId || 'root';
@@ -157,7 +157,7 @@ export const CalendarView = ({ selectedAccounts }) => {
         }
         setPostType(mediaItem.type === 'video' ? 'reels' : 'post');
       }
-      
+
       // Clear location state to prevent reopening modal on reload
       window.history.replaceState({}, document.title);
     }
@@ -402,7 +402,7 @@ export const CalendarView = ({ selectedAccounts }) => {
       };
 
       let url = 'http://localhost:5001/api/scheduler';
-      
+
       if (isBulk) {
         url = 'http://localhost:5001/api/scheduler/bulk';
         body.startDate = new Date(scheduleTime);
@@ -458,7 +458,7 @@ export const CalendarView = ({ selectedAccounts }) => {
 
   return (
     <div className="py-4 px-0 bg-[#f5f5f7] h-screen text-[#1d1d1f] font-sans flex flex-col overflow-hidden">
-      
+
       {/* Page Header */}
       <div className="flex items-center justify-between pb-3 border-b border-[#e5e5ea] px-3 flex-shrink-0">
         <div>
@@ -467,7 +467,7 @@ export const CalendarView = ({ selectedAccounts }) => {
         </div>
 
         {!isViewer && (
-          <button 
+          <button
             onClick={() => setShowComposer(true)}
             className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
           >
@@ -495,45 +495,9 @@ export const CalendarView = ({ selectedAccounts }) => {
           </div>
 
           <form onSubmit={handleComposeSubmit} className="flex-1 min-h-0 overflow-y-auto py-4 pr-1 space-y-4">
-          
 
-            <section className="grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr_auto_1.25fr_auto_1.15fr] gap-0 xl:gap-0 items-stretch">
-              {/* Flow Arrow CSS */}
-              <style>{`
-                @keyframes flowPulse {
-                  0%, 100% { opacity: 0.4; transform: translateX(0); }
-                  50% { opacity: 1; transform: translateX(3px); }
-                }
-                .flow-arrow-connector {
-                  display: none;
-                }
-                @media (min-width: 1280px) {
-                  .flow-arrow-connector {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 0 2px;
-                  }
-                }
-                .flow-arrow-icon {
-                  animation: flowPulse 2s ease-in-out infinite;
-                  filter: drop-shadow(0 0 4px rgba(79, 70, 229, 0.3));
-                }
-                .flow-arrow-icon:nth-child(1) { animation-delay: 0s; }
-                .flow-arrow-icon:nth-child(2) { animation-delay: 0.15s; }
-                .flow-arrow-icon:nth-child(3) { animation-delay: 0.3s; }
-                @keyframes flowDownPulse {
-                  0%, 100% { opacity: 0.4; transform: translateY(0); }
-                  50% { opacity: 1; transform: translateY(3px); }
-                }
-                .flow-down-arrow {
-                  animation: flowDownPulse 2s ease-in-out infinite;
-                  filter: drop-shadow(0 0 4px rgba(79, 70, 229, 0.3));
-                }
-                .flow-down-arrow:nth-child(1) { animation-delay: 0s; }
-                .flow-down-arrow:nth-child(2) { animation-delay: 0.15s; }
-                .flow-down-arrow:nth-child(3) { animation-delay: 0.3s; }
-              `}</style>
+
+            <section className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_1.25fr_1.15fr] gap-4">
               <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
                 <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2">
                   <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">1. Select Accounts</h4>
@@ -546,11 +510,10 @@ export const CalendarView = ({ selectedAccounts }) => {
                         key={chan._id}
                         type="button"
                         onClick={() => toggleChannel(chan._id)}
-                        className={`w-full flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all ${
-                          isSelected
+                        className={`w-full flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all ${isSelected
                             ? 'border-[#4f46e5] bg-[#eef2ff] text-[#0b1645]'
                             : 'border-[#e5e5ea] bg-white text-[#1d1d1f] hover:border-[#b8c4e8]'
-                        }`}
+                          }`}
                       >
                         <span className={`flex h-4 w-4 items-center justify-center rounded border ${isSelected ? 'bg-[#2563eb] border-[#2563eb]' : 'border-[#c7c7cc]'}`}>
                           {isSelected && <Check className="h-3 w-3 text-white" />}
@@ -567,15 +530,6 @@ export const CalendarView = ({ selectedAccounts }) => {
                 <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">{selectedChannels.length} account{selectedChannels.length === 1 ? '' : 's'} selected</div>
               </div>
 
-              {/* Arrow: Step 1 → Step 2 */}
-              <div className="flow-arrow-connector">
-                <div className="flex flex-col items-center gap-0">
-                  <ChevronRight className="w-4 h-4 text-indigo-500 flow-arrow-icon" />
-                  <ChevronRight className="w-4 h-4 text-indigo-400 flow-arrow-icon -mt-2" />
-                  <ChevronRight className="w-4 h-4 text-indigo-300 flow-arrow-icon -mt-2" />
-                </div>
-              </div>
-
               <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
                 <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2">
                   <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">2. Select / Switch Folder</h4>
@@ -589,11 +543,10 @@ export const CalendarView = ({ selectedAccounts }) => {
                         key={folder._id}
                         type="button"
                         onClick={() => setActiveFolderId(folder._id)}
-                        className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all ${
-                          isActive
+                        className={`w-full flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-all ${isActive
                             ? 'border-[#2563eb] bg-[#eff6ff] text-[#0b1645]'
                             : 'border-[#e5e5ea] bg-white hover:border-[#b8c4e8]'
-                        }`}
+                          }`}
                       >
                         <Folder className={`h-4 w-4 ${isActive ? 'text-[#2563eb]' : 'text-[#6b7280]'}`} />
                         <span className="min-w-0 flex-1 truncate text-xs font-semibold">{folder.name}</span>
@@ -603,15 +556,6 @@ export const CalendarView = ({ selectedAccounts }) => {
                   })}
                 </div>
                 <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">Selected folder: {activeFolderName}</div>
-              </div>
-
-              {/* Arrow: Step 2 → Step 3 */}
-              <div className="flow-arrow-connector">
-                <div className="flex flex-col items-center gap-0">
-                  <ChevronRight className="w-4 h-4 text-indigo-500 flow-arrow-icon" />
-                  <ChevronRight className="w-4 h-4 text-indigo-400 flow-arrow-icon -mt-2" />
-                  <ChevronRight className="w-4 h-4 text-indigo-300 flow-arrow-icon -mt-2" />
-                </div>
               </div>
 
               <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
@@ -652,15 +596,6 @@ export const CalendarView = ({ selectedAccounts }) => {
                   </div>
                 </div>
                 <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">All matching assets are selected automatically.</div>
-              </div>
-
-              {/* Arrow: Step 3 → Step 4 */}
-              <div className="flow-arrow-connector">
-                <div className="flex flex-col items-center gap-0">
-                  <ChevronRight className="w-4 h-4 text-indigo-500 flow-arrow-icon" />
-                  <ChevronRight className="w-4 h-4 text-indigo-400 flow-arrow-icon -mt-2" />
-                  <ChevronRight className="w-4 h-4 text-indigo-300 flow-arrow-icon -mt-2" />
-                </div>
               </div>
 
               <div className="space-y-4">
@@ -705,11 +640,10 @@ export const CalendarView = ({ selectedAccounts }) => {
                             key={t}
                             type="button"
                             onClick={() => setPostType(t)}
-                            className={`py-1.5 rounded-lg text-xs font-semibold capitalize border transition-all ${
-                              postType === t
+                            className={`py-1.5 rounded-lg text-xs font-semibold capitalize border transition-all ${postType === t
                                 ? 'bg-[#0b1645] text-white border-[#0b1645]'
                                 : 'bg-white text-[#536079] border-[#d8e0f4] hover:text-[#0b1645]'
-                            }`}
+                              }`}
                           >
                             {t}
                           </button>
@@ -763,15 +697,6 @@ export const CalendarView = ({ selectedAccounts }) => {
                 )}
               </div>
             </section>
-
-            {/* Down Arrow: Top flow → Media & Caption section */}
-            <div className="flex justify-center py-1">
-              <div className="flex items-center gap-0">
-                <ArrowDown className="w-4 h-4 text-indigo-500 flow-down-arrow" />
-                <ArrowDown className="w-4 h-4 text-indigo-400 flow-down-arrow -ml-1" />
-                <ArrowDown className="w-4 h-4 text-indigo-300 flow-down-arrow -ml-1" />
-              </div>
-            </div>
 
             <section className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-4">
               <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
@@ -842,15 +767,6 @@ export const CalendarView = ({ selectedAccounts }) => {
                 </div>
               </div>
             </section>
-
-            {/* Down Arrow: Media section → Review section */}
-            <div className="flex justify-center py-1">
-              <div className="flex items-center gap-0">
-                <ArrowDown className="w-4 h-4 text-indigo-500 flow-down-arrow" />
-                <ArrowDown className="w-4 h-4 text-indigo-400 flow-down-arrow -ml-1" />
-                <ArrowDown className="w-4 h-4 text-indigo-300 flow-down-arrow -ml-1" />
-              </div>
-            </div>
 
             <section className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
               <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2 flex items-center justify-between">
@@ -945,114 +861,114 @@ export const CalendarView = ({ selectedAccounts }) => {
                 const isOverdue = postDate < new Date() && post.status === 'scheduled';
 
                 return (
-                  <div 
+                  <div
                     key={post._id}
                     className="bg-white border border-[#e5e5ea] rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between hover:border-gray-400 transition-all duration-150 shadow-sm"
                   >
-                {/* Left: Execute Time Details */}
-                <div className="flex items-start gap-3 min-w-[200px]">
-                  <div className="p-2 bg-[#f5f5f7] rounded-lg text-gray-500 flex-shrink-0">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-black leading-tight">
-                      {postDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                    </p>
-                    <p className="text-[10px] text-gray-500 mt-1">
-                      {postDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                    {isOverdue && (
-                      <span className="inline-flex items-center gap-1 mt-1.5 text-[8px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-semibold border border-amber-200">
-                        <AlertCircle className="w-2 h-2" />
-                        Overdue / Waiting
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Center: Media & Caption Card */}
-                <div className="flex-1 flex items-center gap-4 min-w-0">
-                  {/* Thumbnail */}
-                  <div className="w-16 h-16 bg-[#f5f5f7] rounded-lg border border-[#e5e5ea] overflow-hidden flex-shrink-0 flex items-center justify-center relative">
-                    {firstMedia ? (
-                      firstMedia.type === 'video' ? (
-                        <video src={firstMedia.url} className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={firstMedia.url} className="w-full h-full object-cover" alt="" />
-                      )
-                    ) : (
-                      <span className="text-[9px] text-gray-300">No media</span>
-                    )}
-                    {firstMedia && (
-                      <div className="absolute bottom-1 right-1 bg-black/75 px-1 py-0.5 rounded text-[7px] text-white uppercase font-bold">
-                        {firstMedia.type}
+                    {/* Left: Execute Time Details */}
+                    <div className="flex items-start gap-3 min-w-[200px]">
+                      <div className="p-2 bg-[#f5f5f7] rounded-lg text-gray-500 flex-shrink-0">
+                        <Clock className="w-4 h-4" />
                       </div>
-                    )}
-                  </div>
-
-                  {/* Caption & Metadata */}
-                  <div className="space-y-2 min-w-0 flex-1">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-black truncate m-0" title={getMediaLabel(firstMedia)}>
-                        {getMediaLabel(firstMedia)}
-                        {mediaCount > 1 ? ` + ${mediaCount - 1} more` : ''}
-                      </p>
-                      <p className="text-[10px] text-gray-500 truncate mt-0.5" title={getMediaLocationLabel(firstMedia)}>
-                        Folder: {getMediaLocationLabel(firstMedia)}
-                      </p>
+                      <div>
+                        <p className="text-xs font-semibold text-black leading-tight">
+                          {postDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          {postDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        {isOverdue && (
+                          <span className="inline-flex items-center gap-1 mt-1.5 text-[8px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-semibold border border-amber-200">
+                            <AlertCircle className="w-2 h-2" />
+                            Overdue / Waiting
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-[#1d1d1f] font-normal leading-relaxed truncate" title={post.caption}>
-                      {post.caption || <span className="text-gray-300 italic">No caption drafted</span>}
-                    </p>
-                    
-                    {/* Badges row */}
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <span className="text-[8px] uppercase tracking-wider bg-black/5 text-[#1d1d1f] border border-black/10 px-1.5 py-0.5 rounded font-bold">
-                        {(post.platformSpecifics?.type || 'reels').toUpperCase()}
-                      </span>
 
-                      {/* Targeted Channels */}
-                      <div className="flex items-center gap-1 pl-2 border-l border-[#e5e5ea]">
-                        <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mr-1">Channels:</span>
-                        <div className="flex -space-x-1.5">
-                          {post.socialAccountIds?.map((accId, accIdx) => {
-                            const acc = channels.find(c => c._id === (accId._id || accId));
-                            return acc ? (
-                              <img 
-                                key={accIdx}
-                                src={acc.avatarUrl} 
-                                className="w-4 h-4 rounded-full object-cover border border-white" 
-                                title={acc.name} 
-                                alt="" 
-                              />
-                            ) : null;
-                          })}
+                    {/* Center: Media & Caption Card */}
+                    <div className="flex-1 flex items-center gap-4 min-w-0">
+                      {/* Thumbnail */}
+                      <div className="w-16 h-16 bg-[#f5f5f7] rounded-lg border border-[#e5e5ea] overflow-hidden flex-shrink-0 flex items-center justify-center relative">
+                        {firstMedia ? (
+                          firstMedia.type === 'video' ? (
+                            <video src={firstMedia.url} className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={firstMedia.url} className="w-full h-full object-cover" alt="" />
+                          )
+                        ) : (
+                          <span className="text-[9px] text-gray-300">No media</span>
+                        )}
+                        {firstMedia && (
+                          <div className="absolute bottom-1 right-1 bg-black/75 px-1 py-0.5 rounded text-[7px] text-white uppercase font-bold">
+                            {firstMedia.type}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Caption & Metadata */}
+                      <div className="space-y-2 min-w-0 flex-1">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-black truncate m-0" title={getMediaLabel(firstMedia)}>
+                            {getMediaLabel(firstMedia)}
+                            {mediaCount > 1 ? ` + ${mediaCount - 1} more` : ''}
+                          </p>
+                          <p className="text-[10px] text-gray-500 truncate mt-0.5" title={getMediaLocationLabel(firstMedia)}>
+                            Folder: {getMediaLocationLabel(firstMedia)}
+                          </p>
+                        </div>
+                        <p className="text-xs text-[#1d1d1f] font-normal leading-relaxed truncate" title={post.caption}>
+                          {post.caption || <span className="text-gray-300 italic">No caption drafted</span>}
+                        </p>
+
+                        {/* Badges row */}
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <span className="text-[8px] uppercase tracking-wider bg-black/5 text-[#1d1d1f] border border-black/10 px-1.5 py-0.5 rounded font-bold">
+                            {(post.platformSpecifics?.type || 'reels').toUpperCase()}
+                          </span>
+
+                          {/* Targeted Channels */}
+                          <div className="flex items-center gap-1 pl-2 border-l border-[#e5e5ea]">
+                            <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mr-1">Channels:</span>
+                            <div className="flex -space-x-1.5">
+                              {post.socialAccountIds?.map((accId, accIdx) => {
+                                const acc = channels.find(c => c._id === (accId._id || accId));
+                                return acc ? (
+                                  <img
+                                    key={accIdx}
+                                    src={acc.avatarUrl}
+                                    className="w-4 h-4 rounded-full object-cover border border-white"
+                                    title={acc.name}
+                                    alt=""
+                                  />
+                                ) : null;
+                              })}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
+
+                    {/* Right: Status Pill & Delete Button */}
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      <span className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${getStatusBadgeColor(post.status)}`}>
+                        {post.status}
+                      </span>
+
+                      {!isViewer && (
+                        <button
+                          onClick={() => handleDeletePost(post._id)}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-[#f5f5f7] rounded-lg transition-all"
+                          title="Cancel and Delete"
+                        >
+                          <Trash2 className="w-4.5 h-4.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-
-                {/* Right: Status Pill & Delete Button */}
-                <div className="flex items-center gap-4 flex-shrink-0">
-                  <span className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${getStatusBadgeColor(post.status)}`}>
-                    {post.status}
-                  </span>
-
-                  {!isViewer && (
-                    <button 
-                      onClick={() => handleDeletePost(post._id)}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-[#f5f5f7] rounded-lg transition-all"
-                      title="Cancel and Delete"
-                    >
-                      <Trash2 className="w-4.5 h-4.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
+                );
+              })
+            )}
           </div>
         </div>
       )}
