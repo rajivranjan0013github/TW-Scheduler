@@ -31,6 +31,7 @@ export const InstagramCallback = () => {
       }
 
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
+      const campaignId = sessionStorage.getItem('connect_campaign_id') || localStorage.getItem('active-campaign-id') || '';
       const redirectUri = sessionStorage.getItem('instagram_oauth_redirect_uri')
         || import.meta.env.VITE_INSTAGRAM_REDIRECT_URI
         || `${window.location.origin}/auth/instagram/callback`;
@@ -40,7 +41,7 @@ export const InstagramCallback = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ code, redirectUri }),
+        body: JSON.stringify({ code, redirectUri, campaignId }),
       });
 
       const data = await response.json();

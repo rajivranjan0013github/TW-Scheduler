@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { Plus, Check, Trash2, Clock, AlertCircle, Folder, Users, Layers, CalendarDays, Save, FileText } from 'lucide-react';
+import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 
 const getProxyUrl = (url) => {
   if (!url) return '';
@@ -171,10 +172,7 @@ export const CalendarView = ({ selectedAccounts }) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
   const isMediaAvailableForChannels = (item, channelIds) => {
-    if (channelIds.length === 0) return true;
-    const mediaAccountIds = getMediaAccountIds(item);
-    if (mediaAccountIds.length === 0) return true;
-    return channelIds.every(channelId => mediaAccountIds.includes(channelId));
+    return true;
   };
   const availableMediaList = useMemo(() => {
     return mediaList.filter(item => {
@@ -327,16 +325,16 @@ export const CalendarView = ({ selectedAccounts }) => {
 
   const fetchPosts = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/scheduler', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
-        }
-      });
+      const headers = { 'Authorization': `Bearer ${localStorage.getItem('tw_token')}` };
+      const accountResponse = await fetch(`http://localhost:5001/api/accounts${withCampaignScope()}`, { headers });
+      const accounts = accountResponse.ok ? await accountResponse.json() : [];
+      const scopedAccountIds = selectedAccounts.length > 0 ? selectedAccounts : accounts.map(account => account._id);
+      const response = await fetch(`http://localhost:5001/api/scheduler${withCampaignScope()}`, { headers });
       if (response.ok) {
         const data = await response.json();
         const filtered = data.filter(p => {
           const accId = p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0];
-          return selectedAccounts.includes(accId);
+          return scopedAccountIds.includes(accId);
         });
         setPosts(filtered);
       }
@@ -350,22 +348,19 @@ export const CalendarView = ({ selectedAccounts }) => {
       const token = localStorage.getItem('tw_token');
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      const accResponse = await fetch('http://localhost:5001/api/accounts', { headers });
+      const accResponse = await fetch(`http://localhost:5001/api/accounts${withCampaignScope()}`, { headers });
       const accData = await accResponse.json();
-      const hasCampaignScope = Boolean(localStorage.getItem('active-campaign-id'));
       setChannels(
         selectedAccounts.length > 0
           ? accData.filter(account => selectedAccounts.includes(account._id))
-          : hasCampaignScope
-            ? []
           : accData
       );
 
-      const medResponse = await fetch('http://localhost:5001/api/media', { headers });
+      const medResponse = await fetch(`http://localhost:5001/api/media${withCampaignScope()}`, { headers });
       const medData = await medResponse.json();
       setMediaList(medData);
 
-      const folderResponse = await fetch('http://localhost:5001/api/media/folders', { headers });
+      const folderResponse = await fetch(`http://localhost:5001/api/media/folders${withCampaignScope()}`, { headers });
       if (folderResponse.ok) {
         const folderData = await folderResponse.json();
         setFolders(folderData);
@@ -378,7 +373,7 @@ export const CalendarView = ({ selectedAccounts }) => {
   const handleDeletePost = async (postId) => {
     if (!window.confirm('Are you sure you want to cancel this scheduled post?')) return;
     try {
-      const response = await fetch(`http://localhost:5001/api/scheduler/${postId}`, {
+      const response = await fetch(`http://localhost:5001/api/scheduler/${postId}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
@@ -398,7 +393,7 @@ export const CalendarView = ({ selectedAccounts }) => {
     setSavingCaptionId(item._id);
 
     try {
-      const response = await fetch(`http://localhost:5001/api/media/${item._id}`, {
+      const response = await fetch(`http://localhost:5001/api/media/${item._id}${withCampaignScope()}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -504,6 +499,7 @@ export const CalendarView = ({ selectedAccounts }) => {
         } : {}),
       };
       const body = {
+        campaignId: getActiveCampaignId(),
         socialAccountIds: selectedChannels,
         mediaIds: selectedMedia,
         caption: caption.trim(),
@@ -590,7 +586,7 @@ export const CalendarView = ({ selectedAccounts }) => {
             className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>New Scheduled Post</span>
+            <span>New Schedule Queue</span>
           </button>
         )}
       </div>
@@ -729,9 +725,6 @@ export const CalendarView = ({ selectedAccounts }) => {
                     <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">{isBulk ? '4B. Set Start Time & Interval' : '4A. Set Post Time'}</h4>
                   </div>
                   <div className="p-3 space-y-3">
-                    <div className={`rounded-lg border px-3 py-2 text-xs font-bold ${isBulk ? 'border-[#bdd0f4] bg-[#eff6ff] text-[#1d4ed8]' : 'border-[#bfe4ca] bg-[#f0fdf4] text-[#166534]'}`}>
-                      {isBulk ? 'Bulk Mode (2+ matching assets)' : 'Single Mode (1 matching asset)'}
-                    </div>
                     <label className="block">
                       <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">{isBulk ? 'Start Time' : 'Post Time'}</span>
                       <input

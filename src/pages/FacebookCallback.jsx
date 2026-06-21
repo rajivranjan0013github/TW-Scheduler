@@ -17,6 +17,7 @@ export const FacebookCallback = () => {
   const exchangeToken = async () => {
     try {
       const token = localStorage.getItem('tw_token');
+      const campaignId = sessionStorage.getItem('connect_campaign_id') || localStorage.getItem('active-campaign-id') || '';
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
       const response = await fetch(`${apiBaseUrl}/api/accounts/facebook-callback`, {
         method: 'POST',
@@ -24,7 +25,7 @@ export const FacebookCallback = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, campaignId }),
       });
 
       const data = await response.json();

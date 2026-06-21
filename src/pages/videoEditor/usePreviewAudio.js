@@ -4,6 +4,7 @@ import {
   MY_AUDIO_STORAGE_KEY,
   PLATFORM_AUDIO_FOLDER_ID,
 } from './videoEditorConstants';
+import { getActiveCampaignId } from '../../utils/campaignScope';
 
 const AUDIO_EXTENSION_PATTERN = /\.(mp3|wav|m4a|aac|ogg|oga|flac|webm)$/i;
 
@@ -95,7 +96,11 @@ export const usePreviewAudio = () => {
 
     try {
       const token = localStorage.getItem('tw_token');
-      const response = await fetch(`${API_BASE_URL}/api/media?folderId=${PLATFORM_AUDIO_FOLDER_ID}`, {
+      const params = new URLSearchParams();
+      const campaignId = getActiveCampaignId();
+      if (campaignId) params.set('campaignId', campaignId);
+      params.set('folderId', PLATFORM_AUDIO_FOLDER_ID);
+      const response = await fetch(`${API_BASE_URL}/api/media?${params.toString()}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 

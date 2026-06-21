@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, ChevronDown, Check, Globe, X } from 'lucide-react';
+import { withCampaignScope } from '../utils/campaignScope';
 
 export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
   const { user, logout } = useAuth();
@@ -39,8 +40,9 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
       const headers = {
         'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
       };
+      const accountQuery = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
       const response = await fetch(
-        adminViewUserId ? `http://localhost:5001/api/accounts?userId=${adminViewUserId}` : 'http://localhost:5001/api/accounts',
+        `http://localhost:5001/api/accounts${accountQuery}`,
         { headers }
       );
       if (response.ok) {

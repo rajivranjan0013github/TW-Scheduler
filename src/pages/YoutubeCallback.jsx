@@ -10,13 +10,14 @@ export const YoutubeCallback = () => {
   const exchangeToken = useCallback(async () => {
     try {
       const token = localStorage.getItem('tw_token');
+      const campaignId = sessionStorage.getItem('connect_campaign_id') || localStorage.getItem('active-campaign-id') || '';
       const response = await fetch('http://localhost:5001/api/accounts/youtube-callback', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, campaignId }),
       });
 
       const data = await response.json();

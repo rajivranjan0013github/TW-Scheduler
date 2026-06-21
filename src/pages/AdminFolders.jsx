@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Folder, Calendar, Search, X, Plus, Trash2, MoreVertical, Eye } from 'lucide-react';
+import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 
 export const AdminFolders = () => {
   const navigate = useNavigate();
@@ -36,13 +37,13 @@ export const AdminFolders = () => {
     setCreating(true);
     setCreateError('');
     try {
-      const response = await fetch('http://localhost:5001/api/media/folders', {
+      const response = await fetch(`http://localhost:5001/api/media/folders${withCampaignScope()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
         },
-        body: JSON.stringify({ name: newFolderName.trim() }),
+        body: JSON.stringify({ campaignId: getActiveCampaignId(), name: newFolderName.trim() }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -64,7 +65,7 @@ export const AdminFolders = () => {
     if (!window.confirm('Are you sure you want to delete this folder? Files inside will be moved to the root.')) return;
 
     try {
-      const response = await fetch(`http://localhost:5001/api/admin/folders/${folderId}`, {
+      const response = await fetch(`http://localhost:5001/api/admin/folders/${folderId}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
       });
@@ -83,7 +84,7 @@ export const AdminFolders = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost:5001/api/admin/folders', {
+      const response = await fetch(`http://localhost:5001/api/admin/folders${withCampaignScope()}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
       });
       const data = await response.json();

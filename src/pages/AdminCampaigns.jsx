@@ -1,22 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Edit3, Megaphone, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Edit3, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const statusOptions = ['active', 'paused', 'archived'];
 
-const numberFormat = new Intl.NumberFormat();
-
 const emptyForm = {
   name: '',
   description: '',
+  mainEmail: '',
   status: 'active',
-  accountIds: [],
 };
 
 export const AdminCampaigns = () => {
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
-  const [accounts, setAccounts] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -36,21 +33,12 @@ export const AdminCampaigns = () => {
     setError('');
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('tw_token')}` };
-      const [campaignRes, accountRes] = await Promise.all([
-        fetch('http://localhost:5001/api/admin/campaigns', { headers }),
-        fetch('http://localhost:5001/api/admin/social-accounts', { headers }),
-      ]);
-
-      const [campaignData, accountData] = await Promise.all([
-        campaignRes.json(),
-        accountRes.json(),
-      ]);
+      const campaignRes = await fetch('http://localhost:5001/api/admin/campaigns', { headers });
+      const campaignData = await campaignRes.json();
 
       if (!campaignRes.ok) throw new Error(campaignData.message || 'Failed to load campaigns.');
-      if (!accountRes.ok) throw new Error(accountData.message || 'Failed to load publishing channels.');
 
       setCampaigns(campaignData);
-      setAccounts(accountData);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -59,6 +47,8 @@ export const AdminCampaigns = () => {
   };
 
   useEffect(() => {
+    // Load campaign setup data on entry.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, []);
 
@@ -80,20 +70,11 @@ export const AdminCampaigns = () => {
     setForm({
       name: campaign.name || '',
       description: campaign.description || '',
+      mainEmail: campaign.mainEmail || campaign.createdBy?.email || '',
       status: campaign.status || 'active',
-      accountIds: (campaign.accountIds || []).map((account) => account._id || account),
     });
     setError('');
     setIsDialogOpen(true);
-  };
-
-  const toggleAccount = (accountId) => {
-    setForm((current) => ({
-      ...current,
-      accountIds: current.accountIds.includes(accountId)
-        ? current.accountIds.filter((id) => id !== accountId)
-        : [...current.accountIds, accountId],
-    }));
   };
 
   const saveCampaign = async (event) => {
@@ -169,7 +150,7 @@ export const AdminCampaigns = () => {
         <div>
           <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
           <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">Campaign Setup</h2>
-          <p className="m-0 mt-1 text-xs text-[#8e8e93]">Create campaigns and attach publishing channels to them.</p>
+          <p className="m-0 mt-1 text-xs text-[#8e8e93]">Create campaign workspaces and assign the main access email.</p>
         </div>
         <button
           onClick={fetchData}
@@ -221,18 +202,14 @@ export const AdminCampaigns = () => {
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-3 text-xs">
+                <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <p className="m-0 font-semibold">{campaign.metrics?.accounts || 0}</p>
-                    <p className="m-0 mt-0.5 text-[#8e8e93]">Accounts</p>
+                    <p className="m-0 truncate font-semibold">{campaign.mainEmail || campaign.createdBy?.email || 'Not set'}</p>
+                    <p className="m-0 mt-0.5 text-[#8e8e93]">Main email</p>
                   </div>
                   <div>
-                    <p className="m-0 font-semibold">{campaign.metrics?.posts || 0}</p>
-                    <p className="m-0 mt-0.5 text-[#8e8e93]">Posts</p>
-                  </div>
-                  <div>
-                    <p className="m-0 font-semibold">{numberFormat.format(campaign.metrics?.lifetimeViews || 0)}</p>
-                    <p className="m-0 mt-0.5 text-[#8e8e93]">Views</p>
+                    <p className="m-0 truncate font-semibold">{campaign.createdBy?.email || 'Unknown'}</p>
+                    <p className="m-0 mt-0.5 text-[#8e8e93]">Created by</p>
                   </div>
                 </div>
                 <div className="mt-4 flex justify-end">
@@ -256,7 +233,7 @@ export const AdminCampaigns = () => {
           <div className="flex items-start justify-between gap-4 border-b border-[#e5e5ea] px-5 py-4">
             <div>
               <h3 className="m-0 text-sm font-semibold">{selectedCampaignId ? 'Edit campaign' : 'Create campaign'}</h3>
-              <p className="m-0 mt-1 text-xs text-[#6e6e73]">Assign publishing channels so the campaign workspace can group views correctly.</p>
+              <p className="m-0 mt-1 text-xs text-[#6e6e73]">Campaign access is controlled by the main email, separate from publishing channels.</p>
             </div>
             <button
               type="button"
@@ -275,6 +252,17 @@ export const AdminCampaigns = () => {
                 value={form.name}
                 onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                 placeholder="June launch"
+                className="mt-2 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#3478f6]"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-[#515154]">Main email</span>
+              <input
+                type="email"
+                value={form.mainEmail}
+                onChange={(event) => setForm((current) => ({ ...current, mainEmail: event.target.value }))}
+                placeholder="owner@example.com"
                 className="mt-2 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#3478f6]"
               />
             </label>
@@ -303,39 +291,6 @@ export const AdminCampaigns = () => {
               </select>
             </label>
 
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-[#515154]">Publishing channels</span>
-                <span className="text-[10px] font-semibold text-[#8e8e93]">{form.accountIds.length} selected</span>
-              </div>
-              <div className="mt-2 max-h-80 overflow-y-auto rounded-lg border border-[#d2d2d7]">
-                {accounts.length === 0 ? (
-                  <div className="p-5 text-center text-xs text-[#6e6e73]">No publishing channels available.</div>
-                ) : accounts.map((account) => (
-                  <label key={account._id} className="flex cursor-pointer items-center gap-3 border-b border-[#e5e5ea] p-3 last:border-b-0 hover:bg-[#f5f5f7]">
-                    <input
-                      type="checkbox"
-                      checked={form.accountIds.includes(account._id)}
-                      onChange={() => toggleAccount(account._id)}
-                      className="h-4 w-4"
-                    />
-                    <img
-                      src={account.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-                      crossOrigin="anonymous"
-                      alt=""
-                      className="h-9 w-9 rounded-full border border-black/10 object-cover"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="m-0 truncate text-sm font-semibold text-[#1d1d1f]">{account.name}</p>
-                      <p className="m-0 mt-0.5 truncate text-xs text-[#6e6e73]">
-                        @{account.username || 'account'} · {account.platform} · {account.userId?.email || 'unknown owner'}
-                      </p>
-                    </div>
-                    <span className={`h-2 w-2 rounded-full ${account.isConnected ? 'bg-[#16a34a]' : 'bg-[#d1d5db]'}`} />
-                  </label>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div className="flex items-center justify-between border-t border-[#e5e5ea] px-5 py-4">

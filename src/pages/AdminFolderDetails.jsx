@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Folder, Upload, X, Tag, AlertTriangle, Music, Save, Trash2 } from 'lucide-react';
+import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 
 const getProxyUrl = (url) => {
   if (!url) return '';
@@ -32,7 +33,7 @@ export const AdminFolderDetails = () => {
 
   const fetchAccounts = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/accounts', {
+      const response = await fetch(`http://localhost:5001/api/accounts${withCampaignScope()}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
       });
       if (response.ok) {
@@ -66,6 +67,7 @@ export const AdminFolderDetails = () => {
     formData.append('tags', uploadTags);
     formData.append('caption', uploadCaption);
     formData.append('socialAccountIds', selectedAccountIds.join(','));
+    formData.append('campaignId', getActiveCampaignId());
 
     try {
       const response = await fetch('http://localhost:5001/api/media/upload', {
@@ -98,7 +100,7 @@ export const AdminFolderDetails = () => {
     if (!window.confirm('Are you sure you want to delete this folder? Files inside will be moved to the root.')) return;
 
     try {
-      const response = await fetch(`http://localhost:5001/api/admin/folders/${id}`, {
+      const response = await fetch(`http://localhost:5001/api/admin/folders/${id}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
       });
@@ -117,7 +119,7 @@ export const AdminFolderDetails = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`http://localhost:5001/api/admin/folders/${id}`, {
+      const response = await fetch(`http://localhost:5001/api/admin/folders/${id}${withCampaignScope()}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
       });
       const data = await response.json();
@@ -147,7 +149,7 @@ export const AdminFolderDetails = () => {
     setSavingCaptionId(item._id);
 
     try {
-      const response = await fetch(`http://localhost:5001/api/media/${item._id}`, {
+      const response = await fetch(`http://localhost:5001/api/media/${item._id}${withCampaignScope()}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

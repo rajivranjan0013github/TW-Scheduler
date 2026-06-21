@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Folder, Loader2, Play, X } from 'lucide-react';
 import { API_BASE_URL } from './videoEditorConstants';
+import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 
 const proxiedMediaUrl = (url) => `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
 
@@ -28,7 +29,7 @@ export const VideoLibraryPickerDialog = ({
       setError('');
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/media/folders`, { headers });
+        const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, { headers });
         if (!response.ok) throw new Error('Unable to load folders.');
 
         const folderData = await response.json();
@@ -51,6 +52,8 @@ export const VideoLibraryPickerDialog = ({
 
     try {
       const params = new URLSearchParams();
+      const campaignId = getActiveCampaignId();
+      if (campaignId) params.set('campaignId', campaignId);
       params.set('folderId', folderId);
       const response = await fetch(`${API_BASE_URL}/api/media?${params.toString()}`, { headers });
       if (!response.ok) throw new Error('Unable to load folder content.');

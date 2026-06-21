@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Share2, Trash2, ShieldCheck, Link2, Eye, Trash } from 'lucide-react';
+import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 
 export const Channels = ({ selectedAccounts = [] }) => {
   const { user } = useAuth();
@@ -23,7 +24,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
   const fetchChannels = async () => {
     try {
       const token = localStorage.getItem('tw_token');
-      const response = await fetch(`http://localhost:5001/api/accounts${adminViewUserId ? `?userId=${adminViewUserId}` : ''}`, {
+      const response = await fetch(`http://localhost:5001/api/accounts${withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '')}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -59,6 +60,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
   };
 
   const connectMetaOAuth = () => {
+    sessionStorage.setItem('connect_campaign_id', getActiveCampaignId());
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
     const redirectUri = encodeURIComponent('http://localhost:5173/auth/facebook/callback');
     const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights,instagram_manage_comments');
@@ -73,6 +75,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
       alert('Set VITE_INSTAGRAM_APP_ID to the Instagram App ID from Meta Dashboard > Instagram > API setup with Instagram login. It cannot be the Facebook App ID.');
       return;
     }
+    sessionStorage.setItem('connect_campaign_id', getActiveCampaignId());
     const rawRedirectUri = import.meta.env.VITE_INSTAGRAM_REDIRECT_URI || `${window.location.origin}/auth/instagram/callback`;
     sessionStorage.setItem('instagram_oauth_redirect_uri', rawRedirectUri);
     const redirectUri = encodeURIComponent(rawRedirectUri);
@@ -83,6 +86,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
 
   const connectYoutubeOAuth = async () => {
     try {
+      sessionStorage.setItem('connect_campaign_id', getActiveCampaignId());
       const token = localStorage.getItem('tw_token');
       const response = await fetch('http://localhost:5001/api/accounts/youtube/auth-url', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -106,11 +110,8 @@ export const Channels = ({ selectedAccounts = [] }) => {
     if (platform === 'youtube') return 'bg-red-50 text-red-600 border-red-200';
     return 'bg-blue-50 text-blue-600 border-blue-200';
   };
-  const hasCampaignScope = Boolean(localStorage.getItem('active-campaign-id'));
   const visibleChannels = selectedAccounts.length > 0
     ? channels.filter(channel => selectedAccounts.includes(channel._id))
-    : hasCampaignScope
-      ? []
     : channels;
 
   return (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, BarChart3, ChevronDown, ChevronUp, ExternalLink, Eye, Heart, MessageSquare, Play, RefreshCw } from 'lucide-react';
+import { withCampaignScope } from '../utils/campaignScope';
 
 export const PublishedFeed = () => {
   const { id } = useParams();
@@ -206,7 +207,7 @@ export const PublishedFeed = () => {
           setChannel(location.state.channel);
         } else {
           const headers = { 'Authorization': `Bearer ${token}` };
-          const chanRes = await fetch('http://localhost:5001/api/accounts', { headers });
+          const chanRes = await fetch(`http://localhost:5001/api/accounts${withCampaignScope()}`, { headers });
           let channels = chanRes.ok ? await chanRes.json() : [];
           let targetChan = channels.find(c => c._id === id);
 

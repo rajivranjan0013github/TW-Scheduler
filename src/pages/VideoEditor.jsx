@@ -13,6 +13,7 @@ import { ExportPanel } from './videoEditor/ExportPanel';
 import { TextSettingsPanel } from './videoEditor/TextSettingsPanel';
 import { AudioDialog } from './videoEditor/AudioDialog';
 import { VideoLibraryPickerDialog } from './videoEditor/VideoLibraryPickerDialog';
+import { getActiveCampaignId } from '../utils/campaignScope';
 
 export const VideoEditor = () => {
   const navigate = useNavigate();
@@ -281,6 +282,7 @@ export const VideoEditor = () => {
       formData.append('file', file);
       formData.append('folderId', 'null');
       formData.append('tags', 'editor,merged');
+      formData.append('campaignId', getActiveCampaignId());
 
       const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
         method: 'POST',

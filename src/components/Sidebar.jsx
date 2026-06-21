@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Clock, FolderHeart, Film, Link2, Settings as SettingsIcon, ChevronLeft, ChevronRight, X, LogOut, Megaphone, Users, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { withCampaignScope } from '../utils/campaignScope';
 
 export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
-  const [activeCampaignId, setActiveCampaignId] = useState(() => localStorage.getItem('active-campaign-id') || '');
+  const [activeCampaignId, setActiveCampaignId] = useState('');
   const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
   const adminViewContext = (() => {
     try {
@@ -29,6 +30,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   const displayedAvatar = isAdminViewingUser
     ? (adminViewChannel?.avatarUrl || user?.avatar)
     : user?.avatar;
+  const campaignStorageKey = `active-campaign-id:${adminViewUserId || user?._id || user?.email || 'default'}`;
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('sidebar-collapsed') === 'true';
   });
@@ -41,22 +43,22 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     });
   };
 
-  const getCampaignAccounts = (campaign) => (campaign?.accountIds || []).map((account) => (
-    account?._id ? account : { _id: account }
-  ));
-
-  const applyCampaign = (campaignList, preferredCampaignId = activeCampaignId) => {
+  const applyCampaign = (campaignList, preferredCampaignId = localStorage.getItem(campaignStorageKey) || activeCampaignId) => {
     const nextCampaign = campaignList.find(campaign => campaign._id === preferredCampaignId) || campaignList[0] || null;
     const nextCampaignId = nextCampaign?._id || '';
-    const nextAccounts = getCampaignAccounts(nextCampaign).filter(account => account._id);
 
     setActiveCampaignId(nextCampaignId);
     if (nextCampaignId) {
+      localStorage.setItem(campaignStorageKey, nextCampaignId);
       localStorage.setItem('active-campaign-id', nextCampaignId);
+      localStorage.setItem('active-campaign-name', nextCampaign?.name || '');
+      localStorage.setItem('active-campaign-main-email', nextCampaign?.mainEmail || nextCampaign?.createdBy?.email || '');
     } else {
+      localStorage.removeItem(campaignStorageKey);
       localStorage.removeItem('active-campaign-id');
+      localStorage.removeItem('active-campaign-name');
+      localStorage.removeItem('active-campaign-main-email');
     }
-    setSelectedAccounts(nextAccounts.map(account => account._id));
   };
 
   const fetchCampaignWorkspace = async () => {
@@ -69,13 +71,30 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
         if (response.ok) {
           const data = await response.json();
           setCampaigns(data);
-          applyCampaign(data);
+          applyCampaign(data, localStorage.getItem(campaignStorageKey) || activeCampaignId);
           return;
         }
       }
 
+      const campaignResponse = await fetch(
+        adminViewUserId ? `http://localhost:5001/api/accounts/campaigns?userId=${adminViewUserId}` : 'http://localhost:5001/api/accounts/campaigns',
+        { headers }
+      );
+
+      if (campaignResponse.ok) {
+        const campaignData = await campaignResponse.json();
+        setCampaigns(campaignData);
+        if (campaignData.length > 0) {
+          applyCampaign(campaignData, localStorage.getItem(campaignStorageKey) || activeCampaignId);
+          return;
+        }
+      } else {
+        setCampaigns([]);
+      }
+
+      const accountQuery = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
       const response = await fetch(
-        adminViewUserId ? `http://localhost:5001/api/accounts?userId=${adminViewUserId}` : 'http://localhost:5001/api/accounts',
+        `http://localhost:5001/api/accounts${accountQuery}`,
         { headers }
       );
 
@@ -105,9 +124,16 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminViewChannel?._id, adminViewUserId]);
 
-  const handleCampaignChange = (campaignId) => {
-    applyCampaign(campaigns, campaignId);
-  };
+  useEffect(() => {
+    const syncSelectedCampaign = (event) => {
+      if (event.detail?.campaignId) {
+        setActiveCampaignId(event.detail.campaignId);
+      }
+    };
+
+    window.addEventListener('campaign-selected', syncSelectedCampaign);
+    return () => window.removeEventListener('campaign-selected', syncSelectedCampaign);
+  }, []);
 
   const exitAdminUserView = () => {
     sessionStorage.removeItem('admin_view_context');
@@ -116,7 +142,8 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   };
 
   const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+    { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Scheduled Queue', path: '/scheduler', icon: Clock },
     { name: 'Media Library', path: '/media', icon: FolderHeart },
     { name: 'Video Editor', path: '/media/editor', icon: Film },
@@ -126,7 +153,6 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   const managerItems = canViewAdmin ? [
     { name: 'Overview', path: '/admin', icon: BarChart3 },
     { name: 'Campaign Setup', path: '/admin/campaign', icon: Megaphone },
-    { name: 'Media Folders', path: '/admin/folders', icon: FolderHeart },
     { name: 'Team Access', path: '/admin/users', icon: Users },
   ] : [];
   const activeCampaign = campaigns.find(campaign => campaign._id === activeCampaignId);
@@ -157,25 +183,6 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
 
       {/* Navigation */}
       <nav className={`flex-1 p-2.5 space-y-1 overflow-y-auto ${isAdminViewingUser ? 'bg-[#111827]' : 'bg-white'}`}>
-        {canViewAdmin && campaigns.length > 0 && !isCollapsed && (
-          <div className={`mb-3 rounded-lg border p-2 ${isAdminViewingUser ? 'border-white/10 bg-white/5' : 'border-[#e5e5ea] bg-[#fbfbfd]'}`}>
-            <label className={`mb-1 block text-[9px] font-semibold uppercase tracking-wider ${isAdminViewingUser ? 'text-[#9ca3af]' : 'text-[#8e8e93]'}`}>
-              Campaign
-            </label>
-            <select
-              value={activeCampaignId}
-              onChange={(event) => handleCampaignChange(event.target.value)}
-              className={`w-full rounded-md border px-2 py-1.5 text-[11px] font-semibold outline-none ${isAdminViewingUser ? 'border-white/10 bg-[#111827] text-white' : 'border-[#d2d2d7] bg-white text-[#1d1d1f]'}`}
-            >
-              {campaigns.map(campaign => (
-                <option key={campaign._id} value={campaign._id}>
-                  {campaign.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
         {navItems.map((item) => (
           <NavLink
             key={item.name}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Folder, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Film } from 'lucide-react';
+import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 
 const getProxyUrl = (url) => {
   if (!url) return '';
@@ -57,7 +58,7 @@ export const MediaLibrary = () => {
 
   const fetchFolders = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/media/folders', {
+      const response = await fetch(`http://localhost:5001/api/media/folders${withCampaignScope()}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
         }
@@ -74,6 +75,8 @@ export const MediaLibrary = () => {
   const fetchMedia = async () => {
     try {
       const params = new URLSearchParams();
+      const campaignId = getActiveCampaignId();
+      if (campaignId) params.set('campaignId', campaignId);
       if (activeFolderId) params.set('folderId', activeFolderId);
       const url = `http://localhost:5001/api/media?${params.toString()}`;
 
@@ -103,6 +106,7 @@ export const MediaLibrary = () => {
     formData.append('tags', '');
     formData.append('caption', uploadCaption);
     formData.append('socialAccountIds', '');
+    formData.append('campaignId', getActiveCampaignId());
 
     try {
       const response = await fetch('http://localhost:5001/api/media/upload', {
@@ -172,13 +176,14 @@ export const MediaLibrary = () => {
       const failedFiles = [];
       const firstRelativePath = mediaFiles[0].webkitRelativePath || mediaFiles[0].name;
       const folderName = firstRelativePath.split('/')[0] || 'Uploaded Folder';
-      const folderResponse = await fetch('http://localhost:5001/api/media/folders', {
+      const folderResponse = await fetch(`http://localhost:5001/api/media/folders${withCampaignScope()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
         },
         body: JSON.stringify({
+          campaignId: getActiveCampaignId(),
           name: folderName,
           parentFolderId: activeFolderId === 'root' ? null : activeFolderId,
         }),
@@ -213,6 +218,7 @@ export const MediaLibrary = () => {
         formData.append('tags', '');
         formData.append('caption', sidecarCaption ?? uploadCaption);
         formData.append('socialAccountIds', '');
+        formData.append('campaignId', getActiveCampaignId());
 
         const response = await fetch('http://localhost:5001/api/media/upload', {
           method: 'POST',
@@ -253,7 +259,7 @@ export const MediaLibrary = () => {
     setSavingCaptionId(item._id);
 
     try {
-      const response = await fetch(`http://localhost:5001/api/media/${item._id}`, {
+      const response = await fetch(`http://localhost:5001/api/media/${item._id}${withCampaignScope()}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -289,13 +295,13 @@ export const MediaLibrary = () => {
     if (!newFolderName.trim()) return;
 
     try {
-      const response = await fetch('http://localhost:5001/api/media/folders', {
+      const response = await fetch(`http://localhost:5001/api/media/folders${withCampaignScope()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
         },
-        body: JSON.stringify({ name: newFolderName }),
+        body: JSON.stringify({ campaignId: getActiveCampaignId(), name: newFolderName }),
       });
 
       if (response.ok) {
@@ -313,7 +319,7 @@ export const MediaLibrary = () => {
     if (!window.confirm('Are you sure you want to delete this campaign folder? Files inside will be moved to the campaign library.')) return;
 
     try {
-      const response = await fetch(`http://localhost:5001/api/media/folders/${folderId}`, {
+      const response = await fetch(`http://localhost:5001/api/media/folders/${folderId}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
@@ -336,7 +342,7 @@ export const MediaLibrary = () => {
     if (!window.confirm('Delete this media file permanently?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5001/api/media/${mediaId}`, {
+      const response = await fetch(`http://localhost:5001/api/media/${mediaId}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`

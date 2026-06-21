@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Eye, TrendingUp, Calendar, Heart, RefreshCw, MessageSquare } from 'lucide-react';
+import { withCampaignScope } from '../utils/campaignScope';
 
 const Instagram = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -66,22 +67,19 @@ export const Dashboard = ({ selectedAccounts }) => {
       }
       const token = localStorage.getItem('tw_token');
       const headers = { 'Authorization': `Bearer ${token}` };
-      const scopedQuery = adminViewUserId ? `userId=${adminViewUserId}` : '';
-      const scopedSuffix = scopedQuery ? `?${scopedQuery}` : '';
+      const scopedSuffix = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
 
       const accResponse = await fetch(`http://localhost:5001/api/accounts${scopedSuffix}`, { headers });
       const accountsList = await accResponse.json();
-      const hasCampaignScope = Boolean(localStorage.getItem('active-campaign-id'));
       const campaignAccounts = selectedAccounts.length > 0
         ? accountsList.filter(account => selectedAccounts.includes(account._id))
-        : hasCampaignScope
-          ? []
         : accountsList;
+      const activeAccountIds = campaignAccounts.map(account => account._id);
       setChannels(campaignAccounts);
 
       const schedResponse = await fetch(`http://localhost:5001/api/scheduler${scopedSuffix}`, { headers });
       const posts = await schedResponse.json();
-      const filteredPosts = posts.filter(p => selectedAccounts.includes(p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0]));
+      const filteredPosts = posts.filter(p => activeAccountIds.includes(p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0]));
       
       const upcoming = filteredPosts.filter(p => p.status === 'scheduled' || p.status === 'publishing');
       setUpcomingPosts(upcoming.slice(0, 3));
@@ -94,6 +92,8 @@ export const Dashboard = ({ selectedAccounts }) => {
         const insightParams = new URLSearchParams({ period: selectedPeriod });
         if (forceRefresh) insightParams.set('refresh', 'true');
         if (adminViewUserId) insightParams.set('userId', adminViewUserId);
+        const campaignId = localStorage.getItem('active-campaign-id');
+        if (campaignId) insightParams.set('campaignId', campaignId);
         const insResponse = await fetch(`http://localhost:5001/api/accounts/insights?${insightParams.toString()}`, { headers });
         if (insResponse.ok) {
           const insightsList = await insResponse.json();
@@ -120,9 +120,7 @@ export const Dashboard = ({ selectedAccounts }) => {
           const recentData = await recentResponse.json();
           setRecentPosts(
             selectedAccounts.length > 0
-              ? recentData.filter(post => selectedAccounts.includes(post.accountId))
-              : hasCampaignScope
-                ? []
+              ? recentData.filter(post => activeAccountIds.includes(post.accountId))
               : recentData
           );
         }

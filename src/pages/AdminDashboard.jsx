@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Megaphone, RefreshCw, Rows3 } from 'lucide-react';
+import { getActiveCampaignId } from '../utils/campaignScope';
 
 const numberFormat = new Intl.NumberFormat();
 
@@ -174,6 +175,10 @@ export const AdminDashboard = () => {
       }
       setCampaigns(data);
       setSelectedCampaignId((current) => {
+        const activeCampaignId = getActiveCampaignId();
+        if (data.some((campaign) => campaign._id === activeCampaignId)) {
+          return activeCampaignId;
+        }
         if (data.some((campaign) => campaign._id === current)) {
           return current;
         }
@@ -188,6 +193,17 @@ export const AdminDashboard = () => {
 
   useEffect(() => {
     fetchCampaigns();
+  }, []);
+
+  useEffect(() => {
+    const syncSelectedCampaign = (event) => {
+      if (event.detail?.campaignId) {
+        setSelectedCampaignId(event.detail.campaignId);
+      }
+    };
+
+    window.addEventListener('campaign-selected', syncSelectedCampaign);
+    return () => window.removeEventListener('campaign-selected', syncSelectedCampaign);
   }, []);
 
   const selectedCampaign = useMemo(
@@ -221,7 +237,22 @@ export const AdminDashboard = () => {
             <select
               id="campaign-select"
               value={selectedCampaignId}
-              onChange={(event) => setSelectedCampaignId(event.target.value)}
+              onChange={(event) => {
+                const campaign = campaigns.find((item) => item._id === event.target.value);
+                setSelectedCampaignId(event.target.value);
+                if (campaign) {
+                  localStorage.setItem('active-campaign-id', campaign._id);
+                  localStorage.setItem('active-campaign-name', campaign.name || '');
+                  localStorage.setItem('active-campaign-main-email', campaign.mainEmail || campaign.createdBy?.email || '');
+                  window.dispatchEvent(new CustomEvent('campaign-selected', {
+                    detail: {
+                      campaignId: campaign._id,
+                      campaignName: campaign.name || '',
+                      mainEmail: campaign.mainEmail || campaign.createdBy?.email || '',
+                    },
+                  }));
+                }
+              }}
               disabled={campaigns.length === 0}
               className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6] disabled:bg-[#f5f5f7] disabled:text-[#8e8e93]"
             >
