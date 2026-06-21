@@ -1,4 +1,4 @@
-import { Video, AlertCircle } from 'lucide-react';
+import { Video, AlertCircle, Sparkles } from 'lucide-react';
 
 /**
  * Left column panel — video file imports, overlay text, and FFmpeg status.
@@ -13,6 +13,7 @@ export const VideoUploadPanel = ({
   ffmpegLoaded,
   ffmpegLoading,
   engineError,
+  onOpenTextGenerator,
 }) => {
   return (
     <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-6">
@@ -50,13 +51,23 @@ export const VideoUploadPanel = ({
 
       {/* Text input area */}
       <div className="pt-4 border-t border-gray-100 space-y-3">
-        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Overlay text</label>
+        <div className="flex items-center justify-between">
+          <label className="block text-[10px] font-bold text-gray-400 uppercase">Overlay text</label>
+          <button
+            type="button"
+            onClick={onOpenTextGenerator}
+            className="flex items-center gap-1 text-[10px] font-bold text-[#ff5500] hover:text-orange-600 transition-colors uppercase"
+          >
+            <Sparkles className="w-3 h-3" />
+            Generate with AI
+          </button>
+        </div>
         <textarea
           value={text}
           onChange={(e) => onTextChange(e.target.value)}
           rows="3"
           placeholder="Enter text..."
-          className="w-full text-xs border border-gray-200 rounded-lg p-2 bg-gray-50 focus:bg-white transition-all outline-none resize-none"
+          className="w-full text-xs border border-gray-200 rounded-lg p-2 bg-gray-50 focus:bg-white transition-all outline-none resize-none text-gray-950"
         />
       </div>
 

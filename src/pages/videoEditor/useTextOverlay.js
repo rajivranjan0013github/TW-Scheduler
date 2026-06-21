@@ -202,7 +202,7 @@ export const useTextOverlay = () => {
         finalY,
         backgroundWidth,
         backgroundHeight,
-        bgType === 'Snapchat' ? Math.round(6 * scaleY) : Math.round(4 * scaleY)
+        bgType === 'Snapchat' ? Math.round(6 * scale) : Math.round(4 * scale)
       );
       ctx.fill();
     }
