@@ -30,7 +30,6 @@ export const VideoPreview = ({
   text,
   onTextChange,
   fontColor,
-  fontFamily,
   fontWeight,
   fontSize,
   strokeWidth,

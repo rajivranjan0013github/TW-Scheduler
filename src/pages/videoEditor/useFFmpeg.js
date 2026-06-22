@@ -50,10 +50,12 @@ export const useFFmpeg = () => {
   /** Check whether a file in the virtual filesystem has an audio stream. */
   const hasAudioStream = useCallback(async (inputName) => {
     const ffmpeg = ffmpegRef.current;
-    const probeOutput = `probe_audio_${inputName}.null`;
+    const safeName = String(inputName).replace(/[^a-z0-9._-]/gi, '_');
+    const probeOutput = `probe_audio_${safeName}_${Date.now()}_${Math.random().toString(36).slice(2)}.null`;
 
     try {
       const exitCode = await ffmpeg.exec([
+        '-y',
         '-i', inputName,
         '-map', '0:a:0',
         '-frames:a', '1',
@@ -63,6 +65,12 @@ export const useFFmpeg = () => {
       return exitCode === 0;
     } catch {
       return false;
+    } finally {
+      try {
+        await ffmpeg.deleteFile(probeOutput);
+      } catch {
+        // Ignore cleanup failures for probe files.
+      }
     }
   }, []);
 

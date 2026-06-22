@@ -85,6 +85,11 @@ export const useVideoPreview = ({ stopPreviewAudio, playPreviewAudio, selectedAu
     stopPreviewAudio();
   }, [stopPreviewAudio]);
 
+  const resetDurations = useCallback(() => {
+    videoDurationsRef.current = { input1: 0, input2: 0 };
+    setPreviewTotalTime(0);
+  }, []);
+
   return {
     activeVideo,
     setActiveVideo,
@@ -100,5 +105,6 @@ export const useVideoPreview = ({ stopPreviewAudio, playPreviewAudio, selectedAu
     handleVideo1Ended,
     handleVideo2Ended,
     resetPlayback,
+    resetDurations,
   };
 };
