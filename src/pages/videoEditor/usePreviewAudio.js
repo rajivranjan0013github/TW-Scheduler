@@ -218,11 +218,11 @@ export const usePreviewAudio = () => {
 
   const handleAudioUpload = useCallback((e, isPlaying, previewCurrentTime) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) return { error: null, track: null };
 
     if (!file.type.startsWith('audio/')) {
       e.target.value = '';
-      return 'Please upload an audio file.';
+      return { error: 'Please upload an audio file.', track: null };
     }
 
     const audioUrl = URL.createObjectURL(file);
@@ -241,7 +241,7 @@ export const usePreviewAudio = () => {
     setMyAudioTracks((currentTracks) => [uploadedTrack, ...currentTracks]);
     selectAudioTrack(uploadedTrack, isPlaying, previewCurrentTime);
     e.target.value = '';
-    return null;
+    return { error: null, track: uploadedTrack };
   }, [selectAudioTrack]);
 
   return {

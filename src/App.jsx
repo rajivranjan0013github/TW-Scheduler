@@ -26,6 +26,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import YoutubeCallback from './pages/YoutubeCallback';
 import { VideoEditor } from './pages/VideoEditor';
+import { BulkVideoBuilder } from './pages/BulkVideoBuilder';
 
 function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const { user } = useAuth();
@@ -54,6 +55,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
           <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
           <Route path="/media" element={<MediaLibrary />} />
           <Route path="/media/editor" element={<VideoEditor />} />
+          <Route path="/media/bulk-builder" element={<BulkVideoBuilder />} />
           <Route path="/channels" element={<Channels selectedAccounts={selectedAccounts} />} />
           <Route path="/channels/:id/feed" element={<PublishedFeed />} />
           <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />

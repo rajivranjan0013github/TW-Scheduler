@@ -1,5 +1,5 @@
 import { Music } from 'lucide-react';
-import { FONT_WEIGHTS, WEIGHT_MAP } from './videoEditorConstants';
+import { FONT_WEIGHTS } from './videoEditorConstants';
 
 /**
  * Right column — font, weight, size, color, stroke, and background controls
@@ -44,7 +44,7 @@ export const TextSettingsPanel = ({
   };
 
   return (
-    <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl p-5 shadow-sm select-none">
+    <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl p-5 shadow-sm select-none max-h-[608px] overflow-y-auto">
       <div className="space-y-5">
         {/* Audio */}
         <div className="space-y-2">

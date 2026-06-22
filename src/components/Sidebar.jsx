@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Clock, FolderHeart, Film, Link2, Settings as SettingsIcon, ChevronLeft, ChevronRight, X, LogOut, Megaphone, Users, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Clock, FolderHeart, Film, Layers, Link2, Settings as SettingsIcon, ChevronLeft, ChevronRight, X, LogOut, Megaphone, Users, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { withCampaignScope } from '../utils/campaignScope';
 

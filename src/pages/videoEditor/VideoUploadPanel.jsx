@@ -16,7 +16,7 @@ export const VideoUploadPanel = ({
   onOpenTextGenerator,
 }) => {
   return (
-    <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-6">
+    <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-6 max-h-[608px] overflow-y-auto">
       <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
         <Video className="w-4 h-4 text-blue-600" />
         <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Import Assets</h3>
