@@ -11,7 +11,7 @@ const emptyCampaignForm = {
 export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const canCreateCampaign = user?.role === 'owner' || user?.role === 'admin';
+  const canCreateCampaign = Boolean(user);
   const storageKey = `active-campaign-id:${user?._id || user?.email || 'default'}`;
   const [campaigns, setCampaigns] = useState([]);
   const [activeCampaignId, setActiveCampaignId] = useState(() => localStorage.getItem(storageKey) || localStorage.getItem('active-campaign-id') || '');
@@ -71,6 +71,9 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
       localStorage.removeItem('active-campaign-name');
       localStorage.removeItem('active-campaign-main-email');
       setSelectedAccounts([]);
+      if (canCreateCampaign) {
+        setIsCreating(true);
+      }
     } catch (err) {
       setError(err.message || 'Failed to load campaigns.');
     } finally {
@@ -114,7 +117,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
     try {
       setSaving(true);
       setCreateError('');
-      const response = await fetch('http://localhost:5001/api/admin/campaigns', {
+      const response = await fetch('http://localhost:5001/api/accounts/campaigns', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -150,9 +153,13 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
         <div className="flex items-start justify-between gap-4 border-b border-[#d2d2d7] pb-5">
           <div>
             <p className="m-0 text-[11px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign access</p>
-            <h1 className="m-0 mt-1 text-2xl font-semibold tracking-tight">Select a campaign</h1>
+            <h1 className="m-0 mt-1 text-2xl font-semibold tracking-tight">
+              {campaigns.length === 0 ? 'Create your campaign' : 'Select a campaign'}
+            </h1>
             <p className="m-0 mt-2 max-w-2xl text-sm leading-6 text-[#6e6e73]">
-              Signed in as <span className="font-semibold text-[#1d1d1f]">{user?.email}</span>. Choose the campaign workspace you want to manage.
+              Signed in as <span className="font-semibold text-[#1d1d1f]">{user?.email}</span>. {campaigns.length === 0
+                ? 'Tell us what product or campaign this workspace is for.'
+                : 'Choose the campaign workspace you want to manage.'}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -164,7 +171,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
               <RefreshCw className="h-3.5 w-3.5" />
               Refresh
             </button>
-            {canCreateCampaign && (
+            {canCreateCampaign && campaigns.length > 0 && (
               <button
                 type="button"
                 onClick={openCreateForm}
@@ -181,17 +188,21 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
           <form onSubmit={createCampaign} className="rounded-lg border border-[#d2d2d7] bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#8e8e93]">Create campaign</p>
-                <h2 className="m-0 mt-1 text-lg font-semibold tracking-tight">New campaign workspace</h2>
+                <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#8e8e93]">Campaign setup</p>
+                <h2 className="m-0 mt-1 text-lg font-semibold tracking-tight">
+                  {campaigns.length === 0 ? 'Tell us about your product' : 'New campaign workspace'}
+                </h2>
               </div>
-              <button
-                type="button"
-                onClick={closeCreateForm}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
-                aria-label="Close campaign form"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              {campaigns.length > 0 && (
+                <button
+                  type="button"
+                  onClick={closeCreateForm}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
+                  aria-label="Close campaign form"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
             {createError && (
@@ -217,7 +228,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
               <textarea
                 value={campaignForm.description}
                 onChange={(event) => setCampaignForm((current) => ({ ...current, description: event.target.value }))}
-                placeholder="What this campaign workspace is for..."
+                placeholder="Campaign description"
                 rows={3}
                 className="mt-2 w-full resize-none rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#3478f6]"
               />
@@ -230,7 +241,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                 className="inline-flex items-center gap-2 rounded-lg bg-[#0071e3] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#005bbd] disabled:opacity-60"
               >
                 <Save className="h-4 w-4" />
-                {saving ? 'Creating...' : 'Create campaign'}
+                {saving ? 'Creating...' : 'Create campaign and continue'}
               </button>
             </div>
           </form>
@@ -265,14 +276,6 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                   Create campaign
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard')}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#d2d2d7] bg-white px-4 py-2 text-sm font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
-              >
-                Continue
-                <ArrowRight className="h-4 w-4" />
-              </button>
             </div>
           </div>
         ) : (
