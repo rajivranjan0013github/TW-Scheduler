@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Eye, TrendingUp, Calendar, Heart, RefreshCw, MessageSquare } from 'lucide-react';
 import { withCampaignScope } from '../utils/campaignScope';
+import SetupChecklist from '../components/SetupChecklist';
 
 const Instagram = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -167,8 +168,17 @@ export const Dashboard = ({ selectedAccounts }) => {
     );
   }
 
+  const isNewWorkspace = stats.accountsCount === 0 && stats.mediaCount === 0 && stats.upcomingCount === 0;
+
   return (
     <div className="p-8 space-y-8 text-[#1d1d1f] min-h-screen bg-[#f5f5f7]">
+
+      {/* Onboarding setup checklist — shown when workspace has no data yet */}
+      <SetupChecklist
+        channelsCount={stats.accountsCount}
+        mediaCount={stats.mediaCount}
+        postsCount={stats.upcomingCount}
+      />
       
       {/* Title Header */}
       <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">

@@ -31,7 +31,11 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const { user } = useAuth();
   const location = useLocation();
   const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
-  const hideSidebar = location.pathname === '/' || location.pathname === '/campaigns';
+  // Only hide sidebar when there's no active campaign (first-time welcome screen).
+  // Returning users with 2+ campaigns still see sidebar on the campaign picker.
+  const hasActiveCampaign = Boolean(localStorage.getItem('active-campaign-id'));
+  const isOnCampaignPage = location.pathname === '/' || location.pathname === '/campaigns';
+  const hideSidebar = isOnCampaignPage && !hasActiveCampaign;
 
   return (
     <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-hidden font-sans">

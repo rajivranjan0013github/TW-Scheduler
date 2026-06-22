@@ -230,23 +230,90 @@ export const AdminCampaigns = () => {
       {isDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-6">
         <div className="w-full max-w-3xl">
-          <CampaignForm
-            form={form}
-            setForm={setForm}
-            onSubmit={saveCampaign}
-            saving={saving}
-            title={selectedCampaignId ? 'Edit campaign' : 'Create campaign'}
-            eyebrow="Campaign setup"
-            helpText="Campaign access is controlled by the main email, separate from publishing channels."
-            submitLabel="Save campaign"
-            canClose
-            onClose={closeDialog}
-            showMainEmail
-            showStatus
-            statusOptions={statusOptions}
-            canDelete={Boolean(selectedCampaignId) && canDelete}
-            onDelete={deleteCampaign}
-          />
+          <form onSubmit={saveCampaign} className="w-full max-w-3xl rounded-xl border border-[#d2d2d7] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-[#e5e5ea] px-5 py-4">
+              <div>
+                <h3 className="m-0 text-sm font-semibold">{selectedCampaignId ? 'Edit campaign' : 'Create campaign'}</h3>
+                <p className="m-0 mt-1 text-xs text-[#6e6e73]">Campaign access is controlled by the main email, separate from publishing channels.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeDialog}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
+                aria-label="Close campaign dialog"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[72vh] space-y-5 overflow-y-auto p-5 text-left">
+              <label className="block">
+                <span className="text-xs font-semibold text-[#515154]">Campaign name</span>
+                <input
+                  value={form.name}
+                  onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                  placeholder="June launch"
+                  className="mt-2 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#3478f6]"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-semibold text-[#515154]">Main email</span>
+                <input
+                  type="email"
+                  value={form.mainEmail}
+                  onChange={(event) => setForm((current) => ({ ...current, mainEmail: event.target.value }))}
+                  placeholder="owner@example.com"
+                  className="mt-2 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#3478f6]"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-semibold text-[#515154]">Description</span>
+                <textarea
+                  value={form.description}
+                  onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                  placeholder="Channels and posts for this campaign..."
+                  rows={3}
+                  className="mt-2 w-full resize-none rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#3478f6]"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-semibold text-[#515154]">Status</span>
+                <select
+                  value={form.status}
+                  onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+                  className="mt-2 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm capitalize outline-none focus:border-[#3478f6]"
+                >
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
+                </select>
+              </label>
+
+            </div>
+
+            <div className="flex items-center justify-between border-t border-[#e5e5ea] px-5 py-4">
+              <button
+                type="button"
+                onClick={deleteCampaign}
+                disabled={!selectedCampaignId || !canDelete || saving}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#d2d2d7] bg-white px-4 py-2 text-xs font-semibold text-[#6e6e73] transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#3478f6] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#2f6fe4] disabled:opacity-60"
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saving ? 'Saving...' : 'Save campaign'}
+              </button>
+            </div>
+          </form>
         </div>
         </div>
       )}

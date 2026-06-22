@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Plus, Check, Trash2, Clock, AlertCircle, Folder, Users, Layers, CalendarDays, Save, FileText } from 'lucide-react';
+import { Plus, Check, Clock, AlertCircle, Folder, Users, Save } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 
 const getProxyUrl = (url) => {
@@ -112,16 +112,44 @@ const MediaPreview = ({ item, className = 'h-full w-full object-cover block' }) 
   return <img src={url} className={className} alt="" />;
 };
 
-export const CalendarView = ({ selectedAccounts }) => {
+const CalendarView = ({ selectedAccounts }) => {
   const { user } = useAuth();
   const location = useLocation();
   const [posts, setPosts] = useState([]);
+  const canvasRef = useRef(null);
+  const [portPositions, setPortPositions] = useState({});
 
   // Composer data
   const [showComposer, setShowComposer] = useState(false);
   const [mediaList, setMediaList] = useState([]);
   const [folders, setFolders] = useState([]);
   const [channels, setChannels] = useState([]);
+
+  useEffect(() => {
+    const updatePositions = () => {
+      if (!canvasRef.current) return;
+      const parentRect = canvasRef.current.getBoundingClientRect();
+      const newPositions = {};
+      const portElements = canvasRef.current.querySelectorAll('[data-port-id]');
+      portElements.forEach(el => {
+        const portId = el.getAttribute('data-port-id');
+        const rect = el.getBoundingClientRect();
+        newPositions[portId] = {
+          x: rect.left - parentRect.left + rect.width / 2,
+          y: rect.top - parentRect.top + rect.height / 2
+        };
+      });
+      setPortPositions(newPositions);
+    };
+
+    updatePositions();
+    window.addEventListener('resize', updatePositions);
+    const timer = setTimeout(updatePositions, 150);
+    return () => {
+      window.removeEventListener('resize', updatePositions);
+      clearTimeout(timer);
+    };
+  }, [posts, folders, channels, showComposer]);
 
   // Post Composer form states
   const [selectedChannels, setSelectedChannels] = useState([]);
@@ -954,131 +982,335 @@ export const CalendarView = ({ selectedAccounts }) => {
         </section>
       )}
 
-      {/* Queue Feed List */}
-      {!showComposer && (
-        <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-4">
-          <div className="max-w-4xl mx-auto space-y-3 pt-1">
+      {/* Schedule Overview — Visual Row Board */}
+      {!showComposer && (() => {
+        const now = new Date();
+
+        // 1. Group posts by account
+        const accountMap = {};
+        posts.forEach(post => {
+          const accountIds = (post.socialAccountIds || []).map(a => a._id || a);
+          accountIds.forEach(accId => {
+            if (!accountMap[accId]) accountMap[accId] = [];
+            accountMap[accId].push(post);
+          });
+        });
+
+        // 2. Build Account Summaries (Destinations)
+        const accountSummaries = Object.entries(accountMap)
+          .map(([accId, accPosts]) => {
+            const channel = channels.find(c => c._id === accId);
+            const scheduled = accPosts.filter(p => p.status === 'scheduled');
+            const published = accPosts.filter(p => p.status === 'published');
+            const failed = accPosts.filter(p => p.status === 'failed');
+            const total = accPosts.length;
+            const done = published.length;
+            const left = scheduled.length;
+            const hasUpcoming = scheduled.some(p => new Date(p.scheduledAt) >= now);
+            const isActive = hasUpcoming && left > 0;
+
+            const nextPost = scheduled
+              .filter(p => new Date(p.scheduledAt) >= now)
+              .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))[0];
+
+            return { accId, channel, total, done, left, failed: failed.length, isActive, nextPost };
+          })
+          .sort((a, b) => (a.channel?.name || '').localeCompare(b.channel?.name || ''));
+
+        const getPlatformTheme = (platform) => {
+          switch (platform) {
+            case 'instagram': return { accent: '#e1306c', bg: '#fdf2f8', border: '#fbcfe8' };
+            case 'youtube': return { accent: '#ff0000', bg: '#fef2f2', border: '#fecaca' };
+            case 'twitter': case 'x': return { accent: '#1da1f2', bg: '#f0f9ff', border: '#bae6fd' };
+            case 'facebook': return { accent: '#1877f2', bg: '#eff6ff', border: '#bfdbfe' };
+            case 'tiktok': return { accent: '#00f2fe', bg: '#f0fdfa', border: '#ccfbf1' };
+            default: return { accent: '#6b7280', bg: '#f3f4f6', border: '#e5e7eb' };
+          }
+        };
+
+        // Simple Solid Circular Progress
+        const CircularProgress = ({ done, total, themeColor }) => {
+          const size = 48;
+          const stroke = 4;
+          const radius = (size - stroke) / 2;
+          const circumference = 2 * Math.PI * radius;
+          const pct = total > 0 ? (done / total) : 0;
+          const strokeDashoffset = circumference - pct * circumference;
+
+          return (
+            <svg width={size} height={size} className="transform -rotate-90">
+              <circle
+                cx={size / 2} cy={size / 2} r={radius}
+                fill="none" stroke="#e5e7eb" strokeWidth={stroke}
+              />
+              <circle
+                cx={size / 2} cy={size / 2} r={radius}
+                fill="none" stroke={themeColor} strokeWidth={stroke}
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                className="transition-all duration-500"
+              />
+            </svg>
+          );
+        };
+
+        return (
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 bg-slate-50 relative bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] [background-size:24px_24px]">
+            {/* Inject keyframes style for moving cable animation */}
+            <style dangerouslySetInnerHTML={{__html: `
+              @keyframes dash {
+                to {
+                  stroke-dashoffset: -1000;
+                }
+              }
+            `}} />
+
             {posts.length === 0 ? (
-              <div className="border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm flex flex-col items-center gap-2">
-                <Clock className="w-8 h-8 text-gray-300 animate-pulse" />
-                <span className="font-semibold text-gray-400">No scheduled posts in the queue.</span>
+              <div className="max-w-4xl mx-auto border border-dashed border-slate-200 p-16 rounded-2xl text-center text-slate-500 bg-white flex flex-col items-center gap-3 mt-8 shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
+                  <Clock className="w-7 h-7 text-slate-400" />
+                </div>
+                <span className="font-semibold text-slate-700 text-sm">No active schedule flows</span>
+                <span className="text-slate-400 text-xs">Create a new schedule queue to establish a flow</span>
               </div>
             ) : (
-              posts.map(post => {
-                const firstMedia = post.mediaIds?.[0];
-                const mediaCount = post.mediaIds?.length || 0;
-                const postDate = new Date(post.scheduledAt);
-                const isOverdue = postDate < new Date() && post.status === 'scheduled';
+              <div ref={canvasRef} className="max-w-5xl mx-auto pt-6 space-y-6 relative" style={{ minHeight: '600px' }}>
+               
 
-                return (
-                  <div
-                    key={post._id}
-                    className="bg-white border border-[#e5e5ea] rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between hover:border-gray-400 transition-all duration-150 shadow-sm"
-                  >
-                    {/* Left: Execute Time Details */}
-                    <div className="flex items-start gap-3 min-w-[200px]">
-                      <div className="p-2 bg-[#f5f5f7] rounded-lg text-gray-500 flex-shrink-0">
-                        <Clock className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-black leading-tight">
-                          {postDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
-                        <p className="text-[10px] text-gray-500 mt-1">
-                          {postDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                        {isOverdue && (
-                          <span className="inline-flex items-center gap-1 mt-1.5 text-[8px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-semibold border border-amber-200">
-                            <AlertCircle className="w-2 h-2" />
-                            Overdue / Waiting
-                          </span>
+                {/* SVG Connections Layer */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
+                  {accountSummaries.map((summary) => {
+                    const { accId } = summary;
+                    const theme = getPlatformTheme(summary.channel?.platform);
+
+                    // Connection 1: Channel Out to Folder In
+                    const fromPort1 = `acc-port-out-${accId}`;
+                    const toPort1 = `folder-port-in-${accId}`;
+                    const fromPos1 = portPositions[fromPort1];
+                    const toPos1 = portPositions[toPort1];
+
+                    // Connection 2: Folder Out to Stats In
+                    const fromPort2 = `folder-port-out-${accId}`;
+                    const toPort2 = `stats-port-in-${accId}`;
+                    const fromPos2 = portPositions[fromPort2];
+                    const toPos2 = portPositions[toPort2];
+
+                    const path1 = fromPos1 && toPos1 && typeof fromPos1.x === 'number' && typeof fromPos1.y === 'number' && typeof toPos1.x === 'number' && typeof toPos1.y === 'number'
+                      ? `M ${fromPos1.x} ${fromPos1.y} C ${fromPos1.x + Math.abs(toPos1.x - fromPos1.x) * 0.4} ${fromPos1.y}, ${toPos1.x - Math.abs(toPos1.x - fromPos1.x) * 0.4} ${toPos1.y}, ${toPos1.x} ${toPos1.y}`
+                      : null;
+
+                    const path2 = fromPos2 && toPos2 && typeof fromPos2.x === 'number' && typeof fromPos2.y === 'number' && typeof toPos2.x === 'number' && typeof toPos2.y === 'number'
+                      ? `M ${fromPos2.x} ${fromPos2.y} C ${fromPos2.x + Math.abs(toPos2.x - fromPos2.x) * 0.4} ${fromPos2.y}, ${toPos2.x - Math.abs(toPos2.x - fromPos2.x) * 0.4} ${toPos2.y}, ${toPos2.x} ${toPos2.y}`
+                      : null;
+
+                    return (
+                      <g key={accId} className="opacity-80">
+                        {path1 && (
+                          <>
+                            <path
+                              d={path1}
+                              fill="none"
+                              stroke={theme.accent}
+                              strokeWidth="4"
+                              className="opacity-15 blur-[2px]"
+                            />
+                            <path
+                              d={path1}
+                              fill="none"
+                              stroke={summary.isActive ? theme.accent : '#94a3b8'}
+                              strokeWidth={summary.isActive ? "2.5" : "1.5"}
+                              strokeDasharray={summary.isActive ? "6, 4" : "4, 4"}
+                              style={summary.isActive ? { animation: 'dash 25s linear infinite' } : {}}
+                            />
+                          </>
                         )}
-                      </div>
-                    </div>
+                        {path2 && (
+                          <>
+                            <path
+                              d={path2}
+                              fill="none"
+                              stroke={theme.accent}
+                              strokeWidth="4"
+                              className="opacity-15 blur-[2px]"
+                            />
+                            <path
+                              d={path2}
+                              fill="none"
+                              stroke={summary.isActive ? theme.accent : '#94a3b8'}
+                              strokeWidth={summary.isActive ? "2.5" : "1.5"}
+                              strokeDasharray={summary.isActive ? "6, 4" : "4, 4"}
+                              style={summary.isActive ? { animation: 'dash 25s linear infinite' } : {}}
+                            />
+                          </>
+                        )}
+                      </g>
+                    );
+                  })}
+                </svg>
 
-                {/* Center: Media & Caption Card */}
-                <div className="flex-1 flex items-center gap-4 min-w-0">
-                  {/* Thumbnail */}
-                  <div className="w-16 h-16 bg-[#f5f5f7] rounded-lg border border-[#e5e5ea] overflow-hidden flex-shrink-0 flex items-center justify-center relative">
-                    {firstMedia ? (
-                      <MediaPreview item={firstMedia} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-[9px] text-gray-300">No media</span>
-                    )}
-                    {firstMedia && (
-                      <div className="absolute bottom-1 right-1 bg-black/75 px-1 py-0.5 rounded text-[7px] text-white uppercase font-bold">
-                        {firstMedia.type}
-                      </div>
-                    )}
-                  </div>
+                <div className="space-y-12 relative z-10">
+                  {accountSummaries.map((summary) => {
+                    const { accId, channel, total, done, left, failed: failedCount, isActive, nextPost } = summary;
+                    const theme = getPlatformTheme(channel?.platform);
+                    const progress = total > 0 ? Math.round((done / total) * 100) : 0;
 
-                      {/* Caption & Metadata */}
-                      <div className="space-y-2 min-w-0 flex-1">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-black truncate m-0" title={getMediaLabel(firstMedia)}>
-                            {getMediaLabel(firstMedia)}
-                            {mediaCount > 1 ? ` + ${mediaCount - 1} more` : ''}
-                          </p>
-                          <p className="text-[10px] text-gray-500 truncate mt-0.5" title={getMediaLocationLabel(firstMedia)}>
-                            Folder: {getMediaLocationLabel(firstMedia)}
-                          </p>
-                        </div>
-                        <p className="text-xs text-[#1d1d1f] font-normal leading-relaxed truncate" title={post.caption}>
-                          {post.caption || <span className="text-gray-300 italic">No caption drafted</span>}
-                        </p>
+                    // Find folders used by this channel's scheduled posts
+                    const usedFolderMap = {};
+                    const channelPosts = accountMap[accId] || [];
+                    channelPosts.forEach(post => {
+                      (post.mediaIds || []).forEach(m => {
+                        const folder = m?.folderId;
+                        const fId = folder?._id || folder || 'root';
+                        if (!usedFolderMap[fId]) {
+                          if (fId === 'root') {
+                            usedFolderMap[fId] = {
+                              id: 'root',
+                              name: 'Campaign Library',
+                              filesLeft: mediaList.filter(media => !media.folderId).length
+                            };
+                          } else {
+                            const folderObj = folders.find(f => f._id === fId);
+                            const mediaCount = mediaList.filter(media => (media.folderId?._id || media.folderId) === fId).length;
+                            usedFolderMap[fId] = {
+                              id: fId,
+                              name: folderObj?.name || 'Campaign Folder',
+                              filesLeft: mediaCount
+                            };
+                          }
+                        }
+                      });
+                    });
+                    const channelFolders = Object.values(usedFolderMap);
 
-                        {/* Badges row */}
-                        <div className="flex flex-wrap gap-2 items-center">
-                          <span className="text-[8px] uppercase tracking-wider bg-black/5 text-[#1d1d1f] border border-black/10 px-1.5 py-0.5 rounded font-bold">
-                            {(post.platformSpecifics?.type || 'reels').toUpperCase()}
-                          </span>
-
-                      {/* Targeted Channels */}
-                      <div className="flex items-center gap-1 pl-2 border-l border-[#e5e5ea]">
-                        <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider mr-1">Channels:</span>
-                        <div className="flex -space-x-1.5">
-                          {post.socialAccountIds?.map((accId, accIdx) => {
-                            const acc = channels.find(c => c._id === (accId._id || accId));
-                            return acc ? (
-                              <img 
-                                key={accIdx}
-                                src={acc.avatarUrl} 
+                    return (
+                      <div
+                        key={accId}
+                        className="flex flex-col md:flex-row items-center md:justify-between gap-8 md:gap-4 relative"
+                      >
+                        {/* Channel Node */}
+                        <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl px-4 py-3 shadow-sm hover:shadow hover:border-indigo-400 hover:scale-[1.02] transition-all duration-300 w-full md:w-[220px]">
+                          {/* Outgoing Connection Port Dot */}
+                          <div
+                            data-port-id={`acc-port-out-${accId}`}
+                            className="hidden md:block absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
+                            style={{ backgroundColor: theme.accent }}
+                          />
+                          <div className="flex items-center gap-3">
+                            {channel?.avatarUrl ? (
+                              <img
+                                src={channel.avatarUrl}
                                 crossOrigin="anonymous"
-                                className="w-4 h-4 rounded-full object-cover border border-white" 
-                                title={acc.name} 
-                                alt="" 
+                                className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                                alt=""
                               />
-                            ) : null;
-                          })}
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                                <Users className="w-4 h-4 text-slate-400" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-xs font-bold text-slate-800 m-0 truncate">{channel?.name || 'Account'}</h4>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span
+                                  className="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded text-white"
+                                  style={{ backgroundColor: theme.accent }}
+                                >
+                                  {channel?.platform || 'unknown'}
+                                </span>
+                                {isActive && (
+                                  <span className="flex items-center gap-0.5 text-[8px] font-bold text-emerald-500 uppercase tracking-wider">
+                                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" /> Active
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Folders Node */}
+                        <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl px-4 py-3 shadow-sm hover:shadow hover:border-indigo-400 hover:scale-[1.02] transition-all duration-300 w-full md:w-[260px]">
+                          {/* Incoming Port Left */}
+                          <div
+                            data-port-id={`folder-port-in-${accId}`}
+                            className="hidden md:block absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
+                          />
+                          {/* Outgoing Port Right */}
+                          <div
+                            data-port-id={`folder-port-out-${accId}`}
+                            className="hidden md:block absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
+                          />
+                          <div className="flex flex-col gap-1.5">
+                            <div className="text-[8px] uppercase tracking-wider font-extrabold text-slate-400">Content Sources</div>
+                            {channelFolders.length === 0 ? (
+                              <span className="text-[10px] text-slate-400 italic">No folder content queued</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1.5">
+                                {channelFolders.map(folder => (
+                                  <div
+                                    key={folder.id}
+                                    className="bg-indigo-50/50 border border-indigo-100 rounded-lg px-2 py-0.5 flex items-center gap-1 shadow-sm"
+                                  >
+                                    <Folder className="w-3 h-3 text-indigo-500 flex-shrink-0" />
+                                    <span className="text-[9px] font-bold text-indigo-950 truncate max-w-[100px]">{folder.name}</span>
+                                    <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1 rounded-full font-extrabold">{folder.filesLeft}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Stats Node */}
+                        <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl p-3.5 shadow-sm hover:shadow hover:border-indigo-400 hover:scale-[1.02] transition-all duration-300 w-full md:w-[280px]">
+                          {/* Incoming Port Left */}
+                          <div
+                            data-port-id={`stats-port-in-${accId}`}
+                            className="hidden md:block absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white bg-emerald-500 shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
+                          />
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="grid grid-cols-3 gap-1 bg-slate-50 border border-slate-100 rounded-xl p-1.5 text-center">
+                                <div>
+                                  <p className="m-0 text-xs font-bold text-indigo-600">{left}</p>
+                                  <p className="m-0 text-[7px] font-bold uppercase text-slate-400">Left</p>
+                                </div>
+                                <div>
+                                  <p className="m-0 text-xs font-bold text-emerald-600">{done}</p>
+                                  <p className="m-0 text-[7px] font-bold uppercase text-slate-400">Done</p>
+                                </div>
+                                <div>
+                                  <p className="m-0 text-xs font-bold text-rose-600">{failedCount}</p>
+                                  <p className="m-0 text-[7px] font-bold uppercase text-slate-400">Fail</p>
+                                </div>
+                              </div>
+                              
+                              {/* Next Post Foot */}
+                              {nextPost && (
+                                <p className="m-0 mt-1.5 text-[8px] text-slate-500 flex items-center gap-1">
+                                  <Clock className="w-2.5 h-2.5 text-slate-400" /> Next: {new Date(nextPost.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex-shrink-0 flex items-center justify-center relative">
+                              <CircularProgress done={done} total={total} themeColor={theme.accent} />
+                              <span className="absolute text-[8px] font-extrabold text-slate-800">{progress}%</span>
+                            </div>
+                          </div>
+                        </div>
+
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-
-                    {/* Right: Status Pill & Delete Button */}
-                    <div className="flex items-center gap-4 flex-shrink-0">
-                      <span className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${getStatusBadgeColor(post.status)}`}>
-                        {post.status}
-                      </span>
-
-                      {!isViewer && (
-                        <button
-                          onClick={() => handleDeletePost(post._id)}
-                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-[#f5f5f7] rounded-lg transition-all"
-                          title="Cancel and Delete"
-                        >
-                          <Trash2 className="w-4.5 h-4.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
+              </div>
             )}
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+
 
     </div>
   );
