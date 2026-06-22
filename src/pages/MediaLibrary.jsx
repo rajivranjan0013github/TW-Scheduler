@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Folder, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Film } from 'lucide-react';
+import { Folder, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 
 const getProxyUrl = (url) => {
@@ -381,23 +381,13 @@ export const MediaLibrary = () => {
           <p className="text-[#8e8e93] text-xs mt-1">Store campaign media, thumbnails, and captions in R2</p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => navigate('/media/editor')}
-            className="flex items-center gap-1.5 bg-white border border-[#e5e5ea] hover:bg-[#f5f5f7] text-[#1d1d1f] px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
-          >
-            <Film className="w-3.5 h-3.5 text-blue-600" />
-            <span>Video Editor</span>
-          </button>
-
-          <button 
-            onClick={() => setShowNewFolderModal(true)}
-            className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Campaign</span>
-          </button>
-        </div>
+        <button 
+          onClick={() => setShowNewFolderModal(true)}
+          className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>New Folder</span>
+        </button>
       </div>
 
       {/* Directory Breadcrumbs */}
