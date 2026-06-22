@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Folder, Loader2, X, Music, CheckSquare, Square, Check, Layers } from 'lucide-react';
+import { Folder, Loader2, X, Music, CheckSquare, Square, Check, Layers, Search } from 'lucide-react';
 import { API_BASE_URL, PLATFORM_AUDIO_FOLDER_ID } from '../videoEditor/videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 
@@ -18,6 +18,7 @@ export const BulkAssetPickerDialog = ({
 
   // Folder & Media state for videos
   const [folders, setFolders] = useState([]);
+  const [folderSearch, setFolderSearch] = useState('');
   const [activeFolderId, setActiveFolderId] = useState(null);
   const [activeFolderName, setActiveFolderName] = useState('');
   const [media, setMedia] = useState([]);
@@ -38,6 +39,12 @@ export const BulkAssetPickerDialog = ({
   const headers = useMemo(() => (
     token ? { Authorization: `Bearer ${token}` } : {}
   ), [token]);
+
+  const filteredFolders = useMemo(() => {
+    const query = folderSearch.trim().toLowerCase();
+    if (!query) return folders;
+    return folders.filter((folder) => (folder.name || '').toLowerCase().includes(query));
+  }, [folderSearch, folders]);
 
   const openFolder = useCallback(async (folderId, folderName) => {
     setActiveFolderId(folderId);
@@ -174,37 +181,37 @@ export const BulkAssetPickerDialog = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-      <div className="flex h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="flex h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-[#18181b] border border-[#2d2d30] shadow-2xl text-[#e0e0e5]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-gray-50/50">
+        <div className="flex items-center justify-between border-b border-[#2d2d30] px-6 py-4 bg-[#121214]">
           <div>
-            <h3 className="text-base font-bold text-gray-950 flex items-center gap-2">
+            <h3 className="text-base font-bold text-white flex items-center gap-2" style={{ color: '#ffffff' }}>
               <Layers className="w-5 h-5 text-[#ff5500]" />
-              Add Videos &amp; Create Temp Library
+              Add Videos &amp; Music
             </h3>
-            <p className="mt-0.5 text-xs text-gray-500 font-medium">
-              Pick First Videos to generate rows, and Second Videos/Music to build your Temporary Library
+            <p className="mt-0.5 text-xs text-gray-400 font-medium" style={{ color: '#a1a1aa' }}>
+              Pick First Videos to create rows, or add First Videos, Second Videos, and Music to your temporary quick library.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-150 hover:text-gray-950"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-[#27272a] hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex border-b border-gray-100 px-6 bg-white">
+        <div className="flex border-b border-[#2d2d30] px-6 bg-[#18181b]">
           <button
             type="button"
             onClick={() => setActiveTab('video1')}
             className={`py-3.5 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
               activeTab === 'video1'
                 ? 'border-[#ff5500] text-[#ff5500]'
-                : 'border-transparent text-gray-500 hover:text-gray-900'
+                : 'border-transparent text-gray-400 hover:text-white'
             }`}
           >
             1. First Video ({selectedVideo1.length})
@@ -215,7 +222,7 @@ export const BulkAssetPickerDialog = ({
             className={`py-3.5 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
               activeTab === 'video2'
                 ? 'border-[#ff5500] text-[#ff5500]'
-                : 'border-transparent text-gray-500 hover:text-gray-900'
+                : 'border-transparent text-gray-400 hover:text-white'
             }`}
           >
             2. Second Video ({selectedVideo2.length})
@@ -226,7 +233,7 @@ export const BulkAssetPickerDialog = ({
             className={`py-3.5 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
               activeTab === 'audio'
                 ? 'border-[#ff5500] text-[#ff5500]'
-                : 'border-transparent text-gray-500 hover:text-gray-900'
+                : 'border-transparent text-gray-400 hover:text-white'
             }`}
           >
             3. Music ({selectedAudio.length})
@@ -234,13 +241,23 @@ export const BulkAssetPickerDialog = ({
         </div>
 
         {/* Main Area */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[240px_1fr] bg-white">
+        <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[240px_1fr] bg-[#18181b]">
           {/* Left Sidebar (Only for video tabs) */}
           {activeTab !== 'audio' ? (
-            <aside className="min-h-0 overflow-y-auto border-r border-gray-100 bg-gray-50/50 p-4">
-              <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Folders</p>
+            <aside className="min-h-0 overflow-y-auto border-r border-[#2d2d30] bg-[#121214] p-4">
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Folders</p>
+              <label className="mb-3 flex items-center gap-2 rounded-lg border border-[#2d2d30] bg-[#18181b] px-3 py-2 text-gray-400 focus-within:border-[#ff5500]/60">
+                <Search className="h-3.5 w-3.5 shrink-0" />
+                <input
+                  type="search"
+                  value={folderSearch}
+                  onChange={(event) => setFolderSearch(event.target.value)}
+                  placeholder="Search folders"
+                  className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-white outline-none placeholder:text-gray-600"
+                />
+              </label>
               {loadingFolders ? (
-                <div className="flex items-center gap-2 rounded-lg bg-white p-3 text-xs font-semibold text-gray-500">
+                <div className="flex items-center gap-2 rounded-lg bg-[#27272a] p-3 text-xs font-semibold text-gray-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading...
                 </div>
@@ -250,35 +267,40 @@ export const BulkAssetPickerDialog = ({
                     type="button"
                     onClick={() => openFolder('root', 'Library Root')}
                     className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors ${
-                      activeFolderId === 'root' ? 'bg-[#ff5500] text-white shadow-sm' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-100'
+                      activeFolderId === 'root' ? 'bg-[#ff5500] text-white shadow-sm' : 'bg-[#27272a] text-gray-300 hover:bg-[#3f3f46] hover:text-white border border-[#2d2d30]'
                     }`}
                   >
                     <Folder className="h-4 w-4" />
                     Library Root
                   </button>
 
-                  {folders.map((folder) => (
+                  {filteredFolders.map((folder) => (
                     <button
                       key={folder._id}
                       type="button"
                       onClick={() => openFolder(folder._id, folder.name)}
                       className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-bold transition-colors ${
-                        activeFolderId === folder._id ? 'bg-[#ff5500] text-white shadow-sm' : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-100'
+                        activeFolderId === folder._id ? 'bg-[#ff5500] text-white shadow-sm' : 'bg-[#27272a] text-gray-300 hover:bg-[#3f3f46] hover:text-white border border-[#2d2d30]'
                       }`}
                     >
                       <Folder className="h-4 w-4" />
                       <span className="truncate">{folder.name}</span>
                     </button>
                   ))}
+                  {folderSearch.trim() && filteredFolders.length === 0 && (
+                    <div className="rounded-lg border border-dashed border-[#2d2d30] px-3 py-4 text-center text-[11px] font-semibold text-gray-500">
+                      No folders found.
+                    </div>
+                  )}
                 </div>
               )}
             </aside>
           ) : (
-            <aside className="min-h-0 border-r border-gray-100 bg-gray-50/50 p-4">
-              <div className="p-3 bg-orange-50/50 border border-orange-100 rounded-xl">
-                <Music className="w-5 h-5 text-[#ff5500] mb-2" />
-                <p className="text-[11px] font-bold text-gray-700 uppercase">Music Catalog</p>
-                <p className="text-[10px] text-gray-500 mt-1 leading-relaxed">
+            <aside className="min-h-0 border-r border-[#2d2d30] bg-[#121214] p-4">
+              <div className="p-3 bg-orange-955/20 border border-orange-900/40 rounded-xl text-orange-400">
+                <Music className="w-5 h-5 text-orange-500 mb-2" />
+                <p className="text-[11px] font-bold uppercase">Music Catalog</p>
+                <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">
                   Select background tracks to add to your temporary quick-selection library.
                 </p>
               </div>
@@ -286,9 +308,9 @@ export const BulkAssetPickerDialog = ({
           )}
 
           {/* Right Main Grid */}
-          <main className="min-h-0 overflow-y-auto p-6">
+          <main className="min-h-0 overflow-y-auto p-6 bg-[#18181b]">
             {error && (
-              <div className="mb-4 rounded-lg border border-red-100 bg-red-50 p-3 text-xs font-semibold text-red-600">
+              <div className="mb-4 rounded-lg border border-red-950/40 bg-red-950/20 p-3 text-xs font-semibold text-red-400">
                 {error}
               </div>
             )}
@@ -296,25 +318,25 @@ export const BulkAssetPickerDialog = ({
             {activeTab !== 'audio' ? (
               <>
                 <div className="mb-4 flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">
                     {activeFolderName || 'Choose a folder'}
                   </h4>
                   {activeFolderId && (
-                    <span className="text-[11px] font-semibold text-gray-400">{media.length} videos</span>
+                    <span className="text-[11px] font-semibold text-gray-500">{media.length} videos</span>
                   )}
                 </div>
 
                 {!activeFolderId ? (
-                  <div className="flex h-full min-h-[280px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm font-semibold text-gray-400">
+                  <div className="flex h-full min-h-[280px] items-center justify-center rounded-xl border border-dashed border-[#2d2d30] text-sm font-semibold text-gray-500">
                     Select a folder to view videos.
                   </div>
                 ) : loadingMedia ? (
-                  <div className="flex h-full min-h-[280px] items-center justify-center gap-2 rounded-xl border border-gray-100 text-sm font-semibold text-gray-500">
+                  <div className="flex h-full min-h-[280px] items-center justify-center gap-2 rounded-xl border border-[#2d2d30] text-sm font-semibold text-gray-400">
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Loading videos...
                   </div>
                 ) : media.length === 0 ? (
-                  <div className="flex h-full min-h-[280px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm font-semibold text-gray-400">
+                  <div className="flex h-full min-h-[280px] items-center justify-center rounded-xl border border-dashed border-[#2d2d30] text-sm font-semibold text-gray-500">
                     No videos found in this folder.
                   </div>
                 ) : (
@@ -327,10 +349,10 @@ export const BulkAssetPickerDialog = ({
                           type="button"
                           onClick={() => handleToggleVideo(item, activeTab)}
                           className={`overflow-hidden rounded-xl border text-left shadow-sm transition-all hover:shadow-md relative flex flex-col ${
-                            selected ? 'border-[#ff5500] ring-2 ring-[#ff5500]/20' : 'border-gray-200 hover:border-gray-300'
+                            selected ? 'border-[#ff5500] ring-2 ring-[#ff5500]/20' : 'border-[#2d2d30] hover:border-[#3a3a3c]'
                           }`}
                         >
-                          <div className="relative aspect-[9/16] bg-gray-100">
+                          <div className="relative aspect-[9/16] bg-zinc-900">
                             <video
                               src={proxiedMediaUrl(item.url)}
                               className="h-full w-full object-cover"
@@ -349,8 +371,8 @@ export const BulkAssetPickerDialog = ({
                               )}
                             </div>
                           </div>
-                          <div className="p-3 bg-white border-t border-gray-50">
-                            <p className="truncate text-[10px] font-bold text-gray-900" title={item.name}>
+                          <div className="p-3 bg-[#121214] border-t border-[#2d2d30]">
+                            <p className="truncate text-[10px] font-bold text-white" title={item.name}>
                               {item.name || 'Untitled video'}
                             </p>
                           </div>
@@ -364,9 +386,9 @@ export const BulkAssetPickerDialog = ({
               // Audio Tab
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Platform Music Tracks</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Platform Music Tracks</h4>
                   {loadingAudio ? (
-                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-gray-400">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading tracks...
                     </div>
@@ -383,18 +405,18 @@ export const BulkAssetPickerDialog = ({
                             onClick={() => handleToggleAudio(item)}
                             className={`flex items-center justify-between rounded-xl border p-3.5 text-left text-xs font-semibold transition-all hover:shadow-sm ${
                               selected
-                                ? 'border-[#ff5500] bg-orange-50/10 text-[#ff5500]'
-                                : 'border-gray-200 bg-white text-gray-800 hover:border-gray-300'
+                                ? 'border-[#ff5500] bg-[#ff5500]/10 text-[#ff5500]'
+                                : 'border-[#2d2d30] bg-[#121214] text-white hover:border-[#3a3a3c]'
                             }`}
                           >
                             <span className="flex min-w-0 items-center gap-2">
-                              <Music className={`h-4 w-4 flex-shrink-0 ${selected ? 'text-[#ff5500]' : 'text-gray-400'}`} />
+                              <Music className={`h-4 w-4 flex-shrink-0 ${selected ? 'text-[#ff5500]' : 'text-gray-500'}`} />
                               <span className="truncate">{item.name}</span>
                             </span>
                             {selected ? (
                               <CheckSquare className="w-4 h-4 text-[#ff5500] flex-shrink-0" />
                             ) : (
-                              <Square className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                              <Square className="w-4 h-4 text-gray-600 flex-shrink-0" />
                             )}
                           </button>
                         );
@@ -405,7 +427,7 @@ export const BulkAssetPickerDialog = ({
 
                 {myAudioTracks.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">My Uploaded Tracks</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">My Uploaded Tracks</h4>
                     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                       {myAudioTracks.map((item) => {
                         const selected = isAudioSelected(item);
@@ -416,18 +438,18 @@ export const BulkAssetPickerDialog = ({
                             onClick={() => handleToggleAudio(item)}
                             className={`flex items-center justify-between rounded-xl border p-3.5 text-left text-xs font-semibold transition-all hover:shadow-sm ${
                               selected
-                                ? 'border-[#ff5500] bg-orange-50/10 text-[#ff5500]'
-                                : 'border-gray-200 bg-white text-gray-800 hover:border-gray-300'
+                                ? 'border-[#ff5500] bg-[#ff5500]/10 text-[#ff5500]'
+                                : 'border-[#2d2d30] bg-[#121214] text-white hover:border-[#3a3a3c]'
                             }`}
                           >
                             <span className="flex min-w-0 items-center gap-2">
-                              <Music className={`h-4 w-4 flex-shrink-0 ${selected ? 'text-[#ff5500]' : 'text-gray-400'}`} />
+                              <Music className={`h-4 w-4 flex-shrink-0 ${selected ? 'text-[#ff5500]' : 'text-gray-500'}`} />
                               <span className="truncate">{item.name}</span>
                             </span>
                             {selected ? (
                               <CheckSquare className="w-4 h-4 text-[#ff5500] flex-shrink-0" />
                             ) : (
-                              <Square className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                              <Square className="w-4 h-4 text-gray-600 flex-shrink-0" />
                             )}
                           </button>
                         );
@@ -441,28 +463,28 @@ export const BulkAssetPickerDialog = ({
         </div>
 
         {/* Footer Summary & Confirm */}
-        <div className="border-t border-gray-100 px-6 py-4 bg-gray-50 flex items-center justify-between">
-          <div className="flex items-center gap-4 text-xs font-semibold text-gray-600">
-            <span>Selected First Videos: <strong className="text-gray-900">{selectedVideo1.length}</strong></span>
-            <span>Selected Second Videos: <strong className="text-gray-900">{selectedVideo2.length}</strong></span>
-            <span>Selected Music: <strong className="text-gray-900">{selectedAudio.length}</strong></span>
+        <div className="border-t border-[#2d2d30] px-6 py-4 bg-[#121214] flex items-center justify-between">
+          <div className="flex items-center gap-4 text-xs font-semibold text-gray-400">
+            <span>Selected First Videos: <strong className="text-white">{selectedVideo1.length}</strong></span>
+            <span>Selected Second Videos: <strong className="text-white">{selectedVideo2.length}</strong></span>
+            <span>Selected Music: <strong className="text-white">{selectedAudio.length}</strong></span>
           </div>
 
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-200 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-600 uppercase tracking-wider transition-colors"
+              className="px-4 py-2 border border-[#2d2d30] bg-[#27272a] hover:bg-[#3f3f46] text-gray-400 hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={selectedVideo1.length === 0}
+              disabled={selectedVideo1.length === 0 && selectedVideo2.length === 0 && selectedAudio.length === 0}
               className="px-4 py-2 bg-[#ff5500] hover:bg-orange-600 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all uppercase tracking-wider shadow-sm"
             >
-              Confirm &amp; Create Rows
+              Confirm &amp; Add
             </button>
           </div>
         </div>

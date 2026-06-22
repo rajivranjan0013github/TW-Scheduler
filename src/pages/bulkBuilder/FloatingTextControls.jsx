@@ -7,7 +7,7 @@ const POSITION_Y_MIN = -260;
 const POSITION_Y_MAX = 260;
 
 /**
- * Compact floating toolbar for per-row text styling.
+ * Compact floating toolbar for per-row text styling (Figma Dark Theme).
  * Appears when the user clicks the caption overlay on a Video 1 card.
  */
 export const FloatingTextControls = ({
@@ -57,7 +57,8 @@ export const FloatingTextControls = ({
 
   return (
     <div
-      className="absolute z-40 bg-white border border-gray-200 rounded-xl shadow-2xl p-3 space-y-2.5 w-[240px]"
+      data-text-controls="true"
+      className="absolute z-40 bg-[#18181b]/95 border border-[#2d2d30] rounded-xl shadow-2xl p-3 space-y-2.5 w-[240px] text-[#e0e0e5] backdrop-blur-md"
       style={{
         top: '50%',
         left: 'calc(100% + 10px)',
@@ -70,7 +71,7 @@ export const FloatingTextControls = ({
       {/* Close */}
       <div className="flex items-center justify-between">
         <span
-          className="cursor-default text-[10px] font-bold text-gray-400 uppercase tracking-wider"
+          className="cursor-default text-[10px] font-bold text-gray-500 uppercase tracking-wider"
           title="Double-click to reset all text controls"
           onDoubleClick={resetAll}
         >
@@ -79,7 +80,7 @@ export const FloatingTextControls = ({
         <button
           type="button"
           onClick={onClose}
-          className="text-[10px] font-bold text-gray-400 hover:text-gray-800 transition-colors uppercase"
+          className="text-[10px] font-bold text-gray-400 hover:text-white transition-colors uppercase"
         >
           Done
         </button>
@@ -90,12 +91,12 @@ export const FloatingTextControls = ({
         <select
           value={fontFamily}
           onChange={(e) => onUpdate({ fontFamily: e.target.value })}
-          className="w-full text-[10px] font-medium border border-gray-200 rounded-lg p-1.5 bg-white outline-none cursor-pointer appearance-none"
+          className="w-full text-[10px] font-medium border border-[#2d2d30] rounded-lg p-1.5 bg-[#121214] text-white outline-none cursor-pointer appearance-none"
         >
-          <option value="TikTok Sans">TikTok Sans</option>
-          <option value="Roboto">Roboto</option>
-          <option value="Impact">Impact</option>
-          <option value="Arial">Arial</option>
+          <option className="bg-[#1e1e24] text-white" value="TikTok Sans">TikTok Sans</option>
+          <option className="bg-[#1e1e24] text-white" value="Roboto">Roboto</option>
+          <option className="bg-[#1e1e24] text-white" value="Impact">Impact</option>
+          <option className="bg-[#1e1e24] text-white" value="Arial">Arial</option>
         </select>
         <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
           <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,7 +108,7 @@ export const FloatingTextControls = ({
       {/* Weight */}
       <div className="space-y-1">
         <span
-          className="cursor-default text-[10px] font-bold text-gray-500"
+          className="cursor-default text-[10px] font-bold text-gray-400"
           title="Double-click to reset weight"
           onDoubleClick={() => onUpdate({ fontWeight: DEFAULT_TEXT_SETTINGS.fontWeight })}
         >
@@ -118,14 +119,14 @@ export const FloatingTextControls = ({
           value={weightIdx}
           onChange={(e) => onUpdate({ fontWeight: FONT_WEIGHTS[Number(e.target.value)] })}
           className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
-          style={{ background: `linear-gradient(to right, #ff5500 ${(weightIdx / 5) * 100}%, #f3f4f6 ${(weightIdx / 5) * 100}%)` }}
+          style={{ background: `linear-gradient(to right, #ff5500 ${(weightIdx / 5) * 100}%, #2d2d30 ${(weightIdx / 5) * 100}%)` }}
         />
       </div>
 
       {/* Size */}
       <div className="space-y-1">
         <span
-          className="cursor-default text-[10px] font-bold text-gray-500"
+          className="cursor-default text-[10px] font-bold text-gray-400"
           title="Double-click to reset size"
           onDoubleClick={() => onUpdate({ fontSize: DEFAULT_TEXT_SETTINGS.fontSize })}
         >
@@ -136,7 +137,7 @@ export const FloatingTextControls = ({
           value={fontSize}
           onChange={(e) => onUpdate({ fontSize: Number(e.target.value) })}
           className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
-          style={{ background: `linear-gradient(to right, #ff5500 ${((fontSize - 10) / 38) * 100}%, #f3f4f6 ${((fontSize - 10) / 38) * 100}%)` }}
+          style={{ background: `linear-gradient(to right, #ff5500 ${((fontSize - 10) / 38) * 100}%, #2d2d30 ${((fontSize - 10) / 38) * 100}%)` }}
         />
       </div>
 
@@ -144,18 +145,18 @@ export const FloatingTextControls = ({
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <span
-            className="cursor-default text-[10px] font-bold text-gray-500"
+            className="cursor-default text-[10px] font-bold text-gray-400"
             title="Double-click to reset position"
             onDoubleClick={resetPosition}
           >
             Position
           </span>
-          <span className="text-[9px] font-bold text-gray-400">
+          <span className="text-[9px] font-bold text-gray-500">
             X {placementX}, Y {placementY}
           </span>
         </div>
         <div className="space-y-2">
-          <label className="grid grid-cols-[14px_1fr] items-center gap-2 text-[9px] font-bold text-gray-400">
+          <label className="grid grid-cols-[14px_1fr] items-center gap-2 text-[9px] font-bold text-gray-500">
             X
             <input
               type="range"
@@ -169,10 +170,10 @@ export const FloatingTextControls = ({
                 else onUpdateDragPos?.({ ...dragPos, x: x + 120 });
               }}
               className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
-              style={{ background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${placementXPercent}%, #ff5500 ${placementXPercent}%, #ff5500 ${placementXPercent + 1}%, #e5e7eb ${placementXPercent + 1}%, #e5e7eb 100%)` }}
+              style={{ background: `linear-gradient(to right, #2d2d30 0%, #2d2d30 ${placementXPercent}%, #ff5500 ${placementXPercent}%, #ff5500 ${placementXPercent + 1}%, #2d2d30 ${placementXPercent + 1}%, #2d2d30 100%)` }}
             />
           </label>
-          <label className="grid grid-cols-[14px_1fr] items-center gap-2 text-[9px] font-bold text-gray-400">
+          <label className="grid grid-cols-[14px_1fr] items-center gap-2 text-[9px] font-bold text-gray-500">
             Y
             <input
               type="range"
@@ -186,7 +187,7 @@ export const FloatingTextControls = ({
                 else onUpdateDragPos?.({ ...dragPos, y: y + 230 });
               }}
               className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
-              style={{ background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${placementYPercent}%, #ff5500 ${placementYPercent}%, #ff5500 ${placementYPercent + 1}%, #e5e7eb ${placementYPercent + 1}%, #e5e7eb 100%)` }}
+              style={{ background: `linear-gradient(to right, #2d2d30 0%, #2d2d30 ${placementYPercent}%, #ff5500 ${placementYPercent}%, #ff5500 ${placementYPercent + 1}%, #2d2d30 ${placementYPercent + 1}%, #2d2d30 100%)` }}
             />
           </label>
         </div>
@@ -196,13 +197,13 @@ export const FloatingTextControls = ({
       <div className="flex gap-2">
         <div className="flex-1 space-y-1">
           <span
-            className="cursor-default text-[10px] font-bold text-gray-500"
+            className="cursor-default text-[10px] font-bold text-gray-400"
             title="Double-click to reset color"
             onDoubleClick={() => onUpdate({ fontColor: DEFAULT_TEXT_SETTINGS.fontColor })}
           >
             Color
           </span>
-          <div className="relative w-full h-6 rounded-lg overflow-hidden border border-gray-200 cursor-pointer">
+          <div className="relative w-full h-6 rounded-lg overflow-hidden border border-[#2d2d30] cursor-pointer">
             <input
               type="color"
               value={fontColor.toLowerCase()}
@@ -213,13 +214,13 @@ export const FloatingTextControls = ({
         </div>
         <div className="flex-1 space-y-1">
           <span
-            className="cursor-default text-[10px] font-bold text-gray-500"
+            className="cursor-default text-[10px] font-bold text-gray-400"
             title="Double-click to reset stroke color"
             onDoubleClick={() => onUpdate({ strokeColor: DEFAULT_TEXT_SETTINGS.strokeColor })}
           >
             Stroke
           </span>
-          <div className="relative w-full h-6 rounded-lg overflow-hidden border border-gray-200 cursor-pointer">
+          <div className="relative w-full h-6 rounded-lg overflow-hidden border border-[#2d2d30] cursor-pointer">
             <input
               type="color"
               value={strokeColor.toLowerCase()}
@@ -233,7 +234,7 @@ export const FloatingTextControls = ({
       {/* Stroke Width */}
       <div className="space-y-1">
         <span
-          className="cursor-default text-[10px] font-bold text-gray-500"
+          className="cursor-default text-[10px] font-bold text-gray-400"
           title="Double-click to reset stroke width"
           onDoubleClick={() => onUpdate({ strokeWidth: DEFAULT_TEXT_SETTINGS.strokeWidth })}
         >
@@ -244,14 +245,14 @@ export const FloatingTextControls = ({
           value={strokeWidth}
           onChange={(e) => onUpdate({ strokeWidth: Number(e.target.value) })}
           className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
-          style={{ background: `linear-gradient(to right, #ff5500 ${(strokeWidth / 10) * 100}%, #f3f4f6 ${(strokeWidth / 10) * 100}%)` }}
+          style={{ background: `linear-gradient(to right, #ff5500 ${(strokeWidth / 10) * 100}%, #2d2d30 ${(strokeWidth / 10) * 100}%)` }}
         />
       </div>
 
       {/* Background Type */}
       <div className="space-y-1">
         <span
-          className="cursor-default text-[10px] font-bold text-gray-500"
+          className="cursor-default text-[10px] font-bold text-[#e0e0e5]"
           title="Double-click to reset background"
           onDoubleClick={() => onUpdate({
             bgType: DEFAULT_TEXT_SETTINGS.bgType,
@@ -268,8 +269,8 @@ export const FloatingTextControls = ({
               onClick={() => handleBgTypeClick(type)}
               className={`flex-1 py-1 text-[9px] font-semibold rounded-full border transition-all ${
                 bgType === type
-                  ? 'bg-[#ff5500] border-[#ff5500] text-white'
-                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                  ? 'bg-[#ff5500] border-[#ff5500] text-white shadow-md'
+                  : 'bg-[#27272a] border-[#2d2d30] text-gray-300 hover:bg-[#3e3e42] hover:text-white'
               }`}
             >
               {type}

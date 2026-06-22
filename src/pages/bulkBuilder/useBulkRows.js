@@ -29,6 +29,7 @@ export const sanitizeBulkRowForStorage = (row) => {
     ...row,
     textSettings: { ...DEFAULT_TEXT_SETTINGS, ...(row.textSettings || {}) },
     dragPos: { ...DEFAULT_DRAG_POS, ...(row.dragPos || {}) },
+    canvasPos: row.canvasPos || { x: 100, y: 100 },
     resultVideoUrl: isBlobUrl(row.resultVideoUrl) ? '' : (row.resultVideoUrl || ''),
   };
 
@@ -53,7 +54,7 @@ export const normalizeBulkRowsFromStorage = (rows) => (
     : []
 );
 
-const createEmptyRow = () => ({
+const createEmptyRow = (index = 0) => ({
   id: `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   video1: null,
   video1Url: '',
@@ -63,6 +64,10 @@ const createEmptyRow = () => ({
   caption: '',
   textSettings: { ...DEFAULT_TEXT_SETTINGS },
   dragPos: { ...DEFAULT_DRAG_POS },
+  canvasPos: {
+    x: 50 + (index % 6) * 370,
+    y: 80 + Math.floor(index / 6) * 450
+  },
   status: 'draft',
   resultMediaId: '',
   resultMediaUrl: '',
@@ -79,7 +84,7 @@ export const useBulkRows = () => {
       const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
       if (saved.length > 0) return saved;
     } catch { /* ignore parse errors */ }
-    return [createEmptyRow()];
+    return [createEmptyRow(0)];
   });
 
   // Auto-save to localStorage on every change
@@ -88,13 +93,13 @@ export const useBulkRows = () => {
   }, [rows]);
 
   const addRow = useCallback(() => {
-    setRows((prev) => [...prev, createEmptyRow()]);
+    setRows((prev) => [...prev, createEmptyRow(prev.length)]);
   }, []);
 
   const removeRow = useCallback((rowId) => {
     setRows((prev) => {
       const next = prev.filter((r) => r.id !== rowId);
-      return next.length > 0 ? next : [createEmptyRow()];
+      return next.length > 0 ? next : [createEmptyRow(0)];
     });
   }, []);
 
@@ -103,7 +108,7 @@ export const useBulkRows = () => {
       prev.map((r) => {
         if (r.id !== rowId) return r;
         const updated = { ...r, ...partialData };
-        if (Object.prototype.hasOwnProperty.call(partialData, 'status')) {
+        if (Object.prototype.hasOwnProperty.call(partialData, 'status') || Object.prototype.hasOwnProperty.call(partialData, 'canvasPos')) {
           return sanitizeBulkRowForStorage(updated);
         }
         return {
@@ -165,12 +170,13 @@ export const useBulkRows = () => {
   }, []);
 
   const clearAllRows = useCallback(() => {
-    setRows([createEmptyRow()]);
+    setRows([createEmptyRow(0)]);
   }, []);
 
   const addRowsWithFirstVideos = useCallback((video1List) => {
     setRows((prev) => {
-      const newRows = video1List.map((video) => ({
+      const startIdx = prev.length;
+      const newRows = video1List.map((video, idx) => ({
         id: `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${Math.random().toString(36).slice(2, 5)}`,
         video1: video,
         video1Url: video.url,
@@ -180,6 +186,10 @@ export const useBulkRows = () => {
         caption: '',
         textSettings: { ...DEFAULT_TEXT_SETTINGS },
         dragPos: { ...DEFAULT_DRAG_POS },
+        canvasPos: {
+          x: 50 + ((startIdx + idx) % 6) * 370,
+          y: 80 + Math.floor((startIdx + idx) / 6) * 450
+        },
         status: 'draft',
         resultMediaId: '',
         resultMediaUrl: '',
@@ -188,7 +198,13 @@ export const useBulkRows = () => {
       }));
       const isEmptyRow = (r) => !r.video1 && !r.video2 && !r.caption && !r.audio;
       if (prev.length === 1 && isEmptyRow(prev[0])) {
-        return newRows;
+        return newRows.map((r, idx) => ({
+          ...r,
+          canvasPos: {
+            x: 50 + (idx % 6) * 370,
+            y: 80 + Math.floor(idx / 6) * 450
+          }
+        }));
       }
       return [...prev, ...newRows];
     });

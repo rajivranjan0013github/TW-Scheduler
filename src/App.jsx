@@ -32,7 +32,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const { user } = useAuth();
   const location = useLocation();
   const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
-  const hideSidebar = location.pathname === '/' || location.pathname === '/campaigns';
+  const hideSidebar = location.pathname === '/' || location.pathname === '/campaigns' || location.pathname === '/media/bulk-builder';
 
   return (
     <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-hidden font-sans">

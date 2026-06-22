@@ -2,7 +2,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchFile } from '@ffmpeg/util';
-import { Folder, Layers, Loader2, X } from 'lucide-react';
+import { Download, Folder, Layers, Loader2, UploadCloud, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { OUTPUT_WIDTH, OUTPUT_HEIGHT, OUTPUT_FPS, API_BASE_URL } from './videoEditor/videoEditorConstants';
 import { useFFmpeg } from './videoEditor/useFFmpeg';
@@ -535,15 +535,21 @@ export const VideoEditor = () => {
   }, [resultVideoUrl, uploadVideoBlob, navigate, isBulkMode, currentQueueIndex, bulkRows, updateBulkRowData]);
 
   const startBulkQueue = useCallback(() => {
-    const firstPendingIdx = bulkRows.findIndex((row) => row.video1 && row.video2 && row.status !== 'done');
+    activeBulkRunRef.current = null;
+    const queueRows = bulkRows.map((row) => (
+      row.video1 && row.video2 && ['processing', 'saving', 'error'].includes(row.status)
+        ? { ...row, status: 'ready' }
+        : row
+    ));
+    const firstPendingIdx = queueRows.findIndex((row) => row.video1 && row.video2 && row.status !== 'done');
     if (firstPendingIdx < 0) {
-      const firstReadyIdx = bulkRows.findIndex((row) => row.video1 && row.video2);
+      const firstReadyIdx = queueRows.findIndex((row) => row.video1 && row.video2);
       if (firstReadyIdx < 0) {
         setStatusMessage({ type: 'error', text: 'No ready bulk rows found. Add Video 1 and Video 2 before exporting.' });
         return;
       }
 
-      const resetRows = bulkRows.map((row) => (
+      const resetRows = queueRows.map((row) => (
         row.video1 && row.video2
           ? {
               ...row,
@@ -567,6 +573,13 @@ export const VideoEditor = () => {
       setStatusMessage(null);
       return;
     }
+    setBulkRows(queueRows);
+    try {
+      localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(queueRows.map(sanitizeBulkRowForStorage)));
+    } catch (err) {
+      console.error('Failed to normalize bulk rows for export:', err);
+    }
+    setResultVideoUrl('');
     setCurrentQueueIndex(firstPendingIdx);
     setIsQueueRunning(true);
     setStatusMessage(null);
@@ -680,7 +693,14 @@ export const VideoEditor = () => {
 
     // Wait for current row's video durations to be resolved (> 0)
     const videoDurations = preview.videoDurationsRef.current;
-    if (!videoDurations.input1 || !videoDurations.input2) {
+    const input1Duration = videoDurations.input1 || preview.video1Ref.current?.duration || 0;
+    const input2Duration = videoDurations.input2 || preview.video2Ref.current?.duration || 0;
+    if (input1Duration > 0 && input2Duration > 0) {
+      preview.videoDurationsRef.current = {
+        input1: input1Duration,
+        input2: input2Duration,
+      };
+    } else {
       setProgressMsg('Loading video assets...');
       return;
     }
@@ -884,6 +904,14 @@ export const VideoEditor = () => {
                   type="button"
                   onClick={() => {
                     if (isQueueRunning) {
+                      activeBulkRunRef.current = null;
+                      setBulkRows((prev) =>
+                        prev.map((row) => (
+                          ['processing', 'saving'].includes(row.status)
+                            ? { ...row, status: row.video1 && row.video2 ? 'ready' : 'draft' }
+                            : row
+                        ))
+                      );
                       setIsQueueRunning(false);
                     } else {
                       startBulkQueue();
@@ -932,13 +960,33 @@ export const VideoEditor = () => {
                 return (
                   <div
                     key={row.id}
-                    className={`flex items-center justify-between p-2.5 transition-colors ${
-                      isActive ? 'bg-orange-50/40' : 'bg-white'
+                    role="button"
+                    tabIndex={isQueueRunning ? -1 : 0}
+                    aria-disabled={isQueueRunning}
+                    onClick={() => {
+                      if (!isQueueRunning) setCurrentQueueIndex(idx);
+                    }}
+                    onKeyDown={(event) => {
+                      if (isQueueRunning) return;
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setCurrentQueueIndex(idx);
+                      }
+                    }}
+                    className={`relative flex items-center justify-between p-2.5 transition-colors ${
+                      isQueueRunning
+                        ? 'cursor-not-allowed opacity-80'
+                        : 'cursor-pointer hover:bg-gray-50'
+                    } ${isActive ? 'bg-slate-50' : 'bg-white'
                     }`}
+                    title={isQueueRunning ? 'Queue is running' : 'Load this row in the editor'}
                   >
+                    {isActive && (
+                      <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full bg-[#0071e3]" />
+                    )}
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[9px] font-bold text-gray-400">#{idx + 1}</span>
-                      <span className="text-[11px] font-semibold text-gray-700 truncate max-w-[110px]" title={row.caption}>
+                      <span className={`text-[9px] font-bold ${isActive ? 'text-[#0071e3]' : 'text-gray-400'}`}>#{idx + 1}</span>
+                      <span className={`text-[11px] font-semibold truncate max-w-[110px] ${isActive ? 'text-gray-900' : 'text-gray-700'}`} title={row.caption}>
                         {row.caption || '(No caption)'}
                       </span>
                     </div>
@@ -949,21 +997,13 @@ export const VideoEditor = () => {
             row.status === 'saving' ? 'bg-purple-50 text-purple-600 animate-pulse' :
             row.status === 'error' ? 'bg-red-50 text-red-600' :
             'bg-gray-100 text-gray-500'
-          }`}>
+                      }`}>
             {row.status === 'done' ? 'Done' :
              row.status === 'processing' ? 'Proc' :
              row.status === 'saving' ? 'Save' :
              row.status === 'error' ? 'Err' :
              'Pend'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentQueueIndex(idx)}
-                        disabled={isQueueRunning}
-                        className={`text-[9px] font-bold ${isActive ? 'text-[#0071e3]' : 'text-gray-400 hover:text-gray-700'} disabled:opacity-40 disabled:cursor-not-allowed`}
-                      >
-                        Load
-                      </button>
                     </div>
                   </div>
                 );
@@ -1087,7 +1127,7 @@ export const VideoEditor = () => {
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-6 gap-3">
             {showBulkGeneratingCard && (
               <div className="overflow-hidden rounded-xl border border-blue-200 bg-blue-50/40">
                 <div className="relative aspect-[9/16] overflow-hidden bg-black">
@@ -1115,8 +1155,8 @@ export const VideoEditor = () => {
                 </div>
                 <div className="space-y-2 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-[11px] font-bold text-gray-800" title={activeBulkRow.caption}>
-                      {activeBulkRow.caption || `Bulk video ${currentQueueIndex + 1}`}
+                    <p className="truncate text-[11px] font-bold text-gray-800">
+                      Video {currentQueueIndex + 1}
                     </p>
                     <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[8px] font-bold uppercase text-blue-700">
                       FFmpeg
@@ -1146,37 +1186,35 @@ export const VideoEditor = () => {
                   </div>
                   <div className="space-y-2 p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-[11px] font-bold text-gray-800" title={row.resultMediaName || row.caption}>
-                        {row.resultMediaName || `Bulk video ${idx + 1}`}
+                      <p className="truncate text-[11px] font-bold text-gray-800">
+                        Video {idx + 1}
                       </p>
-                      <span className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase ${
-                        row.resultMediaUrl
-                          ? 'bg-green-50 text-green-600'
-                          : 'bg-blue-50 text-blue-600'
-                      }`}>
-                        {row.resultMediaUrl ? 'Library' : 'Local'}
-                      </span>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <a
+                          href={resultUrl}
+                          download={row.resultMediaName || `bulk_video_${idx + 1}.mp4`}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-gray-600 ring-1 ring-gray-200 transition-colors hover:bg-gray-100"
+                          title="Download"
+                          aria-label="Download video"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => openBulkSaveFolderPicker(row.id)}
+                          disabled={bulkSavingRowId === row.id}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0071e3] text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          title={row.resultMediaUrl ? 'Save again to media library' : 'Add to media library'}
+                          aria-label={row.resultMediaUrl ? 'Save again to media library' : 'Add to media library'}
+                        >
+                          {bulkSavingRowId === row.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <UploadCloud className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
-                    {row.caption && (
-                      <p className="line-clamp-2 text-[10px] font-medium leading-relaxed text-gray-500" title={row.caption}>
-                        {row.caption}
-                      </p>
-                    )}
-                    <a
-                      href={resultUrl}
-                      download={row.resultMediaName || `bulk_video_${idx + 1}.mp4`}
-                      className="block rounded-lg bg-white px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-gray-600 ring-1 ring-gray-200 transition-colors hover:bg-gray-100"
-                    >
-                      Download
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => openBulkSaveFolderPicker(row.id)}
-                      disabled={bulkSavingRowId === row.id}
-                      className="block w-full rounded-lg bg-[#0071e3] px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {bulkSavingRowId === row.id ? 'Saving...' : row.resultMediaUrl ? 'Save Again' : 'Add to Media Library'}
-                    </button>
                   </div>
                 </div>
               );
