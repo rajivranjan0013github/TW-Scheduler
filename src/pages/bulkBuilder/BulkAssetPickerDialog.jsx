@@ -155,6 +155,35 @@ export const BulkAssetPickerDialog = ({
     }
   };
 
+  const handleSelectAllVideosInFolder = () => {
+    const slot = activeTab;
+    const videoObjs = media.map((item) => ({
+      id: item._id,
+      name: item.name || 'Library video',
+      sourceType: 'library',
+      url: proxiedMediaUrl(item.url),
+      originalUrl: item.url,
+    }));
+
+    if (slot === 'video1') {
+      setSelectedVideo1((prev) => {
+        const merged = [...prev];
+        videoObjs.forEach((video) => {
+          if (!merged.some((item) => item.id === video.id)) merged.push(video);
+        });
+        return merged;
+      });
+    } else {
+      setSelectedVideo2((prev) => {
+        const merged = [...prev];
+        videoObjs.forEach((video) => {
+          if (!merged.some((item) => item.id === video.id)) merged.push(video);
+        });
+        return merged;
+      });
+    }
+  };
+
   const handleToggleAudio = (item) => {
     setSelectedAudio((prev) => {
       const exists = prev.some((a) => a.id === item.id);
@@ -322,7 +351,18 @@ export const BulkAssetPickerDialog = ({
                     {activeFolderName || 'Choose a folder'}
                   </h4>
                   {activeFolderId && (
-                    <span className="text-[11px] font-semibold text-gray-500">{media.length} videos</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-semibold text-gray-500">{media.length} videos</span>
+                      {media.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleSelectAllVideosInFolder}
+                          className="rounded-lg border border-[#2d2d30] bg-[#27272a] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-[#3f3f46] active:scale-95"
+                        >
+                          Select All
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
 

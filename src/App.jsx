@@ -36,7 +36,8 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   // Returning users with 2+ campaigns still see sidebar on the campaign picker.
   const hasActiveCampaign = Boolean(localStorage.getItem('active-campaign-id'));
   const isOnCampaignPage = location.pathname === '/' || location.pathname === '/campaigns';
-  const hideSidebar = isOnCampaignPage && !hasActiveCampaign;
+  const isBulkBuilderPage = location.pathname === '/media/bulk-builder';
+  const hideSidebar = isBulkBuilderPage || (isOnCampaignPage && !hasActiveCampaign);
 
   return (
     <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-hidden font-sans">
