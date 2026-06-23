@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertTriangle, Folder, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save } from 'lucide-react';
+import { AlertTriangle, Folder, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
@@ -57,6 +57,7 @@ export const MediaLibrary = () => {
   const [savingFolderId, setSavingFolderId] = useState(null);
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null);
   const [openMediaMenuId, setOpenMediaMenuId] = useState(null);
+  const [captionDialogMedia, setCaptionDialogMedia] = useState(null);
   const [filterType, setFilterType] = useState('all');
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(false);
@@ -299,15 +300,34 @@ export const MediaLibrary = () => {
           delete next[item._id];
           return next;
         });
+        return true;
       } else {
         throw new Error(await getErrorMessage(response, 'Unable to update media caption'));
       }
     } catch (error) {
       console.error('Failed saving caption:', error);
       alert(`Caption save failed: ${error.message || 'Unable to update media caption'}`);
+      return false;
     } finally {
       setSavingCaptionId(null);
     }
+  };
+
+  const openCaptionDialog = (item, e) => {
+    e.stopPropagation();
+    setOpenMediaMenuId(null);
+    setCaptionDialogMedia(item);
+  };
+
+  const closeCaptionDialog = () => {
+    setCaptionDialogMedia(null);
+  };
+
+  const handleCaptionDialogSave = async (e) => {
+    e.preventDefault();
+    if (!captionDialogMedia) return;
+    const saved = await handleSaveCaption(captionDialogMedia);
+    if (saved) closeCaptionDialog();
   };
 
   const handleCreateFolder = async (e) => {
@@ -695,13 +715,13 @@ export const MediaLibrary = () => {
             {!loadingMedia && filteredMedia.map(item => (
               <div
                 key={item._id}
-                className="bg-white border border-[#e5e5ea] rounded-xl overflow-hidden group hover:border-gray-400 transition-all flex flex-col relative shadow-sm"
+                className="bg-white border border-[#e5e5ea] rounded-xl overflow-visible group hover:border-gray-400 transition-all flex flex-col relative shadow-sm"
               >
                 {(() => {
                   return (
                     <>
                       {/* Media Preview Box */}
-                      <div className="aspect-video bg-[#f5f5f7] relative overflow-hidden flex items-center justify-center border-b border-[#e5e5ea]">
+                      <div className="aspect-[9/16] bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center">
                         {item.type === 'video' && item.thumbnailUrl ? (
                           <img src={getProxyUrl(item.thumbnailUrl)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                         ) : item.type === 'video' ? (
@@ -717,36 +737,22 @@ export const MediaLibrary = () => {
                         <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm">
                           {item.type}
                         </div>
-                      </div>
-
-                      {/* Details Footer */}
-                      <div className="p-4 flex-1 flex flex-col justify-between">
-                        <div>
-                          <h4 className="text-xs font-semibold text-[#1d1d1f] truncate m-0" title={item.name}>{item.name}</h4>
-                          <p className="text-[10px] text-gray-500 mt-1">
-                            {Number.isFinite(item.size) ? `${(item.size / (1024 * 1024)).toFixed(2)} MB` : 'Size unavailable'}
-                          </p>
+                        <div
+                          className={`absolute left-2 top-9 inline-flex h-7 w-7 items-center justify-center rounded-lg border shadow-sm ${
+                            item.caption?.trim()
+                              ? 'border-[#34c759]/20 bg-white/95 text-[#15803d]'
+                              : 'border-[#ff9500]/20 bg-white/95 text-[#b45309]'
+                          }`}
+                          title={item.caption?.trim() ? 'Caption saved' : 'No caption saved'}
+                        >
+                          {item.caption?.trim() ? (
+                            <MessageSquareCheck className="h-3.5 w-3.5" />
+                          ) : (
+                            <MessageSquareWarning className="h-3.5 w-3.5" />
+                          )}
                         </div>
-
-                        <div className="mt-3 space-y-2">
-                          <textarea
-                            value={getCaptionDraft(item)}
-                            onChange={(e) => setCaptionDrafts((current) => ({
-                              ...current,
-                              [item._id]: e.target.value,
-                            }))}
-                            placeholder="Caption for this asset..."
-                            className="h-20 w-full rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] p-2 text-[10px] leading-relaxed text-black placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#0071e3] resize-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSaveCaption(item)}
-                            disabled={savingCaptionId === item._id || getCaptionDraft(item) === (item.caption || '')}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5ea] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#1d1d1f] transition-all hover:border-gray-400 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:border-[#e5e5ea]"
-                          >
-                            <Save className="h-3 w-3" />
-                            <span>{savingCaptionId === item._id ? 'Saving...' : 'Save caption'}</span>
-                          </button>
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                          <p className="m-0 truncate" title={item.name}>{item.name || 'Untitled media'}</p>
                         </div>
                       </div>
 
@@ -775,7 +781,15 @@ export const MediaLibrary = () => {
                               }}
                               className="fixed inset-0 z-10 cursor-default bg-transparent"
                             />
-                            <div className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
+                            <div className="absolute right-0 top-8 z-20 w-40 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
+                              <button
+                                type="button"
+                                onClick={(e) => openCaptionDialog(item, e)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                <span>Edit caption</span>
+                              </button>
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -881,6 +895,48 @@ export const MediaLibrary = () => {
                   className="px-4 py-2 bg-[#0071e3] hover:bg-[#147ce5] rounded-lg text-xs text-white disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
                 >
                   {savingFolderId === renamingFolder._id ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {captionDialogMedia && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-lg text-black shadow-xl">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-black">Edit Caption</h3>
+              <p className="mt-1 truncate text-xs text-[#8e8e93]" title={captionDialogMedia.name}>
+                {captionDialogMedia.name || 'Media asset'}
+              </p>
+            </div>
+            <form onSubmit={handleCaptionDialogSave} className="space-y-4">
+              <textarea
+                value={getCaptionDraft(captionDialogMedia)}
+                onChange={(e) => setCaptionDrafts((current) => ({
+                  ...current,
+                  [captionDialogMedia._id]: e.target.value,
+                }))}
+                placeholder="Caption for this asset..."
+                className="h-40 w-full rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] p-3 text-xs leading-relaxed text-black placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#0071e3] resize-none"
+                autoFocus
+              />
+              <div className="flex justify-end gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={closeCaptionDialog}
+                  className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingCaptionId === captionDialogMedia._id || getCaptionDraft(captionDialogMedia) === (captionDialogMedia.caption || '')}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0071e3] px-4 py-2 text-xs font-semibold text-white hover:bg-[#147ce5] disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span>{savingCaptionId === captionDialogMedia._id ? 'Saving...' : 'Save caption'}</span>
                 </button>
               </div>
             </form>
