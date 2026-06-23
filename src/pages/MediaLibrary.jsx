@@ -1,15 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Folder, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save } from 'lucide-react';
+import { AlertTriangle, Folder, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
+import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from './videoEditor/videoEditorConstants';
 
 const getProxyUrl = (url) => {
   if (!url) return '';
-  if (url.startsWith('https://pub-') || url.includes('r2.cloudflarestorage.com')) {
-    return `http://localhost:5001/api/media/proxy?url=${encodeURIComponent(url)}`;
-  }
+  if (url.startsWith('blob:') || url.includes('/api/media/proxy')) return url;
+  if (url.startsWith('https://pub-') || url.includes('r2.cloudflarestorage.com')) return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
   return url;
 };
+
+const getErrorMessage = async (response, fallback) => {
+  try {
+    const data = await response.json();
+    return data.message || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
 
 const getPathWithoutExtension = (filePath) => (
   String(filePath || '')
@@ -25,17 +37,13 @@ const getFileNameWithoutExtension = (filePath) => (
 export const MediaLibrary = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, token } = useAuth();
   const [folders, setFolders] = useState([]);
   const [media, setMedia] = useState([]);
   const [activeFolderId, setActiveFolderId] = useState(() => {
     return location.state?.preselectedFolderId || 'root';
   });
 
-  useEffect(() => {
-    if (location.state?.preselectedFolderId) {
-      setActiveFolderId(location.state.preselectedFolderId);
-    }
-  }, [location.state?.preselectedFolderId]);
   const [searchQuery, setSearchQuery] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
@@ -44,55 +52,87 @@ export const MediaLibrary = () => {
   const [uploadCaption, setUploadCaption] = useState('');
   const [captionDrafts, setCaptionDrafts] = useState({});
   const [savingCaptionId, setSavingCaptionId] = useState(null);
+  const [renamingFolder, setRenamingFolder] = useState(null);
+  const [renameFolderName, setRenameFolderName] = useState('');
+  const [savingFolderId, setSavingFolderId] = useState(null);
+  const [openFolderMenuId, setOpenFolderMenuId] = useState(null);
   const [filterType, setFilterType] = useState('all');
+  const [loadingFolders, setLoadingFolders] = useState(false);
+  const [loadingMedia, setLoadingMedia] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const canUpload = true;
+  const authToken = token || localStorage.getItem('tw_token');
+  const canUpload = ['owner', 'admin', 'editor'].includes(user?.role);
+  const canDelete = ['owner', 'admin'].includes(user?.role);
+  const canManageFolders = canUpload;
 
-  useEffect(() => {
-    fetchFolders();
-  }, []);
-
-  useEffect(() => {
-    fetchMedia();
-  }, [activeFolderId]);
-
-  const fetchFolders = async () => {
+  const fetchFolders = useCallback(async () => {
+    setLoadingFolders(true);
+    setErrorMessage('');
     try {
-      const response = await fetch(`http://localhost:5001/api/media/folders${withCampaignScope()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+          'Authorization': `Bearer ${authToken}`
         }
       });
       if (response.ok) {
         const data = await response.json();
-        setFolders(data);
+        setFolders(Array.isArray(data) ? data : []);
+      } else {
+        throw new Error(await getErrorMessage(response, 'Failed to load folders.'));
       }
     } catch (error) {
       console.error('Failed to load folders:', error);
+      setFolders([]);
+      setErrorMessage(error.message || 'Failed to load folders.');
+    } finally {
+      setLoadingFolders(false);
     }
-  };
+  }, [authToken]);
 
-  const fetchMedia = async () => {
+  const fetchMedia = useCallback(async () => {
+    setLoadingMedia(true);
+    setErrorMessage('');
     try {
       const params = new URLSearchParams();
       const campaignId = getActiveCampaignId();
       if (campaignId) params.set('campaignId', campaignId);
       if (activeFolderId) params.set('folderId', activeFolderId);
-      const url = `http://localhost:5001/api/media?${params.toString()}`;
+      const url = `${API_BASE_URL}/api/media?${params.toString()}`;
 
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+          'Authorization': `Bearer ${authToken}`
         }
       });
       if (response.ok) {
         const data = await response.json();
-        setMedia(data);
+        setMedia(Array.isArray(data) ? data : []);
+      } else {
+        throw new Error(await getErrorMessage(response, 'Failed to load media.'));
       }
     } catch (error) {
       console.error('Failed to load media:', error);
+      setMedia([]);
+      setErrorMessage(error.message || 'Failed to load media.');
+    } finally {
+      setLoadingMedia(false);
     }
-  };
+  }, [activeFolderId, authToken]);
+
+  useEffect(() => {
+    if (location.state?.preselectedFolderId) {
+      queueMicrotask(() => setActiveFolderId(location.state.preselectedFolderId));
+    }
+  }, [location.state?.preselectedFolderId]);
+
+  useEffect(() => {
+    queueMicrotask(() => void fetchFolders());
+  }, [fetchFolders]);
+
+  useEffect(() => {
+    queueMicrotask(() => void fetchMedia());
+  }, [fetchMedia]);
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
@@ -109,43 +149,23 @@ export const MediaLibrary = () => {
     formData.append('campaignId', getActiveCampaignId());
 
     try {
-      const response = await fetch('http://localhost:5001/api/media/upload', {
+      const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: formData,
       });
 
       if (response.ok) {
         setUploadCaption('');
-        fetchMedia();
+        void fetchMedia();
       } else {
-        const error = await response.json();
-        alert(`Upload failed: ${error.message}`);
+        throw new Error(await getErrorMessage(response, 'Upload failed.'));
       }
     } catch (error) {
       console.error('Failed uploading file:', error);
-      alert('Upload failed. Using fallback simulation.');
-      const fakeUrl = file.type.startsWith('video/') 
-        ? 'https://assets.mixkit.co/videos/preview/mixkit-waves-breaking-in-the-sunset-1527-large.mp4'
-        : 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600';
-      
-      const newMockItem = {
-        _id: `m_${Date.now()}`,
-        folderId: activeFolderId === 'root' ? null : activeFolderId,
-        name: file.name,
-        type: file.type.startsWith('video/') ? 'video' : 'image',
-        url: fakeUrl,
-        storageKey: `mock-${Date.now()}`,
-        caption: uploadCaption,
-        tags: [],
-        socialAccountIds: [],
-        size: file.size,
-        createdAt: new Date()
-      };
-      setMedia([newMockItem, ...media]);
-      setUploadCaption('');
+      alert(`Upload failed: ${error.message || 'Unable to save this file.'}`);
     } finally {
       setUploading(false);
       setUploadProgress('');
@@ -176,11 +196,11 @@ export const MediaLibrary = () => {
       const failedFiles = [];
       const firstRelativePath = mediaFiles[0].webkitRelativePath || mediaFiles[0].name;
       const folderName = firstRelativePath.split('/')[0] || 'Uploaded Folder';
-      const folderResponse = await fetch(`http://localhost:5001/api/media/folders${withCampaignScope()}`, {
+      const folderResponse = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           campaignId: getActiveCampaignId(),
@@ -190,8 +210,7 @@ export const MediaLibrary = () => {
       });
 
       if (!folderResponse.ok) {
-        const error = await folderResponse.json();
-        throw new Error(error.message || 'Could not create folder in media library.');
+        throw new Error(await getErrorMessage(folderResponse, 'Could not create folder in media library.'));
       }
 
       const createdFolder = await folderResponse.json();
@@ -220,16 +239,17 @@ export const MediaLibrary = () => {
         formData.append('socialAccountIds', '');
         formData.append('campaignId', getActiveCampaignId());
 
-        const response = await fetch('http://localhost:5001/api/media/upload', {
+        const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+            'Authorization': `Bearer ${authToken}`
           },
           body: formData,
         });
 
         if (!response.ok) {
-          failedFiles.push(file.name);
+          const message = await getErrorMessage(response, 'Upload failed.');
+          failedFiles.push(`${file.name} (${message})`);
         }
       }
 
@@ -242,7 +262,7 @@ export const MediaLibrary = () => {
       }
     } catch (error) {
       console.error('Failed uploading folder:', error);
-      alert('Folder upload failed.');
+      alert(`Folder upload failed: ${error.message || 'Unable to import this folder.'}`);
     } finally {
       setUploading(false);
       setUploadProgress('');
@@ -259,11 +279,11 @@ export const MediaLibrary = () => {
     setSavingCaptionId(item._id);
 
     try {
-      const response = await fetch(`http://localhost:5001/api/media/${item._id}${withCampaignScope()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/media/${item._id}${withCampaignScope()}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({ caption: nextCaption }),
       });
@@ -279,12 +299,11 @@ export const MediaLibrary = () => {
           return next;
         });
       } else {
-        const error = await response.json();
-        alert(`Caption save failed: ${error.message || 'Unable to update media caption'}`);
+        throw new Error(await getErrorMessage(response, 'Unable to update media caption'));
       }
     } catch (error) {
       console.error('Failed saving caption:', error);
-      alert('Caption save failed.');
+      alert(`Caption save failed: ${error.message || 'Unable to update media caption'}`);
     } finally {
       setSavingCaptionId(null);
     }
@@ -295,45 +314,104 @@ export const MediaLibrary = () => {
     if (!newFolderName.trim()) return;
 
     try {
-      const response = await fetch(`http://localhost:5001/api/media/folders${withCampaignScope()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+          'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({ campaignId: getActiveCampaignId(), name: newFolderName }),
+        body: JSON.stringify({
+          campaignId: getActiveCampaignId(),
+          name: newFolderName.trim(),
+          parentFolderId: activeFolderId === 'root' ? null : activeFolderId,
+        }),
       });
 
       if (response.ok) {
         setNewFolderName('');
         setShowNewFolderModal(false);
-        fetchFolders();
+        void fetchFolders();
+      } else {
+        throw new Error(await getErrorMessage(response, 'Failed to create folder.'));
       }
     } catch (error) {
       console.error('Failed to create folder:', error);
+      alert(error.message || 'Failed to create folder.');
+    }
+  };
+
+  const openRenameFolderModal = (folder, e) => {
+    e.stopPropagation();
+    setOpenFolderMenuId(null);
+    setRenamingFolder(folder);
+    setRenameFolderName(folder.name || '');
+  };
+
+  const closeRenameFolderModal = () => {
+    setRenamingFolder(null);
+    setRenameFolderName('');
+  };
+
+  const handleRenameFolder = async (e) => {
+    e.preventDefault();
+    if (!renamingFolder || !renameFolderName.trim()) return;
+
+    setSavingFolderId(renamingFolder._id);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/media/folders/${renamingFolder._id}${withCampaignScope()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          campaignId: getActiveCampaignId(),
+          name: renameFolderName.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        const updatedFolder = await response.json();
+        setFolders((current) => current.map((folder) => (
+          folder._id === updatedFolder._id ? updatedFolder : folder
+        )));
+        closeRenameFolderModal();
+      } else {
+        throw new Error(await getErrorMessage(response, 'Failed to rename folder.'));
+      }
+    } catch (error) {
+      console.error('Failed to rename folder:', error);
+      alert(error.message || 'Failed to rename folder.');
+    } finally {
+      setSavingFolderId(null);
     }
   };
 
   const handleDeleteFolder = async (folderId, e) => {
     e.stopPropagation();
+    setOpenFolderMenuId(null);
     if (!window.confirm('Are you sure you want to delete this campaign folder? Files inside will be moved to the campaign library.')) return;
 
     try {
-      const response = await fetch(`http://localhost:5001/api/media/folders/${folderId}${withCampaignScope()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/media/folders/${folderId}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+          'Authorization': `Bearer ${authToken}`
         }
       });
       if (response.ok) {
         if (activeFolderId === folderId) {
           setActiveFolderId('root');
         }
-        fetchFolders();
-        fetchMedia();
+        void fetchFolders();
+        void fetchMedia();
+      } else {
+        throw new Error(await getErrorMessage(response, 'Failed to delete folder.'));
       }
     } catch (error) {
       console.error('Failed to delete folder:', error);
+      alert(error.message || 'Failed to delete folder.');
     }
   };
 
@@ -342,20 +420,34 @@ export const MediaLibrary = () => {
     if (!window.confirm('Delete this media file permanently?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5001/api/media/${mediaId}${withCampaignScope()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/media/${mediaId}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+          'Authorization': `Bearer ${authToken}`
         }
       });
       if (response.ok) {
-        fetchMedia();
+        void fetchMedia();
+      } else {
+        throw new Error(await getErrorMessage(response, 'Failed to delete media.'));
       }
     } catch (error) {
       console.error('Failed to delete media:', error);
-      setMedia(media.filter(m => m._id !== mediaId));
+      alert(error.message || 'Failed to delete media.');
     }
   };
+
+  const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
+  const visibleFolders = folders.filter((folder) => getFolderParentId(folder) === activeFolderId);
+  const activeFolder = folders.find((folder) => folder._id === activeFolderId);
+  const breadcrumbFolders = [];
+  let breadcrumbFolder = activeFolder;
+  while (breadcrumbFolder) {
+    breadcrumbFolders.unshift(breadcrumbFolder);
+    const parentId = getFolderParentId(breadcrumbFolder);
+    if (!parentId || parentId === 'root') break;
+    breadcrumbFolder = folders.find((folder) => folder._id === parentId);
+  }
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredMedia = media.filter(m => {
@@ -381,13 +473,15 @@ export const MediaLibrary = () => {
           <p className="text-[#8e8e93] text-xs mt-1">Store campaign media, thumbnails, and captions in R2</p>
         </div>
 
-        <button 
-          onClick={() => setShowNewFolderModal(true)}
-          className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>New Folder</span>
-        </button>
+        {canManageFolders && (
+          <button 
+            onClick={() => setShowNewFolderModal(true)}
+            className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Folder</span>
+          </button>
+        )}
       </div>
 
       {/* Directory Breadcrumbs */}
@@ -398,40 +492,94 @@ export const MediaLibrary = () => {
         >
           Campaign Library
         </span>
-        {activeFolderId !== 'root' && (
-          <>
+        {breadcrumbFolders.map((folder) => (
+          <React.Fragment key={folder._id}>
             <ChevronRight className="w-3 h-3 text-gray-300" />
-            <span className="text-black font-semibold">
-              {folders.find(f => f._id === activeFolderId)?.name || 'Campaign View'}
+            <span
+              onClick={() => setActiveFolderId(folder._id)}
+              className={`cursor-pointer hover:text-black ${folder._id === activeFolderId ? 'text-black font-semibold' : ''}`}
+            >
+              {folder.name || 'Campaign View'}
             </span>
-          </>
-        )}
+          </React.Fragment>
+        ))}
       </div>
 
+      {errorMessage && (
+        <div className="flex items-start gap-2 rounded-lg border border-[#ff9500]/30 bg-[#fff7ed] px-3 py-2 text-xs font-medium text-[#9a3412]">
+          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
       {/* Folders List Grid */}
-      {activeFolderId === 'root' && !searchQuery && (
+      {!searchQuery && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          {folders.map(folder => (
+          {visibleFolders.map(folder => (
             <div 
               key={folder._id}
               onClick={() => setActiveFolderId(folder._id)}
-              className="bg-white border border-[#e5e5ea] hover:border-gray-400 p-4 rounded-xl flex items-center justify-between cursor-pointer group transition-all shadow-sm"
+              className="relative bg-white border border-[#e5e5ea] hover:border-gray-400 p-4 rounded-xl flex items-center justify-between cursor-pointer group transition-all shadow-sm"
             >
               <div className="flex items-center gap-3">
                 <Folder className="w-5 h-5 text-gray-400" />
                 <span className="text-xs font-semibold text-black group-hover:text-black transition-colors">{folder.name}</span>
               </div>
-              <button 
-                onClick={(e) => handleDeleteFolder(folder._id, e)}
-                className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-[#f5f5f7] hover:text-red-500 rounded-md transition-all text-gray-400"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {(canManageFolders || canDelete) && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenFolderMenuId((current) => (current === folder._id ? null : folder._id));
+                    }}
+                    className="p-1.5 hover:bg-[#f5f5f7] hover:text-black rounded-md transition-all text-gray-400"
+                    title="Folder actions"
+                    aria-label="Folder actions"
+                  >
+                    <MoreVertical className="w-3.5 h-3.5" />
+                  </button>
+                  {openFolderMenuId === folder._id && (
+                    <div className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
+                      {canManageFolders && (
+                        <button
+                          type="button"
+                          onClick={(e) => openRenameFolderModal(folder, e)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          <span>Rename</span>
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteFolder(folder._id, e)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
-          {folders.length === 0 && (
+          {loadingFolders && (
+            <div className="col-span-full border border-dashed border-[#e5e5ea] p-6 rounded-xl text-center text-[#8e8e93] text-xs">
+              Loading folders...
+            </div>
+          )}
+          {!loadingFolders && activeFolderId === 'root' && folders.length === 0 && (
             <div className="col-span-full border border-dashed border-[#e5e5ea] p-6 rounded-xl text-center text-[#8e8e93] text-xs">
               No campaigns created.
+            </div>
+          )}
+          {!loadingFolders && activeFolderId !== 'root' && visibleFolders.length === 0 && (
+            <div className="col-span-full border border-dashed border-[#e5e5ea] p-6 rounded-xl text-center text-[#8e8e93] text-xs">
+              No nested folders here.
             </div>
           )}
         </div>
@@ -455,8 +603,8 @@ export const MediaLibrary = () => {
 
           <div className="space-y-2">
             <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">File Type</label>
-            <div className="grid grid-cols-3 gap-2">
-              {['all', 'video', 'image'].map(t => (
+            <div className="grid grid-cols-4 gap-2">
+              {['all', 'video', 'image', 'audio'].map(t => (
                 <button
                   key={t}
                   onClick={() => setFilterType(t)}
@@ -473,7 +621,7 @@ export const MediaLibrary = () => {
           </div>
 
           {/* Upload Widget */}
-          {canUpload && (
+          {canUpload ? (
             <div className="space-y-4 border-t border-[#e5e5ea] pt-6">
               <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Campaign Assets</label>
               
@@ -526,13 +674,23 @@ export const MediaLibrary = () => {
                 </div>
               </div>
             </div>
+          ) : (
+            <div className="border-t border-[#e5e5ea] pt-6 text-xs font-medium text-[#8e8e93]">
+              Your role can view media assets but cannot upload new files.
+            </div>
           )}
         </div>
 
         {/* Right Side: Media Files Grid */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {filteredMedia.map(item => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
+            {loadingMedia && (
+              <div className="col-span-full border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm">
+                Loading media assets...
+              </div>
+            )}
+
+            {!loadingMedia && filteredMedia.map(item => (
               <div
                 key={item._id}
                 className="bg-white border border-[#e5e5ea] rounded-xl overflow-hidden group hover:border-gray-400 transition-all flex flex-col relative shadow-sm"
@@ -546,6 +704,11 @@ export const MediaLibrary = () => {
                           <img src={getProxyUrl(item.thumbnailUrl)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                         ) : item.type === 'video' ? (
                           <video src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" controls preload="metadata" />
+                        ) : item.type === 'audio' ? (
+                          <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center">
+                            <Music className="h-8 w-8 text-gray-400" />
+                            <audio src={getProxyUrl(item.url)} controls preload="metadata" className="w-full max-w-[180px]" />
+                          </div>
                         ) : (
                           <img src={getProxyUrl(item.thumbnailUrl || item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                         )}
@@ -558,7 +721,9 @@ export const MediaLibrary = () => {
                       <div className="p-4 flex-1 flex flex-col justify-between">
                         <div>
                           <h4 className="text-xs font-semibold text-[#1d1d1f] truncate m-0" title={item.name}>{item.name}</h4>
-                          <p className="text-[10px] text-gray-500 mt-1">{(item.size / (1024 * 1024)).toFixed(2)} MB</p>
+                          <p className="text-[10px] text-gray-500 mt-1">
+                            {Number.isFinite(item.size) ? `${(item.size / (1024 * 1024)).toFixed(2)} MB` : 'Size unavailable'}
+                          </p>
                         </div>
 
                         <div className="mt-3 space-y-2">
@@ -589,26 +754,29 @@ export const MediaLibrary = () => {
                           e.stopPropagation();
                           navigate('/scheduler', { state: { preselectedMediaId: item._id } });
                         }}
-                        className="absolute top-2 right-10 p-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white rounded-lg transition-all opacity-0 group-hover:opacity-100 border border-transparent shadow-sm flex items-center gap-1 text-[9px] font-semibold"
+                        className={`absolute top-2 ${canDelete ? 'right-10' : 'right-2'} p-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white rounded-lg transition-all opacity-0 group-hover:opacity-100 border border-transparent shadow-sm flex items-center gap-1 text-[9px] font-semibold`}
                         title="Schedule Post"
                       >
                         <Clock className="w-3 h-3" />
                         <span>Schedule</span>
                       </button>
 
-                      <button
-                        onClick={(e) => handleDeleteMedia(item._id, e)}
-                        className="absolute top-2 right-2 p-1.5 bg-white/95 hover:bg-red-500 hover:text-white rounded-lg transition-all text-gray-500 opacity-0 group-hover:opacity-100 border border-[#e5e5ea] shadow-sm"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={(e) => handleDeleteMedia(item._id, e)}
+                          className="absolute top-2 right-2 p-1.5 bg-white/95 hover:bg-red-500 hover:text-white rounded-lg transition-all text-gray-500 opacity-0 group-hover:opacity-100 border border-[#e5e5ea] shadow-sm"
+                          title="Delete media"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </>
                   );
                 })()}
               </div>
             ))}
 
-            {filteredMedia.length === 0 && (
+            {!loadingMedia && filteredMedia.length === 0 && (
               <div className="col-span-full border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm">
                 No media assets found.
               </div>
@@ -622,7 +790,9 @@ export const MediaLibrary = () => {
       {showNewFolderModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
           <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-sm text-black shadow-xl">
-            <h3 className="text-sm font-semibold text-black mb-4">New Campaign Folder</h3>
+            <h3 className="text-sm font-semibold text-black mb-4">
+              {activeFolderId === 'root' ? 'New Campaign Folder' : 'New Nested Folder'}
+            </h3>
             <form onSubmit={handleCreateFolder} className="space-y-4">
               <input
                 type="text"
@@ -645,6 +815,40 @@ export const MediaLibrary = () => {
                   className="px-4 py-2 bg-[#0071e3] hover:bg-[#147ce5] rounded-lg text-xs text-white"
                 >
                   Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {renamingFolder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-sm text-black shadow-xl">
+            <h3 className="text-sm font-semibold text-black mb-4">Rename Folder</h3>
+            <form onSubmit={handleRenameFolder} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Folder name"
+                value={renameFolderName}
+                onChange={(e) => setRenameFolderName(e.target.value)}
+                className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black"
+                autoFocus
+              />
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeRenameFolderModal}
+                  className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingFolderId === renamingFolder._id || !renameFolderName.trim()}
+                  className="px-4 py-2 bg-[#0071e3] hover:bg-[#147ce5] rounded-lg text-xs text-white disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
+                >
+                  {savingFolderId === renamingFolder._id ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </form>

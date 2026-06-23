@@ -22,7 +22,7 @@ export const TempAssetQuickPickerDialog = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="flex max-h-[78vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[#18181b] border border-[#2d2d30] shadow-2xl text-[#e0e0e5]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#2d2d30] px-5 py-4">
+        <div className="flex items-center justify-between border-b border-[#2d2d30] px-4 py-2.5 bg-[#121214]">
           <div>
             <h3 className="text-sm font-bold text-white" style={{ color: '#ffffff' }}>
               Select {assetLabel}
@@ -35,7 +35,7 @@ export const TempAssetQuickPickerDialog = ({
             <button
               type="button"
               onClick={onBrowseGlobal}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff5500] text-white shadow-sm transition-all hover:bg-orange-600 active:scale-95"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-[#ff5500] text-white shadow-sm transition-all hover:bg-orange-600 active:scale-95"
               title="Add more from library"
               aria-label="Add more from library"
             >
@@ -44,7 +44,7 @@ export const TempAssetQuickPickerDialog = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-[#27272a] hover:text-white transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-[#27272a] hover:text-white transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
@@ -58,7 +58,7 @@ export const TempAssetQuickPickerDialog = ({
               No items in your temporary library.
             </div>
           ) : (
-            <div className={type === 'video' ? 'grid grid-cols-5 gap-4' : 'space-y-2'}>
+             <div className={type === 'video' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'space-y-2'}>
               {items.map((item) => {
                 if (type === 'video') {
                   const resolvedUrl = item.sourceType === 'library'
@@ -69,7 +69,7 @@ export const TempAssetQuickPickerDialog = ({
                       key={item.id || item.url}
                       type="button"
                       onClick={() => onSelect(item)}
-                      className="overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md"
+                      className="overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md relative"
                     >
                       <div className="relative aspect-[9/16] bg-zinc-900">
                         <video
@@ -83,11 +83,10 @@ export const TempAssetQuickPickerDialog = ({
                             <Play className="h-4 w-4 fill-current" />
                           </span>
                         </span>
-                      </div>
-                      <div className="p-2">
-                        <p className="truncate text-[10px] font-bold text-white" title={item.name}>
+                        {/* Bottom Title Overlay */}
+                        <div className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] rounded text-[8px] font-bold text-gray-300 truncate px-1 py-0.5 text-center z-10" title={item.name}>
                           {item.name || 'Untitled video'}
-                        </p>
+                        </div>
                       </div>
                     </button>
                   );
@@ -135,7 +134,7 @@ export const TempMediaLibraryDialog = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="flex h-[78vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[#2d2d30] bg-[#18181b] text-[#e0e0e5] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#2d2d30] bg-[#121214] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[#2d2d30] bg-[#121214] px-4 py-2.5">
           <div>
             <h3 className="text-sm font-bold text-white" style={{ color: '#ffffff' }}>Temporary Media Library</h3>
             <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ color: '#a1a1aa' }}>
@@ -146,7 +145,7 @@ export const TempMediaLibraryDialog = ({
             <button
               type="button"
               onClick={onAddMore}
-              className="flex items-center gap-1.5 rounded-xl bg-[#ff5500] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-orange-600 active:scale-95"
+              className="flex items-center gap-1.5 rounded-lg bg-[#ff5500] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-orange-600 active:scale-95"
             >
               <Plus className="h-3.5 w-3.5" />
               Add More
@@ -154,14 +153,14 @@ export const TempMediaLibraryDialog = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-[#27272a] hover:text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-[#27272a] hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <div className="flex border-b border-[#2d2d30] bg-[#18181b] px-6">
+        <div className="flex border-b border-[#2d2d30] bg-[#18181b] px-4">
           {TEMP_TABS.map((tab) => {
             const count = Array.isArray(library[tab.id]) ? library[tab.id].length : 0;
             const isActive = activeTab === tab.id;
@@ -170,7 +169,7 @@ export const TempMediaLibraryDialog = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`border-b-2 px-4 py-3 text-xs font-bold uppercase tracking-wider transition-colors ${
+                className={`border-b-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
                   isActive
                     ? 'border-[#ff5500] text-[#ff5500]'
                     : 'border-transparent text-gray-400 hover:text-white'
@@ -194,7 +193,7 @@ export const TempMediaLibraryDialog = ({
               <p className="mt-1 text-xs font-medium text-gray-500">Use Add More to place files in this tab.</p>
             </div>
           ) : activeMeta.type === 'video' ? (
-            <div className="grid grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {items.map((item) => {
                 const resolvedUrl = item.sourceType === 'library'
                   ? proxiedMediaUrl(item.originalUrl || item.url)
@@ -202,7 +201,7 @@ export const TempMediaLibraryDialog = ({
                 return (
                   <div
                     key={item.id || item.url}
-                    className="overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] shadow-sm"
+                    className="overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] shadow-sm relative group"
                   >
                     <div className="relative aspect-[9/16] bg-zinc-900">
                       <video src={resolvedUrl} className="h-full w-full object-cover" muted preload="metadata" />
@@ -211,19 +210,21 @@ export const TempMediaLibraryDialog = ({
                           <Play className="h-4 w-4 fill-current" />
                         </span>
                       </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 border-t border-[#2d2d30] p-2">
-                      <p className="truncate text-[10px] font-bold text-white" title={item.name}>
+                      {/* Top-Right Trash Button Overlay */}
+                      <div className="absolute top-1.5 right-1.5 z-10">
+                        <button
+                          type="button"
+                          onClick={() => onRemove(activeTab, item)}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-black/50 text-gray-400 hover:bg-red-950/60 hover:text-red-400 transition-all shadow-sm"
+                          title="Remove from temporary library"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {/* Bottom Title Overlay */}
+                      <div className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] rounded text-[8px] font-bold text-gray-300 truncate px-1 py-0.5 text-center z-10" title={item.name}>
                         {item.name || 'Untitled video'}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => onRemove(activeTab, item)}
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-500 transition-colors hover:bg-red-950/40 hover:text-red-400"
-                        title="Remove from temporary library"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      </div>
                     </div>
                   </div>
                 );
