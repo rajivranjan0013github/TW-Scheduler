@@ -56,6 +56,7 @@ export const MediaLibrary = () => {
   const [renameFolderName, setRenameFolderName] = useState('');
   const [savingFolderId, setSavingFolderId] = useState(null);
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null);
+  const [openMediaMenuId, setOpenMediaMenuId] = useState(null);
   const [filterType, setFilterType] = useState('all');
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(false);
@@ -417,6 +418,7 @@ export const MediaLibrary = () => {
 
   const handleDeleteMedia = async (mediaId, e) => {
     e.stopPropagation();
+    setOpenMediaMenuId(null);
     if (!window.confirm('Delete this media file permanently?')) return;
 
     try {
@@ -748,28 +750,58 @@ export const MediaLibrary = () => {
                         </div>
                       </div>
 
-                      {/* Hover Delete & Schedule Actions */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate('/scheduler', { state: { preselectedMediaId: item._id } });
-                        }}
-                        className={`absolute top-2 ${canDelete ? 'right-10' : 'right-2'} p-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white rounded-lg transition-all opacity-0 group-hover:opacity-100 border border-transparent shadow-sm flex items-center gap-1 text-[9px] font-semibold`}
-                        title="Schedule Post"
-                      >
-                        <Clock className="w-3 h-3" />
-                        <span>Schedule</span>
-                      </button>
-
-                      {canDelete && (
+                      {/* Media Actions */}
+                      <div className="absolute right-2 top-2">
                         <button
-                          onClick={(e) => handleDeleteMedia(item._id, e)}
-                          className="absolute top-2 right-2 p-1.5 bg-white/95 hover:bg-red-500 hover:text-white rounded-lg transition-all text-gray-500 opacity-0 group-hover:opacity-100 border border-[#e5e5ea] shadow-sm"
-                          title="Delete media"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMediaMenuId((current) => (current === item._id ? null : item._id));
+                          }}
+                          className="p-1.5 bg-white/95 hover:bg-white hover:text-black rounded-lg transition-all text-gray-500 border border-[#e5e5ea] shadow-sm"
+                          title="Media actions"
+                          aria-label="Media actions"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <MoreVertical className="w-3.5 h-3.5" />
                         </button>
-                      )}
+                        {openMediaMenuId === item._id && (
+                          <>
+                            <button
+                              type="button"
+                              aria-label="Close media actions"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMediaMenuId(null);
+                              }}
+                              className="fixed inset-0 z-10 cursor-default bg-transparent"
+                            />
+                            <div className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMediaMenuId(null);
+                                  navigate('/scheduler', { state: { preselectedMediaId: item._id } });
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                              >
+                                <Clock className="h-3.5 w-3.5" />
+                                <span>Schedule</span>
+                              </button>
+                              {canDelete && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleDeleteMedia(item._id, e)}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <span>Delete</span>
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </>
                   );
                 })()}
