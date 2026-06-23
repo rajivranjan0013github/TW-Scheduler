@@ -213,31 +213,31 @@ export const BulkAssetPickerDialog = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="flex h-[85vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-[#18181b] border border-[#2d2d30] shadow-2xl text-[#e0e0e5]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#2d2d30] px-6 py-4 bg-[#121214]">
+        <div className="flex items-center justify-between border-b border-[#2d2d30] px-4 py-2.5 bg-[#121214]">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2" style={{ color: '#ffffff' }}>
-              <Layers className="w-5 h-5 text-[#ff5500]" />
+            <h3 className="text-sm font-bold text-white flex items-center gap-1.5" style={{ color: '#ffffff' }}>
+              <Layers className="w-4 h-4 text-[#ff5500]" />
               Add Videos &amp; Music
             </h3>
-            <p className="mt-0.5 text-xs text-gray-400 font-medium" style={{ color: '#a1a1aa' }}>
+            <p className="mt-0.5 text-[10px] text-gray-400 font-medium" style={{ color: '#a1a1aa' }}>
               Pick First Videos to create rows, or add First Videos, Second Videos, and Music to your temporary quick library.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-[#27272a] hover:text-white"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-[#27272a] hover:text-white"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex border-b border-[#2d2d30] px-6 bg-[#18181b]">
+        <div className="flex border-b border-[#2d2d30] px-4 bg-[#18181b]">
           <button
             type="button"
             onClick={() => setActiveTab('video1')}
-            className={`py-3.5 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+            className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all ${
               activeTab === 'video1'
                 ? 'border-[#ff5500] text-[#ff5500]'
                 : 'border-transparent text-gray-400 hover:text-white'
@@ -248,7 +248,7 @@ export const BulkAssetPickerDialog = ({
           <button
             type="button"
             onClick={() => setActiveTab('video2')}
-            className={`py-3.5 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+            className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all ${
               activeTab === 'video2'
                 ? 'border-[#ff5500] text-[#ff5500]'
                 : 'border-transparent text-gray-400 hover:text-white'
@@ -259,7 +259,7 @@ export const BulkAssetPickerDialog = ({
           <button
             type="button"
             onClick={() => setActiveTab('audio')}
-            className={`py-3.5 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+            className={`py-2 px-3 text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all ${
               activeTab === 'audio'
                 ? 'border-[#ff5500] text-[#ff5500]'
                 : 'border-transparent text-gray-400 hover:text-white'
@@ -347,7 +347,7 @@ export const BulkAssetPickerDialog = ({
             {activeTab !== 'audio' ? (
               <>
                 <div className="mb-4 flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500" style={{ color: '#71717a' }}>
                     {activeFolderName || 'Choose a folder'}
                   </h4>
                   {activeFolderId && (
@@ -380,7 +380,7 @@ export const BulkAssetPickerDialog = ({
                     No videos found in this folder.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {media.map((item) => {
                       const selected = isVideoSelected(item, activeTab);
                       return (
@@ -388,7 +388,7 @@ export const BulkAssetPickerDialog = ({
                           key={item._id}
                           type="button"
                           onClick={() => handleToggleVideo(item, activeTab)}
-                          className={`overflow-hidden rounded-xl border text-left shadow-sm transition-all hover:shadow-md relative flex flex-col ${
+                          className={`overflow-hidden rounded-xl border text-left shadow-sm transition-all hover:shadow-md relative ${
                             selected ? 'border-[#ff5500] ring-2 ring-[#ff5500]/20' : 'border-[#2d2d30] hover:border-[#3a3a3c]'
                           }`}
                         >
@@ -410,11 +410,10 @@ export const BulkAssetPickerDialog = ({
                                 </div>
                               )}
                             </div>
-                          </div>
-                          <div className="p-3 bg-[#121214] border-t border-[#2d2d30]">
-                            <p className="truncate text-[10px] font-bold text-white" title={item.name}>
+                            {/* Bottom Title Overlay */}
+                            <div className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] rounded text-[8px] font-bold text-gray-300 truncate px-1 py-0.5 text-center z-10" title={item.name}>
                               {item.name || 'Untitled video'}
-                            </p>
+                            </div>
                           </div>
                         </button>
                       );
@@ -426,7 +425,7 @@ export const BulkAssetPickerDialog = ({
               // Audio Tab
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Platform Music Tracks</h4>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3" style={{ color: '#71717a' }}>Platform Music Tracks</h4>
                   {loadingAudio ? (
                     <div className="flex items-center gap-2 text-xs font-semibold text-gray-400">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -467,7 +466,7 @@ export const BulkAssetPickerDialog = ({
 
                 {myAudioTracks.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">My Uploaded Tracks</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3" style={{ color: '#71717a' }}>My Uploaded Tracks</h4>
                     <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                       {myAudioTracks.map((item) => {
                         const selected = isAudioSelected(item);
@@ -503,18 +502,18 @@ export const BulkAssetPickerDialog = ({
         </div>
 
         {/* Footer Summary & Confirm */}
-        <div className="border-t border-[#2d2d30] px-6 py-4 bg-[#121214] flex items-center justify-between">
-          <div className="flex items-center gap-4 text-xs font-semibold text-gray-400">
+        <div className="border-t border-[#2d2d30] px-4 py-2.5 bg-[#121214] flex items-center justify-between">
+          <div className="flex items-center gap-3 text-[10px] font-semibold text-gray-400">
             <span>Selected First Videos: <strong className="text-white">{selectedVideo1.length}</strong></span>
             <span>Selected Second Videos: <strong className="text-white">{selectedVideo2.length}</strong></span>
             <span>Selected Music: <strong className="text-white">{selectedAudio.length}</strong></span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-[#2d2d30] bg-[#27272a] hover:bg-[#3f3f46] text-gray-400 hover:text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
+              className="px-3 py-1.5 border border-[#2d2d30] bg-[#27272a] hover:bg-[#3f3f46] text-gray-400 hover:text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors"
             >
               Cancel
             </button>
@@ -522,7 +521,7 @@ export const BulkAssetPickerDialog = ({
               type="button"
               onClick={handleConfirm}
               disabled={selectedVideo1.length === 0 && selectedVideo2.length === 0 && selectedAudio.length === 0}
-              className="px-4 py-2 bg-[#ff5500] hover:bg-orange-600 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all uppercase tracking-wider shadow-sm"
+              className="px-3 py-1.5 bg-[#ff5500] hover:bg-orange-600 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] font-bold rounded-lg transition-all uppercase tracking-wider shadow-sm"
             >
               Confirm &amp; Add
             </button>
