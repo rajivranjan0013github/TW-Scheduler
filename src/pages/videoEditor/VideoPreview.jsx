@@ -49,24 +49,24 @@ export const VideoPreview = ({
 }) => {
   if (!video1Url || !video2Url) {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
-        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Placement Preview</h4>
-        <div className="aspect-[9/16] h-[520px] max-w-[292px] mx-auto rounded-xl bg-gray-150 border border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 gap-2">
-          <Video className="w-8 h-8" />
-          <span className="text-xs">Import Video 1 &amp; Video 2</span>
+      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
+        <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Placement Preview</h4>
+        <div className="aspect-[9/16] h-[480px] max-w-[270px] mx-auto rounded-xl bg-gray-150 border border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 gap-2">
+          <Video className="w-7 h-7" />
+          <span className="text-[11px]">Import Video 1 &amp; Video 2</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
-      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Placement Preview</h4>
+    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
+      <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Placement Preview</h4>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div
           ref={containerRef}
-          className="aspect-[9/16] h-[520px] max-w-[292px] mx-auto rounded-xl bg-black overflow-hidden relative select-none"
+          className="aspect-[9/16] h-[480px] max-w-[270px] mx-auto rounded-xl bg-black overflow-hidden relative select-none"
           style={{ overflow: 'hidden' }}
         >
           {/* Video 1 */}

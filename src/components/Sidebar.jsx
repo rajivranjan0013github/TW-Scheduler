@@ -67,7 +67,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
         'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
       };
       if (canViewAdmin && !adminViewUserId) {
-        const response = await fetch('http://localhost:5001/api/admin/campaigns', { headers });
+        const response = await fetch('http://localhost:5001/api/admin/campaigns?scope=workspace', { headers });
         if (response.ok) {
           const data = await response.json();
           setCampaigns(data);
