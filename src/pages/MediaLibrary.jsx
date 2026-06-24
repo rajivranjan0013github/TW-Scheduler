@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertTriangle, Folder, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save } from 'lucide-react';
+import { AlertTriangle, Folder, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
@@ -23,17 +23,6 @@ const getErrorMessage = async (response, fallback) => {
 
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
 
-const getPathWithoutExtension = (filePath) => (
-  String(filePath || '')
-    .replace(/\\/g, '/')
-    .replace(/\.[^/.]+$/, '')
-    .toLowerCase()
-);
-
-const getFileNameWithoutExtension = (filePath) => (
-  getPathWithoutExtension(filePath).split('/').pop()
-);
-
 export const MediaLibrary = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,7 +38,7 @@ export const MediaLibrary = () => {
   const [uploadProgress, setUploadProgress] = useState('');
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [uploadCaption, setUploadCaption] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [captionDrafts, setCaptionDrafts] = useState({});
   const [savingCaptionId, setSavingCaptionId] = useState(null);
   const [renamingFolder, setRenamingFolder] = useState(null);
@@ -58,10 +47,16 @@ export const MediaLibrary = () => {
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null);
   const [openMediaMenuId, setOpenMediaMenuId] = useState(null);
   const [captionDialogMedia, setCaptionDialogMedia] = useState(null);
-  const [filterType, setFilterType] = useState('all');
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(false);
+  const [generatingCaption, setGeneratingCaption] = useState(false);
+  const [renamingMedia, setRenamingMedia] = useState(null);
+  const [renameMediaName, setRenameMediaName] = useState('');
+  const [savingMediaNameId, setSavingMediaNameId] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const authToken = token || localStorage.getItem('tw_token');
   const canUpload = ['owner', 'admin', 'editor'].includes(user?.role);
@@ -92,14 +87,23 @@ export const MediaLibrary = () => {
     }
   }, [authToken]);
 
-  const fetchMedia = useCallback(async () => {
-    setLoadingMedia(true);
+  const PAGE_SIZE = 18;
+
+  const fetchMedia = useCallback(async (targetPage = 1) => {
+    const isFirstPage = targetPage === 1;
+    if (isFirstPage) {
+      setLoadingMedia(true);
+    } else {
+      setLoadingMore(true);
+    }
     setErrorMessage('');
     try {
       const params = new URLSearchParams();
       const campaignId = getActiveCampaignId();
       if (campaignId) params.set('campaignId', campaignId);
       if (activeFolderId) params.set('folderId', activeFolderId);
+      params.set('page', String(targetPage));
+      params.set('limit', String(PAGE_SIZE));
       const url = `${API_BASE_URL}/api/media?${params.toString()}`;
 
       const response = await fetch(url, {
@@ -109,16 +113,29 @@ export const MediaLibrary = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setMedia(Array.isArray(data) ? data : []);
+        const items = Array.isArray(data) ? data : [];
+        if (isFirstPage) {
+          setMedia(items);
+        } else {
+          setMedia((prev) => [...prev, ...items]);
+        }
+        setHasMore(items.length === PAGE_SIZE);
+        setPage(targetPage);
       } else {
         throw new Error(await getErrorMessage(response, 'Failed to load media.'));
       }
     } catch (error) {
       console.error('Failed to load media:', error);
-      setMedia([]);
+      if (isFirstPage) {
+        setMedia([]);
+      }
       setErrorMessage(error.message || 'Failed to load media.');
     } finally {
-      setLoadingMedia(false);
+      if (isFirstPage) {
+        setLoadingMedia(false);
+      } else {
+        setLoadingMore(false);
+      }
     }
   }, [activeFolderId, authToken]);
 
@@ -137,41 +154,54 @@ export const MediaLibrary = () => {
   }, [fetchMedia]);
 
   const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length === 0) return;
 
     setUploading(true);
     setUploadProgress('');
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('folderId', activeFolderId === 'root' ? 'null' : activeFolderId);
-    formData.append('tags', '');
-    formData.append('caption', uploadCaption);
-    formData.append('socialAccountIds', '');
-    formData.append('campaignId', getActiveCampaignId());
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: formData,
-      });
+      const failedFiles = [];
 
-      if (response.ok) {
-        setUploadCaption('');
-        void fetchMedia();
-      } else {
-        throw new Error(await getErrorMessage(response, 'Upload failed.'));
+      for (let index = 0; index < selectedFiles.length; index += 1) {
+        const file = selectedFiles[index];
+        setUploadProgress(`Uploading ${index + 1}/${selectedFiles.length}: ${file.name}`);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folderId', activeFolderId === 'root' ? 'null' : activeFolderId);
+        formData.append('tags', '');
+        formData.append('caption', '');
+        formData.append('socialAccountIds', '');
+        formData.append('campaignId', getActiveCampaignId());
+
+        const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const message = await getErrorMessage(response, 'Upload failed.');
+          failedFiles.push(`${file.name} (${message})`);
+        }
+      }
+
+      void fetchMedia();
+
+      if (failedFiles.length > 0) {
+        alert(`${failedFiles.length} files could not be uploaded: ${failedFiles.slice(0, 5).join(', ')}`);
       }
     } catch (error) {
       console.error('Failed uploading file:', error);
-      alert(`Upload failed: ${error.message || 'Unable to save this file.'}`);
+      alert(`Upload failed: ${error.message || 'Unable to save these files.'}`);
     } finally {
       setUploading(false);
       setUploadProgress('');
       e.target.value = '';
+      setShowUploadModal(false);
     }
   };
 
@@ -180,14 +210,11 @@ export const MediaLibrary = () => {
     if (selectedFiles.length === 0) return;
 
     const mediaFiles = selectedFiles.filter(file => (
-      file.type.startsWith('image/') || file.type.startsWith('video/')
-    ));
-    const captionFiles = selectedFiles.filter(file => (
-      file.type === 'text/plain' || /\.txt$/i.test(file.name)
+      file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')
     ));
 
     if (mediaFiles.length === 0) {
-      alert('No supported image or video files were found in this folder.');
+      alert('No supported image, video, or audio files were found in this folder.');
       e.target.value = '';
       return;
     }
@@ -217,27 +244,16 @@ export const MediaLibrary = () => {
 
       const createdFolder = await folderResponse.json();
       const targetFolderId = createdFolder._id;
-      const captionsByPath = new Map();
-
-      for (const captionFile of captionFiles) {
-        const relativePath = captionFile.webkitRelativePath || captionFile.name;
-        const captionText = await captionFile.text();
-        captionsByPath.set(getPathWithoutExtension(relativePath), captionText);
-        captionsByPath.set(getFileNameWithoutExtension(relativePath), captionText);
-      }
 
       for (let index = 0; index < mediaFiles.length; index += 1) {
         const file = mediaFiles[index];
-        const relativePath = file.webkitRelativePath || file.name;
-        const sidecarCaption = captionsByPath.get(getPathWithoutExtension(relativePath))
-          ?? captionsByPath.get(getFileNameWithoutExtension(relativePath));
         setUploadProgress(`Uploading ${index + 1}/${mediaFiles.length}: ${file.webkitRelativePath || file.name}`);
 
         const formData = new FormData();
         formData.append('file', file);
         formData.append('folderId', targetFolderId);
         formData.append('tags', '');
-        formData.append('caption', sidecarCaption ?? uploadCaption);
+        formData.append('caption', '');
         formData.append('socialAccountIds', '');
         formData.append('campaignId', getActiveCampaignId());
 
@@ -255,7 +271,6 @@ export const MediaLibrary = () => {
         }
       }
 
-      setUploadCaption('');
       await fetchFolders();
       setActiveFolderId(targetFolderId);
 
@@ -269,6 +284,7 @@ export const MediaLibrary = () => {
       setUploading(false);
       setUploadProgress('');
       e.target.value = '';
+      setShowUploadModal(false);
     }
   };
 
@@ -328,6 +344,87 @@ export const MediaLibrary = () => {
     if (!captionDialogMedia) return;
     const saved = await handleSaveCaption(captionDialogMedia);
     if (saved) closeCaptionDialog();
+  };
+
+  const handleGenerateAICaption = async () => {
+    if (!captionDialogMedia) return;
+    setGeneratingCaption(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ai/generate-caption`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          videoName: captionDialogMedia.name,
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.caption) {
+          setCaptionDrafts((current) => ({
+            ...current,
+            [captionDialogMedia._id]: data.caption,
+          }));
+        }
+      } else {
+        throw new Error(await getErrorMessage(response, 'Failed to generate caption.'));
+      }
+    } catch (error) {
+      console.error('AI generation failed:', error);
+      alert(error.message || 'Failed to generate caption.');
+    } finally {
+      setGeneratingCaption(false);
+    }
+  };
+
+  const openRenameMediaModal = (item, e) => {
+    e.stopPropagation();
+    setOpenMediaMenuId(null);
+    setRenamingMedia(item);
+    setRenameMediaName(item.name || '');
+  };
+
+  const closeRenameMediaModal = () => {
+    setRenamingMedia(null);
+    setRenameMediaName('');
+  };
+
+  const handleRenameMedia = async (e) => {
+    e.preventDefault();
+    if (!renamingMedia || !renameMediaName.trim()) return;
+
+    setSavingMediaNameId(renamingMedia._id);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/media/${renamingMedia._id}${withCampaignScope()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          name: renameMediaName.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        const updatedMedia = await response.json();
+        setMedia((current) => current.map((item) => (
+          item._id === updatedMedia._id ? updatedMedia : item
+        )));
+        closeRenameMediaModal();
+      } else {
+        throw new Error(await getErrorMessage(response, 'Failed to rename file.'));
+      }
+    } catch (error) {
+      console.error('Failed to rename media file:', error);
+      alert(error.message || 'Failed to rename file.');
+    } finally {
+      setSavingMediaNameId(null);
+    }
   };
 
   const handleCreateFolder = async (e) => {
@@ -473,9 +570,6 @@ export const MediaLibrary = () => {
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredMedia = media.filter(m => {
-    if (filterType === 'all') return true;
-    return m.type === filterType;
-  }).filter(m => {
     if (!normalizedSearch) return true;
     const searchable = [
       m.name,
@@ -496,35 +590,58 @@ export const MediaLibrary = () => {
         </div>
 
         {canManageFolders && (
-          <button 
-            onClick={() => setShowNewFolderModal(true)}
-            className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Folder</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setShowUploadModal(true)}
+              className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload Assets</span>
+            </button>
+            <button 
+              onClick={() => setShowNewFolderModal(true)}
+              className="flex items-center gap-1.5 bg-white border border-[#e5e5ea] hover:bg-[#f5f5f7] text-[#1d1d1f] px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Folder</span>
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Directory Breadcrumbs */}
-      <div className="flex items-center gap-2 text-[11px] text-[#8e8e93] bg-white px-3 py-1.5 rounded-lg border border-[#e5e5ea] shadow-sm">
-        <span 
-          onClick={() => { setActiveFolderId('root'); setSearchQuery(''); }}
-          className={`cursor-pointer hover:text-black ${activeFolderId === 'root' ? 'text-black font-semibold' : ''}`}
-        >
-          Campaign Library
-        </span>
-        {breadcrumbFolders.map((folder) => (
-          <React.Fragment key={folder._id}>
-            <ChevronRight className="w-3 h-3 text-gray-300" />
-            <span
-              onClick={() => setActiveFolderId(folder._id)}
-              className={`cursor-pointer hover:text-black ${folder._id === activeFolderId ? 'text-black font-semibold' : ''}`}
-            >
-              {folder.name || 'Campaign View'}
-            </span>
-          </React.Fragment>
-        ))}
+      {/* Directory Breadcrumbs & Search */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-[11px] text-[#8e8e93]">
+          <span 
+            onClick={() => { setActiveFolderId('root'); setSearchQuery(''); }}
+            className={`cursor-pointer hover:text-black ${activeFolderId === 'root' ? 'text-black font-semibold' : ''}`}
+          >
+            Campaign Library
+          </span>
+          {breadcrumbFolders.map((folder) => (
+            <React.Fragment key={folder._id}>
+              <ChevronRight className="w-3 h-3 text-gray-300" />
+              <span
+                onClick={() => setActiveFolderId(folder._id)}
+                className={`cursor-pointer hover:text-black ${folder._id === activeFolderId ? 'text-black font-semibold' : ''}`}
+              >
+                {folder.name || 'Campaign View'}
+              </span>
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* Search Media Input */}
+        <div className="relative w-48 sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <input 
+            type="text"
+            placeholder="Search media..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-[#f5f5f7] border border-[#e5e5ea] pl-8 pr-2.5 py-1 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black placeholder:text-gray-400"
+          />
+        </div>
       </div>
 
       {errorMessage && (
@@ -599,113 +716,12 @@ export const MediaLibrary = () => {
               No campaigns created.
             </div>
           )}
-          {!loadingFolders && activeFolderId !== 'root' && visibleFolders.length === 0 && (
-            <div className="col-span-full border border-dashed border-[#e5e5ea] p-6 rounded-xl text-center text-[#8e8e93] text-xs">
-              No nested folders here.
-            </div>
-          )}
         </div>
       )}
 
-      {/* Main Search & Upload Controls */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        
-        {/* Left Side: Filter Options */}
-        <div className="bg-white border border-[#e5e5ea] rounded-xl p-6 space-y-6 shadow-sm">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 w-3.5 h-3.5 text-gray-400" />
-            <input 
-              type="text"
-              placeholder="Search media..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#f5f5f7] border border-[#e5e5ea] pl-9 pr-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black placeholder:text-gray-400"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">File Type</label>
-            <div className="grid grid-cols-4 gap-2">
-              {['all', 'video', 'image', 'audio'].map(t => (
-                <button
-                  key={t}
-                  onClick={() => setFilterType(t)}
-                  className={`py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${
-                    filterType === t 
-                      ? 'bg-black text-white font-semibold' 
-                      : 'bg-[#f5f5f7] text-gray-500 border border-[#e5e5ea] hover:text-black'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Upload Widget */}
-          {canUpload ? (
-            <div className="space-y-4 border-t border-[#e5e5ea] pt-6">
-              <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Campaign Assets</label>
-              
-              <div className="space-y-2">
-                <textarea
-                  placeholder="Caption for single upload or folder fallback..."
-                  value={uploadCaption}
-                  onChange={(e) => setUploadCaption(e.target.value)}
-                  className="h-20 w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3 py-2 rounded-lg focus:outline-none text-xs text-black placeholder:text-gray-400 resize-none"
-                />
-              </div>
-
-              <div className="border border-dashed border-[#e5e5ea] rounded-xl p-6 text-center hover:border-gray-400 cursor-pointer relative group transition-all bg-[#f5f5f7]">
-                <input 
-                  type="file" 
-                  accept="image/*,video/*"
-                  onChange={handleFileUpload}
-                  disabled={uploading}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                />
-                {uploading ? (
-                  <div className="space-y-2 flex flex-col items-center">
-                    <div className="w-5 h-5 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-[10px] text-gray-500">{uploadProgress || 'Uploading to R2...'}</span>
-                  </div>
-                ) : (
-                  <div className="space-y-2 text-gray-400">
-                    <Upload className="w-6 h-6 mx-auto text-gray-400" />
-                    <p className="text-xs font-semibold text-black">Click to upload file</p>
-                    <p className="text-[10px] text-gray-500">Supports videos/images up to 100MB</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="border border-dashed border-[#d2d2d7] rounded-xl p-5 text-center hover:border-gray-400 cursor-pointer relative group transition-all bg-white">
-                <input
-                  type="file"
-                  accept="image/*,video/*,.txt,text/plain"
-                  multiple
-                  webkitdirectory="true"
-                  directory="true"
-                  onChange={handleFolderUpload}
-                  disabled={uploading}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                />
-                <div className="space-y-2 text-gray-400">
-                  <Folder className="w-6 h-6 mx-auto text-gray-400" />
-                  <p className="text-xs font-semibold text-black">Import campaign folder</p>
-                  <p className="text-[10px] text-gray-500">Use matching .txt files for per-video captions</p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="border-t border-[#e5e5ea] pt-6 text-xs font-medium text-[#8e8e93]">
-              Your role can view media assets but cannot upload new files.
-            </div>
-          )}
-        </div>
-
-        {/* Right Side: Media Files Grid */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6">
+      {/* Media Files Grid */}
+      <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
             {loadingMedia && (
               <div className="col-span-full border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm">
                 Loading media assets...
@@ -722,10 +738,23 @@ export const MediaLibrary = () => {
                     <>
                       {/* Media Preview Box */}
                       <div className="aspect-[9/16] bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center">
-                        {item.type === 'video' && item.thumbnailUrl ? (
-                          <img src={getProxyUrl(item.thumbnailUrl)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
-                        ) : item.type === 'video' ? (
-                          <video src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" controls preload="metadata" />
+                        {item.type === 'video' ? (
+                          <video 
+                            src={getProxyUrl(item.url)} 
+                            poster={item.thumbnailUrl ? getProxyUrl(item.thumbnailUrl) : undefined}
+                            crossOrigin="anonymous" 
+                            className="w-full h-full object-cover cursor-pointer" 
+                            muted
+                            playsInline
+                            preload="metadata"
+                            onMouseEnter={(e) => {
+                              e.target.play().catch(err => console.log("Play interrupted:", err));
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.pause();
+                              e.target.currentTime = 0;
+                            }}
+                          />
                         ) : item.type === 'audio' ? (
                           <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center">
                             <Music className="h-8 w-8 text-gray-400" />
@@ -784,10 +813,18 @@ export const MediaLibrary = () => {
                             <div className="absolute right-0 top-8 z-20 w-40 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
                               <button
                                 type="button"
-                                onClick={(e) => openCaptionDialog(item, e)}
+                                onClick={(e) => openRenameMediaModal(item, e)}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
+                                <span>Rename</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => openCaptionDialog(item, e)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                              >
+                                <MessageSquareCheck className="h-3.5 w-3.5" />
                                 <span>Edit caption</span>
                               </button>
                               <button
@@ -828,9 +865,27 @@ export const MediaLibrary = () => {
               </div>
             )}
           </div>
-        </div>
 
-      </div>
+          {hasMore && !loadingMedia && (
+            <div className="flex justify-center pt-4">
+              <button
+                type="button"
+                onClick={() => void fetchMedia(page + 1)}
+                disabled={loadingMore}
+                className="flex items-center gap-2 bg-white border border-[#e5e5ea] hover:bg-[#f5f5f7] text-[#1d1d1f] hover:text-black px-6 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingMore ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    <span>Loading more...</span>
+                  </>
+                ) : (
+                  <span>Load More</span>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
 
       {/* New Folder Modal */}
       {showNewFolderModal && (
@@ -864,6 +919,68 @@ export const MediaLibrary = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-md text-black shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#e5e5ea] pb-3">
+              <h3 className="text-sm font-semibold text-black">Upload Campaign Assets</h3>
+              {!uploading && (
+                <button 
+                  onClick={() => setShowUploadModal(false)}
+                  className="text-gray-400 hover:text-black text-xs font-semibold"
+                >
+                  Close
+                </button>
+              )}
+            </div>
+            
+            <div className="space-y-4">
+              {uploading ? (
+                <div className="py-8 flex flex-col items-center justify-center gap-3">
+                  <div className="w-8 h-8 border-3 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-xs font-medium text-gray-500">{uploadProgress || 'Uploading to R2...'}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="border border-dashed border-[#e5e5ea] rounded-xl p-6 text-center hover:border-gray-400 cursor-pointer relative group transition-all bg-[#f5f5f7]">
+                    <input 
+                      type="file" 
+                      accept="image/*,video/*,audio/*"
+                      multiple
+                      onChange={handleFileUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <div className="space-y-2 text-gray-400">
+                      <Upload className="w-6 h-6 mx-auto text-gray-400" />
+                      <p className="text-xs font-semibold text-black">Click to upload files</p>
+                      <p className="text-[10px] text-gray-500">Supports videos/images/audio up to 100MB</p>
+                    </div>
+                  </div>
+
+                  <div className="border border-dashed border-[#d2d2d7] rounded-xl p-5 text-center hover:border-gray-400 cursor-pointer relative group transition-all bg-white">
+                    <input
+                      type="file"
+                      accept="image/*,video/*,audio/*"
+                      multiple
+                      webkitdirectory="true"
+                      directory="true"
+                      onChange={handleFolderUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <div className="space-y-2 text-gray-400">
+                      <Folder className="w-6 h-6 mx-auto text-gray-400" />
+                      <p className="text-xs font-semibold text-black">Import campaign folder</p>
+                      <p className="text-[10px] text-gray-500">Supports uploading entire nested folder structure</p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -902,14 +1019,59 @@ export const MediaLibrary = () => {
         </div>
       )}
 
+      {renamingMedia && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-sm text-black shadow-xl">
+            <h3 className="text-sm font-semibold text-black mb-4">Rename Media File</h3>
+            <form onSubmit={handleRenameMedia} className="space-y-4">
+              <input
+                type="text"
+                placeholder="File name"
+                value={renameMediaName}
+                onChange={(e) => setRenameMediaName(e.target.value)}
+                className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0071e3] text-xs text-black"
+                autoFocus
+              />
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeRenameMediaModal}
+                  className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingMediaNameId === renamingMedia._id || !renameMediaName.trim()}
+                  className="px-4 py-2 bg-[#0071e3] hover:bg-[#147ce5] rounded-lg text-xs text-white disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
+                >
+                  {savingMediaNameId === renamingMedia._id ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {captionDialogMedia && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
           <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-lg text-black shadow-xl">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-black">Edit Caption</h3>
-              <p className="mt-1 truncate text-xs text-[#8e8e93]" title={captionDialogMedia.name}>
-                {captionDialogMedia.name || 'Media asset'}
-              </p>
+            <div className="flex items-center justify-between mb-4 border-b border-[#e5e5ea] pb-2">
+              <div>
+                <h3 className="text-sm font-semibold text-black">Edit Caption</h3>
+                <p className="mt-1 truncate text-[11px] text-[#8e8e93] max-w-[240px]" title={captionDialogMedia.name}>
+                  {captionDialogMedia.name || 'Media asset'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleGenerateAICaption}
+                disabled={generatingCaption}
+                className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] disabled:bg-[#a7c7ed] disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
+              >
+                <Sparkles className={`h-3.5 w-3.5 ${generatingCaption ? 'animate-spin' : ''}`} />
+                <span>{generatingCaption ? 'Generating...' : 'AI Generate'}</span>
+              </button>
             </div>
             <form onSubmit={handleCaptionDialogSave} className="space-y-4">
               <textarea
