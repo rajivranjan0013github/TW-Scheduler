@@ -84,6 +84,7 @@ export const VideoEditor = () => {
   const [bulkRows, setBulkRows] = useState([]);
   const [currentQueueIndex, setCurrentQueueIndex] = useState(-1);
   const [isQueueRunning, setIsQueueRunning] = useState(false);
+  const [generatingCaptions, setGeneratingCaptions] = useState(false);
 
   // Object URL tracking
   const objectUrlsRef = useRef({ video1: '', video2: '', result: '' });
@@ -374,13 +375,12 @@ export const VideoEditor = () => {
   }, [token]);
 
   const updateBulkRowData = useCallback((rowId, partialData) => {
-    const applyPatch = (row) => sanitizeBulkRowForStorage({ ...row, ...partialData });
     setBulkRows((prev) =>
-      prev.map((r) => (r.id === rowId ? applyPatch(r) : r))
+      prev.map((r) => (r.id === rowId ? { ...r, ...partialData } : r))
     );
     try {
       const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
-      const updated = saved.map((r) => (r.id === rowId ? applyPatch(r) : r));
+      const updated = saved.map((r) => (r.id === rowId ? sanitizeBulkRowForStorage({ ...r, ...partialData }) : r));
       localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(updated));
     } catch (err) {
       console.error('Failed to update row data in localStorage:', err);
@@ -420,13 +420,16 @@ export const VideoEditor = () => {
     void loadMediaFolders();
   }, [loadMediaFolders]);
 
-  const uploadVideoBlobToFolder = useCallback(async (blob, folderId, filename = `merged_${Date.now()}.mp4`) => {
+  const uploadVideoBlobToFolder = useCallback(async (blob, folderId, filename = `merged_${Date.now()}.mp4`, caption = '') => {
     const file = new File([blob], filename, { type: 'video/mp4' });
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folderId', folderId === 'root' ? 'null' : folderId);
     formData.append('tags', 'editor,merged');
     formData.append('campaignId', getActiveCampaignId());
+    if (caption) {
+      formData.append('caption', caption);
+    }
 
     const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
       method: 'POST',
@@ -463,13 +466,15 @@ export const VideoEditor = () => {
     const uploadedMedia = await uploadVideoBlobToFolder(
       blob,
       selectedSaveFolderId,
-      row.resultMediaName || `bulk_video_${Date.now()}.mp4`
+      row.resultMediaName || `bulk_video_${Date.now()}.mp4`,
+      row.generatedCaption || ''
     );
     const uploadedSummary = getUploadedMediaSummary(uploadedMedia);
     updateBulkRowData(row.id, {
       status: 'done',
       ...uploadedSummary,
       resultVideoUrl: resultUrl,
+      generatedCaption: row.generatedCaption || '',
     });
   }, [selectedSaveFolderId, uploadVideoBlobToFolder, updateBulkRowData]);
 
@@ -581,9 +586,41 @@ export const VideoEditor = () => {
     }
     setResultVideoUrl('');
     setCurrentQueueIndex(firstPendingIdx);
-    setIsQueueRunning(true);
+      setIsQueueRunning(true);
+      setStatusMessage(null);
+    }, [bulkRows]);
+
+  const handleGenerateAllCaptions = useCallback(async () => {
+    setGeneratingCaptions(true);
     setStatusMessage(null);
-  }, [bulkRows]);
+    try {
+      const doneRows = bulkRows.filter((r) => r.status === 'done');
+      if (doneRows.length === 0) {
+        throw new Error('No completed bulk videos found to generate captions for.');
+      }
+      for (const row of doneRows) {
+        const response = await fetch(`${API_BASE_URL}/api/ai/generate-caption`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ videoName: row.caption || 'couple video' }),
+        });
+        if (!response.ok) {
+          throw new Error('Failed to generate one or more captions.');
+        }
+        const data = await response.json();
+        updateBulkRowData(row.id, { generatedCaption: data.caption });
+      }
+      setStatusMessage({ type: 'success', text: 'Captions generated successfully for all videos!' });
+    } catch (err) {
+      console.error(err);
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to generate captions.' });
+    } finally {
+      setGeneratingCaptions(false);
+    }
+  }, [bulkRows, token, updateBulkRowData]);
 
   const handleClearEditor = useCallback(() => {
     setVideo1(null);
@@ -1116,14 +1153,24 @@ export const VideoEditor = () => {
               </p>
             </div>
             {doneBulkRows.length > 0 && (
-              <button
-                type="button"
-                onClick={openBulkSaveAllFolderPicker}
-                disabled={Boolean(bulkSavingRowId)}
-                className="rounded-lg bg-[#0071e3] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {bulkSavingRowId ? 'Saving...' : 'Add All to Media Library'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateAllCaptions}
+                  disabled={generatingCaptions || Boolean(bulkSavingRowId)}
+                  className="rounded-lg bg-orange-600 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {generatingCaptions ? 'Generating Captions...' : 'Generate Captions'}
+                </button>
+                <button
+                  type="button"
+                  onClick={openBulkSaveAllFolderPicker}
+                  disabled={Boolean(bulkSavingRowId) || generatingCaptions}
+                  className="rounded-lg bg-[#0071e3] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {bulkSavingRowId ? 'Saving...' : 'Add All to Media Library'}
+                </button>
+              </div>
             )}
           </div>
 
@@ -1215,6 +1262,11 @@ export const VideoEditor = () => {
                         </button>
                       </div>
                     </div>
+                    {row.generatedCaption && (
+                      <p className="text-[9px] font-medium text-gray-500 line-clamp-3 whitespace-pre-line border-t border-gray-100 pt-1.5 mt-1" title={row.generatedCaption}>
+                        📝 {row.generatedCaption}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
