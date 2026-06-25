@@ -156,6 +156,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [caption, setCaption] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
+  const [scheduleMode, setScheduleMode] = useState('auto');
   const [postType, setPostType] = useState('reels');
   const [youtubeTitle, setYoutubeTitle] = useState('');
   const [youtubePrivacy, setYoutubePrivacy] = useState('private');
@@ -170,6 +171,9 @@ const CalendarView = ({ selectedAccounts }) => {
   const isViewer = user?.role === 'viewer';
   const selectedChannelObjects = channels.filter(chan => selectedChannels.includes(chan._id));
   const hasYoutubeSelected = selectedChannelObjects.some(chan => chan.platform === 'youtube');
+  const isPureManualMode = scheduleMode === 'manual';
+  const requiresScheduleTime = !isPureManualMode;
+  const shouldUseYoutubePublishing = hasYoutubeSelected && !isPureManualMode;
   const getMediaAccountIds = (item) => (item?.socialAccountIds || []).map(account => account._id || account);
   const getFolderName = (folderId) => {
     if (!folderId) return 'Campaign Library';
@@ -198,6 +202,37 @@ const CalendarView = ({ selectedAccounts }) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '--:--';
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  const getScheduleModeLabel = (mode) => {
+    switch (mode) {
+      case 'manual': return 'Manual';
+      case 'hybrid': return 'Hybrid';
+      default: return 'Auto';
+    }
+  };
+  const getScheduleModeSummary = (mode) => {
+    switch (mode) {
+      case 'manual': return 'Creator downloads and posts. No auto publish job is queued.';
+      case 'hybrid': return 'Auto publish is queued, but creator can post first and remove it from queue.';
+      default: return 'Software publishes at the scheduled time.';
+    }
+  };
+  const getPostStatusLabel = (post) => {
+    switch (post?.status) {
+      case 'manual_ready': return 'Manual Ready';
+      case 'downloaded': return 'Downloaded';
+      case 'posted_manual': return 'Posted Manually';
+      case 'published_auto': return 'Published Auto';
+      case 'published': return 'Published';
+      case 'publishing': return 'Publishing';
+      case 'failed': return 'Failed';
+      case 'cancelled': return 'Cancelled';
+      default: return 'Scheduled';
+    }
+  };
+  const getScheduleTimingLabel = (value) => {
+    if (isPureManualMode) return 'Manual queue';
+    return `${formatScheduleDate(value)} ${formatScheduleTime(value)}`;
   };
   const isMediaAvailableForChannels = (item, channelIds) => {
     return true;
@@ -272,6 +307,12 @@ const CalendarView = ({ selectedAccounts }) => {
       })
       .map((row, index) => ({ ...row, index: index + 1 }));
   }, [bulkInterval, caption, captionDrafts, isBulk, scheduleTime, selectedChannelObjects, selectedChannels.length, selectedMediaItems]);
+  const manualTaskButtonLabel = (() => {
+    const count = schedulePlan.length || selectedMedia.length;
+    return count > 0
+      ? `Create ${count} Manual Task${count === 1 ? '' : 's'}`
+      : 'Create Manual Tasks';
+  })();
   useEffect(() => {
     fetchPosts();
     fetchComposerData();
@@ -492,11 +533,11 @@ const CalendarView = ({ selectedAccounts }) => {
       alert('Selected media is restricted away from one or more selected publishing channels.');
       return;
     }
-    if (!scheduleTime) {
+    if (requiresScheduleTime && !scheduleTime) {
       alert('Pick a scheduling date and time');
       return;
     }
-    if (hasYoutubeSelected) {
+    if (shouldUseYoutubePublishing) {
       const hasVideo = selectedMedia.some(medId => mediaList.find(item => item._id === medId)?.type === 'video');
       if (!hasVideo) {
         alert('YouTube uploads require a video media asset');
@@ -513,9 +554,10 @@ const CalendarView = ({ selectedAccounts }) => {
       if (!captionsSaved) return;
 
       const token = localStorage.getItem('tw_token');
+      const effectiveScheduleDate = isPureManualMode ? new Date() : new Date(scheduleTime);
       const platformSpecifics = {
         type: postType,
-        ...(hasYoutubeSelected ? {
+        ...(shouldUseYoutubePublishing ? {
           youtube: {
             title: youtubeTitle.trim(),
             description: caption.trim(),
@@ -531,7 +573,8 @@ const CalendarView = ({ selectedAccounts }) => {
         socialAccountIds: selectedChannels,
         mediaIds: selectedMedia,
         caption: caption.trim(),
-        scheduledAt: new Date(scheduleTime),
+        scheduledAt: effectiveScheduleDate,
+        scheduleMode,
         platformSpecifics
       };
 
@@ -539,7 +582,7 @@ const CalendarView = ({ selectedAccounts }) => {
 
       if (isBulk) {
         url = 'http://localhost:5001/api/scheduler/bulk';
-        body.startDate = new Date(scheduleTime);
+        body.startDate = effectiveScheduleDate;
         body.intervalHours = parseFloat(bulkInterval);
         body.type = postType;
       }
@@ -559,6 +602,7 @@ const CalendarView = ({ selectedAccounts }) => {
         setSelectedMedia([]);
         setCaption('');
         setScheduleTime('');
+        setScheduleMode('auto');
         setYoutubeTitle('');
         setYoutubePrivacy('private');
         setYoutubeTags('');
@@ -748,21 +792,53 @@ const CalendarView = ({ selectedAccounts }) => {
               </div>
 
               <div className="space-y-4">
-                <div className={`rounded-lg border bg-white overflow-hidden ${isBulk ? 'border-[#bdd0f4]' : 'border-[#bfe4ca]'}`}>
-                  <div className={`${isBulk ? 'bg-[#f8fbff]' : 'bg-[#f8fff9]'} border-b border-[#e5e5ea] px-3 py-2`}>
-                    <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">{isBulk ? '4B. Set Start Time & Interval' : '4A. Set Post Time'}</h4>
+                <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
+                  <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2">
+                    <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">4. Choose Handler Mode</h4>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {['auto', 'manual', 'hybrid'].map(mode => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setScheduleMode(mode)}
+                          className={`py-1.5 rounded-lg text-xs font-semibold border transition-all ${scheduleMode === mode
+                              ? 'bg-[#0b1645] text-white border-[#0b1645]'
+                              : 'bg-white text-[#536079] border-[#d8e0f4] hover:text-[#0b1645]'
+                            }`}
+                        >
+                          {getScheduleModeLabel(mode)}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="m-0 text-[10px] leading-relaxed text-[#536079]">{getScheduleModeSummary(scheduleMode)}</p>
+                  </div>
+                </div>
+
+                <div className={`rounded-lg border bg-white overflow-hidden ${isPureManualMode ? 'border-[#f4d7a1]' : isBulk ? 'border-[#bdd0f4]' : 'border-[#bfe4ca]'}`}>
+                  <div className={`${isPureManualMode ? 'bg-[#fffaf0]' : isBulk ? 'bg-[#f8fbff]' : 'bg-[#f8fff9]'} border-b border-[#e5e5ea] px-3 py-2`}>
+                    <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">
+                      {isPureManualMode ? '5. Manual Posting' : isBulk ? '5B. Set Start Time & Interval' : '5A. Set Post Time'}
+                    </h4>
                   </div>
                   <div className="p-3 space-y-3">
-                    <label className="block">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">{isBulk ? 'Start Time' : 'Post Time'}</span>
-                      <input
-                        type="datetime-local"
-                        value={scheduleTime}
-                        onChange={(e) => setScheduleTime(e.target.value)}
-                        className="w-full rounded-lg border border-[#d8e0f4] bg-white px-3 py-2 text-xs text-black focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
-                      />
-                    </label>
-                    {isBulk && (
+                    {isPureManualMode ? (
+                      <div className="rounded-lg border border-[#f4d7a1] bg-[#fffaf0] px-3 py-2 text-[11px] font-semibold leading-relaxed text-[#7a4b00]">
+                        No date or time needed. This creates a creator-ready task for manual download, share, and posting.
+                      </div>
+                    ) : (
+                      <label className="block">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">{isBulk ? 'Start Time' : 'Post Time'}</span>
+                        <input
+                          type="datetime-local"
+                          value={scheduleTime}
+                          onChange={(e) => setScheduleTime(e.target.value)}
+                          className="w-full rounded-lg border border-[#d8e0f4] bg-white px-3 py-2 text-xs text-black focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+                        />
+                      </label>
+                    )}
+                    {isBulk && !isPureManualMode && (
                       <label className="block">
                         <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">Interval</span>
                         <select
@@ -799,7 +875,7 @@ const CalendarView = ({ selectedAccounts }) => {
                   </div>
                 </div>
 
-                {hasYoutubeSelected && (
+                {shouldUseYoutubePublishing && (
                   <div className="rounded-lg border border-[#f1c6c6] bg-white overflow-hidden">
                     <div className="bg-[#fff8f8] border-b border-[#f1c6c6] px-3 py-2">
                       <h4 className="m-0 text-[11px] font-bold text-[#991b1b]">YouTube Upload Options</h4>
@@ -912,18 +988,19 @@ const CalendarView = ({ selectedAccounts }) => {
 
             <section className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
               <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2 flex items-center justify-between">
-                <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">5. Review & Confirm</h4>
+                <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">6. Review & Confirm</h4>
                 <span className="text-[10px] font-semibold text-[#536079]">{schedulePlan.length} post{schedulePlan.length === 1 ? '' : 's'} will be scheduled</span>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] border-collapse text-left text-[10px]">
+                <table className="w-full min-w-[860px] border-collapse text-left text-[10px]">
                   <thead className="bg-[#f8fafc] text-[#0b1645]">
                     <tr>
                       <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">#</th>
                       <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Asset</th>
                       <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Account</th>
+                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Handler</th>
                       <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Caption Source</th>
-                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Scheduled Time</th>
+                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">{isPureManualMode ? 'Manual Status' : 'Scheduled Time'}</th>
                       <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Caption</th>
                     </tr>
                   </thead>
@@ -940,14 +1017,21 @@ const CalendarView = ({ selectedAccounts }) => {
                           </div>
                         </td>
                         <td className="px-3 py-2 text-[#536079]">{row.channel?.name || 'Selected portal'}</td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex rounded-full border border-[#d8e0f4] bg-[#f8fafc] px-2 py-1 font-semibold text-[#0b1645]">
+                            {getScheduleModeLabel(scheduleMode)}
+                          </span>
+                        </td>
                         <td className="px-3 py-2 text-[#536079]">{getCaptionSource(row.mediaItem)}</td>
-                        <td className="px-3 py-2 text-[#536079]">{formatScheduleDate(row.scheduledAt)} {formatScheduleTime(row.scheduledAt)}</td>
+                        <td className="px-3 py-2 text-[#536079]">{getScheduleTimingLabel(row.scheduledAt)}</td>
                         <td className="px-3 py-2 max-w-[240px] truncate text-[#536079]" title={row.caption}>{row.caption || 'No caption drafted'}</td>
                       </tr>
                     ))}
                     {schedulePlan.length === 0 && (
                       <tr>
-                        <td colSpan="6" className="px-3 py-8 text-center text-xs text-[#6b7280]">Select accounts, a folder, and a time to preview the schedule.</td>
+                        <td colSpan="7" className="px-3 py-8 text-center text-xs text-[#6b7280]">
+                          {isPureManualMode ? 'Select accounts and media to create manual tasks.' : 'Select accounts, a folder, and a time to preview the schedule.'}
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -957,6 +1041,7 @@ const CalendarView = ({ selectedAccounts }) => {
                 <div className="flex flex-wrap gap-4 text-[10px] font-semibold text-[#536079]">
                   <span>{selectedChannels.length} account{selectedChannels.length === 1 ? '' : 's'}</span>
                   <span>{activeFolderName}</span>
+                  <span>{getScheduleModeLabel(scheduleMode)} handler</span>
                   <span>{isBulk ? `${selectedMedia.length} asset sequence` : 'single asset post'}</span>
                 </div>
                 <div className="flex justify-end gap-2">
@@ -971,7 +1056,9 @@ const CalendarView = ({ selectedAccounts }) => {
                     type="submit"
                     className="px-4 py-2 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-lg text-xs font-semibold transition-all shadow-sm"
                   >
-                    {schedulePlan.length > 0
+                    {isPureManualMode
+                      ? manualTaskButtonLabel
+                      : schedulePlan.length > 0
                       ? `Schedule ${schedulePlan.length} Post${schedulePlan.length === 1 ? '' : 's'}`
                       : 'Schedule Posts'}
                   </button>
@@ -1000,8 +1087,8 @@ const CalendarView = ({ selectedAccounts }) => {
         const accountSummaries = Object.entries(accountMap)
           .map(([accId, accPosts]) => {
             const channel = channels.find(c => c._id === accId);
-            const scheduled = accPosts.filter(p => p.status === 'scheduled');
-            const published = accPosts.filter(p => p.status === 'published');
+            const scheduled = accPosts.filter(p => ['scheduled', 'manual_ready', 'downloaded', 'publishing'].includes(p.status));
+            const published = accPosts.filter(p => ['published', 'published_auto', 'posted_manual'].includes(p.status));
             const failed = accPosts.filter(p => p.status === 'failed');
             const total = accPosts.length;
             const done = published.length;
@@ -1288,7 +1375,7 @@ const CalendarView = ({ selectedAccounts }) => {
                               {/* Next Post Foot */}
                               {nextPost && (
                                 <p className="m-0 mt-1.5 text-[8px] text-slate-500 flex items-center gap-1">
-                                  <Clock className="w-2.5 h-2.5 text-slate-400" /> Next: {new Date(nextPost.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  <Clock className="w-2.5 h-2.5 text-slate-400" /> {getScheduleModeLabel(nextPost.scheduleMode)} - {getPostStatusLabel(nextPost)} - {new Date(nextPost.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </p>
                               )}
                             </div>

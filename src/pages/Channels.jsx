@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Share2, Trash2, ShieldCheck, Link2, Eye, Trash } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
@@ -7,6 +7,14 @@ import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 export const Channels = ({ selectedAccounts = [] }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.campaignId) {
+      sessionStorage.setItem('connect_campaign_id', location.state.campaignId);
+    }
+  }, [location.state]);
+
   const adminViewContext = (() => {
     try {
       return JSON.parse(sessionStorage.getItem('admin_view_context') || 'null');
@@ -17,19 +25,39 @@ export const Channels = ({ selectedAccounts = [] }) => {
   const adminViewUserId = adminViewContext?.userId || '';
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const activeConnectCampaignId = location.state?.campaignId
+    || sessionStorage.getItem('connect_campaign_id')
+    || getActiveCampaignId();
 
   useEffect(() => {
     fetchChannels();
-  }, [adminViewUserId]);
+  }, [adminViewUserId, activeConnectCampaignId, user?.userType]);
   const fetchChannels = async () => {
     try {
       const token = localStorage.getItem('tw_token');
-      const response = await fetch(`http://localhost:5001/api/accounts${withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '')}`, {
+      const isCreator = user?.userType === 'account_handler';
+      const campaignId = activeConnectCampaignId;
+      const queryParam = campaignId
+        ? `?${new URLSearchParams({ campaignId }).toString()}`
+        : isCreator
+          ? ''
+          : withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
+      const endpoint = campaignId ? '/api/accounts/publishing-channels' : '/api/accounts';
+      const response = await fetch(`http://localhost:5001${endpoint}${queryParam}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
         const data = await response.json();
-        setChannels(data);
+        setChannels((Array.isArray(data) ? data : []).map((channel) => {
+          if (channel.status) return channel;
+          const isConnectedAccount = Boolean(channel._id && channel.accountId && channel.isConnected !== false);
+          return {
+            ...channel,
+            socialAccountId: channel.socialAccountId || (isConnectedAccount ? channel._id : null),
+            status: isConnectedAccount ? 'verified' : 'pending_verification',
+            isVerified: isConnectedAccount,
+          };
+        }));
       }
     } catch (error) {
       console.error('Failed to fetch connected channels:', error);
@@ -50,7 +78,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
-        setChannels(channels.filter(chan => chan._id !== id));
+        setChannels(channels.filter(chan => chan.socialAccountId !== id && chan._id !== id));
       } else {
         alert('Failed to disconnect channel');
       }
@@ -60,7 +88,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
   };
 
   const connectMetaOAuth = () => {
-    sessionStorage.setItem('connect_campaign_id', getActiveCampaignId());
+    if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
     const redirectUri = encodeURIComponent('http://localhost:5173/auth/facebook/callback');
     const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights,instagram_manage_comments');
@@ -75,7 +103,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
       alert('Set VITE_INSTAGRAM_APP_ID to the Instagram App ID from Meta Dashboard > Instagram > API setup with Instagram login. It cannot be the Facebook App ID.');
       return;
     }
-    sessionStorage.setItem('connect_campaign_id', getActiveCampaignId());
+    if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
     const rawRedirectUri = import.meta.env.VITE_INSTAGRAM_REDIRECT_URI || `${window.location.origin}/auth/instagram/callback`;
     sessionStorage.setItem('instagram_oauth_redirect_uri', rawRedirectUri);
     const redirectUri = encodeURIComponent(rawRedirectUri);
@@ -86,7 +114,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
 
   const connectYoutubeOAuth = async () => {
     try {
-      sessionStorage.setItem('connect_campaign_id', getActiveCampaignId());
+      if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
       const token = localStorage.getItem('tw_token');
       const response = await fetch('http://localhost:5001/api/accounts/youtube/auth-url', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -110,9 +138,18 @@ export const Channels = ({ selectedAccounts = [] }) => {
     if (platform === 'youtube') return 'bg-red-50 text-red-600 border-red-200';
     return 'bg-blue-50 text-blue-600 border-blue-200';
   };
-  const visibleChannels = selectedAccounts.length > 0
-    ? channels.filter(channel => selectedAccounts.includes(channel._id))
-    : channels;
+  const getStatusBadgeClasses = (status) => {
+    if (status === 'verified') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (status === 'disconnected') return 'bg-red-50 text-red-700 border-red-200';
+    return 'bg-amber-50 text-amber-700 border-amber-200';
+  };
+  const getStatusLabel = (status) => {
+    if (status === 'verified') return 'Connected';
+    if (status === 'disconnected') return 'Disconnected';
+    return 'Pending verification';
+  };
+  const getChannelAccountId = (channel) => channel.socialAccountId || (channel.accountId ? channel._id : null);
+  const visibleChannels = channels;
 
   return (
     <div className="p-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f] space-y-8">
@@ -194,38 +231,53 @@ export const Channels = ({ selectedAccounts = [] }) => {
                     />
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-black">{chan.name}</span>
+                        <span className="text-xs font-semibold text-black">{chan.name || chan.displayName || chan.handle}</span>
                         <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border uppercase ${getPlatformBadgeClasses(chan.platform)}`}>
                           {chan.platform}
                         </span>
+                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border uppercase ${getStatusBadgeClasses(chan.status)}`}>
+                          {getStatusLabel(chan.status)}
+                        </span>
                       </div>
                       <p className="text-[10px] text-gray-500 mt-1">
-                        Username: @{chan.username || 'unspecified'} • ID: {chan.accountId}
+                        Handle: @{chan.username || chan.handle || 'unspecified'}
+                        {chan.accountId ? ` • ID: ${chan.accountId}` : ' • Awaiting account connection'}
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => navigate(`/channels/${chan._id}/feed`, {
-                        state: adminViewUserId ? { fromAdmin: true, channel: chan } : undefined,
-                      })}
-                      className="flex items-center gap-1.5 text-[10px] text-[#0071e3] hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 transition-all font-semibold active:scale-95"
-                    >
-                      <Eye className="w-3 h-3" />
-                      <span>View Feed</span>
-                    </button>
-                    <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                    {chan.status === 'verified' && getChannelAccountId(chan) ? (
+                      <button
+                        onClick={() => navigate(`/channels/${getChannelAccountId(chan)}/feed`, {
+                          state: adminViewUserId ? { fromAdmin: true, channel: chan } : undefined,
+                        })}
+                        className="flex items-center gap-1.5 text-[10px] text-[#0071e3] hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 transition-all font-semibold active:scale-95"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>View Feed</span>
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                        <Link2 className="w-3.5 h-3.5" />
+                        <span>Needs verification</span>
+                      </div>
+                    )}
+                    <div className={`flex items-center gap-1 text-[10px] font-medium ${
+                      chan.status === 'verified' ? 'text-emerald-600' : chan.status === 'disconnected' ? 'text-red-600' : 'text-amber-600'
+                    }`}>
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>Connected</span>
+                      <span>{getStatusLabel(chan.status)}</span>
                     </div>
-                    <button
-                      onClick={() => disconnectChannel(chan._id)}
-                      className="p-2 hover:bg-red-50 hover:text-red-600 text-gray-400 rounded-lg transition-all"
-                      title="Disconnect Channel"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {getChannelAccountId(chan) && (
+                      <button
+                        onClick={() => disconnectChannel(getChannelAccountId(chan))}
+                        className="p-2 hover:bg-red-50 hover:text-red-600 text-gray-400 rounded-lg transition-all"
+                        title="Disconnect Channel"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))

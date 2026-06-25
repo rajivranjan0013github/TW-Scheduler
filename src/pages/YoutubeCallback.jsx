@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export const YoutubeCallback = () => {
@@ -6,6 +6,7 @@ export const YoutubeCallback = () => {
   const navigate = useNavigate();
   const code = searchParams.get('code');
   const error = searchParams.get('error');
+  const exchangeStartedRef = useRef(false);
 
   const exchangeToken = useCallback(async () => {
     try {
@@ -42,6 +43,11 @@ export const YoutubeCallback = () => {
     }
 
     if (code) {
+      if (exchangeStartedRef.current) return;
+      const codeKey = `youtube_oauth_code_${code}`;
+      if (sessionStorage.getItem(codeKey)) return;
+      sessionStorage.setItem(codeKey, 'processing');
+      exchangeStartedRef.current = true;
       exchangeToken();
     } else {
       navigate('/channels');

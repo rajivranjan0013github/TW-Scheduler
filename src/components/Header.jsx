@@ -56,7 +56,8 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
         } else {
           const nextAccountIds = nextAccounts.map(acc => acc._id);
           const hasOutsideSelection = selectedAccounts.some(id => !nextAccountIds.includes(id));
-          if (selectedAccounts.length === 0 || hasOutsideSelection) {
+          const hasNewAccounts = nextAccountIds.some(id => !selectedAccounts.includes(id));
+          if (selectedAccounts.length === 0 || hasOutsideSelection || hasNewAccounts) {
             setSelectedAccounts(nextAccountIds);
           }
         }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Clock, FolderHeart, Film, Layers, Link2, Settings as SettingsIcon, ChevronLeft, ChevronRight, X, LogOut, Megaphone, Users, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Clock, FolderHeart, Film, Link2, Settings as SettingsIcon, ChevronLeft, ChevronRight, X, LogOut, Megaphone, Users, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { withCampaignScope } from '../utils/campaignScope';
 
@@ -61,68 +61,70 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     }
   };
 
-  const fetchCampaignWorkspace = async () => {
-    try {
-      const headers = {
-        'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
-      };
-      if (canViewAdmin && !adminViewUserId) {
-        const response = await fetch('http://localhost:5001/api/admin/campaigns?scope=workspace', { headers });
-        if (response.ok) {
-          const data = await response.json();
-          setCampaigns(data);
-          applyCampaign(data, localStorage.getItem(campaignStorageKey) || activeCampaignId);
-          return;
-        }
-      }
-
-      const campaignResponse = await fetch(
-        adminViewUserId ? `http://localhost:5001/api/accounts/campaigns?userId=${adminViewUserId}` : 'http://localhost:5001/api/accounts/campaigns',
-        { headers }
-      );
-
-      if (campaignResponse.ok) {
-        const campaignData = await campaignResponse.json();
-        setCampaigns(campaignData);
-        if (campaignData.length > 0) {
-          applyCampaign(campaignData, localStorage.getItem(campaignStorageKey) || activeCampaignId);
-          return;
-        }
-      } else {
-        setCampaigns([]);
-      }
-
-      const accountQuery = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
-      const response = await fetch(
-        `http://localhost:5001/api/accounts${accountQuery}`,
-        { headers }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const nextAccounts = data.length > 0 ? data : (adminViewChannel ? [adminViewChannel] : []);
-
-        if (adminViewUserId) {
-          setSelectedAccounts(nextAccounts.map(acc => acc._id));
-        } else {
-          const nextAccountIds = nextAccounts.map(acc => acc._id);
-          const hasOutsideSelection = selectedAccounts.some(id => !nextAccountIds.includes(id));
-          if (selectedAccounts.length === 0 || hasOutsideSelection) {
-            setSelectedAccounts(nextAccountIds);
+  useEffect(() => {
+    const fetchCampaignWorkspace = async () => {
+      try {
+        const headers = {
+          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
+        };
+        if (canViewAdmin && !adminViewUserId) {
+          const response = await fetch('http://localhost:5001/api/admin/campaigns?scope=workspace', { headers });
+          if (response.ok) {
+            const data = await response.json();
+            setCampaigns(data);
+            applyCampaign(data, localStorage.getItem(campaignStorageKey) || activeCampaignId);
+            return;
           }
         }
-      }
-    } catch (error) {
-      console.error('Failed to load campaign workspace in sidebar:', error);
-    }
-  };
 
-  useEffect(() => {
+        const campaignResponse = await fetch(
+          adminViewUserId ? `http://localhost:5001/api/accounts/campaigns?userId=${adminViewUserId}` : 'http://localhost:5001/api/accounts/campaigns',
+          { headers }
+        );
+
+        if (campaignResponse.ok) {
+          const campaignData = await campaignResponse.json();
+          setCampaigns(campaignData);
+          if (campaignData.length > 0) {
+            applyCampaign(campaignData, localStorage.getItem(campaignStorageKey) || activeCampaignId);
+            return;
+          }
+        } else {
+          setCampaigns([]);
+        }
+
+        const accountQuery = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
+        const response = await fetch(
+          `http://localhost:5001/api/accounts${accountQuery}`,
+          { headers }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const nextAccounts = data.length > 0 ? data : (adminViewChannel ? [adminViewChannel] : []);
+
+          if (adminViewUserId) {
+            setSelectedAccounts(nextAccounts.map(acc => acc._id));
+          } else {
+            const nextAccountIds = nextAccounts.map(acc => acc._id);
+            const hasOutsideSelection = selectedAccounts.some(id => !nextAccountIds.includes(id));
+            const hasNewAccounts = nextAccountIds.some(id => !selectedAccounts.includes(id));
+            if (selectedAccounts.length === 0 || hasOutsideSelection || hasNewAccounts) {
+              setSelectedAccounts(nextAccountIds);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load campaign workspace in sidebar:', error);
+      }
+    };
+
     // Load campaign publishing channels when the viewed workspace changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchCampaignWorkspace();
+    if (user?.userType !== 'account_handler') {
+      fetchCampaignWorkspace();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminViewChannel?._id, adminViewUserId]);
+  }, [adminViewChannel?._id, adminViewUserId, user?.userType]);
 
   useEffect(() => {
     const syncSelectedCampaign = (event) => {
@@ -141,7 +143,13 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     navigate('/', { replace: true, state: {} });
   };
 
-  const navItems = [
+  const isCreator = user?.userType === 'account_handler';
+
+  const navItems = isCreator ? [
+    { name: 'My Campaigns', path: '/campaigns', icon: Megaphone },
+    { name: 'My Channels', path: '/channels', icon: Link2 },
+    { name: 'Settings', path: '/settings', icon: SettingsIcon },
+  ] : [
     { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Scheduled Queue', path: '/scheduler', icon: Clock },
@@ -150,7 +158,8 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     { name: 'Publishing Channels', path: '/channels', icon: Link2 },
     { name: 'Settings', path: '/settings', icon: SettingsIcon },
   ];
-  const managerItems = canViewAdmin ? [
+
+  const managerItems = (!isCreator && canViewAdmin) ? [
     { name: 'Overview', path: '/admin', icon: BarChart3 },
     { name: 'Campaign Setup', path: '/admin/campaign', icon: Megaphone },
     { name: 'Team Access', path: '/admin/users', icon: Users },
@@ -158,17 +167,17 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   const activeCampaign = campaigns.find(campaign => campaign._id === activeCampaignId);
 
   return (
-    <aside className={`${isCollapsed ? 'w-16' : 'w-52'} ${isAdminViewingUser ? 'bg-[#111827] border-black/10 text-[#cbd5e1]' : 'bg-white border-[#e5e5ea] text-[#8e8e93]'} border-r flex flex-col h-screen sticky top-0 transition-all duration-300`}>
+    <aside className={`${isCollapsed ? 'w-16' : 'w-52'} ${isAdminViewingUser ? 'bg-[#111827] border-black/10 text-[#cbd5e1]' : 'bg-white border-[#e5e5ea] text-[#8e8e93]'} hidden border-r md:flex flex-col h-screen sticky top-0 transition-all duration-300`}>
       
       {/* App Store Connect style header */}
       <div className={`p-4 border-b flex items-center justify-between h-[73px] flex-shrink-0 ${isAdminViewingUser ? 'border-white/10 bg-[#111827]' : 'border-[#e5e5ea] bg-white'}`}>
         {!isCollapsed && (
           <div className="flex flex-col justify-center">
             <h1 className={`text-base font-semibold tracking-tight leading-none m-0 ${isAdminViewingUser ? 'text-white' : 'text-[#1d1d1f]'}`} style={isAdminViewingUser ? { color: '#ffffff' } : undefined}>
-              {activeCampaign?.name || (isAdminViewingUser ? (adminViewContext.userName || 'Campaign View') : 'EasyPost')}
+              {isCreator ? 'Creator Hub' : (activeCampaign?.name || (isAdminViewingUser ? (adminViewContext.userName || 'Campaign View') : 'EasyPost'))}
             </h1>
             <span className={`text-[10px] font-medium tracking-wider uppercase mt-1 ${isAdminViewingUser ? 'text-[#93c5fd]' : 'text-[#8e8e93]'}`}>
-              {isAdminViewingUser ? 'Manager view' : 'Campaign workspace'}
+              {isCreator ? 'My Dashboard' : (isAdminViewingUser ? 'Manager view' : 'Campaign workspace')}
             </span>
           </div>
         )}

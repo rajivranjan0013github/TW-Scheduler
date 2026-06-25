@@ -1,14 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Crown, RefreshCw, Shield, Trash2, UserCog, Users } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, RefreshCw, Shield, UserCog, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-const roles = ['owner', 'admin', 'editor', 'viewer'];
+import { getActiveCampaignId } from '../utils/campaignScope';
 
 const roleStyles = {
   owner: 'bg-[#fff8e5] text-[#8a5a00] border-[#f5d074]',
-  admin: 'bg-[#eef5ff] text-[#1d5fd1] border-[#bfdbff]',
-  editor: 'bg-[#f0fdf4] text-[#16733a] border-[#bbf7d0]',
-  viewer: 'bg-[#f5f5f7] text-[#515154] border-[#d2d2d7]',
+  account_handler: 'bg-[#eef5ff] text-[#1d5fd1] border-[#bfdbff]',
+};
+
+const roleLabels = {
+  owner: 'Owner',
+  account_handler: 'Account handler',
 };
 
 const formatBytes = (bytes = 0) => {
@@ -23,9 +25,21 @@ const formatBytes = (bytes = 0) => {
   return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 };
 
-const tokenStatus = (expiresAt) => {
+const tokenStatus = (accountHealth = {}) => {
+  const statuses = accountHealth.tokenStatuses || [];
+  if (statuses.includes('reauth_required')) {
+    return { label: 'Reauth required', className: 'text-red-600' };
+  }
+
+  if (statuses.includes('expired')) {
+    return { label: 'Token expired', className: 'text-red-600' };
+  }
+
+  const expiresAt = accountHealth.tokenExpiresAt;
   if (!expiresAt) {
-    return { label: 'No expiry', className: 'text-[#6e6e73]' };
+    return statuses.includes('healthy')
+      ? { label: 'Healthy', className: 'text-[#16733a]' }
+      : { label: 'No expiry tracked', className: 'text-[#6e6e73]' };
   }
 
   const expires = new Date(expiresAt);
@@ -47,9 +61,6 @@ export const AdminUsers = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [updatingId, setUpdatingId] = useState('');
-
-  const canManageRoles = user?.role === 'owner';
 
   const totals = useMemo(() => users.reduce((acc, item) => {
     acc.users += 1;
@@ -59,11 +70,19 @@ export const AdminUsers = () => {
     return acc;
   }, { users: 0, connectedAccounts: 0, failedPosts: 0, media: 0 }), [users]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost:5001/api/admin/users', {
+      const campaignId = getActiveCampaignId();
+      if (!campaignId) {
+        setUsers([]);
+        setError('Select a campaign workspace before managing team access.');
+        return;
+      }
+
+      const query = new URLSearchParams({ campaignId, scope: 'workspace' });
+      const response = await fetch(`http://localhost:5001/api/admin/users?${query.toString()}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
         },
@@ -80,70 +99,18 @@ export const AdminUsers = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchUsers();
   }, []);
 
-  const updateRole = async (targetUser, role) => {
-    if (!canManageRoles || targetUser.role === role) return;
+  useEffect(() => {
+    const refreshUsers = () => fetchUsers();
+    const timeout = window.setTimeout(refreshUsers, 0);
+    window.addEventListener('campaign-selected', refreshUsers);
 
-    setUpdatingId(targetUser._id);
-    setError('');
-    try {
-      const response = await fetch(`http://localhost:5001/api/admin/users/${targetUser._id}/role`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
-        },
-        body: JSON.stringify({ role }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update role.');
-      }
-
-      setUsers((current) => current.map((item) => (
-        item._id === targetUser._id ? { ...item, role: data.role } : item
-      )));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUpdatingId('');
-    }
-  };
-
-  const deleteUser = async (targetUser) => {
-    if (!canManageRoles || targetUser._id === user?._id) return;
-
-    const confirmed = window.confirm(`Delete ${targetUser.email} and their EasyPost workspace data? This cannot be undone.`);
-    if (!confirmed) return;
-
-    setUpdatingId(targetUser._id);
-    setError('');
-    try {
-      const response = await fetch(`http://localhost:5001/api/admin/users/${targetUser._id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
-        },
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to delete user.');
-      }
-
-      setUsers((current) => current.filter((item) => item._id !== targetUser._id));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUpdatingId('');
-    }
-  };
+    return () => {
+      window.clearTimeout(timeout);
+      window.removeEventListener('campaign-selected', refreshUsers);
+    };
+  }, [fetchUsers]);
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] p-8 text-[#1d1d1f]">
@@ -151,7 +118,7 @@ export const AdminUsers = () => {
         <div>
           <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
           <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">Team Access</h2>
-          <p className="m-0 mt-1 text-xs text-[#8e8e93]">Manage workspace users, roles, and publishing channel health.</p>
+          <p className="m-0 mt-1 text-xs text-[#8e8e93]">Manage users connected to the active campaign workspace.</p>
         </div>
 
         <button
@@ -193,25 +160,25 @@ export const AdminUsers = () => {
       )}
 
       <div className="mt-6 overflow-hidden rounded-xl border border-[#d2d2d7] bg-white">
-        <div className="grid grid-cols-[1.5fr_0.75fr_1fr_1fr_0.75fr] gap-4 border-b border-[#e5e5ea] bg-[#fbfbfd] px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+        <div className="grid grid-cols-[1.5fr_0.75fr_1fr_1fr] gap-4 border-b border-[#e5e5ea] bg-[#fbfbfd] px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">
           <span>User</span>
           <span>Role</span>
           <span>Workspace</span>
           <span>Health</span>
-          <span className="text-right">Actions</span>
         </div>
 
         {loading ? (
           <div className="p-10 text-center text-sm text-[#6e6e73]">Loading users...</div>
         ) : users.length === 0 ? (
-          <div className="p-10 text-center text-sm text-[#6e6e73]">No users found.</div>
+          <div className="p-10 text-center text-sm text-[#6e6e73]">No users found for this campaign.</div>
         ) : (
           users.map((item) => {
-            const health = tokenStatus(item.accountHealth?.tokenExpiresAt);
+            const health = tokenStatus(item.accountHealth);
             const isSelf = item._id === user?._id;
+            const campaignRole = item.campaignRole || 'account_handler';
 
             return (
-              <div key={item._id} className="grid grid-cols-[1.5fr_0.75fr_1fr_1fr_0.75fr] items-center gap-4 border-b border-[#e5e5ea] px-5 py-4 last:border-b-0">
+              <div key={item._id} className="grid grid-cols-[1.5fr_0.75fr_1fr_1fr] items-center gap-4 border-b border-[#e5e5ea] px-5 py-4 last:border-b-0">
                 <div className="flex min-w-0 items-center gap-3">
                   <img
                     src={item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
@@ -232,22 +199,9 @@ export const AdminUsers = () => {
                 </div>
 
                 <div>
-                  {canManageRoles ? (
-                    <select
-                      value={item.role}
-                      disabled={updatingId === item._id}
-                      onChange={(event) => updateRole(item, event.target.value)}
-                      className={`w-full rounded-lg border px-3 py-2 text-xs font-semibold capitalize outline-none ${roleStyles[item.role] || roleStyles.viewer}`}
-                    >
-                      {roles.map((role) => (
-                        <option key={role} value={role}>{role}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className={`inline-flex rounded-lg border px-3 py-1.5 text-xs font-semibold capitalize ${roleStyles[item.role] || roleStyles.viewer}`}>
-                      {item.role}
-                    </span>
-                  )}
+                  <span className={`inline-flex rounded-lg border px-3 py-1.5 text-xs font-semibold ${roleStyles[campaignRole] || roleStyles.account_handler}`}>
+                    {roleLabels[campaignRole] || roleLabels.account_handler}
+                  </span>
                 </div>
 
                 <div className="text-xs text-[#515154]">
@@ -266,17 +220,11 @@ export const AdminUsers = () => {
                   {(item.metrics?.failedPosts || 0) > 0 && (
                     <p className="m-0 mt-1 font-semibold text-red-600">{item.metrics.failedPosts} failed posts</p>
                   )}
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => deleteUser(item)}
-                    disabled={!canManageRoles || isSelf || updatingId === item._id}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#d2d2d7] bg-white text-[#6e6e73] transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                    title={isSelf ? 'You cannot delete yourself' : 'Delete user'}
-                  >
-                    {item.role === 'owner' ? <Crown className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
-                  </button>
+                  {(item.accountHealth?.tokenRefreshErrors || []).length > 0 && (
+                    <p className="m-0 mt-1 truncate text-red-600" title={item.accountHealth.tokenRefreshErrors[0]}>
+                      {item.accountHealth.tokenRefreshErrors[0]}
+                    </p>
+                  )}
                 </div>
               </div>
             );
