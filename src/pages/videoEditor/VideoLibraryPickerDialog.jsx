@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Folder, Loader2, Play, X } from 'lucide-react';
+import { Folder, Loader2, Play, X, Search } from 'lucide-react';
 import { API_BASE_URL } from './videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 
@@ -18,10 +18,17 @@ export const VideoLibraryPickerDialog = ({
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [error, setError] = useState('');
+  const [folderSearchQuery, setFolderSearchQuery] = useState('');
 
   const headers = useMemo(() => (
     token ? { Authorization: `Bearer ${token}` } : {}
   ), [token]);
+
+  const filteredFolders = useMemo(() => {
+    if (!folderSearchQuery.trim()) return folders;
+    const query = folderSearchQuery.toLowerCase();
+    return folders.filter((f) => f.name?.toLowerCase().includes(query));
+  }, [folders, folderSearchQuery]);
 
   useEffect(() => {
     const loadFolders = async () => {
@@ -84,24 +91,36 @@ export const VideoLibraryPickerDialog = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
       <div className="flex h-[78vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-2.5">
           <div>
-            <h3 className="text-lg font-bold text-gray-950">Select Video</h3>
-            <p className="mt-0.5 text-xs font-medium text-gray-500">{slotLabel}</p>
+            <h3 className="text-sm font-bold text-gray-950">
+              {slotLabel?.includes('First') ? 'Select First Video' : 'Select Second Video'}
+            </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close video picker"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-950"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-950"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_1fr]">
-          <aside className="min-h-0 overflow-y-auto border-r border-gray-100 bg-gray-50 p-4">
-            <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">Folders</p>
+          <aside className="min-h-0 overflow-y-auto border-r border-gray-100 bg-gray-50 p-4 flex flex-col">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Folders</p>
+
+            <div className="mb-3 relative">
+              <input
+                type="text"
+                value={folderSearchQuery}
+                onChange={(e) => setFolderSearchQuery(e.target.value)}
+                placeholder="Search folders..."
+                className="w-full rounded-lg border border-gray-200 bg-white pl-7 pr-3 py-1 text-[11px] font-semibold outline-none focus:border-[#ff5500] focus:ring-1 focus:ring-[#ff5500]/10 transition-all text-gray-950"
+              />
+              <Search className="absolute left-2 top-2.5 h-3 w-3 text-gray-400" />
+            </div>
 
             {loadingFolders ? (
               <div className="flex items-center gap-2 rounded-lg bg-white p-3 text-xs font-semibold text-gray-500">
@@ -109,7 +128,7 @@ export const VideoLibraryPickerDialog = ({
                 Loading folders...
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 flex-1 overflow-y-auto min-h-0">
                 <button
                   type="button"
                   onClick={() => openFolder('root', 'Library Root')}
@@ -121,7 +140,7 @@ export const VideoLibraryPickerDialog = ({
                   Library Root
                 </button>
 
-                {folders.map((folder) => (
+                {filteredFolders.map((folder) => (
                   <button
                     key={folder._id}
                     type="button"
@@ -168,34 +187,26 @@ export const VideoLibraryPickerDialog = ({
                 No videos found in this folder.
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 {media.map((item) => (
                   <button
                     key={item._id}
                     type="button"
                     onClick={() => handleSelectVideo(item)}
-                    className="overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md"
+                    className="group relative overflow-hidden rounded-xl border border-gray-200 bg-black text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md"
                   >
-                    <div className="relative aspect-[9/16] bg-gray-100">
+                    <div className="relative aspect-[9/16]">
                       <video
                         src={proxiedMediaUrl(item.url)}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
                         muted
                         preload="metadata"
                       />
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/10 text-white">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/45">
-                          <Play className="h-5 w-5 fill-current" />
-                        </span>
-                      </span>
-                    </div>
-                    <div className="p-3">
-                      <p className="truncate text-xs font-bold text-gray-900" title={item.name}>
-                        {item.name || 'Untitled video'}
-                      </p>
-                      <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                        Select video
-                      </p>
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2.5">
+                        <p className="truncate text-[10px] font-bold text-white shadow-sm" title={item.name}>
+                          {item.name || 'Untitled video'}
+                        </p>
+                      </div>
                     </div>
                   </button>
                 ))}
