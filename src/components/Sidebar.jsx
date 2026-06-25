@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 import { LayoutDashboard, Clock, FolderHeart, Film, Link2, Settings as SettingsIcon, ChevronLeft, ChevronRight, X, LogOut, Megaphone, Users, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { withCampaignScope } from '../utils/campaignScope';
@@ -68,7 +69,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
         };
         if (canViewAdmin && !adminViewUserId) {
-          const response = await fetch('http://localhost:5001/api/admin/campaigns?scope=workspace', { headers });
+          const response = await fetch(`${API_BASE_URL}/api/admin/campaigns?scope=workspace`, { headers });
           if (response.ok) {
             const data = await response.json();
             setCampaigns(data);
@@ -78,7 +79,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
         }
 
         const campaignResponse = await fetch(
-          adminViewUserId ? `http://localhost:5001/api/accounts/campaigns?userId=${adminViewUserId}` : 'http://localhost:5001/api/accounts/campaigns',
+          adminViewUserId ? `${API_BASE_URL}/api/accounts/campaigns?userId=${adminViewUserId}` : `${API_BASE_URL}/api/accounts/campaigns`,
           { headers }
         );
 
@@ -95,7 +96,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
 
         const accountQuery = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
         const response = await fetch(
-          `http://localhost:5001/api/accounts${accountQuery}`,
+          `${API_BASE_URL}/api/accounts${accountQuery}`,
           { headers }
         );
 

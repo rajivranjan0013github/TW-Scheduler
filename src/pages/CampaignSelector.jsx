@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -75,7 +76,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
         Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
       };
       const campaignResponse = await fetch(
-        'http://localhost:5001/api/accounts/campaigns',
+        `${API_BASE_URL}/api/accounts/campaigns`,
         { headers }
       );
       if (!campaignResponse.ok) {
@@ -156,7 +157,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
       setSaving(true);
       setCreateError('');
       const response = await fetch(
-        'http://localhost:5001/api/accounts/campaigns',
+        `${API_BASE_URL}/api/accounts/campaigns`,
         {
           method: 'POST',
           headers: {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Eye, Heart, MessageSquare, ExternalLink, Calendar } from 'lucide-react';
 import { withCampaignScope } from '../utils/campaignScope';
@@ -29,12 +30,12 @@ export const PostDetails = () => {
         setChannel(location.state.channel);
       } else {
         const headers = { 'Authorization': `Bearer ${token}` };
-        const chanRes = await fetch(`http://localhost:5001/api/accounts${withCampaignScope()}`, { headers });
+        const chanRes = await fetch(`${API_BASE_URL}/api/accounts${withCampaignScope()}`, { headers });
         let channels = chanRes.ok ? await chanRes.json() : [];
         let targetChan = channels.find(c => c._id === accountId);
 
         if (!targetChan) {
-          const adminRes = await fetch('http://localhost:5001/api/admin/social-accounts', { headers });
+          const adminRes = await fetch(`${API_BASE_URL}/api/admin/social-accounts`, { headers });
           channels = adminRes.ok ? await adminRes.json() : [];
           targetChan = channels.find(c => c._id === accountId);
         }
@@ -45,7 +46,7 @@ export const PostDetails = () => {
       }
 
       // 2. Fetch post insights
-      const response = await fetch(`http://localhost:5001/api/accounts/${accountId}/posts/${metaPostId}/insights`, {
+      const response = await fetch(`${API_BASE_URL}/api/accounts/${accountId}/posts/${metaPostId}/insights`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, ChevronDown, Check, Globe, X } from 'lucide-react';
 import { withCampaignScope } from '../utils/campaignScope';
@@ -42,7 +43,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
       };
       const accountQuery = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
       const response = await fetch(
-        `http://localhost:5001/api/accounts${accountQuery}`,
+        `${API_BASE_URL}/api/accounts${accountQuery}`,
         { headers }
       );
       if (response.ok) {

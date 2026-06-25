@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Megaphone, RefreshCw, Rows3 } from 'lucide-react';
 import { getActiveCampaignId } from '../utils/campaignScope';
@@ -166,7 +167,7 @@ export const AdminDashboard = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost:5001/api/admin/campaigns', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/campaigns`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
       });
       const data = await response.json();

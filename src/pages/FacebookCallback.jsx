@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export const FacebookCallback = () => {
@@ -18,7 +19,7 @@ export const FacebookCallback = () => {
     try {
       const token = localStorage.getItem('tw_token');
       const campaignId = sessionStorage.getItem('connect_campaign_id') || localStorage.getItem('active-campaign-id') || '';
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
+      const apiBaseUrl = API_BASE_URL;
       const response = await fetch(`${apiBaseUrl}/api/accounts/facebook-callback`, {
         method: 'POST',
         headers: {

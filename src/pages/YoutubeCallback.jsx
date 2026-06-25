@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export const YoutubeCallback = () => {
@@ -12,7 +13,7 @@ export const YoutubeCallback = () => {
     try {
       const token = localStorage.getItem('tw_token');
       const campaignId = sessionStorage.getItem('connect_campaign_id') || localStorage.getItem('active-campaign-id') || '';
-      const response = await fetch('http://localhost:5001/api/accounts/youtube-callback', {
+      const response = await fetch(`${API_BASE_URL}/api/accounts/youtube-callback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

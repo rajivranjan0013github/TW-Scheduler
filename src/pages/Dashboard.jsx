@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -70,7 +71,7 @@ export const Dashboard = ({ selectedAccounts }) => {
       const headers = { 'Authorization': `Bearer ${token}` };
       const scopedSuffix = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
 
-      const accResponse = await fetch(`http://localhost:5001/api/accounts${scopedSuffix}`, { headers });
+      const accResponse = await fetch(`${API_BASE_URL}/api/accounts${scopedSuffix}`, { headers });
       const accountsList = await accResponse.json();
       const campaignAccounts = selectedAccounts.length > 0
         ? accountsList.filter(account => selectedAccounts.includes(account._id))
@@ -78,14 +79,14 @@ export const Dashboard = ({ selectedAccounts }) => {
       const activeAccountIds = campaignAccounts.map(account => account._id);
       setChannels(campaignAccounts);
 
-      const schedResponse = await fetch(`http://localhost:5001/api/scheduler${scopedSuffix}`, { headers });
+      const schedResponse = await fetch(`${API_BASE_URL}/api/scheduler${scopedSuffix}`, { headers });
       const posts = await schedResponse.json();
       const filteredPosts = posts.filter(p => activeAccountIds.includes(p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0]));
       
       const upcoming = filteredPosts.filter(p => p.status === 'scheduled' || p.status === 'publishing');
       setUpcomingPosts(upcoming.slice(0, 3));
 
-      const medResponse = await fetch(`http://localhost:5001/api/media${scopedSuffix}`, { headers });
+      const medResponse = await fetch(`${API_BASE_URL}/api/media${scopedSuffix}`, { headers });
       const mediaList = await medResponse.json();
 
       setErrorInsights(null);
@@ -95,7 +96,7 @@ export const Dashboard = ({ selectedAccounts }) => {
         if (adminViewUserId) insightParams.set('userId', adminViewUserId);
         const campaignId = localStorage.getItem('active-campaign-id');
         if (campaignId) insightParams.set('campaignId', campaignId);
-        const insResponse = await fetch(`http://localhost:5001/api/accounts/insights?${insightParams.toString()}`, { headers });
+        const insResponse = await fetch(`${API_BASE_URL}/api/accounts/insights?${insightParams.toString()}`, { headers });
         if (insResponse.ok) {
           const insightsList = await insResponse.json();
           setChartData(insightsList);
@@ -116,7 +117,7 @@ export const Dashboard = ({ selectedAccounts }) => {
 
       // Fetch recent 25 published posts
       try {
-        const recentResponse = await fetch(`http://localhost:5001/api/accounts/posts/recent${scopedSuffix}`, { headers });
+        const recentResponse = await fetch(`${API_BASE_URL}/api/accounts/posts/recent${scopedSuffix}`, { headers });
         if (recentResponse.ok) {
           const recentData = await recentResponse.json();
           setRecentPosts(

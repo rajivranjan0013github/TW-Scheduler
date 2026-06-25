@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Share2, Trash2, ShieldCheck, Link2, Eye, Trash } from 'lucide-react';
@@ -43,7 +44,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
           ? ''
           : withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
       const endpoint = campaignId ? '/api/accounts/publishing-channels' : '/api/accounts';
-      const response = await fetch(`http://localhost:5001${endpoint}${queryParam}`, {
+      const response = await fetch(`${API_BASE_URL}${endpoint}${queryParam}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -73,7 +74,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
 
     try {
       const token = localStorage.getItem('tw_token');
-      const response = await fetch(`http://localhost:5001/api/accounts/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/accounts/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -90,7 +91,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
   const connectMetaOAuth = () => {
     if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
-    const redirectUri = encodeURIComponent('http://localhost:5173/auth/facebook/callback');
+    const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
     const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights,instagram_manage_comments');
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
     window.location.href = oauthUrl;
@@ -116,7 +117,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
     try {
       if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
       const token = localStorage.getItem('tw_token');
-      const response = await fetch('http://localhost:5001/api/accounts/youtube/auth-url', {
+      const response = await fetch(`${API_BASE_URL}/api/accounts/youtube/auth-url`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
