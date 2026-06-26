@@ -94,6 +94,76 @@ export const CreatorCampaigns = () => {
     )));
   };
 
+  const prepareVerificationRedirect = (campaignId) => {
+    sessionStorage.setItem('connect_campaign_id', campaignId);
+    sessionStorage.setItem('connect_return_path', '/campaigns');
+  };
+
+  const connectMetaOAuth = (campaignId) => {
+    prepareVerificationRedirect(campaignId);
+    const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
+    const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
+    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
+    const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
+    window.location.href = oauthUrl;
+  };
+
+  const connectInstagramOAuth = (campaignId) => {
+    const appId = import.meta.env.VITE_INSTAGRAM_APP_ID;
+    const facebookAppId = import.meta.env.VITE_META_APP_ID;
+    if (!appId || appId === facebookAppId) {
+      alert('Set VITE_INSTAGRAM_APP_ID to the Instagram App ID from Meta Dashboard > Instagram > API setup with Instagram login. It cannot be the Facebook App ID.');
+      return;
+    }
+
+    prepareVerificationRedirect(campaignId);
+    const rawRedirectUri = import.meta.env.VITE_INSTAGRAM_REDIRECT_URI || `${window.location.origin}/auth/instagram/callback`;
+    sessionStorage.setItem('instagram_oauth_redirect_uri', rawRedirectUri);
+    const redirectUri = encodeURIComponent(rawRedirectUri);
+    const scope = encodeURIComponent('instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights');
+    const oauthUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+    window.location.href = oauthUrl;
+  };
+
+  const connectYoutubeOAuth = async (campaignId) => {
+    try {
+      prepareVerificationRedirect(campaignId);
+      const response = await fetch(`${API_BASE_URL}/api/accounts/youtube/auth-url`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.url) {
+        alert(data.message || 'Failed to start YouTube connection.');
+        return;
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      console.error('Failed to start YouTube OAuth:', error);
+      alert('Failed to connect to the backend for YouTube OAuth.');
+    }
+  };
+
+  const handleVerifyChannel = (channel) => {
+    if (channel.platform === 'instagram') {
+      connectInstagramOAuth(channel.campaignId);
+      return;
+    }
+
+    if (channel.platform === 'youtube') {
+      void connectYoutubeOAuth(channel.campaignId);
+      return;
+    }
+
+    if (channel.platform === 'facebook') {
+      connectMetaOAuth(channel.campaignId);
+      return;
+    }
+
+    navigate('/channels', { state: { campaignId: channel.campaignId } });
+  };
+
   const markPostDownloaded = async (post) => {
     const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/downloaded`, {
       method: 'POST',
@@ -381,7 +451,7 @@ export const CreatorCampaigns = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => navigate('/channels', { state: { campaignId: ch.campaignId } })}
+                        onClick={() => handleVerifyChannel(ch)}
                         className="shrink-0 rounded-lg bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white transition hover:bg-black"
                       >
                         Verify

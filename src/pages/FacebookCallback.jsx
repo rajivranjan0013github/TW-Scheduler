@@ -7,11 +7,24 @@ export const FacebookCallback = () => {
   const navigate = useNavigate();
   const code = searchParams.get('code');
 
+  const navigateAfterConnect = () => {
+    const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
+    const returnPath = sessionStorage.getItem('connect_return_path') || '';
+    sessionStorage.removeItem('connect_return_path');
+
+    if (returnPath) {
+      navigate(returnPath);
+      return;
+    }
+
+    navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
+  };
+
   useEffect(() => {
     if (code) {
       exchangeToken();
     } else {
-      navigate('/channels');
+      navigateAfterConnect();
     }
   }, [code]);
 
@@ -39,8 +52,7 @@ export const FacebookCallback = () => {
       console.error('Error in Facebook OAuth token exchange:', error);
       alert('❌ Error completing Facebook authentication flow.');
     } finally {
-      const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
-      navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
+      navigateAfterConnect();
     }
   };
 

@@ -9,6 +9,19 @@ export const YoutubeCallback = () => {
   const error = searchParams.get('error');
   const exchangeStartedRef = useRef(false);
 
+  const navigateAfterConnect = useCallback(() => {
+    const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
+    const returnPath = sessionStorage.getItem('connect_return_path') || '';
+    sessionStorage.removeItem('connect_return_path');
+
+    if (returnPath) {
+      navigate(returnPath);
+      return;
+    }
+
+    navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
+  }, [navigate]);
+
   const exchangeToken = useCallback(async () => {
     try {
       const token = localStorage.getItem('tw_token');
@@ -32,16 +45,14 @@ export const YoutubeCallback = () => {
       console.error('Error in YouTube OAuth token exchange:', err);
       alert('Error completing YouTube authentication flow.');
     } finally {
-      const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
-      navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
+      navigateAfterConnect();
     }
-  }, [code, navigate]);
+  }, [code, navigateAfterConnect]);
 
   useEffect(() => {
     if (error) {
       alert(`YouTube authorization was cancelled or failed: ${error}`);
-      const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
-      navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
+      navigateAfterConnect();
       return;
     }
 
@@ -53,9 +64,9 @@ export const YoutubeCallback = () => {
       exchangeStartedRef.current = true;
       exchangeToken();
     } else {
-      navigate('/channels');
+      navigateAfterConnect();
     }
-  }, [code, error, exchangeToken, navigate]);
+  }, [code, error, exchangeToken, navigateAfterConnect]);
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] flex flex-col items-center justify-center font-sans p-6 text-[#1d1d1f]">
