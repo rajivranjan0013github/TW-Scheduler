@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import { queryClient } from '../lib/queryClient';
 
 const AuthContext = createContext(null);
 
@@ -52,6 +53,7 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         const data = await response.json();
+        queryClient.clear();
         localStorage.setItem('tw_token', data.token);
         setToken(data.token);
         setUser(data.user);
@@ -79,6 +81,7 @@ export const AuthProvider = ({ children }) => {
 
       if (response.ok) {
         const data = await response.json();
+        queryClient.clear();
         localStorage.setItem('tw_token', data.token);
         setToken(data.token);
         setUser(data.user);
@@ -95,6 +98,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('tw_token');
+    queryClient.clear();
     setToken(null);
     setUser(null);
     setLoading(false);

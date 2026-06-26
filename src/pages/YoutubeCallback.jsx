@@ -32,14 +32,16 @@ export const YoutubeCallback = () => {
       console.error('Error in YouTube OAuth token exchange:', err);
       alert('Error completing YouTube authentication flow.');
     } finally {
-      navigate('/channels');
+      const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
+      navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
     }
   }, [code, navigate]);
 
   useEffect(() => {
     if (error) {
       alert(`YouTube authorization was cancelled or failed: ${error}`);
-      navigate('/channels');
+      const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
+      navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
       return;
     }
 

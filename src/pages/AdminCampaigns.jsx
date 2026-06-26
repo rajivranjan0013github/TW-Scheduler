@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   Plus,
@@ -60,6 +61,7 @@ const tabConfig = [
 export const AdminCampaigns = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [campaign, setCampaign] = useState(null);
   const [form, setForm] = useState({ name: '', description: '', mainEmail: '', status: 'active', channels: [] });
   const [loading, setLoading] = useState(true);
@@ -75,6 +77,24 @@ export const AdminCampaigns = () => {
 
   const canDelete = user?.role === 'owner';
   const campaignId = getActiveCampaignId();
+  const applyCampaignToForm = (nextCampaign) => {
+    setCampaign(nextCampaign || null);
+    if (nextCampaign) {
+      setForm({
+        name: nextCampaign.name || '',
+        description: nextCampaign.description || '',
+        mainEmail: nextCampaign.mainEmail || nextCampaign.createdBy?.email || '',
+        status: nextCampaign.status || 'active',
+        channels: nextCampaign.channels || [],
+      });
+    }
+  };
+  const invalidateCampaignCaches = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['admin'] }),
+    queryClient.invalidateQueries({ queryKey: ['channels'] }),
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+    queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
+  ]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -87,22 +107,19 @@ export const AdminCampaigns = () => {
       setError('');
       try {
         const headers = { Authorization: `Bearer ${localStorage.getItem('tw_token')}` };
-        const campaignRes = await fetch(`${API_BASE_URL}/api/admin/campaigns?scope=workspace`, { headers });
-        const campaignList = await campaignRes.json();
-
-        if (!campaignRes.ok) throw new Error(campaignList.message || 'Failed to load campaigns.');
+        const campaignList = await queryClient.fetchQuery({
+          queryKey: ['admin', 'campaigns', 'workspace'],
+          queryFn: async () => {
+            const campaignRes = await fetch(`${API_BASE_URL}/api/admin/campaigns?scope=workspace`, { headers });
+            const payload = await campaignRes.json();
+            if (!campaignRes.ok) throw new Error(payload.message || 'Failed to load campaigns.');
+            return payload;
+          },
+          staleTime: 2 * 60 * 1000,
+        });
 
         const found = (Array.isArray(campaignList) ? campaignList : []).find((c) => c._id === campaignId);
-        setCampaign(found || null);
-        if (found) {
-          setForm({
-            name: found.name || '',
-            description: found.description || '',
-            mainEmail: found.mainEmail || found.createdBy?.email || '',
-            status: found.status || 'active',
-            channels: found.channels || [],
-          });
-        }
+        applyCampaignToForm(found || null);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -111,7 +128,7 @@ export const AdminCampaigns = () => {
     };
 
     fetchData();
-  }, [campaignId]);
+  }, [campaignId, queryClient]);
 
   const addChannel = () => {
     if (!newChannelHandle.trim()) return;
@@ -201,13 +218,12 @@ export const AdminCampaigns = () => {
       }
 
       setCampaign(data);
-      setForm({
-        name: data.name || '',
-        description: data.description || '',
-        mainEmail: data.mainEmail || data.createdBy?.email || '',
-        status: data.status || 'active',
-        channels: data.channels || [],
+      applyCampaignToForm(data);
+      queryClient.setQueryData(['admin', 'campaigns', 'workspace'], (current = []) => {
+        if (!Array.isArray(current)) return current;
+        return current.map((item) => (item._id === data._id ? data : item));
       });
+      await invalidateCampaignCaches();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -235,6 +251,7 @@ export const AdminCampaigns = () => {
       }
 
       localStorage.removeItem('active-campaign-id');
+      await invalidateCampaignCaches();
       navigate('/campaigns');
     } catch (err) {
       setError(err.message);

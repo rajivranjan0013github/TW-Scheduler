@@ -39,7 +39,8 @@ export const FacebookCallback = () => {
       console.error('Error in Facebook OAuth token exchange:', error);
       alert('❌ Error completing Facebook authentication flow.');
     } finally {
-      navigate('/channels');
+      const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
+      navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
     }
   };
 

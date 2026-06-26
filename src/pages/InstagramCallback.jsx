@@ -55,7 +55,8 @@ export const InstagramCallback = () => {
       console.error('Error in Instagram OAuth token exchange:', error);
       alert('❌ Error completing Instagram authentication flow.');
     } finally {
-      navigate('/channels');
+      const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
+      navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
     }
   };
 

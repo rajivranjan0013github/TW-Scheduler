@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -74,6 +75,7 @@ const PlatformLogo = ({ platform, className = 'h-7 w-7' }) => {
 export const CreatorCampaigns = () => {
   const { token } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [campaigns, setCampaigns] = useState([]);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +101,8 @@ export const CreatorCampaigns = () => {
     });
     if (response.ok) {
       updatePostInList(await response.json());
+      void queryClient.invalidateQueries({ queryKey: ['creator'] });
+      void queryClient.invalidateQueries({ queryKey: ['scheduler'] });
     }
   };
 
@@ -207,6 +211,9 @@ export const CreatorCampaigns = () => {
         throw new Error(data.message || 'Could not mark this post as posted.');
       }
       updatePostInList(data);
+      await queryClient.invalidateQueries({ queryKey: ['creator'] });
+      await queryClient.invalidateQueries({ queryKey: ['scheduler'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     } catch (err) {
       alert(err.message);
     }
@@ -217,16 +224,23 @@ export const CreatorCampaigns = () => {
     setError('');
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [campRes, postRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/accounts/creator/campaigns`, { headers }),
-        fetch(`${API_BASE_URL}/api/scheduler/creator/posts`, { headers }),
+      const fetchJson = async (url) => {
+        const response = await fetch(url, { headers });
+        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+        return response.json();
+      };
+      const [campData, postData] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ['creator', 'campaigns'],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
+          staleTime: 2 * 60 * 1000,
+        }),
+        queryClient.fetchQuery({
+          queryKey: ['creator', 'posts'],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler/creator/posts`),
+          staleTime: 20 * 1000,
+        }),
       ]);
-
-      if (!campRes.ok) throw new Error('Failed to load assigned campaigns.');
-      if (!postRes.ok) throw new Error('Failed to load scheduled posts.');
-
-      const campData = await campRes.json();
-      const postData = await postRes.json();
 
       setCampaigns(campData);
       setPosts(postData);
@@ -235,25 +249,32 @@ export const CreatorCampaigns = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [queryClient, token]);
 
   useEffect(() => {
     let active = true;
     const initialFetch = async () => {
       try {
         const headers = { Authorization: `Bearer ${token}` };
-        const [campRes, postRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/accounts/creator/campaigns`, { headers }),
-          fetch(`${API_BASE_URL}/api/scheduler/creator/posts`, { headers }),
+        const fetchJson = async (url) => {
+          const response = await fetch(url, { headers });
+          if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+          return response.json();
+        };
+        const [campData, postData] = await Promise.all([
+          queryClient.fetchQuery({
+            queryKey: ['creator', 'campaigns'],
+            queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
+            staleTime: 2 * 60 * 1000,
+          }),
+          queryClient.fetchQuery({
+            queryKey: ['creator', 'posts'],
+            queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler/creator/posts`),
+            staleTime: 20 * 1000,
+          }),
         ]);
 
         if (!active) return;
-
-        if (!campRes.ok) throw new Error('Failed to load assigned campaigns.');
-        if (!postRes.ok) throw new Error('Failed to load scheduled posts.');
-
-        const campData = await campRes.json();
-        const postData = await postRes.json();
 
         setCampaigns(campData);
         setPosts(postData);
@@ -271,7 +292,7 @@ export const CreatorCampaigns = () => {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [queryClient, token]);
 
   const pendingVerifications = campaigns.flatMap((camp) => (
     (camp.channels || [])
