@@ -748,7 +748,7 @@ export const MediaLibrary = () => {
                             playsInline
                             preload="metadata"
                             onMouseEnter={(e) => {
-                              e.target.play().catch(err => console.log("Play interrupted:", err));
+                              e.target.play().catch(err => {});
                             }}
                             onMouseLeave={(e) => {
                               e.target.pause();
