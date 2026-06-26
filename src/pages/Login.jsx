@@ -30,7 +30,7 @@ export const Login = () => {
       return;
     }
 
-    const rawRedirectUri = `${window.location.origin}/auth/facebook/callback`;
+    const rawRedirectUri = `${window.location.origin}/auth/facebook-login/callback`;
     sessionStorage.setItem('facebook_login_redirect_uri', rawRedirectUri);
     const params = new URLSearchParams({
       client_id: appId,
