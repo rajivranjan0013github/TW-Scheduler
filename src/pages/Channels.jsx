@@ -92,7 +92,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
     if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
     const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
-    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights,instagram_manage_comments');
+    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
     window.location.href = oauthUrl;
   };
