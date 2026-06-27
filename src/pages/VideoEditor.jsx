@@ -693,12 +693,30 @@ export const VideoEditor = () => {
         return;
       }
       loadedBulkRowSignatureRef.current = rowSignature;
-      // Reset durations to 0 first to ensure loadedmetadata fires correctly for the new video URLs
+
+      // Save durations before reset — if a video URL stays the same between
+      // rows its <video> element won't remount (same React key) so
+      // loadedmetadata won't re-fire.  We must restore its known duration
+      // after the reset so the total-time HUD remains correct.
+      const prevDurations = { ...preview.videoDurationsRef.current };
+      const v1UrlChanged = row.video1Url !== video1Url;
+      const v2UrlChanged = row.video2Url !== video2Url;
+
       preview.resetDurations();
+
       setVideo1(row.video1);
       setVideo1Url(row.video1Url);
       setVideo2(row.video2);
       setVideo2Url(row.video2Url);
+
+      // Restore durations for videos whose URL didn't change
+      if (!v1UrlChanged && prevDurations.input1 > 0) {
+        preview.setVideoDuration('input1', prevDurations.input1);
+      }
+      if (!v2UrlChanged && prevDurations.input2 > 0) {
+        preview.setVideoDuration('input2', prevDurations.input2);
+      }
+
       audio.selectAudioTrack(row.audio, false, 0);
       overlay.setText(row.caption);
       overlay.setFontFamily(row.textSettings.fontFamily);

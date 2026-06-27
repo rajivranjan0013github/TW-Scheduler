@@ -126,5 +126,6 @@ export const useVideoPreview = ({ stopPreviewAudio, playPreviewAudio, selectedAu
     handleVideo2Ended,
     resetPlayback,
     resetDurations,
+    setVideoDuration,
   };
 };
