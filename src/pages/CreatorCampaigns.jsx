@@ -4,14 +4,9 @@ import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AlertCircle, Calendar, CheckCircle, Share2 } from 'lucide-react';
+import { getProxiedMediaUrl } from '../utils/mediaUrls';
 
-const getProxyUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('https://pub-') || url.includes('r2.cloudflarestorage.com')) {
-    return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
-  }
-  return url;
-};
+const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
 
 const copyToClipboard = (text) => {
   if (navigator.clipboard && window.isSecureContext) {

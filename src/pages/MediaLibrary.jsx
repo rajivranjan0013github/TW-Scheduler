@@ -5,13 +5,9 @@ import { AlertTriangle, Folder, MessageSquareCheck, MessageSquareWarning, MoreVe
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
+import { getProxiedMediaUrl } from '../utils/mediaUrls';
 
-const getProxyUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('blob:') || url.includes('/api/media/proxy')) return url;
-  if (url.startsWith('https://pub-') || url.includes('r2.cloudflarestorage.com')) return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
-  return url;
-};
+const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
 
 const getErrorMessage = async (response, fallback) => {
   try {
@@ -164,6 +160,7 @@ export const MediaLibrary = () => {
     let completed = 0;
     let failed = 0;
     let active = 0;
+    let shouldAttemptDirectUpload = true;
 
     const updateProgress = (currentFile = '') => {
       setUploadProgress({
@@ -175,6 +172,88 @@ export const MediaLibrary = () => {
       });
     };
 
+    const uploadViaNode = async (file, caption) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folderId', folderId);
+      formData.append('tags', '');
+      formData.append('caption', caption);
+      formData.append('socialAccountIds', '');
+      formData.append('campaignId', getActiveCampaignId());
+
+      const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(await getErrorMessage(response, 'Upload failed.'));
+      }
+    };
+
+    const uploadDirectToR2 = async (file, caption) => {
+      const campaignId = getActiveCampaignId();
+      const contentType = file.type || 'application/octet-stream';
+      const initResponse = await fetch(`${API_BASE_URL}/api/media/direct-upload/init`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          campaignId,
+          folderId,
+          name: file.name,
+          contentType,
+          size: file.size,
+        }),
+      });
+
+      if (!initResponse.ok) {
+        throw new Error(await getErrorMessage(initResponse, 'Direct upload is not available.'));
+      }
+
+      const upload = await initResponse.json();
+      const r2Response = await fetch(upload.uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': contentType,
+        },
+        body: file,
+      });
+
+      if (!r2Response.ok) {
+        throw new Error('Direct upload to R2 failed.');
+      }
+
+      const completeResponse = await fetch(`${API_BASE_URL}/api/media/direct-upload/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          campaignId,
+          folderId,
+          mediaId: upload.mediaId,
+          name: file.name,
+          contentType,
+          size: file.size,
+          storageKey: upload.storageKey,
+          caption,
+          tags: '',
+          socialAccountIds: '',
+        }),
+      });
+
+      if (!completeResponse.ok) {
+        throw new Error(await getErrorMessage(completeResponse, 'Could not save uploaded media.'));
+      }
+    };
+
     updateProgress('');
 
     await runWithConcurrency(files, UPLOAD_CONCURRENCY, async (file) => {
@@ -182,27 +261,17 @@ export const MediaLibrary = () => {
       updateProgress(`${progressLabel}: ${file.webkitRelativePath || file.name}`);
 
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('folderId', folderId);
-        formData.append('tags', '');
-        formData.append('caption', getCaption(file));
-        formData.append('socialAccountIds', '');
-        formData.append('campaignId', getActiveCampaignId());
-
-        const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const message = await getErrorMessage(response, 'Upload failed.');
-          failed += 1;
-          failedFiles.push(`${file.name} (${message})`);
+        const caption = getCaption(file);
+        if (shouldAttemptDirectUpload) {
+          try {
+            await uploadDirectToR2(file, caption);
+            return;
+          } catch (directError) {
+            shouldAttemptDirectUpload = false;
+            console.warn('Direct R2 upload failed, using Node upload fallback for this batch:', directError.message);
+          }
         }
+        await uploadViaNode(file, caption);
       } catch (error) {
         failed += 1;
         failedFiles.push(`${file.name} (${error.message || 'Upload failed'})`);

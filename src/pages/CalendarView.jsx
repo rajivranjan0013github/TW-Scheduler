@@ -5,14 +5,9 @@ import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { Plus, Check, Clock, AlertCircle, Folder, Users, Save } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
+import { getProxiedMediaUrl } from '../utils/mediaUrls';
 
-const getProxyUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('https://pub-') || url.includes('r2.cloudflarestorage.com')) {
-    return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
-  }
-  return url;
-};
+const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
 
 const VideoThumbnail = ({ url, className }) => {
   const [poster, setPoster] = useState('');

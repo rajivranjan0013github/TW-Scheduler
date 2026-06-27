@@ -4,14 +4,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Folder, Upload, X, Tag, AlertTriangle, Music, Save, Trash2 } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
+import { getProxiedMediaUrl } from '../utils/mediaUrls';
 
-const getProxyUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('https://pub-') || url.includes('r2.cloudflarestorage.com')) {
-    return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
-  }
-  return url;
-};
+const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
 
 export const AdminFolderDetails = () => {
   const { id } = useParams();
