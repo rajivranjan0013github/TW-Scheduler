@@ -1,6 +1,8 @@
 export const OUTPUT_WIDTH = 720;
 export const OUTPUT_HEIGHT = 1280;
 export const OUTPUT_FPS = 30;
+export const PREVIEW_FRAME_WIDTH = 270;
+export const PREVIEW_FRAME_HEIGHT = 480;
 
 import { API_BASE_URL as CONFIG_API_BASE_URL } from '../../config';
 export const API_BASE_URL = CONFIG_API_BASE_URL;

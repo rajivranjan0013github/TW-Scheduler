@@ -72,6 +72,8 @@ export const VideoEditor = () => {
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null); // { type: 'success'|'error', text: '' }
   const [showTextGenerator, setShowTextGenerator] = useState(false);
+  const [singleGeneratedCaption, setSingleGeneratedCaption] = useState('');
+  const [singleGeneratingCaption, setSingleGeneratingCaption] = useState(false);
   const [folders, setFolders] = useState([]);
   const [foldersLoading, setFoldersLoading] = useState(false);
   const [folderPickerRowId, setFolderPickerRowId] = useState(null);
@@ -185,6 +187,9 @@ export const VideoEditor = () => {
     try {
       setProcessing(true);
       setStatusMessage(null);
+      if (!isBulkMode) {
+        setSingleGeneratedCaption('');
+      }
       setProgressMsg('Initializing processing engine...');
       await Promise.all([
         removeIfExists('input1.mp4'),
@@ -349,30 +354,41 @@ export const VideoEditor = () => {
       }
       setProcessing(false);
     }
-  }, [video1, video2, ffmpegLoaded, ffmpegRef, audio.selectedAudio, hasAudioStream, removeIfExists, overlay, preview.videoDurationsRef, ffmpegLogHandlerRef, ffmpegLogLinesRef]);
+  }, [video1, video2, ffmpegLoaded, ffmpegRef, audio.selectedAudio, hasAudioStream, removeIfExists, overlay, preview.videoDurationsRef, ffmpegLogHandlerRef, ffmpegLogLinesRef, isBulkMode]);
 
-  const uploadVideoBlob = useCallback(async (blob, filename = `merged_${Date.now()}.mp4`) => {
-    const file = new File([blob], filename, { type: 'video/mp4' });
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('folderId', 'null');
-    formData.append('tags', 'editor,merged');
-    formData.append('campaignId', getActiveCampaignId());
+  const handleGenerateSingleCaption = useCallback(async () => {
+    if (!resultVideoUrl) return;
 
-    const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formData,
-    });
+    try {
+      setSingleGeneratingCaption(true);
+      setStatusMessage(null);
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to save to server library.');
+      const response = await fetch(`${API_BASE_URL}/api/ai/generate-caption`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          videoName: overlay.text || video1?.name || video2?.name || 'couple video',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to generate caption.');
+      }
+
+      const data = await response.json();
+      setSingleGeneratedCaption(data.caption || '');
+      setStatusMessage({ type: 'success', text: 'Caption generated successfully.' });
+    } catch (err) {
+      console.error('Error generating single video caption:', err);
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to generate caption.' });
+    } finally {
+      setSingleGeneratingCaption(false);
     }
-    return await response.json();
-  }, [token]);
+  }, [resultVideoUrl, token, overlay.text, video1, video2]);
 
   const updateBulkRowData = useCallback((rowId, partialData) => {
     setBulkRows((prev) =>
@@ -416,6 +432,13 @@ export const VideoEditor = () => {
   const openBulkSaveAllFolderPicker = useCallback(() => {
     setFolderPickerRowId('all');
     setFolderPickerMode('all');
+    setSelectedSaveFolderId('root');
+    void loadMediaFolders();
+  }, [loadMediaFolders]);
+
+  const openSingleSaveFolderPicker = useCallback(() => {
+    setFolderPickerRowId('single-editor');
+    setFolderPickerMode('single-editor');
     setSelectedSaveFolderId('root');
     void loadMediaFolders();
   }, [loadMediaFolders]);
@@ -478,35 +501,6 @@ export const VideoEditor = () => {
     });
   }, [selectedSaveFolderId, uploadVideoBlobToFolder, updateBulkRowData]);
 
-  const saveBulkSelectionToMediaLibrary = useCallback(async () => {
-    if (!folderPickerRowId) return;
-
-    try {
-      setFolderPickerError('');
-
-      if (folderPickerMode === 'all') {
-        const rowsToSave = bulkRows.filter((row) => row.status === 'done' && getBulkResultUrl(row));
-        if (rowsToSave.length === 0) {
-          throw new Error('No generated videos are available to save.');
-        }
-        for (const row of rowsToSave) {
-          await saveOneBulkRowToMediaLibrary(row);
-        }
-        setStatusMessage({ type: 'success', text: `${rowsToSave.length} videos saved successfully to your Media Library!` });
-      } else {
-        const row = bulkRows.find((item) => item.id === folderPickerRowId);
-        await saveOneBulkRowToMediaLibrary(row);
-        setStatusMessage({ type: 'success', text: 'Video saved successfully to your Media Library!' });
-      }
-
-      setFolderPickerRowId(null);
-    } catch (err) {
-      setFolderPickerError(err.message || 'Failed to save video.');
-    } finally {
-      setBulkSavingRowId(null);
-    }
-  }, [bulkRows, folderPickerMode, folderPickerRowId, saveOneBulkRowToMediaLibrary]);
-
   // --- Save to media library (uses auth token from context) ---
   const saveToMediaLibrary = useCallback(async () => {
     if (!resultVideoUrl) return;
@@ -518,7 +512,7 @@ export const VideoEditor = () => {
       const responseBlob = await fetch(resultVideoUrl);
       const blob = await responseBlob.blob();
 
-      const uploadedMedia = await uploadVideoBlob(blob);
+      const uploadedMedia = await uploadVideoBlobToFolder(blob, selectedSaveFolderId, `merged_${Date.now()}.mp4`, singleGeneratedCaption);
       const uploadedSummary = getUploadedMediaSummary(uploadedMedia);
       setStatusMessage({ type: 'success', text: 'Video saved successfully to your Media Library!' });
 
@@ -537,7 +531,38 @@ export const VideoEditor = () => {
     } finally {
       setSaving(false);
     }
-  }, [resultVideoUrl, uploadVideoBlob, navigate, isBulkMode, currentQueueIndex, bulkRows, updateBulkRowData]);
+  }, [resultVideoUrl, uploadVideoBlobToFolder, selectedSaveFolderId, singleGeneratedCaption, navigate, isBulkMode, currentQueueIndex, bulkRows, updateBulkRowData]);
+
+  const saveBulkSelectionToMediaLibrary = useCallback(async () => {
+    if (!folderPickerRowId) return;
+
+    try {
+      setFolderPickerError('');
+
+      if (folderPickerMode === 'all') {
+        const rowsToSave = bulkRows.filter((row) => row.status === 'done' && getBulkResultUrl(row));
+        if (rowsToSave.length === 0) {
+          throw new Error('No generated videos are available to save.');
+        }
+        for (const row of rowsToSave) {
+          await saveOneBulkRowToMediaLibrary(row);
+        }
+        setStatusMessage({ type: 'success', text: `${rowsToSave.length} videos saved successfully to your Media Library!` });
+      } else if (folderPickerMode === 'single-editor') {
+        await saveToMediaLibrary();
+      } else {
+        const row = bulkRows.find((item) => item.id === folderPickerRowId);
+        await saveOneBulkRowToMediaLibrary(row);
+        setStatusMessage({ type: 'success', text: 'Video saved successfully to your Media Library!' });
+      }
+
+      setFolderPickerRowId(null);
+    } catch (err) {
+      setFolderPickerError(err.message || 'Failed to save video.');
+    } finally {
+      setBulkSavingRowId(null);
+    }
+  }, [bulkRows, folderPickerMode, folderPickerRowId, saveOneBulkRowToMediaLibrary, saveToMediaLibrary]);
 
   const startBulkQueue = useCallback(() => {
     activeBulkRunRef.current = null;
@@ -628,6 +653,7 @@ export const VideoEditor = () => {
     setVideo1Url('');
     setVideo2Url('');
     setResultVideoUrl('');
+    setSingleGeneratedCaption('');
     setStatusMessage(null);
     audio.clearSelectedAudio();
     overlay.setText('');
@@ -1081,6 +1107,7 @@ export const VideoEditor = () => {
             onVideo1Ended={preview.handleVideo1Ended}
             onVideo2Ended={preview.handleVideo2Ended}
             onLoadedMetadata={preview.handleLoadedMetadata}
+            onDurationChange={preview.handleDurationChange}
             onTimeUpdate={preview.updatePreviewTime}
             text={overlay.text}
             onTextChange={overlay.setText}
@@ -1111,7 +1138,11 @@ export const VideoEditor = () => {
               resultVideoUrl={resultVideoUrl}
               saving={saving}
               statusMessage={statusMessage}
-              onSave={saveToMediaLibrary}
+              generatedCaption={singleGeneratedCaption}
+              generatingCaption={singleGeneratingCaption}
+              onGenerateCaption={handleGenerateSingleCaption}
+              onCaptionChange={setSingleGeneratedCaption}
+              onSave={openSingleSaveFolderPicker}
             />
           )}
         </div>
@@ -1352,10 +1383,10 @@ export const VideoEditor = () => {
               <button
                 type="button"
                 onClick={saveBulkSelectionToMediaLibrary}
-                disabled={foldersLoading || Boolean(bulkSavingRowId)}
+                disabled={foldersLoading || Boolean(bulkSavingRowId) || saving}
                 className="rounded-xl bg-[#0071e3] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {bulkSavingRowId
+                {bulkSavingRowId || saving
                   ? 'Saving...'
                   : folderPickerMode === 'all'
                     ? 'Save All Here'

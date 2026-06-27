@@ -1,4 +1,4 @@
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 
 /**
  * Center column — processing progress, result video player,
@@ -11,6 +11,10 @@ export const ExportPanel = ({
   resultVideoUrl,
   saving,
   statusMessage,
+  generatedCaption,
+  generatingCaption,
+  onGenerateCaption,
+  onCaptionChange,
   onSave,
 }) => {
   if (!processing && !resultVideoUrl && !progressMsg) return null;
@@ -36,6 +40,34 @@ export const ExportPanel = ({
 
           <div className="aspect-[9/16] h-[480px] max-w-[270px] mx-auto rounded-xl bg-black overflow-hidden relative">
             <video src={resultVideoUrl} controls className="w-full h-full object-contain" />
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h5 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Media Caption</h5>
+              <button
+                type="button"
+                disabled={generatingCaption || saving}
+                onClick={onGenerateCaption}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#ff5500] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {generatingCaption ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                {generatingCaption ? 'Generating' : 'Generate Caption'}
+              </button>
+            </div>
+            {(generatedCaption || generatingCaption) && (
+              <textarea
+                value={generatedCaption}
+                onChange={(event) => onCaptionChange(event.target.value)}
+                rows={3}
+                placeholder="Generated caption will appear here..."
+                className="w-full resize-none rounded-lg border border-gray-200 bg-white p-2 text-xs font-medium leading-relaxed text-gray-800 outline-none focus:border-[#ff5500] focus:ring-2 focus:ring-[#ff5500]/10"
+              />
+            )}
           </div>
 
           {/* Inline status message for save success/failure (replaces alert()) */}

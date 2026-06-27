@@ -1,10 +1,12 @@
-import { FONT_WEIGHTS } from '../videoEditor/videoEditorConstants';
+import { FONT_WEIGHTS, PREVIEW_FRAME_HEIGHT, PREVIEW_FRAME_WIDTH } from '../videoEditor/videoEditorConstants';
 import { DEFAULT_DRAG_POS, DEFAULT_TEXT_SETTINGS } from './useBulkRows';
 
-const POSITION_X_MIN = -146;
-const POSITION_X_MAX = 146;
-const POSITION_Y_MIN = -260;
-const POSITION_Y_MAX = 260;
+const POSITION_X_MIN = -Math.round(PREVIEW_FRAME_WIDTH / 2);
+const POSITION_X_MAX = Math.round(PREVIEW_FRAME_WIDTH / 2);
+const POSITION_Y_MIN = -Math.round(PREVIEW_FRAME_HEIGHT / 2);
+const POSITION_Y_MAX = Math.round(PREVIEW_FRAME_HEIGHT / 2);
+const FALLBACK_CENTER_X = PREVIEW_FRAME_WIDTH / 2;
+const FALLBACK_CENTER_Y = PREVIEW_FRAME_HEIGHT / 2;
 
 /**
  * Compact floating toolbar for per-row text styling (Figma Dark Theme).
@@ -23,12 +25,12 @@ export const FloatingTextControls = ({
   const { fontFamily, fontWeight, fontSize, fontColor, strokeWidth, strokeColor, bgType } = textSettings;
   const weightIdx = FONT_WEIGHTS.indexOf(fontWeight);
   const fallbackPlacement = {
-    x: Math.round(Math.min(Math.max(dragPos.x, 0), 240) - 120),
-    y: Math.round(Math.min(Math.max(dragPos.y, 0), 460) - 230),
-    minX: -120,
-    maxX: 120,
-    minY: -230,
-    maxY: 230,
+    x: Math.round(Math.min(Math.max(dragPos.x, 0), PREVIEW_FRAME_WIDTH) - FALLBACK_CENTER_X),
+    y: Math.round(Math.min(Math.max(dragPos.y, 0), PREVIEW_FRAME_HEIGHT) - FALLBACK_CENTER_Y),
+    minX: POSITION_X_MIN,
+    maxX: POSITION_X_MAX,
+    minY: POSITION_Y_MIN,
+    maxY: POSITION_Y_MAX,
   };
   const activePlacement = placement || fallbackPlacement;
   const placementX = Math.round(activePlacement.x);
@@ -47,7 +49,7 @@ export const FloatingTextControls = ({
 
   const resetPosition = () => {
     if (onUpdatePlacement) onUpdatePlacement({ x: 0, y: 0 });
-    else onUpdateDragPos?.({ ...dragPos, x: 120, y: 230 });
+    else onUpdateDragPos?.({ ...dragPos, x: FALLBACK_CENTER_X, y: FALLBACK_CENTER_Y });
   };
 
   const resetAll = () => {
@@ -167,7 +169,7 @@ export const FloatingTextControls = ({
               onChange={(e) => {
                 const x = Number(e.target.value);
                 if (onUpdatePlacement) onUpdatePlacement({ x, y: placementY });
-                else onUpdateDragPos?.({ ...dragPos, x: x + 120 });
+                else onUpdateDragPos?.({ ...dragPos, x: x + FALLBACK_CENTER_X });
               }}
               className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
               style={{ background: `linear-gradient(to right, #2d2d30 0%, #2d2d30 ${placementXPercent}%, #ff5500 ${placementXPercent}%, #ff5500 ${placementXPercent + 1}%, #2d2d30 ${placementXPercent + 1}%, #2d2d30 100%)` }}
@@ -184,7 +186,7 @@ export const FloatingTextControls = ({
               onChange={(e) => {
                 const y = Number(e.target.value);
                 if (onUpdatePlacement) onUpdatePlacement({ x: placementX, y });
-                else onUpdateDragPos?.({ ...dragPos, y: y + 230 });
+                else onUpdateDragPos?.({ ...dragPos, y: y + FALLBACK_CENTER_Y });
               }}
               className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
               style={{ background: `linear-gradient(to right, #2d2d30 0%, #2d2d30 ${placementYPercent}%, #ff5500 ${placementYPercent}%, #ff5500 ${placementYPercent + 1}%, #2d2d30 ${placementYPercent + 1}%, #2d2d30 100%)` }}

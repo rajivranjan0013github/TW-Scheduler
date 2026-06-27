@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   OUTPUT_WIDTH,
   OUTPUT_HEIGHT,
+  PREVIEW_FRAME_WIDTH,
+  PREVIEW_FRAME_HEIGHT,
   FONT_FAMILY_CSS,
   CANVAS_FONT_FAMILY,
   WEIGHT_MAP,
@@ -32,8 +34,8 @@ export const useTextOverlay = () => {
   const [dragPos, setDragPos] = useState({ x: 20, y: 220 });
   const [isEditingOverlay, setIsEditingOverlay] = useState(false);
   const [isDraggingOverlay, setIsDraggingOverlay] = useState(false);
-  const [previewWidth, setPreviewWidth] = useState(292);
-  const [previewHeight, setPreviewHeight] = useState(520);
+  const [previewWidth, setPreviewWidth] = useState(PREVIEW_FRAME_WIDTH);
+  const [previewHeight, setPreviewHeight] = useState(PREVIEW_FRAME_HEIGHT);
 
   const dragRef = useRef(null);
   const overlayTextRef = useRef(null);

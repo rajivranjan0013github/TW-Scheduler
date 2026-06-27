@@ -945,11 +945,13 @@ export const MediaLibrary = () => {
                             poster={item.thumbnailUrl ? getProxyUrl(item.thumbnailUrl) : undefined}
                             crossOrigin="anonymous" 
                             className="w-full h-full object-cover cursor-pointer" 
-                            muted
                             playsInline
                             preload="metadata"
                             onMouseEnter={(e) => {
-                              e.target.play().catch(err => {});
+                              e.target.muted = false;
+                              e.target.play().catch(err => {
+                                console.warn('Autoplay with audio blocked by browser policy:', err);
+                              });
                             }}
                             onMouseLeave={(e) => {
                               e.target.pause();
