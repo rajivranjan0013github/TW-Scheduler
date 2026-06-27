@@ -25,6 +25,7 @@ export const VideoPreview = ({
   onVideo1Ended,
   onVideo2Ended,
   onLoadedMetadata,
+  onDurationChange,
   onTimeUpdate,
   // Text overlay
   text,
@@ -71,21 +72,25 @@ export const VideoPreview = ({
         >
           {/* Video 1 */}
           <video
+            key={video1Url}
             ref={video1Ref}
             src={video1Url}
             onEnded={onVideo1Ended}
             onLoadedMetadata={(e) => onLoadedMetadata('input1', e)}
-            onTimeUpdate={onTimeUpdate}
+            onDurationChange={(e) => onDurationChange('input1', e)}
+            onTimeUpdate={() => onTimeUpdate('input1')}
             muted={Boolean(selectedAudio)}
             className={`absolute inset-0 w-full h-full object-contain ${activeVideo === 1 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           />
           {/* Video 2 */}
           <video
+            key={video2Url}
             ref={video2Ref}
             src={video2Url}
             onEnded={onVideo2Ended}
             onLoadedMetadata={(e) => onLoadedMetadata('input2', e)}
-            onTimeUpdate={onTimeUpdate}
+            onDurationChange={(e) => onDurationChange('input2', e)}
+            onTimeUpdate={() => onTimeUpdate('input2')}
             muted={Boolean(selectedAudio)}
             className={`absolute inset-0 w-full h-full object-contain ${activeVideo === 2 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           />

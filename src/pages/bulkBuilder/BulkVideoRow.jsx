@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Video, Music, Type, X, Move } from 'lucide-react';
-import { FONT_FAMILY_CSS, WEIGHT_MAP } from '../videoEditor/videoEditorConstants';
+import {
+  FONT_FAMILY_CSS,
+  PREVIEW_FRAME_HEIGHT,
+  PREVIEW_FRAME_WIDTH,
+  WEIGHT_MAP,
+} from '../videoEditor/videoEditorConstants';
 import { getOverlayTextHeight, getOverlayTextWidth, hexToRgba } from '../videoEditor/videoEditorUtils';
 import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
 import { DEFAULT_DRAG_POS } from './useBulkRows';
 import { FloatingTextControls } from './FloatingTextControls';
 
-const SOURCE_PREVIEW_WIDTH = 292;
-const SOURCE_PREVIEW_HEIGHT = 520;
+const SOURCE_PREVIEW_WIDTH = PREVIEW_FRAME_WIDTH;
+const SOURCE_PREVIEW_HEIGHT = PREVIEW_FRAME_HEIGHT;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 

@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Folder, Loader2, Play, X, Search } from 'lucide-react';
+import { Folder, Loader2, Play, X, Search, Video } from 'lucide-react';
 import { API_BASE_URL } from './videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 
 const proxiedMediaUrl = (url) => `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
+
+const getThumbnailUrl = (item) => {
+  const url = item.thumbnailUrl || item.thumbnail || item.previewUrl || '';
+  return url ? proxiedMediaUrl(url) : '';
+};
 
 export const VideoLibraryPickerDialog = ({
   slotLabel,
@@ -196,12 +201,23 @@ export const VideoLibraryPickerDialog = ({
                     className="group relative overflow-hidden rounded-xl border border-gray-200 bg-black text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md"
                   >
                     <div className="relative aspect-[9/16]">
-                      <video
-                        src={proxiedMediaUrl(item.url)}
-                        className="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
-                        muted
-                        preload="metadata"
-                      />
+                      {getThumbnailUrl(item) ? (
+                        <img
+                          src={getThumbnailUrl(item)}
+                          alt={item.name || 'Video thumbnail'}
+                          loading="lazy"
+                          className="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-gray-900 text-white/70">
+                          <Video className="h-8 w-8" />
+                        </div>
+                      )}
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/5 text-white opacity-90 transition-opacity group-hover:opacity-100">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45">
+                          <Play className="h-4 w-4 fill-current" />
+                        </span>
+                      </span>
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2.5">
                         <p className="truncate text-[10px] font-bold text-white shadow-sm" title={item.name}>
                           {item.name || 'Untitled video'}

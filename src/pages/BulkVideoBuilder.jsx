@@ -11,10 +11,10 @@ import { usePreviewAudio } from './videoEditor/usePreviewAudio';
 import { BulkAssetPickerDialog } from './bulkBuilder/BulkAssetPickerDialog';
 import { TempAssetQuickPickerDialog, TempMediaLibraryDialog } from './bulkBuilder/TempAssetQuickPickerDialog';
 import { getOverlayTextHeight, getOverlayTextWidth } from './videoEditor/videoEditorUtils';
-import { FONT_WEIGHTS } from './videoEditor/videoEditorConstants';
+import { FONT_WEIGHTS, PREVIEW_FRAME_HEIGHT, PREVIEW_FRAME_WIDTH } from './videoEditor/videoEditorConstants';
 
-const SOURCE_PREVIEW_WIDTH = 292;
-const SOURCE_PREVIEW_HEIGHT = 520;
+const SOURCE_PREVIEW_WIDTH = PREVIEW_FRAME_WIDTH;
+const SOURCE_PREVIEW_HEIGHT = PREVIEW_FRAME_HEIGHT;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 

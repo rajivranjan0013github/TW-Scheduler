@@ -20,18 +20,36 @@ export const useVideoPreview = ({ stopPreviewAudio, playPreviewAudio, selectedAu
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
-  const updatePreviewTime = useCallback(() => {
+  const updateTotalTime = useCallback((nextDurations) => {
+    const nextTotal = nextDurations.input1 + nextDurations.input2;
+    setPreviewTotalTime(Number.isFinite(nextTotal) && nextTotal > 0 ? nextTotal : 0);
+  }, []);
+
+  const setVideoDuration = useCallback((inputKey, duration) => {
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    const nextDurations = {
+      ...videoDurationsRef.current,
+      [inputKey]: duration,
+    };
+    videoDurationsRef.current = nextDurations;
+    updateTotalTime(nextDurations);
+  }, [updateTotalTime]);
+
+  const updatePreviewTime = useCallback((inputKey = null) => {
     const clip1Duration = videoDurationsRef.current.input1 || 0;
     const clip1Current = video1Ref.current?.currentTime || 0;
     const clip2Current = video2Ref.current?.currentTime || 0;
-    setPreviewCurrentTime(activeVideo === 1 ? clip1Current : clip1Duration + clip2Current);
+    const resolvedInputKey = inputKey || (activeVideo === 1 ? 'input1' : 'input2');
+    setPreviewCurrentTime(resolvedInputKey === 'input1' ? clip1Current : clip1Duration + clip2Current);
   }, [activeVideo]);
 
   const handleLoadedMetadata = useCallback((inputKey, e) => {
-    const duration = e.target.duration;
-    videoDurationsRef.current[inputKey] = Number.isFinite(duration) && duration > 0 ? duration : 0;
-    setPreviewTotalTime(videoDurationsRef.current.input1 + videoDurationsRef.current.input2);
-  }, []);
+    setVideoDuration(inputKey, e.currentTarget.duration);
+  }, [setVideoDuration]);
+
+  const handleDurationChange = useCallback((inputKey, e) => {
+    setVideoDuration(inputKey, e.currentTarget.duration);
+  }, [setVideoDuration]);
 
   const handleVideo1Ended = useCallback(() => {
     setActiveVideo(2);
@@ -88,6 +106,7 @@ export const useVideoPreview = ({ stopPreviewAudio, playPreviewAudio, selectedAu
   const resetDurations = useCallback(() => {
     videoDurationsRef.current = { input1: 0, input2: 0 };
     setPreviewTotalTime(0);
+    setPreviewCurrentTime(0);
   }, []);
 
   return {
@@ -102,6 +121,7 @@ export const useVideoPreview = ({ stopPreviewAudio, playPreviewAudio, selectedAu
     togglePlay,
     updatePreviewTime,
     handleLoadedMetadata,
+    handleDurationChange,
     handleVideo1Ended,
     handleVideo2Ended,
     resetPlayback,
