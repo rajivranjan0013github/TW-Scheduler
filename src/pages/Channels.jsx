@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Share2, Trash2, ShieldCheck, Link2, Eye, Trash } from 'lucide-react';
@@ -43,7 +44,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
           ? ''
           : withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
       const endpoint = campaignId ? '/api/accounts/publishing-channels' : '/api/accounts';
-      const response = await fetch(`http://localhost:5001${endpoint}${queryParam}`, {
+      const response = await fetch(`${API_BASE_URL}${endpoint}${queryParam}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -73,7 +74,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
 
     try {
       const token = localStorage.getItem('tw_token');
-      const response = await fetch(`http://localhost:5001/api/accounts/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/accounts/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -90,7 +91,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
   const connectMetaOAuth = () => {
     if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
-    const redirectUri = encodeURIComponent('http://localhost:5173/auth/facebook/callback');
+    const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
     const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights,instagram_manage_comments');
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
     window.location.href = oauthUrl;
@@ -116,7 +117,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
     try {
       if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
       const token = localStorage.getItem('tw_token');
-      const response = await fetch('http://localhost:5001/api/accounts/youtube/auth-url', {
+      const response = await fetch(`${API_BASE_URL}/api/accounts/youtube/auth-url`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -152,10 +153,10 @@ export const Channels = ({ selectedAccounts = [] }) => {
   const visibleChannels = channels;
 
   return (
-    <div className="p-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f] space-y-8">
+    <div className="p-4 sm:p-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f] space-y-6 sm:space-y-8">
       
       {/* Title */}
-      <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-[#e5e5ea] gap-2">
         <div>
           <h2 className="text-xl font-semibold text-black tracking-tight m-0">Publishing Channels</h2>
           <p className="text-[#8e8e93] text-xs mt-1">
@@ -169,40 +170,30 @@ export const Channels = ({ selectedAccounts = [] }) => {
       <div className="max-w-4xl mx-auto space-y-6">
         
         {/* Info card */}
-        <div className="bg-white border border-[#e5e5ea] rounded-xl p-5 shadow-sm flex items-start gap-4">
-          <div className="p-2.5 bg-blue-50 text-[#0071e3] rounded-lg">
-            <Share2 className="w-5 h-5" />
-          </div>
-          <div className="space-y-1.5">
-            <h4 className="text-xs font-semibold text-black m-0">Publishing Integrations</h4>
-            <p className="text-[11px] text-gray-500 leading-relaxed m-0">
-              Users can connect Meta accounts and YouTube channels. Connected channels are available in the scheduled publishing queue.
-            </p>
-          </div>
-        </div>
+       
 
         {/* Channels Listing */}
         <div className="bg-white border border-[#e5e5ea] rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#e5e5ea] flex justify-between items-center">
+          <div className="px-4 sm:px-6 py-4 border-b border-[#e5e5ea] flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Campaign Publishing Channels ({visibleChannels.length})</span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
               <button
                 onClick={connectInstagramOAuth}
-                className="flex items-center gap-1.5 bg-black hover:bg-gray-800 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm"
+                className="flex items-center justify-center gap-1.5 bg-black hover:bg-gray-800 text-white px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm w-full sm:w-auto"
               >
                 <Link2 className="w-3.5 h-3.5" />
                 <span>Connect Instagram</span>
               </button>
               <button
                 onClick={connectYoutubeOAuth}
-                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm"
+                className="flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm w-full sm:w-auto"
               >
                 <Link2 className="w-3.5 h-3.5" />
                 <span>Connect YouTube</span>
               </button>
               <button
                 onClick={connectMetaOAuth}
-                className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm"
+                className="flex items-center justify-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm w-full sm:w-auto"
               >
                 <Link2 className="w-3.5 h-3.5" />
                 <span>Connect Facebook & Instagram</span>
@@ -221,38 +212,37 @@ export const Channels = ({ selectedAccounts = [] }) => {
               </div>
             ) : (
               visibleChannels.map(chan => (
-                <div key={chan._id} className="px-6 py-5 flex items-center justify-between hover:bg-[#f5f5f7]/40 transition-colors">
-                  <div className="flex items-center gap-4">
+                <div key={chan._id} className="px-4 sm:px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:bg-[#f5f5f7]/40 transition-colors">
+                  <div className="flex items-start sm:items-center gap-4 w-full md:w-auto">
                     <img 
                       src={chan.avatarUrl || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=150'} 
                       crossOrigin="anonymous"
-                      className="w-10 h-10 rounded-full object-cover border border-[#d2d2d7]" 
+                      className="w-10 h-10 rounded-full object-cover border border-[#d2d2d7] flex-shrink-0" 
                       alt="" 
                     />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-black">{chan.name || chan.displayName || chan.handle}</span>
-                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border uppercase ${getPlatformBadgeClasses(chan.platform)}`}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-semibold text-black truncate">{chan.name || chan.displayName || chan.handle}</span>
+                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border uppercase flex-shrink-0 ${getPlatformBadgeClasses(chan.platform)}`}>
                           {chan.platform}
                         </span>
-                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border uppercase ${getStatusBadgeClasses(chan.status)}`}>
+                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border uppercase flex-shrink-0 ${getStatusBadgeClasses(chan.status)}`}>
                           {getStatusLabel(chan.status)}
                         </span>
                       </div>
-                      <p className="text-[10px] text-gray-500 mt-1">
+                      <p className="text-[10px] text-gray-500 mt-1 truncate">
                         Handle: @{chan.username || chan.handle || 'unspecified'}
-                        {chan.accountId ? ` • ID: ${chan.accountId}` : ' • Awaiting account connection'}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full md:w-auto justify-start md:justify-end pt-3 md:pt-0 border-t border-[#e5e5ea]/50 md:border-t-0">
                     {chan.status === 'verified' && getChannelAccountId(chan) ? (
                       <button
                         onClick={() => navigate(`/channels/${getChannelAccountId(chan)}/feed`, {
                           state: adminViewUserId ? { fromAdmin: true, channel: chan } : undefined,
                         })}
-                        className="flex items-center gap-1.5 text-[10px] text-[#0071e3] hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 transition-all font-semibold active:scale-95"
+                        className="flex items-center justify-center gap-1.5 text-[10px] text-[#0071e3] hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 transition-all font-semibold active:scale-95"
                       >
                         <Eye className="w-3 h-3" />
                         <span>View Feed</span>
@@ -272,7 +262,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
                     {getChannelAccountId(chan) && (
                       <button
                         onClick={() => disconnectChannel(getChannelAccountId(chan))}
-                        className="p-2 hover:bg-red-50 hover:text-red-600 text-gray-400 rounded-lg transition-all"
+                        className="p-2 hover:bg-red-50 hover:text-red-600 text-gray-400 rounded-lg transition-all ml-auto md:ml-0"
                         title="Disconnect Channel"
                       >
                         <Trash2 className="w-4 h-4" />

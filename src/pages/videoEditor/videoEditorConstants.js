@@ -2,7 +2,8 @@ export const OUTPUT_WIDTH = 720;
 export const OUTPUT_HEIGHT = 1280;
 export const OUTPUT_FPS = 30;
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
+import { API_BASE_URL as CONFIG_API_BASE_URL } from '../../config';
+export const API_BASE_URL = CONFIG_API_BASE_URL;
 
 export const FONT_FAMILY_CSS = {
   'TikTok Sans': 'Outfit, sans-serif',

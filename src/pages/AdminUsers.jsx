@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { API_BASE_URL } from '../config';
 import { AlertTriangle, RefreshCw, Shield, UserCog, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getActiveCampaignId } from '../utils/campaignScope';
@@ -82,7 +83,7 @@ export const AdminUsers = () => {
       }
 
       const query = new URLSearchParams({ campaignId, scope: 'workspace' });
-      const response = await fetch(`http://localhost:5001/api/admin/users?${query.toString()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users?${query.toString()}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
         },

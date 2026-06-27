@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AlertCircle, Calendar, CheckCircle, Share2 } from 'lucide-react';
@@ -6,7 +7,7 @@ import { AlertCircle, Calendar, CheckCircle, Share2 } from 'lucide-react';
 const getProxyUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('https://pub-') || url.includes('r2.cloudflarestorage.com')) {
-    return `http://localhost:5001/api/media/proxy?url=${encodeURIComponent(url)}`;
+    return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
   }
   return url;
 };
@@ -92,7 +93,7 @@ export const CreatorCampaigns = () => {
   };
 
   const markPostDownloaded = async (post) => {
-    const response = await fetch(`http://localhost:5001/api/scheduler/${post._id}/downloaded`, {
+    const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/downloaded`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -193,7 +194,7 @@ export const CreatorCampaigns = () => {
 
   const handleMarkManualPosted = async (post) => {
     try {
-      const response = await fetch(`http://localhost:5001/api/scheduler/${post._id}/manual-posted`, {
+      const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/manual-posted`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -217,8 +218,8 @@ export const CreatorCampaigns = () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       const [campRes, postRes] = await Promise.all([
-        fetch('http://localhost:5001/api/accounts/creator/campaigns', { headers }),
-        fetch('http://localhost:5001/api/scheduler/creator/posts', { headers }),
+        fetch(`${API_BASE_URL}/api/accounts/creator/campaigns`, { headers }),
+        fetch(`${API_BASE_URL}/api/scheduler/creator/posts`, { headers }),
       ]);
 
       if (!campRes.ok) throw new Error('Failed to load assigned campaigns.');
@@ -242,8 +243,8 @@ export const CreatorCampaigns = () => {
       try {
         const headers = { Authorization: `Bearer ${token}` };
         const [campRes, postRes] = await Promise.all([
-          fetch('http://localhost:5001/api/accounts/creator/campaigns', { headers }),
-          fetch('http://localhost:5001/api/scheduler/creator/posts', { headers }),
+          fetch(`${API_BASE_URL}/api/accounts/creator/campaigns`, { headers }),
+          fetch(`${API_BASE_URL}/api/scheduler/creator/posts`, { headers }),
         ]);
 
         if (!active) return;

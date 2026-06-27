@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
 export const InstagramCallback = () => {
@@ -30,7 +31,7 @@ export const InstagramCallback = () => {
         return;
       }
 
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001';
+      const apiBaseUrl = API_BASE_URL;
       const campaignId = sessionStorage.getItem('connect_campaign_id') || localStorage.getItem('active-campaign-id') || '';
       const redirectUri = sessionStorage.getItem('instagram_oauth_redirect_uri')
         || import.meta.env.VITE_INSTAGRAM_REDIRECT_URI

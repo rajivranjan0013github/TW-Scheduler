@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { Plus, Check, Clock, AlertCircle, Folder, Users, Save } from 'lucide-react';
@@ -7,7 +8,7 @@ import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 const getProxyUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('https://pub-') || url.includes('r2.cloudflarestorage.com')) {
-    return `http://localhost:5001/api/media/proxy?url=${encodeURIComponent(url)}`;
+    return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
   }
   return url;
 };
@@ -395,10 +396,10 @@ const CalendarView = ({ selectedAccounts }) => {
   const fetchPosts = async () => {
     try {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('tw_token')}` };
-      const accountResponse = await fetch(`http://localhost:5001/api/accounts${withCampaignScope()}`, { headers });
+      const accountResponse = await fetch(`${API_BASE_URL}/api/accounts${withCampaignScope()}`, { headers });
       const accounts = accountResponse.ok ? await accountResponse.json() : [];
       const scopedAccountIds = selectedAccounts.length > 0 ? selectedAccounts : accounts.map(account => account._id);
-      const response = await fetch(`http://localhost:5001/api/scheduler${withCampaignScope()}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/api/scheduler${withCampaignScope()}`, { headers });
       if (response.ok) {
         const data = await response.json();
         const filtered = data.filter(p => {
@@ -417,7 +418,7 @@ const CalendarView = ({ selectedAccounts }) => {
       const token = localStorage.getItem('tw_token');
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      const accResponse = await fetch(`http://localhost:5001/api/accounts${withCampaignScope()}`, { headers });
+      const accResponse = await fetch(`${API_BASE_URL}/api/accounts${withCampaignScope()}`, { headers });
       const accData = await accResponse.json();
       setChannels(
         selectedAccounts.length > 0
@@ -425,11 +426,11 @@ const CalendarView = ({ selectedAccounts }) => {
           : accData
       );
 
-      const medResponse = await fetch(`http://localhost:5001/api/media${withCampaignScope()}`, { headers });
+      const medResponse = await fetch(`${API_BASE_URL}/api/media${withCampaignScope()}`, { headers });
       const medData = await medResponse.json();
       setMediaList(medData);
 
-      const folderResponse = await fetch(`http://localhost:5001/api/media/folders${withCampaignScope()}`, { headers });
+      const folderResponse = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, { headers });
       if (folderResponse.ok) {
         const folderData = await folderResponse.json();
         setFolders(folderData);
@@ -442,7 +443,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const handleDeletePost = async (postId) => {
     if (!window.confirm('Are you sure you want to cancel this scheduled post?')) return;
     try {
-      const response = await fetch(`http://localhost:5001/api/scheduler/${postId}${withCampaignScope()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/scheduler/${postId}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
@@ -462,7 +463,7 @@ const CalendarView = ({ selectedAccounts }) => {
     setSavingCaptionId(item._id);
 
     try {
-      const response = await fetch(`http://localhost:5001/api/media/${item._id}${withCampaignScope()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/media/${item._id}${withCampaignScope()}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -578,10 +579,9 @@ const CalendarView = ({ selectedAccounts }) => {
         platformSpecifics
       };
 
-      let url = 'http://localhost:5001/api/scheduler';
-
+      let url = `${API_BASE_URL}/api/scheduler`;
       if (isBulk) {
-        url = 'http://localhost:5001/api/scheduler/bulk';
+        url = `${API_BASE_URL}/api/scheduler/bulk`;
         body.startDate = effectiveScheduleDate;
         body.intervalHours = parseFloat(bulkInterval);
         body.type = postType;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
@@ -86,7 +87,7 @@ export const AdminCampaigns = () => {
       setError('');
       try {
         const headers = { Authorization: `Bearer ${localStorage.getItem('tw_token')}` };
-        const campaignRes = await fetch('http://localhost:5001/api/admin/campaigns?scope=workspace', { headers });
+        const campaignRes = await fetch(`${API_BASE_URL}/api/admin/campaigns?scope=workspace`, { headers });
         const campaignList = await campaignRes.json();
 
         if (!campaignRes.ok) throw new Error(campaignList.message || 'Failed to load campaigns.');
@@ -183,7 +184,7 @@ export const AdminCampaigns = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:5001/api/admin/campaigns/${campaignId}?scope=workspace`,
+        `${API_BASE_URL}/api/admin/campaigns/${campaignId}?scope=workspace`,
         {
           method: 'PATCH',
           headers: {
@@ -223,7 +224,7 @@ export const AdminCampaigns = () => {
     setSaving(true);
     setError('');
     try {
-      const response = await fetch(`http://localhost:5001/api/admin/campaigns/${campaign._id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/campaigns/${campaign._id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
       });
