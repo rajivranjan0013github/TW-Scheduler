@@ -24,6 +24,77 @@ const getErrorMessage = async (response, fallback) => {
 
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
 
+const getRelativePath = (file) => file.webkitRelativePath || file.name || '';
+
+const splitRelativePath = (file) => {
+  const relativePath = getRelativePath(file);
+  const lastSlashIndex = relativePath.lastIndexOf('/');
+  const directory = lastSlashIndex === -1 ? '' : relativePath.slice(0, lastSlashIndex);
+  const filename = lastSlashIndex === -1 ? relativePath : relativePath.slice(lastSlashIndex + 1);
+  const dotIndex = filename.lastIndexOf('.');
+  const basename = dotIndex === -1 ? filename : filename.slice(0, dotIndex);
+  const extension = dotIndex === -1 ? '' : filename.slice(dotIndex + 1).toLowerCase();
+
+  return {
+    directory: directory.toLowerCase(),
+    basename: basename.toLowerCase(),
+    extension,
+  };
+};
+
+const getCaptionMatchKeys = (file) => {
+  const { directory, basename } = splitRelativePath(file);
+  const baseKey = `${directory}/${basename}`;
+  const keys = [baseKey];
+
+  if (basename.endsWith('s')) {
+    keys.push(`${directory}/${basename.slice(0, -1)}`);
+  } else {
+    keys.push(`${directory}/${basename}s`);
+  }
+
+  return keys;
+};
+
+const buildCaptionFileMap = async (files) => {
+  const captionFiles = files.filter((file) => splitRelativePath(file).extension === 'txt');
+  const captionMap = new Map();
+
+  await Promise.all(captionFiles.map(async (file) => {
+    const { directory, basename } = splitRelativePath(file);
+    const text = (await file.text()).trim();
+    if (!text) return;
+    captionMap.set(`${directory}/${basename}`, text);
+  }));
+
+  return captionMap;
+};
+
+const getImportedCaption = (captionMap, mediaFile) => {
+  for (const key of getCaptionMatchKeys(mediaFile)) {
+    if (captionMap.has(key)) return captionMap.get(key);
+  }
+  return '';
+};
+
+const UPLOAD_CONCURRENCY = 4;
+
+const runWithConcurrency = async (items, limit, worker) => {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await worker(items[currentIndex], currentIndex);
+    }
+  });
+
+  await Promise.all(runners);
+  return results;
+};
+
 export const MediaLibrary = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,7 +108,7 @@ export const MediaLibrary = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(null);
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -64,11 +135,86 @@ export const MediaLibrary = () => {
   const canUpload = ['owner', 'admin', 'editor'].includes(user?.role);
   const canDelete = ['owner', 'admin'].includes(user?.role);
   const canManageFolders = canUpload;
+  const resetUploadProgress = () => setUploadProgress(null);
+  const getUploadProgressText = () => {
+    if (!uploadProgress) return 'Uploading to R2...';
+
+    const uploaded = uploadProgress.completed || 0;
+    const failed = uploadProgress.failed || 0;
+    const active = uploadProgress.active || 0;
+    const total = uploadProgress.total || 0;
+    const pieces = [`Uploaded ${uploaded}/${total}`];
+    if (active > 0) pieces.push(`${active} active`);
+    if (failed > 0) pieces.push(`${failed} failed`);
+    return pieces.join(' • ');
+  };
   const invalidateMediaCaches = () => Promise.all([
     queryClient.invalidateQueries({ queryKey: ['media-library'] }),
     queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
     queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
   ]);
+
+  const uploadMediaFiles = async ({
+    files,
+    folderId,
+    getCaption = () => '',
+    progressLabel = 'Uploading',
+  }) => {
+    const failedFiles = [];
+    let completed = 0;
+    let failed = 0;
+    let active = 0;
+
+    const updateProgress = (currentFile = '') => {
+      setUploadProgress({
+        total: files.length,
+        completed,
+        failed,
+        active,
+        currentFile,
+      });
+    };
+
+    updateProgress('');
+
+    await runWithConcurrency(files, UPLOAD_CONCURRENCY, async (file) => {
+      active += 1;
+      updateProgress(`${progressLabel}: ${file.webkitRelativePath || file.name}`);
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folderId', folderId);
+        formData.append('tags', '');
+        formData.append('caption', getCaption(file));
+        formData.append('socialAccountIds', '');
+        formData.append('campaignId', getActiveCampaignId());
+
+        const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const message = await getErrorMessage(response, 'Upload failed.');
+          failed += 1;
+          failedFiles.push(`${file.name} (${message})`);
+        }
+      } catch (error) {
+        failed += 1;
+        failedFiles.push(`${file.name} (${error.message || 'Upload failed'})`);
+      } finally {
+        active -= 1;
+        completed += 1;
+        updateProgress(file.webkitRelativePath || file.name);
+      }
+    });
+
+    return failedFiles;
+  };
 
   const fetchFolders = useCallback(async () => {
     setLoadingFolders(true);
@@ -176,36 +322,14 @@ export const MediaLibrary = () => {
     if (selectedFiles.length === 0) return;
 
     setUploading(true);
-    setUploadProgress('');
+    resetUploadProgress();
 
     try {
-      const failedFiles = [];
-
-      for (let index = 0; index < selectedFiles.length; index += 1) {
-        const file = selectedFiles[index];
-        setUploadProgress(`Uploading ${index + 1}/${selectedFiles.length}: ${file.name}`);
-
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('folderId', activeFolderId === 'root' ? 'null' : activeFolderId);
-        formData.append('tags', '');
-        formData.append('caption', '');
-        formData.append('socialAccountIds', '');
-        formData.append('campaignId', getActiveCampaignId());
-
-        const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const message = await getErrorMessage(response, 'Upload failed.');
-          failedFiles.push(`${file.name} (${message})`);
-        }
-      }
+      const failedFiles = await uploadMediaFiles({
+        files: selectedFiles,
+        folderId: activeFolderId === 'root' ? 'null' : activeFolderId,
+        progressLabel: 'Uploading file',
+      });
 
       await invalidateMediaCaches();
       void fetchMedia();
@@ -218,7 +342,7 @@ export const MediaLibrary = () => {
       alert(`Upload failed: ${error.message || 'Unable to save these files.'}`);
     } finally {
       setUploading(false);
-      setUploadProgress('');
+      resetUploadProgress();
       e.target.value = '';
       setShowUploadModal(false);
     }
@@ -239,9 +363,10 @@ export const MediaLibrary = () => {
     }
 
     setUploading(true);
+    resetUploadProgress();
 
     try {
-      const failedFiles = [];
+      const captionMap = await buildCaptionFileMap(selectedFiles);
       const firstRelativePath = mediaFiles[0].webkitRelativePath || mediaFiles[0].name;
       const folderName = firstRelativePath.split('/')[0] || 'Uploaded Folder';
       const folderResponse = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
@@ -264,31 +389,12 @@ export const MediaLibrary = () => {
       const createdFolder = await folderResponse.json();
       const targetFolderId = createdFolder._id;
 
-      for (let index = 0; index < mediaFiles.length; index += 1) {
-        const file = mediaFiles[index];
-        setUploadProgress(`Uploading ${index + 1}/${mediaFiles.length}: ${file.webkitRelativePath || file.name}`);
-
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('folderId', targetFolderId);
-        formData.append('tags', '');
-        formData.append('caption', '');
-        formData.append('socialAccountIds', '');
-        formData.append('campaignId', getActiveCampaignId());
-
-        const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const message = await getErrorMessage(response, 'Upload failed.');
-          failedFiles.push(`${file.name} (${message})`);
-        }
-      }
+      const failedFiles = await uploadMediaFiles({
+        files: mediaFiles,
+        folderId: targetFolderId,
+        getCaption: (file) => getImportedCaption(captionMap, file),
+        progressLabel: 'Uploading folder file',
+      });
 
       await invalidateMediaCaches();
       await fetchFolders();
@@ -302,7 +408,7 @@ export const MediaLibrary = () => {
       alert(`Folder upload failed: ${error.message || 'Unable to import this folder.'}`);
     } finally {
       setUploading(false);
-      setUploadProgress('');
+      resetUploadProgress();
       e.target.value = '';
       setShowUploadModal(false);
     }
@@ -612,7 +718,7 @@ export const MediaLibrary = () => {
       <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">
         <div>
           <h2 className="text-xl font-semibold text-black tracking-tight m-0">Media Library</h2>
-          <p className="text-[#8e8e93] text-xs mt-1">Store campaign media, thumbnails, and captions in R2</p>
+          <p className="text-[#8e8e93] text-xs mt-1">Store campaign media in R2 with captions saved to the library</p>
         </div>
 
         {canManageFolders && (
@@ -967,9 +1073,14 @@ export const MediaLibrary = () => {
             
             <div className="space-y-4">
               {uploading ? (
-                <div className="py-8 flex flex-col items-center justify-center gap-3">
+                <div className="py-8 flex flex-col items-center justify-center gap-3 text-center">
                   <div className="w-8 h-8 border-3 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-xs font-medium text-gray-500">{uploadProgress || 'Uploading to R2...'}</span>
+                  <span className="text-xs font-semibold text-[#1d1d1f]">{getUploadProgressText()}</span>
+                  {uploadProgress?.currentFile && (
+                    <span className="max-w-[320px] truncate text-[10px] font-medium text-gray-500">
+                      {uploadProgress.currentFile}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <>
