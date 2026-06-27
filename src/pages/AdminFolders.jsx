@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Folder, Calendar, Search, X, Plus, Trash2, MoreVertical, Eye } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 
 export const AdminFolders = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,7 +53,8 @@ export const AdminFolders = () => {
         throw new Error(data.message || 'Failed to create folder.');
       }
 
-      await fetchFolders();
+      await invalidateFolderCaches();
+      await fetchFolders({ force: true });
       setIsCreateModalOpen(false);
       setNewFolderName('');
     } catch (err) {
@@ -75,23 +78,43 @@ export const AdminFolders = () => {
         throw new Error(data.message || 'Failed to delete folder.');
       }
 
-      await fetchFolders();
+      await invalidateFolderCaches();
+      await fetchFolders({ force: true });
     } catch (err) {
       alert(err.message);
     }
   };
 
-  const fetchFolders = async () => {
-    setLoading(true);
+  const invalidateFolderCaches = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['admin', 'folders'] }),
+    queryClient.invalidateQueries({ queryKey: ['media-library'] }),
+    queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+  ]);
+
+  const fetchFolders = async ({ force = false } = {}) => {
+    if (folders.length === 0) setLoading(true);
     setError('');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/folders${withCampaignScope()}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to load folders.');
+      const scope = withCampaignScope();
+      const queryKey = ['admin', 'folders', scope];
+      if (force) {
+        await queryClient.invalidateQueries({ queryKey });
       }
+      const data = await queryClient.fetchQuery({
+        queryKey,
+        queryFn: async () => {
+          const response = await fetch(`${API_BASE_URL}/api/admin/folders${scope}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.message || 'Failed to load folders.');
+          }
+          return payload;
+        },
+        staleTime: 2 * 60 * 1000,
+      });
       setFolders(data);
     } catch (err) {
       setError(err.message);

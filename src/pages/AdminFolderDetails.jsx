@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Folder, Upload, X, Tag, AlertTriangle, Music, Save, Trash2 } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 
@@ -15,6 +16,7 @@ const getProxyUrl = (url) => {
 export const AdminFolderDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [folder, setFolder] = useState(null);
   const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,17 +34,34 @@ export const AdminFolderDetails = () => {
   const [captionDrafts, setCaptionDrafts] = useState({});
   const [savingCaptionId, setSavingCaptionId] = useState(null);
 
+  const invalidateFolderDetailCaches = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['admin', 'folder-details'] }),
+    queryClient.invalidateQueries({ queryKey: ['admin', 'folders'] }),
+    queryClient.invalidateQueries({ queryKey: ['media-library'] }),
+    queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+  ]);
+
   const fetchAccounts = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/accounts${withCampaignScope()}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
+      const scope = withCampaignScope();
+      const data = await queryClient.fetchQuery({
+        queryKey: ['admin', 'folder-details', 'accounts', scope],
+        queryFn: async () => {
+          const response = await fetch(`${API_BASE_URL}/api/accounts${scope}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.message || 'Failed to fetch accounts.');
+          }
+          return payload;
+        },
+        staleTime: 2 * 60 * 1000,
       });
-      if (response.ok) {
-        const data = await response.json();
-        const connected = data.filter((acc) => acc.isConnected !== false);
-        setAccounts(connected);
-        setSelectedAccountIds(connected.map((acc) => acc._id));
-      }
+      const connected = data.filter((acc) => acc.isConnected !== false);
+      setAccounts(connected);
+      setSelectedAccountIds(connected.map((acc) => acc._id));
     } catch (err) {
       console.error('Failed to fetch accounts:', err);
     }
@@ -84,7 +103,8 @@ export const AdminFolderDetails = () => {
         throw new Error(data.message || 'Failed to upload media asset.');
       }
 
-      await fetchFolderDetails();
+      await invalidateFolderDetailCaches();
+      await fetchFolderDetails({ force: true });
       setIsUploadModalOpen(false);
       setUploadFile(null);
       setUploadTags('');
@@ -110,23 +130,36 @@ export const AdminFolderDetails = () => {
         throw new Error(data.message || 'Failed to delete folder.');
       }
 
+      await invalidateFolderDetailCaches();
       navigate('/admin/folders');
     } catch (err) {
       alert(err.message);
     }
   };
 
-  const fetchFolderDetails = async () => {
-    setLoading(true);
+  const fetchFolderDetails = async ({ force = false } = {}) => {
+    if (!folder && media.length === 0) setLoading(true);
     setError('');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/folders/${id}${withCampaignScope()}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to load folder details.');
+      const scope = withCampaignScope();
+      const queryKey = ['admin', 'folder-details', id, scope];
+      if (force) {
+        await queryClient.invalidateQueries({ queryKey });
       }
+      const data = await queryClient.fetchQuery({
+        queryKey,
+        queryFn: async () => {
+          const response = await fetch(`${API_BASE_URL}/api/admin/folders/${id}${scope}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.message || 'Failed to load folder details.');
+          }
+          return payload;
+        },
+        staleTime: 60 * 1000,
+      });
       setFolder(data.folder);
       setMedia(data.media);
     } catch (err) {
@@ -172,6 +205,7 @@ export const AdminFolderDetails = () => {
         delete next[item._id];
         return next;
       });
+      await invalidateFolderDetailCaches();
     } catch (err) {
       alert(`Caption save failed: ${err.message}`);
     } finally {

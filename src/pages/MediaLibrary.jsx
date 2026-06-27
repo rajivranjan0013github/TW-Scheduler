@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AlertTriangle, Folder, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
@@ -26,6 +27,7 @@ const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
 export const MediaLibrary = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { user, token } = useAuth();
   const [folders, setFolders] = useState([]);
   const [media, setMedia] = useState([]);
@@ -62,22 +64,33 @@ export const MediaLibrary = () => {
   const canUpload = ['owner', 'admin', 'editor'].includes(user?.role);
   const canDelete = ['owner', 'admin'].includes(user?.role);
   const canManageFolders = canUpload;
+  const invalidateMediaCaches = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['media-library'] }),
+    queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+  ]);
 
   const fetchFolders = useCallback(async () => {
     setLoadingFolders(true);
     setErrorMessage('');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+      const campaignId = getActiveCampaignId();
+      const data = await queryClient.fetchQuery({
+        queryKey: ['media-library', 'folders', campaignId],
+        queryFn: async () => {
+          const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+          if (!response.ok) {
+            throw new Error(await getErrorMessage(response, 'Failed to load folders.'));
+          }
+          return response.json();
+        },
+        staleTime: 2 * 60 * 1000,
       });
-      if (response.ok) {
-        const data = await response.json();
-        setFolders(Array.isArray(data) ? data : []);
-      } else {
-        throw new Error(await getErrorMessage(response, 'Failed to load folders.'));
-      }
+      setFolders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load folders:', error);
       setFolders([]);
@@ -85,7 +98,7 @@ export const MediaLibrary = () => {
     } finally {
       setLoadingFolders(false);
     }
-  }, [authToken]);
+  }, [authToken, queryClient]);
 
   const PAGE_SIZE = 18;
 
@@ -106,24 +119,29 @@ export const MediaLibrary = () => {
       params.set('limit', String(PAGE_SIZE));
       const url = `${API_BASE_URL}/api/media?${params.toString()}`;
 
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+      const data = await queryClient.fetchQuery({
+        queryKey: ['media-library', 'media', campaignId || '', activeFolderId, targetPage, PAGE_SIZE],
+        queryFn: async () => {
+          const response = await fetch(url, {
+            headers: {
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+          if (!response.ok) {
+            throw new Error(await getErrorMessage(response, 'Failed to load media.'));
+          }
+          return response.json();
+        },
+        staleTime: 60 * 1000,
       });
-      if (response.ok) {
-        const data = await response.json();
-        const items = Array.isArray(data) ? data : [];
-        if (isFirstPage) {
-          setMedia(items);
-        } else {
-          setMedia((prev) => [...prev, ...items]);
-        }
-        setHasMore(items.length === PAGE_SIZE);
-        setPage(targetPage);
+      const items = Array.isArray(data) ? data : [];
+      if (isFirstPage) {
+        setMedia(items);
       } else {
-        throw new Error(await getErrorMessage(response, 'Failed to load media.'));
+        setMedia((prev) => [...prev, ...items]);
       }
+      setHasMore(items.length === PAGE_SIZE);
+      setPage(targetPage);
     } catch (error) {
       console.error('Failed to load media:', error);
       if (isFirstPage) {
@@ -137,7 +155,7 @@ export const MediaLibrary = () => {
         setLoadingMore(false);
       }
     }
-  }, [activeFolderId, authToken]);
+  }, [activeFolderId, authToken, queryClient]);
 
   useEffect(() => {
     if (location.state?.preselectedFolderId) {
@@ -189,6 +207,7 @@ export const MediaLibrary = () => {
         }
       }
 
+      await invalidateMediaCaches();
       void fetchMedia();
 
       if (failedFiles.length > 0) {
@@ -271,6 +290,7 @@ export const MediaLibrary = () => {
         }
       }
 
+      await invalidateMediaCaches();
       await fetchFolders();
       setActiveFolderId(targetFolderId);
 
@@ -316,6 +336,7 @@ export const MediaLibrary = () => {
           delete next[item._id];
           return next;
         });
+        await invalidateMediaCaches();
         return true;
       } else {
         throw new Error(await getErrorMessage(response, 'Unable to update media caption'));
@@ -415,6 +436,7 @@ export const MediaLibrary = () => {
         setMedia((current) => current.map((item) => (
           item._id === updatedMedia._id ? updatedMedia : item
         )));
+        await invalidateMediaCaches();
         closeRenameMediaModal();
       } else {
         throw new Error(await getErrorMessage(response, 'Failed to rename file.'));
@@ -448,6 +470,7 @@ export const MediaLibrary = () => {
       if (response.ok) {
         setNewFolderName('');
         setShowNewFolderModal(false);
+        await invalidateMediaCaches();
         void fetchFolders();
       } else {
         throw new Error(await getErrorMessage(response, 'Failed to create folder.'));
@@ -494,6 +517,7 @@ export const MediaLibrary = () => {
         setFolders((current) => current.map((folder) => (
           folder._id === updatedFolder._id ? updatedFolder : folder
         )));
+        await invalidateMediaCaches();
         closeRenameFolderModal();
       } else {
         throw new Error(await getErrorMessage(response, 'Failed to rename folder.'));
@@ -522,6 +546,7 @@ export const MediaLibrary = () => {
         if (activeFolderId === folderId) {
           setActiveFolderId('root');
         }
+        await invalidateMediaCaches();
         void fetchFolders();
         void fetchMedia();
       } else {
@@ -546,6 +571,7 @@ export const MediaLibrary = () => {
         }
       });
       if (response.ok) {
+        await invalidateMediaCaches();
         void fetchMedia();
       } else {
         throw new Error(await getErrorMessage(response, 'Failed to delete media.'));
@@ -748,7 +774,7 @@ export const MediaLibrary = () => {
                             playsInline
                             preload="metadata"
                             onMouseEnter={(e) => {
-                              e.target.play().catch(err => console.log("Play interrupted:", err));
+                              e.target.play().catch(err => {});
                             }}
                             onMouseLeave={(e) => {
                               e.target.pause();

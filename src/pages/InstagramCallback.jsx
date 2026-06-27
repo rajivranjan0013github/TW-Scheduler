@@ -8,6 +8,19 @@ export const InstagramCallback = () => {
   const code = searchParams.get('code');
   const exchangeStartedRef = useRef(false);
 
+  const navigateAfterConnect = () => {
+    const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
+    const returnPath = sessionStorage.getItem('connect_return_path') || '';
+    sessionStorage.removeItem('connect_return_path');
+
+    if (returnPath) {
+      navigate(returnPath);
+      return;
+    }
+
+    navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
+  };
+
   useEffect(() => {
     if (code) {
       if (exchangeStartedRef.current) return;
@@ -17,7 +30,7 @@ export const InstagramCallback = () => {
       exchangeStartedRef.current = true;
       exchangeToken();
     } else {
-      navigate('/channels');
+      navigateAfterConnect();
     }
   }, [code]);
 
@@ -26,8 +39,8 @@ export const InstagramCallback = () => {
       const token = localStorage.getItem('tw_token');
       if (!token) {
         sessionStorage.setItem('pending_instagram_code', code);
-        alert('Please sign in with Google first, then return to Channels to finish connecting Instagram.');
-        navigate('/channels');
+        alert('Please sign in with Google first, then return to finish connecting Instagram.');
+        navigateAfterConnect();
         return;
       }
 
@@ -55,7 +68,7 @@ export const InstagramCallback = () => {
       console.error('Error in Instagram OAuth token exchange:', error);
       alert('❌ Error completing Instagram authentication flow.');
     } finally {
-      navigate('/channels');
+      navigateAfterConnect();
     }
   };
 

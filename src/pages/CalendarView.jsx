@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
@@ -116,6 +117,7 @@ const MediaPreview = ({ item, className = 'h-full w-full object-cover block' }) 
 const CalendarView = ({ selectedAccounts }) => {
   const { user } = useAuth();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const [posts, setPosts] = useState([]);
   const canvasRef = useRef(null);
   const [portPositions, setPortPositions] = useState({});
@@ -396,18 +398,30 @@ const CalendarView = ({ selectedAccounts }) => {
   const fetchPosts = async () => {
     try {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('tw_token')}` };
-      const accountResponse = await fetch(`${API_BASE_URL}/api/accounts${withCampaignScope()}`, { headers });
-      const accounts = accountResponse.ok ? await accountResponse.json() : [];
+      const scope = withCampaignScope();
+      const fetchJson = async (url) => {
+        const response = await fetch(url, { headers });
+        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+        return response.json();
+      };
+      const [accounts, data] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ['scheduler', 'accounts', scope],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts${scope}`),
+          staleTime: 2 * 60 * 1000,
+        }),
+        queryClient.fetchQuery({
+          queryKey: ['scheduler', 'posts', scope],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler${scope}`),
+          staleTime: 20 * 1000,
+        }),
+      ]);
       const scopedAccountIds = selectedAccounts.length > 0 ? selectedAccounts : accounts.map(account => account._id);
-      const response = await fetch(`${API_BASE_URL}/api/scheduler${withCampaignScope()}`, { headers });
-      if (response.ok) {
-        const data = await response.json();
-        const filtered = data.filter(p => {
-          const accId = p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0];
-          return scopedAccountIds.includes(accId);
-        });
-        setPosts(filtered);
-      }
+      const filtered = data.filter(p => {
+        const accId = p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0];
+        return scopedAccountIds.includes(accId);
+      });
+      setPosts(filtered);
     } catch (error) {
       console.error('Failed to load scheduled posts:', error);
     }
@@ -417,24 +431,37 @@ const CalendarView = ({ selectedAccounts }) => {
     try {
       const token = localStorage.getItem('tw_token');
       const headers = { 'Authorization': `Bearer ${token}` };
+      const scope = withCampaignScope();
+      const fetchJson = async (url) => {
+        const response = await fetch(url, { headers });
+        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+        return response.json();
+      };
 
-      const accResponse = await fetch(`${API_BASE_URL}/api/accounts${withCampaignScope()}`, { headers });
-      const accData = await accResponse.json();
+      const [accData, medData, folderData] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ['scheduler', 'accounts', scope],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts${scope}`),
+          staleTime: 2 * 60 * 1000,
+        }),
+        queryClient.fetchQuery({
+          queryKey: ['scheduler', 'media', scope],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/media${scope}`),
+          staleTime: 60 * 1000,
+        }),
+        queryClient.fetchQuery({
+          queryKey: ['scheduler', 'folders', scope],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/media/folders${scope}`),
+          staleTime: 2 * 60 * 1000,
+        }),
+      ]);
       setChannels(
         selectedAccounts.length > 0
           ? accData.filter(account => selectedAccounts.includes(account._id))
           : accData
       );
-
-      const medResponse = await fetch(`${API_BASE_URL}/api/media${withCampaignScope()}`, { headers });
-      const medData = await medResponse.json();
       setMediaList(medData);
-
-      const folderResponse = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, { headers });
-      if (folderResponse.ok) {
-        const folderData = await folderResponse.json();
-        setFolders(folderData);
-      }
+      setFolders(folderData);
     } catch (error) {
       console.error('Failed to fetch composer data:', error);
     }
@@ -450,6 +477,8 @@ const CalendarView = ({ selectedAccounts }) => {
         }
       });
       if (response.ok) {
+        await queryClient.invalidateQueries({ queryKey: ['scheduler'] });
+        await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
         fetchPosts();
       }
     } catch (error) {
@@ -597,6 +626,8 @@ const CalendarView = ({ selectedAccounts }) => {
       });
 
       if (response.ok) {
+        await queryClient.invalidateQueries({ queryKey: ['scheduler'] });
+        await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
         setShowComposer(false);
         setSelectedChannels([]);
         setSelectedMedia([]);

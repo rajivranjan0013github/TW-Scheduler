@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Eye, TrendingUp, Calendar, Heart, RefreshCw, MessageSquare } from 'lucide-react';
 import { withCampaignScope } from '../utils/campaignScope';
@@ -34,6 +35,7 @@ const mockChartData = [
 export const Dashboard = ({ selectedAccounts }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const adminViewContext = (() => {
     try {
       return JSON.parse(sessionStorage.getItem('admin_view_context') || 'null');
@@ -64,49 +66,77 @@ export const Dashboard = ({ selectedAccounts }) => {
     try {
       if (forceRefresh) {
         setRefreshing(true);
+        await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       } else {
         setLoading(true);
       }
       const token = localStorage.getItem('tw_token');
       const headers = { 'Authorization': `Bearer ${token}` };
       const scopedSuffix = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
+      const selectedAccountKey = selectedAccounts.join(',');
+      const fetchJson = async (url) => {
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+          throw new Error(`Request failed: ${response.status}`);
+        }
+        return response.json();
+      };
+      const cachedJson = (key, url, staleTime = 30 * 1000) => (
+        forceRefresh
+          ? fetchJson(url)
+          : queryClient.fetchQuery({
+              queryKey: ['dashboard', ...key],
+              queryFn: () => fetchJson(url),
+              staleTime,
+            })
+      );
 
-      const accResponse = await fetch(`${API_BASE_URL}/api/accounts${scopedSuffix}`, { headers });
-      const accountsList = await accResponse.json();
+      const accountsList = await cachedJson(
+        ['accounts', scopedSuffix],
+        `${API_BASE_URL}/api/accounts${scopedSuffix}`,
+        2 * 60 * 1000
+      );
       const campaignAccounts = selectedAccounts.length > 0
         ? accountsList.filter(account => selectedAccounts.includes(account._id))
         : accountsList;
       const activeAccountIds = campaignAccounts.map(account => account._id);
       setChannels(campaignAccounts);
 
-      const schedResponse = await fetch(`${API_BASE_URL}/api/scheduler${scopedSuffix}`, { headers });
-      const posts = await schedResponse.json();
+      setErrorInsights(null);
+      const insightParams = new URLSearchParams({ period: selectedPeriod });
+      if (forceRefresh) insightParams.set('refresh', 'true');
+      if (adminViewUserId) insightParams.set('userId', adminViewUserId);
+      const campaignId = localStorage.getItem('active-campaign-id');
+      if (campaignId) insightParams.set('campaignId', campaignId);
+      const insightUrl = `${API_BASE_URL}/api/accounts/insights?${insightParams.toString()}`;
+
+      const [
+        posts,
+        mediaList,
+        insightsResult,
+        recentData,
+      ] = await Promise.all([
+        cachedJson(['scheduler', scopedSuffix], `${API_BASE_URL}/api/scheduler${scopedSuffix}`, 20 * 1000),
+        cachedJson(['media', scopedSuffix], `${API_BASE_URL}/api/media${scopedSuffix}`, 60 * 1000),
+        cachedJson(['insights', selectedPeriod, campaignId || '', adminViewUserId || '', forceRefresh ? 'refresh' : 'cached'], insightUrl, 2 * 60 * 1000)
+          .then((data) => ({ ok: true, data }))
+          .catch((error) => ({ ok: false, error })),
+        cachedJson(['recent-posts', scopedSuffix, selectedAccountKey], `${API_BASE_URL}/api/accounts/posts/recent${scopedSuffix}`, 60 * 1000)
+          .catch((error) => {
+            console.error('Failed to fetch recent published posts:', error);
+            return [];
+          }),
+      ]);
+
       const filteredPosts = posts.filter(p => activeAccountIds.includes(p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0]));
-      
       const upcoming = filteredPosts.filter(p => p.status === 'scheduled' || p.status === 'publishing');
       setUpcomingPosts(upcoming.slice(0, 3));
 
-      const medResponse = await fetch(`${API_BASE_URL}/api/media${scopedSuffix}`, { headers });
-      const mediaList = await medResponse.json();
-
-      setErrorInsights(null);
-      try {
-        const insightParams = new URLSearchParams({ period: selectedPeriod });
-        if (forceRefresh) insightParams.set('refresh', 'true');
-        if (adminViewUserId) insightParams.set('userId', adminViewUserId);
-        const campaignId = localStorage.getItem('active-campaign-id');
-        if (campaignId) insightParams.set('campaignId', campaignId);
-        const insResponse = await fetch(`${API_BASE_URL}/api/accounts/insights?${insightParams.toString()}`, { headers });
-        if (insResponse.ok) {
-          const insightsList = await insResponse.json();
-          setChartData(insightsList);
-        } else {
-          const errData = await insResponse.json();
-          setErrorInsights(errData.message || 'Failed to fetch insights.');
-        }
-      } catch (insErr) {
-        console.error('Failed to fetch aggregated insights:', insErr);
-        setErrorInsights('Network error: Failed to connect to server.');
+      if (insightsResult.ok) {
+        setChartData(insightsResult.data);
+      } else {
+        console.error('Failed to fetch aggregated insights:', insightsResult.error);
+        setErrorInsights(insightsResult.error.message || 'Network error: Failed to connect to server.');
       }
 
       setStats({
@@ -115,20 +145,11 @@ export const Dashboard = ({ selectedAccounts }) => {
         mediaCount: mediaList.length
       });
 
-      // Fetch recent 25 published posts
-      try {
-        const recentResponse = await fetch(`${API_BASE_URL}/api/accounts/posts/recent${scopedSuffix}`, { headers });
-        if (recentResponse.ok) {
-          const recentData = await recentResponse.json();
-          setRecentPosts(
-            selectedAccounts.length > 0
-              ? recentData.filter(post => activeAccountIds.includes(post.accountId))
-              : recentData
-          );
-        }
-      } catch (err) {
-        console.error('Failed to fetch recent published posts:', err);
-      }
+      setRecentPosts(
+        selectedAccounts.length > 0
+          ? recentData.filter(post => activeAccountIds.includes(post.accountId))
+          : recentData
+      );
     } catch (error) {
       console.error('Failed to load dashboard metrics:', error);
     } finally {

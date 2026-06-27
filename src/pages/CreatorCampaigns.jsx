@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -74,6 +75,7 @@ const PlatformLogo = ({ platform, className = 'h-7 w-7' }) => {
 export const CreatorCampaigns = () => {
   const { token } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [campaigns, setCampaigns] = useState([]);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +94,76 @@ export const CreatorCampaigns = () => {
     )));
   };
 
+  const prepareVerificationRedirect = (campaignId) => {
+    sessionStorage.setItem('connect_campaign_id', campaignId);
+    sessionStorage.setItem('connect_return_path', '/campaigns');
+  };
+
+  const connectMetaOAuth = (campaignId) => {
+    prepareVerificationRedirect(campaignId);
+    const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
+    const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
+    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
+    const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
+    window.location.href = oauthUrl;
+  };
+
+  const connectInstagramOAuth = (campaignId) => {
+    const appId = import.meta.env.VITE_INSTAGRAM_APP_ID;
+    const facebookAppId = import.meta.env.VITE_META_APP_ID;
+    if (!appId || appId === facebookAppId) {
+      alert('Set VITE_INSTAGRAM_APP_ID to the Instagram App ID from Meta Dashboard > Instagram > API setup with Instagram login. It cannot be the Facebook App ID.');
+      return;
+    }
+
+    prepareVerificationRedirect(campaignId);
+    const rawRedirectUri = import.meta.env.VITE_INSTAGRAM_REDIRECT_URI || `${window.location.origin}/auth/instagram/callback`;
+    sessionStorage.setItem('instagram_oauth_redirect_uri', rawRedirectUri);
+    const redirectUri = encodeURIComponent(rawRedirectUri);
+    const scope = encodeURIComponent('instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights');
+    const oauthUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+    window.location.href = oauthUrl;
+  };
+
+  const connectYoutubeOAuth = async (campaignId) => {
+    try {
+      prepareVerificationRedirect(campaignId);
+      const response = await fetch(`${API_BASE_URL}/api/accounts/youtube/auth-url`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.url) {
+        alert(data.message || 'Failed to start YouTube connection.');
+        return;
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      console.error('Failed to start YouTube OAuth:', error);
+      alert('Failed to connect to the backend for YouTube OAuth.');
+    }
+  };
+
+  const handleVerifyChannel = (channel) => {
+    if (channel.platform === 'instagram') {
+      connectInstagramOAuth(channel.campaignId);
+      return;
+    }
+
+    if (channel.platform === 'youtube') {
+      void connectYoutubeOAuth(channel.campaignId);
+      return;
+    }
+
+    if (channel.platform === 'facebook') {
+      connectMetaOAuth(channel.campaignId);
+      return;
+    }
+
+    navigate('/channels', { state: { campaignId: channel.campaignId } });
+  };
+
   const markPostDownloaded = async (post) => {
     const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/downloaded`, {
       method: 'POST',
@@ -99,6 +171,8 @@ export const CreatorCampaigns = () => {
     });
     if (response.ok) {
       updatePostInList(await response.json());
+      void queryClient.invalidateQueries({ queryKey: ['creator'] });
+      void queryClient.invalidateQueries({ queryKey: ['scheduler'] });
     }
   };
 
@@ -207,6 +281,9 @@ export const CreatorCampaigns = () => {
         throw new Error(data.message || 'Could not mark this post as posted.');
       }
       updatePostInList(data);
+      await queryClient.invalidateQueries({ queryKey: ['creator'] });
+      await queryClient.invalidateQueries({ queryKey: ['scheduler'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     } catch (err) {
       alert(err.message);
     }
@@ -217,16 +294,23 @@ export const CreatorCampaigns = () => {
     setError('');
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [campRes, postRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/accounts/creator/campaigns`, { headers }),
-        fetch(`${API_BASE_URL}/api/scheduler/creator/posts`, { headers }),
+      const fetchJson = async (url) => {
+        const response = await fetch(url, { headers });
+        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+        return response.json();
+      };
+      const [campData, postData] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: ['creator', 'campaigns'],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
+          staleTime: 2 * 60 * 1000,
+        }),
+        queryClient.fetchQuery({
+          queryKey: ['creator', 'posts'],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler/creator/posts`),
+          staleTime: 20 * 1000,
+        }),
       ]);
-
-      if (!campRes.ok) throw new Error('Failed to load assigned campaigns.');
-      if (!postRes.ok) throw new Error('Failed to load scheduled posts.');
-
-      const campData = await campRes.json();
-      const postData = await postRes.json();
 
       setCampaigns(campData);
       setPosts(postData);
@@ -235,25 +319,32 @@ export const CreatorCampaigns = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [queryClient, token]);
 
   useEffect(() => {
     let active = true;
     const initialFetch = async () => {
       try {
         const headers = { Authorization: `Bearer ${token}` };
-        const [campRes, postRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/accounts/creator/campaigns`, { headers }),
-          fetch(`${API_BASE_URL}/api/scheduler/creator/posts`, { headers }),
+        const fetchJson = async (url) => {
+          const response = await fetch(url, { headers });
+          if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+          return response.json();
+        };
+        const [campData, postData] = await Promise.all([
+          queryClient.fetchQuery({
+            queryKey: ['creator', 'campaigns'],
+            queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
+            staleTime: 2 * 60 * 1000,
+          }),
+          queryClient.fetchQuery({
+            queryKey: ['creator', 'posts'],
+            queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler/creator/posts`),
+            staleTime: 20 * 1000,
+          }),
         ]);
 
         if (!active) return;
-
-        if (!campRes.ok) throw new Error('Failed to load assigned campaigns.');
-        if (!postRes.ok) throw new Error('Failed to load scheduled posts.');
-
-        const campData = await campRes.json();
-        const postData = await postRes.json();
 
         setCampaigns(campData);
         setPosts(postData);
@@ -271,13 +362,14 @@ export const CreatorCampaigns = () => {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [queryClient, token]);
 
   const pendingVerifications = campaigns.flatMap((camp) => (
     (camp.channels || [])
       .filter((ch) => !ch.isVerified)
       .map((ch) => ({ ...ch, campaignId: camp._id, campaignName: camp.name }))
   ));
+  const assignedCampaigns = campaigns.filter((camp) => (camp.channels || []).length > 0);
   const creatorQueuePosts = posts.filter((post) => (
     ['manual', 'hybrid'].includes(post.scheduleMode)
     && !['failed', 'cancelled'].includes(post.status)
@@ -285,18 +377,13 @@ export const CreatorCampaigns = () => {
   const actionablePosts = posts.filter(isCreatorActionable);
   const nextQueuedPost = actionablePosts[0] || null;
   const getIdValue = (value) => (typeof value === 'object' && value !== null ? value._id : value);
-  const activeCampaign = nextQueuedPost
-    ? campaigns.find((camp) => String(camp._id) === String(getIdValue(nextQueuedPost.campaignId)))
-    : campaigns[0] || null;
+  const getCampaignCreatorPosts = (campaignId) => (
+    creatorQueuePosts.filter((post) => String(getIdValue(post.campaignId)) === String(campaignId))
+  );
 
   const getPrimaryMedia = (post) => post.mediaIds?.[0] || null;
   const getPostAccounts = (post) => post.socialAccountIds || [];
-  const getAccountLabel = (account) => account?.username || account?.name || 'Account';
-  const primaryPostAccount = getPostAccounts(nextQueuedPost || {})[0] || null;
-  const extraAccountCount = Math.max(getPostAccounts(nextQueuedPost || {}).length - 1, 0);
-  const nextPostPosition = nextQueuedPost
-    ? Math.max(creatorQueuePosts.findIndex((post) => post._id === nextQueuedPost._id) + 1, 1)
-    : 0;
+  const getAccountLabel = (account) => account?.username || account?.name || account?.handle || account?.requestedHandle || 'Account';
   const creatorQueueTotal = creatorQueuePosts.length || actionablePosts.length;
   const nextShareMedia = getPrimaryMedia(nextQueuedPost || {});
 
@@ -364,7 +451,7 @@ export const CreatorCampaigns = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => navigate('/channels', { state: { campaignId: ch.campaignId } })}
+                        onClick={() => handleVerifyChannel(ch)}
                         className="shrink-0 rounded-lg bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white transition hover:bg-black"
                       >
                         Verify
@@ -376,163 +463,117 @@ export const CreatorCampaigns = () => {
             )}
 
             <section className="rounded-lg border border-[#d2d2d7] bg-white">
-              {!nextQueuedPost ? (
-                <div className="p-5 text-center text-sm text-[#6e6e73] md:p-6">
-                  <Calendar className="mx-auto h-7 w-7 text-[#8e8e93]/60" />
-                  <p className="m-0 mt-2 font-semibold text-[#1d1d1f]">No queued video ready</p>
-                  <p className="m-0 mt-1 text-xs">The next manual or hybrid creator post will appear here.</p>
-                  {activeCampaign && (
-                    <div className="mx-auto mt-4 max-w-lg rounded-lg border border-[#e5e5ea] bg-[#fbfbfb] p-3 text-left">
-                      <p className="m-0 truncate text-xs font-semibold text-black">{activeCampaign.name}</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {(activeCampaign.channels || []).slice(0, 4).map((ch, idx) => (
-                          <span key={idx} className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[#1d1d1f]">
-                            <PlatformLogo platform={ch.platform} className="h-3.5 w-3.5" />
-                            {ch.handle?.startsWith('@') ? ch.handle : `@${ch.handle}`}
-                          </span>
-                        ))}
+              <div className="border-b border-[#e5e5ea] px-3 py-2.5 md:px-4 md:py-3">
+                <h2 className="m-0 text-sm font-semibold text-black">My Campaigns</h2>
+              </div>
+              {assignedCampaigns.length > 0 ? (
+                <div className="grid gap-2 p-3 md:gap-3 md:p-4 lg:grid-cols-2">
+                  {assignedCampaigns.map((camp) => {
+                    const verifiedCount = (camp.channels || []).filter((ch) => ch.isVerified).length;
+                    const campaignPosts = getCampaignCreatorPosts(camp._id);
+                    const campaignNextPost = campaignPosts.find(isCreatorActionable) || null;
+                    const campaignPrimaryAccount = getPostAccounts(campaignNextPost || {})[0] || (camp.channels || [])[0] || null;
+                    const campaignExtraAccountCount = Math.max(getPostAccounts(campaignNextPost || {}).length - 1, 0);
+                    const campaignPostPosition = campaignNextPost
+                      ? Math.max(creatorQueuePosts.findIndex((post) => post._id === campaignNextPost._id) + 1, 1)
+                      : 0;
+                    const campaignMedia = getPrimaryMedia(campaignNextPost || {});
+                    const campaignMediaUrl = getProxyUrl(campaignMedia?.url);
+                    return (
+                      <div key={camp._id} className="rounded-lg border border-[#e5e5ea] bg-[#fbfbfb] p-3">
+                        <div className="flex flex-col gap-1.5 border-b border-[#e5e5ea] pb-2.5">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="truncate text-base font-semibold text-black">{camp.name}</span>
+                              {campaignNextPost && (
+                                <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold text-[#1d1d1f]">
+                                  Post {campaignPostPosition}/{creatorQueueTotal}
+                                </span>
+                              )}
+                            </div>
+                            <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold capitalize text-[#6e6e73] border border-[#e5e5ea]">
+                              {camp.status || 'active'}
+                            </span>
+                          </div>
+                          {(camp.channels || []).length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1">
+                              {(camp.channels || []).map((ch) => (
+                                <span
+                                  key={`${camp._id}-${ch.platform}-${ch.handle || ch.username}`}
+                                  className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium border ${
+                                    ch.isVerified
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                      : 'bg-amber-50 text-amber-700 border-amber-100'
+                                  }`}
+                                >
+                                  <PlatformLogo platform={ch.platform} className="h-3 w-3 shrink-0" />
+                                  <span className="truncate max-w-[100px]">
+                                    {(ch.handle || ch.username || '').startsWith('@')
+                                      ? (ch.handle || ch.username)
+                                      : `@${ch.handle || ch.username || 'channel'}`}
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-2.5 rounded-lg border border-[#e5e5ea] bg-white p-2.5">
+                          {campaignNextPost ? (
+                            <div className="flex flex-col items-center">
+                              <div className="w-full max-w-[150px] overflow-hidden rounded-md border border-[#e5e5ea] bg-black">
+                                {!campaignMedia?.url ? (
+                                  <div className="flex aspect-[9/16] items-center justify-center bg-[#f5f5f7] p-2 text-center text-xs font-semibold text-[#6e6e73]">
+                                    No media
+                                  </div>
+                                ) : campaignMedia.type === 'video' || campaignMedia.url.endsWith('.mp4') ? (
+                                  <video
+                                    src={campaignMediaUrl}
+                                    controls
+                                    playsInline
+                                    preload="metadata"
+                                    className="aspect-[9/16] w-full object-cover"
+                                  />
+                                ) : (
+                                  <img src={campaignMediaUrl} alt="" className="aspect-[9/16] w-full object-cover" />
+                                )}
+                              </div>
+                              <div className="mt-2.5 grid grid-cols-2 gap-2 w-full">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSharePost(campaignNextPost)}
+                                  disabled={sharingPostId === campaignNextPost._id}
+                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg bg-[#1d1d1f] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60 hover:bg-black transition-colors"
+                                >
+                                  <Share2 className="h-3.5 w-3.5" />
+                                  {sharingPostId === campaignNextPost._id ? 'Opening' : 'Share Video'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkManualPosted(campaignNextPost)}
+                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  Mark Posted
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="py-2 text-center">
+                              <p className="m-0 text-[10px] font-bold uppercase text-[#6e6e73]">Videos</p>
+                              <p className="m-0 mt-0.5 text-xs font-semibold text-[#1d1d1f]">No videos yet</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
               ) : (
-                <>
-                  <div className="p-2 sm:p-3 md:hidden">
-                    <div className="flex items-center justify-between gap-2 rounded-lg border border-[#e5e5ea] bg-[#fbfbfb] p-2 sm:gap-2.5 sm:p-3">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <PlatformLogo platform={primaryPostAccount?.platform} className="h-6 w-6 shrink-0 sm:h-8 sm:w-8" />
-                        <div className="min-w-0">
-                          <p className="m-0 truncate text-xs font-semibold text-black sm:text-sm">
-                            {primaryPostAccount ? `@${getAccountLabel(primaryPostAccount)}` : 'Account'}
-                          </p>
-                          <p className="m-0 mt-0.5 text-[11px] font-semibold text-[#6e6e73] capitalize">
-                            {primaryPostAccount?.platform || 'Platform'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="m-0 text-[10px] font-bold uppercase tracking-wider text-[#8e8e93]">Post</p>
-                        <p className="m-0 mt-0.5 text-sm font-semibold text-black">{nextPostPosition}/{creatorQueueTotal}</p>
-                      </div>
-                    </div>
-
-                    <div className="mx-auto mt-2 w-full max-w-[104px] overflow-hidden rounded-lg border border-[#e5e5ea] bg-black sm:max-w-[150px]">
-                      {(() => {
-                        const media = getPrimaryMedia(nextQueuedPost);
-                        const mediaUrl = getProxyUrl(media?.url);
-                        if (!media?.url) {
-                          return (
-                            <div className="flex aspect-[9/16] items-center justify-center bg-[#f5f5f7] p-4 text-center text-xs font-semibold text-[#6e6e73]">
-                              No media attached
-                            </div>
-                          );
-                        }
-                        if (media.type === 'video' || media.url.endsWith('.mp4')) {
-                          return (
-                            <video
-                              src={mediaUrl}
-                              controls
-                              playsInline
-                              preload="metadata"
-                              className="aspect-[9/16] w-full object-cover"
-                            />
-                          );
-                        }
-                        return <img src={mediaUrl} alt="" className="aspect-[9/16] w-full object-cover" />;
-                      })()}
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSharePost(nextQueuedPost)}
-                        disabled={sharingPostId === nextQueuedPost._id}
-                        className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg bg-[#1d1d1f] px-1.5 py-1 text-xs font-semibold text-white disabled:opacity-60 sm:min-h-10 sm:gap-1.5 sm:px-2 sm:py-1.5"
-                      >
-                        <Share2 className="h-3.5 w-3.5" />
-                        {sharingPostId === nextQueuedPost._id ? 'Opening' : 'Share'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMarkManualPosted(nextQueuedPost)}
-                        className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-xs font-semibold text-emerald-700 sm:min-h-10 sm:gap-1.5 sm:px-2 sm:py-1.5"
-                      >
-                        <CheckCircle className="h-3.5 w-3.5" />
-                       Mark as Posted
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="hidden grid-cols-[200px_1fr] gap-5 p-4 md:grid">
-                    <div className="w-full overflow-hidden rounded-lg border border-[#e5e5ea] bg-black">
-                      {(() => {
-                        const media = getPrimaryMedia(nextQueuedPost);
-                        const mediaUrl = getProxyUrl(media?.url);
-                        if (!media?.url) {
-                          return (
-                            <div className="flex aspect-[9/16] items-center justify-center bg-[#f5f5f7] p-4 text-center text-xs font-semibold text-[#6e6e73]">
-                              No media attached
-                            </div>
-                          );
-                        }
-                        if (media.type === 'video' || media.url.endsWith('.mp4')) {
-                          return (
-                            <video
-                              src={mediaUrl}
-                              controls
-                              playsInline
-                              preload="metadata"
-                              className="aspect-[9/16] w-full object-cover"
-                            />
-                          );
-                        }
-                        return <img src={mediaUrl} alt="" className="aspect-[9/16] w-full object-cover" />;
-                      })()}
-                    </div>
-
-                    <div className="flex min-w-0 flex-col gap-3">
-                      <div className="rounded-lg border border-[#e5e5ea] bg-[#fbfbfb] p-3">
-                        <div className="flex items-center gap-2.5">
-                          <PlatformLogo platform={primaryPostAccount?.platform} className="h-8 w-8 shrink-0" />
-                          <div className="min-w-0">
-                            <p className="m-0 truncate text-sm font-semibold text-black">
-                              {primaryPostAccount ? `@${getAccountLabel(primaryPostAccount)}` : 'Account'}
-                            </p>
-                            <p className="m-0 mt-0.5 truncate text-[11px] font-semibold text-[#6e6e73]">
-                              <span className="capitalize">{primaryPostAccount?.platform || 'Platform'}</span>
-                              {extraAccountCount > 0 ? ` +${extraAccountCount}` : ''}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          <span className="rounded-lg bg-white px-2.5 py-1.5 text-[10px] font-bold text-[#1d1d1f]">
-                            Post {nextPostPosition} of {creatorQueueTotal}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleSharePost(nextQueuedPost)}
-                          disabled={sharingPostId === nextQueuedPost._id}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white transition hover:bg-black disabled:opacity-60"
-                        >
-                          <Share2 className="h-4 w-4" />
-                          {sharingPostId === nextQueuedPost._id ? 'Opening Share...' : 'Share Video'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleMarkManualPosted(nextQueuedPost)}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                          Mark Posted
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </>
+                <div className="p-5 text-center text-sm text-[#6e6e73] md:p-6">
+                  <Calendar className="mx-auto h-7 w-7 text-[#8e8e93]/60" />
+                  <p className="m-0 mt-2 font-semibold text-[#1d1d1f]">No campaign cards yet</p>
+                  <p className="m-0 mt-1 text-xs">Assigned campaigns will appear here.</p>
+                </div>
               )}
             </section>
           </div>

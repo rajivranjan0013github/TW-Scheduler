@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Share2, Trash2, ShieldCheck, Link2, Eye, Trash } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 
@@ -9,10 +10,13 @@ export const Channels = ({ selectedAccounts = [] }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (location.state?.campaignId) {
       sessionStorage.setItem('connect_campaign_id', location.state.campaignId);
+    } else {
+      sessionStorage.removeItem('connect_campaign_id');
     }
   }, [location.state]);
 
@@ -25,47 +29,57 @@ export const Channels = ({ selectedAccounts = [] }) => {
   })();
   const adminViewUserId = adminViewContext?.userId || '';
   const [channels, setChannels] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const activeConnectCampaignId = location.state?.campaignId
-    || sessionStorage.getItem('connect_campaign_id')
-    || getActiveCampaignId();
-
-  useEffect(() => {
-    fetchChannels();
-  }, [adminViewUserId, activeConnectCampaignId, user?.userType]);
-  const fetchChannels = async () => {
-    try {
+  const isCreator = user?.userType === 'account_handler';
+  const activeConnectCampaignId = isCreator
+    ? (location.state?.campaignId || sessionStorage.getItem('connect_campaign_id') || null)
+    : (location.state?.campaignId
+       || sessionStorage.getItem('connect_campaign_id')
+       || getActiveCampaignId());
+  const channelQueryParam = activeConnectCampaignId
+    ? `?${new URLSearchParams({ campaignId: activeConnectCampaignId }).toString()}`
+    : isCreator
+      ? ''
+      : withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
+  const channelEndpoint = activeConnectCampaignId ? '/api/accounts/publishing-channels' : '/api/accounts';
+  const normalizeChannels = (data) => (
+    (Array.isArray(data) ? data : []).map((channel) => {
+      if (channel.status) return channel;
+      const isConnectedAccount = Boolean(channel._id && channel.accountId && channel.isConnected !== false);
+      return {
+        ...channel,
+        socialAccountId: channel.socialAccountId || (isConnectedAccount ? channel._id : null),
+        status: isConnectedAccount ? 'verified' : 'pending_verification',
+        isVerified: isConnectedAccount,
+      };
+    })
+  );
+  const channelsQuery = useQuery({
+    queryKey: ['channels', channelEndpoint, channelQueryParam, adminViewUserId, isCreator],
+    queryFn: async () => {
       const token = localStorage.getItem('tw_token');
-      const isCreator = user?.userType === 'account_handler';
-      const campaignId = activeConnectCampaignId;
-      const queryParam = campaignId
-        ? `?${new URLSearchParams({ campaignId }).toString()}`
-        : isCreator
-          ? ''
-          : withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
-      const endpoint = campaignId ? '/api/accounts/publishing-channels' : '/api/accounts';
-      const response = await fetch(`${API_BASE_URL}${endpoint}${queryParam}`, {
+      const response = await fetch(`${API_BASE_URL}${channelEndpoint}${channelQueryParam}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setChannels((Array.isArray(data) ? data : []).map((channel) => {
-          if (channel.status) return channel;
-          const isConnectedAccount = Boolean(channel._id && channel.accountId && channel.isConnected !== false);
-          return {
-            ...channel,
-            socialAccountId: channel.socialAccountId || (isConnectedAccount ? channel._id : null),
-            status: isConnectedAccount ? 'verified' : 'pending_verification',
-            isVerified: isConnectedAccount,
-          };
-        }));
+      if (!response.ok) {
+        throw new Error(`Failed to fetch connected channels: ${response.status}`);
       }
-    } catch (error) {
-      console.error('Failed to fetch connected channels:', error);
-    } finally {
-      setLoading(false);
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000,
+    enabled: Boolean(user),
+  });
+
+  useEffect(() => {
+    if (channelsQuery.data) {
+      setChannels(normalizeChannels(channelsQuery.data));
     }
-  };
+  }, [channelsQuery.data]);
+
+  useEffect(() => {
+    if (channelsQuery.error) {
+      console.error('Failed to fetch connected channels:', channelsQuery.error);
+    }
+  }, [channelsQuery.error]);
 
   const disconnectChannel = async (id) => {
     if (!window.confirm('Are you sure you want to disconnect this account? This will stop future automatic publications targeting it.')) {
@@ -80,6 +94,9 @@ export const Channels = ({ selectedAccounts = [] }) => {
       });
       if (response.ok) {
         setChannels(channels.filter(chan => chan.socialAccountId !== id && chan._id !== id));
+        await queryClient.invalidateQueries({ queryKey: ['channels'] });
+        await queryClient.invalidateQueries({ queryKey: ['scheduler'] });
+        await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       } else {
         alert('Failed to disconnect channel');
       }
@@ -92,7 +109,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
     if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
     const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
-    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights,instagram_manage_comments');
+    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
     window.location.href = oauthUrl;
   };
@@ -151,6 +168,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
   };
   const getChannelAccountId = (channel) => channel.socialAccountId || (channel.accountId ? channel._id : null);
   const visibleChannels = channels;
+  const loading = channelsQuery.isLoading && channels.length === 0;
 
   return (
     <div className="p-4 sm:p-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f] space-y-6 sm:space-y-8">
@@ -175,7 +193,9 @@ export const Channels = ({ selectedAccounts = [] }) => {
         {/* Channels Listing */}
         <div className="bg-white border border-[#e5e5ea] rounded-xl shadow-sm overflow-hidden">
           <div className="px-4 sm:px-6 py-4 border-b border-[#e5e5ea] flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Campaign Publishing Channels ({visibleChannels.length})</span>
+            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+              {isCreator ? 'Connected Accounts' : 'Campaign Publishing Channels'} ({visibleChannels.length})
+            </span>
             <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
               <button
                 onClick={connectInstagramOAuth}
@@ -208,7 +228,9 @@ export const Channels = ({ selectedAccounts = [] }) => {
               </div>
             ) : visibleChannels.length === 0 ? (
               <div className="text-center py-16 text-xs text-gray-400 font-medium">
-                No publishing channels are assigned to this campaign yet. Add them in Campaign Setup.
+                {isCreator 
+                  ? 'No connected accounts found. Connect an account to get started.'
+                  : 'No publishing channels are assigned to this campaign yet. Add them in Campaign Setup.'}
               </div>
             ) : (
               visibleChannels.map(chan => (
