@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertTriangle, Folder, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles } from 'lucide-react';
+import { AlertTriangle, Folder, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
@@ -73,7 +73,7 @@ const getImportedCaption = (captionMap, mediaFile) => {
   return '';
 };
 
-const UPLOAD_CONCURRENCY = 4;
+const UPLOAD_CONCURRENCY = 20;
 
 const runWithConcurrency = async (items, limit, worker) => {
   const results = new Array(items.length);
@@ -1184,6 +1184,14 @@ export const MediaLibrary = () => {
                       <Folder className="w-6 h-6 mx-auto text-gray-400" />
                       <p className="text-xs font-semibold text-black">Import campaign folder</p>
                       <p className="text-[10px] text-gray-500">Supports uploading entire nested folder structure</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-100 p-3.5 text-[11px] text-blue-800 leading-relaxed shadow-sm">
+                    <Info className="h-4.5 w-4.5 shrink-0 text-[#0071e3] mt-0.5" />
+                    <div>
+                      <span className="font-semibold block text-black mb-0.5">Caption Auto-matching:</span>
+                      To automatically apply captions when importing a folder, include a <code className="bg-blue-100/60 px-1 py-0.5 rounded text-[10px] font-mono text-[#0071e3] font-semibold">.txt</code> file matching the exact name of each media file (e.g., <code className="bg-blue-100/60 px-1 py-0.5 rounded text-[10px] font-mono text-[#0071e3]">video.mp4</code> and <code className="bg-blue-100/60 px-1 py-0.5 rounded text-[10px] font-mono text-[#0071e3]">video.txt</code>).
                     </div>
                   </div>
                 </>
