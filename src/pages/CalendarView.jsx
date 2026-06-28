@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Plus, Check, Clock, AlertCircle, Folder, Users, Save } from 'lucide-react';
+import { Plus, Check, Clock, AlertCircle, Folder, Users, Save, Trash2 } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { getProxiedMediaUrl } from '../utils/mediaUrls';
 
@@ -122,6 +122,8 @@ const CalendarView = ({ selectedAccounts }) => {
   const [mediaList, setMediaList] = useState([]);
   const [folders, setFolders] = useState([]);
   const [channels, setChannels] = useState([]);
+  const [queueError, setQueueError] = useState('');
+  const [deletingAccountQueueIds, setDeletingAccountQueueIds] = useState([]);
 
   useEffect(() => {
     const updatePositions = () => {
@@ -178,6 +180,7 @@ const CalendarView = ({ selectedAccounts }) => {
     const id = folderId._id || folderId;
     return folders.find(folder => folder._id === id)?.name || 'Unknown folder';
   };
+  const getAccountLabel = (account) => account?.username || account?.handle || account?.name || 'Account';
   const getMediaLabel = (item) => item?.name || 'Untitled media';
   const getMediaLocationLabel = (item) => getFolderName(item?.folderId);
   const getAssetCaptionDraft = (item) => (
@@ -228,6 +231,9 @@ const CalendarView = ({ selectedAccounts }) => {
       default: return 'Scheduled';
     }
   };
+  const isActiveQueuePost = (post) => (
+    ['scheduled', 'manual_ready', 'downloaded', 'publishing'].includes(post?.status)
+  );
   const getScheduleTimingLabel = (value) => {
     if (isPureManualMode) return 'Manual queue';
     return `${formatScheduleDate(value)} ${formatScheduleTime(value)}`;
@@ -287,13 +293,13 @@ const CalendarView = ({ selectedAccounts }) => {
         });
       });
     } else if (selectedChannels.length > 0 && selectedMediaItems.length > 0) {
-      rows.push({
-        channel: selectedChannelObjects.length === 1
-          ? selectedChannelObjects[0]
-          : { name: `${selectedChannelObjects.length} portals`, platform: 'multi' },
-        mediaItem: selectedMediaItems[0],
-        caption: getPlannedCaption(selectedMediaItems[0]),
-        scheduledAt: hasValidDate ? baseDate : null,
+      selectedChannelObjects.forEach((channel) => {
+        rows.push({
+          channel,
+          mediaItem: selectedMediaItems[0],
+          caption: getPlannedCaption(selectedMediaItems[0]),
+          scheduledAt: hasValidDate ? baseDate : null,
+        });
       });
     }
 
@@ -390,27 +396,44 @@ const CalendarView = ({ selectedAccounts }) => {
     setSelectedMedia(availableMediaList.map(item => item._id));
   }, [availableMediaList, selectedChannels.length]);
 
-  const fetchPosts = async () => {
+  const fetchPosts = async ({ force = false } = {}) => {
     try {
+      setQueueError('');
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('tw_token')}` };
       const scope = withCampaignScope();
       const fetchJson = async (url) => {
         const response = await fetch(url, { headers });
-        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-        return response.json();
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(data?.message || `Request failed: ${response.status}`);
+        return data;
       };
-      const [accounts, data] = await Promise.all([
-        queryClient.fetchQuery({
+      const fetchFreshJson = async (url) => {
+        const response = await fetch(url, { headers, cache: 'no-store' });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(data?.message || `Request failed: ${response.status}`);
+        return data;
+      };
+      const [accounts, data] = force
+        ? await Promise.all([
+          fetchFreshJson(`${API_BASE_URL}/api/accounts${scope}`),
+          fetchFreshJson(`${API_BASE_URL}/api/scheduler${scope}`),
+        ])
+        : await Promise.all([
+          queryClient.fetchQuery({
           queryKey: ['scheduler', 'accounts', scope],
           queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts${scope}`),
           staleTime: 2 * 60 * 1000,
-        }),
-        queryClient.fetchQuery({
+          }),
+          queryClient.fetchQuery({
           queryKey: ['scheduler', 'posts', scope],
           queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler${scope}`),
           staleTime: 20 * 1000,
-        }),
-      ]);
+          }),
+        ]);
+      if (force) {
+        queryClient.setQueryData(['scheduler', 'accounts', scope], accounts);
+        queryClient.setQueryData(['scheduler', 'posts', scope], data);
+      }
       const scopedAccountIds = selectedAccounts.length > 0 ? selectedAccounts : accounts.map(account => account._id);
       const filtered = data.filter(p => {
         const accId = p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0];
@@ -419,6 +442,7 @@ const CalendarView = ({ selectedAccounts }) => {
       setPosts(filtered);
     } catch (error) {
       console.error('Failed to load scheduled posts:', error);
+      setQueueError(error.message || 'Failed to load scheduled posts.');
     }
   };
 
@@ -462,23 +486,44 @@ const CalendarView = ({ selectedAccounts }) => {
     }
   };
 
-  const handleDeletePost = async (postId) => {
-    if (!window.confirm('Are you sure you want to cancel this scheduled post?')) return;
+  const handleDeleteAccountQueue = async (accountId, accountLabel) => {
+    const activePostIds = posts
+      .filter((post) => (
+        isActiveQueuePost(post)
+        && (post.socialAccountIds || []).some((account) => String(account?._id || account) === String(accountId))
+      ))
+      .map((post) => post._id);
+    if (activePostIds.length === 0 || deletingAccountQueueIds.includes(accountId)) return;
+
+    if (!window.confirm(`Delete the schedule queue for ${accountLabel || 'this account'}? This will remove ${activePostIds.length} queued post${activePostIds.length === 1 ? '' : 's'} for this account only.`)) return;
+
+    const previousPosts = posts;
+    setQueueError('');
+    setDeletingAccountQueueIds((current) => [...current, accountId]);
+    setPosts((current) => current.filter((post) => !activePostIds.includes(post._id)));
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/scheduler/${postId}${withCampaignScope()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/scheduler/queue/account/${accountId}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
-        }
+          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
+        },
       });
-      if (response.ok) {
-        await queryClient.invalidateQueries({ queryKey: ['scheduler'] });
-        await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-        fetchPosts();
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || `Delete failed: ${response.status}`);
       }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
+      await fetchPosts({ force: true });
     } catch (error) {
-      console.error('Failed to delete scheduled post:', error);
-      setPosts(posts.filter(p => p._id !== postId));
+      console.error('Failed to delete account schedule queue:', error);
+      setPosts(previousPosts);
+      setQueueError(error.message || 'Failed to delete account schedule queue.');
+    } finally {
+      setDeletingAccountQueueIds((current) => current.filter((id) => id !== accountId));
     }
   };
 
@@ -689,6 +734,13 @@ const CalendarView = ({ selectedAccounts }) => {
         )}
       </div>
 
+      {queueError && (
+        <div className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{queueError}</span>
+        </div>
+      )}
+
       {/* In-page Composer */}
       {showComposer && (
         <section className="flex-1 min-h-0 mt-3 mx-3 mb-4 bg-white border border-[#d8e0f4] py-3 px-3 rounded-xl text-black shadow-sm flex flex-col overflow-hidden">
@@ -732,7 +784,7 @@ const CalendarView = ({ selectedAccounts }) => {
                         </span>
                         <img src={chan.avatarUrl} crossOrigin="anonymous" className="w-6 h-6 rounded-full object-cover border border-black/10" alt="" />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-semibold">{chan.name}</span>
+                          <span className="block truncate text-xs font-semibold">{getAccountLabel(chan)}</span>
                           <span className="block truncate text-[10px] capitalize text-[#6b7280]">{chan.platform}</span>
                         </span>
                       </button>
@@ -1042,7 +1094,7 @@ const CalendarView = ({ selectedAccounts }) => {
                             <span className="truncate font-semibold text-[#1d1d1f]">{getMediaLabel(row.mediaItem)}</span>
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-[#536079]">{row.channel?.name || 'Selected portal'}</td>
+                        <td className="px-3 py-2 text-[#536079]">{getAccountLabel(row.channel) || 'Selected portal'}</td>
                         <td className="px-3 py-2">
                           <span className="inline-flex rounded-full border border-[#d8e0f4] bg-[#f8fafc] px-2 py-1 font-semibold text-[#0b1645]">
                             {getScheduleModeLabel(scheduleMode)}
@@ -1098,10 +1150,11 @@ const CalendarView = ({ selectedAccounts }) => {
       {/* Schedule Overview — Visual Row Board */}
       {!showComposer && (() => {
         const now = new Date();
+        const activeQueuePosts = posts.filter(isActiveQueuePost);
 
-        // 1. Group posts by account
+        // 1. Group active queued posts by account
         const accountMap = {};
-        posts.forEach(post => {
+        activeQueuePosts.forEach(post => {
           const accountIds = (post.socialAccountIds || []).map(a => a._id || a);
           accountIds.forEach(accId => {
             if (!accountMap[accId]) accountMap[accId] = [];
@@ -1113,22 +1166,20 @@ const CalendarView = ({ selectedAccounts }) => {
         const accountSummaries = Object.entries(accountMap)
           .map(([accId, accPosts]) => {
             const channel = channels.find(c => c._id === accId);
-            const scheduled = accPosts.filter(p => ['scheduled', 'manual_ready', 'downloaded', 'publishing'].includes(p.status));
-            const published = accPosts.filter(p => ['published', 'published_auto', 'posted_manual'].includes(p.status));
+            const scheduled = accPosts.filter(isActiveQueuePost);
             const failed = accPosts.filter(p => p.status === 'failed');
-            const total = accPosts.length;
-            const done = published.length;
+            const total = scheduled.length;
+            const done = 0;
             const left = scheduled.length;
             const hasUpcoming = scheduled.some(p => new Date(p.scheduledAt) >= now);
             const isActive = hasUpcoming && left > 0;
 
-            const nextPost = scheduled
-              .filter(p => new Date(p.scheduledAt) >= now)
-              .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))[0];
+            const queuePosts = scheduled.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
+            const nextPost = queuePosts.find(p => new Date(p.scheduledAt) >= now) || queuePosts[0];
 
             return { accId, channel, total, done, left, failed: failed.length, isActive, nextPost };
           })
-          .sort((a, b) => (a.channel?.name || '').localeCompare(b.channel?.name || ''));
+          .sort((a, b) => getAccountLabel(a.channel).localeCompare(getAccountLabel(b.channel)));
 
         const getPlatformTheme = (platform) => {
           switch (platform) {
@@ -1179,7 +1230,7 @@ const CalendarView = ({ selectedAccounts }) => {
               }
             `}} />
 
-            {posts.length === 0 ? (
+            {activeQueuePosts.length === 0 ? (
               <div className="max-w-4xl mx-auto border border-dashed border-slate-200 p-16 rounded-2xl text-center text-slate-500 bg-white flex flex-col items-center gap-3 mt-8 shadow-sm">
                 <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
                   <Clock className="w-7 h-7 text-slate-400" />
@@ -1267,6 +1318,7 @@ const CalendarView = ({ selectedAccounts }) => {
                     const { accId, channel, total, done, left, failed: failedCount, isActive, nextPost } = summary;
                     const theme = getPlatformTheme(channel?.platform);
                     const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+                    const deletingAccountQueue = deletingAccountQueueIds.includes(accId);
 
                     // Find folders used by this channel's scheduled posts
                     const usedFolderMap = {};
@@ -1277,18 +1329,26 @@ const CalendarView = ({ selectedAccounts }) => {
                         const fId = folder?._id || folder || 'root';
                         if (!usedFolderMap[fId]) {
                           if (fId === 'root') {
+                            const queuedCount = channelPosts.filter(queuedPost => (
+                              (queuedPost.mediaIds || []).some(media => !(media?.folderId?._id || media?.folderId))
+                            )).length;
                             usedFolderMap[fId] = {
                               id: 'root',
                               name: 'Campaign Library',
-                              filesLeft: mediaList.filter(media => !media.folderId).length
+                              filesLeft: queuedCount
                             };
                           } else {
                             const folderObj = folders.find(f => f._id === fId);
-                            const mediaCount = mediaList.filter(media => (media.folderId?._id || media.folderId) === fId).length;
+                            const queuedCount = channelPosts.filter(queuedPost => (
+                              (queuedPost.mediaIds || []).some(media => {
+                                const mediaFolderId = media?.folderId?._id || media?.folderId || 'root';
+                                return mediaFolderId === fId;
+                              })
+                            )).length;
                             usedFolderMap[fId] = {
                               id: fId,
                               name: folderObj?.name || 'Campaign Folder',
-                              filesLeft: mediaCount
+                              filesLeft: queuedCount
                             };
                           }
                         }
@@ -1323,7 +1383,7 @@ const CalendarView = ({ selectedAccounts }) => {
                               </div>
                             )}
                             <div className="min-w-0 flex-1">
-                              <h4 className="text-xs font-bold text-slate-800 m-0 truncate">{channel?.name || 'Account'}</h4>
+                              <h4 className="text-xs font-bold text-slate-800 m-0 truncate">{getAccountLabel(channel)}</h4>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <span
                                   className="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded text-white"
@@ -1400,9 +1460,21 @@ const CalendarView = ({ selectedAccounts }) => {
                               
                               {/* Next Post Foot */}
                               {nextPost && (
-                                <p className="m-0 mt-1.5 text-[8px] text-slate-500 flex items-center gap-1">
-                                  <Clock className="w-2.5 h-2.5 text-slate-400" /> {getScheduleModeLabel(nextPost.scheduleMode)} - {getPostStatusLabel(nextPost)} - {new Date(nextPost.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </p>
+                                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                  <p className="m-0 text-[8px] text-slate-500 flex items-center gap-1">
+                                    <Clock className="w-2.5 h-2.5 text-slate-400" /> {getScheduleModeLabel(nextPost.scheduleMode)} - {getPostStatusLabel(nextPost)} - {new Date(nextPost.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteAccountQueue(accId, getAccountLabel(channel))}
+                                    disabled={deletingAccountQueue}
+                                    className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    title="Delete this account's queued schedule"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                    {deletingAccountQueue ? 'Deleting' : `Delete account queue (${left})`}
+                                  </button>
+                                </div>
                               )}
                             </div>
 

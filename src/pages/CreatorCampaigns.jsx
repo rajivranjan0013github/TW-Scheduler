@@ -378,8 +378,56 @@ export const CreatorCampaigns = () => {
 
   const getPrimaryMedia = (post) => post.mediaIds?.[0] || null;
   const getPostAccounts = (post) => post.socialAccountIds || [];
+  const getAccountId = (account) => String(getIdValue(account) || '');
   const getAccountLabel = (account) => account?.username || account?.name || account?.handle || account?.requestedHandle || 'Account';
-  const creatorQueueTotal = creatorQueuePosts.length || actionablePosts.length;
+  const getAccountQueueGroups = (camp) => {
+    const campaignPosts = getCampaignCreatorPosts(camp._id);
+    const groups = new Map();
+
+    (camp.channels || []).forEach((channel) => {
+      const accountId = getAccountId(channel.socialAccountId || channel.matchedAccountId || channel._id);
+      if (!accountId) return;
+      groups.set(accountId, {
+        accountId,
+        account: channel,
+        posts: [],
+      });
+    });
+
+    campaignPosts.forEach((post) => {
+      const postAccounts = getPostAccounts(post);
+      postAccounts.forEach((account) => {
+        const accountId = getAccountId(account);
+        if (!accountId) return;
+        if (!groups.has(accountId)) {
+          groups.set(accountId, {
+            accountId,
+            account,
+            posts: [],
+          });
+        }
+        groups.get(accountId).posts.push(post);
+      });
+    });
+
+    return Array.from(groups.values())
+      .map((group) => {
+        const actionableQueue = group.posts.filter(isCreatorActionable);
+        return {
+          ...group,
+          posts: group.posts.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt)),
+          actionableQueue,
+          nextPost: actionableQueue[0] || null,
+        };
+      })
+      .sort((a, b) => {
+        if (a.nextPost && !b.nextPost) return -1;
+        if (!a.nextPost && b.nextPost) return 1;
+        const aTime = a.nextPost ? new Date(a.nextPost.scheduledAt).getTime() : 0;
+        const bTime = b.nextPost ? new Date(b.nextPost.scheduledAt).getTime() : 0;
+        return aTime - bTime || getAccountLabel(a.account).localeCompare(getAccountLabel(b.account));
+      });
+  };
   const nextShareMedia = getPrimaryMedia(nextQueuedPost || {});
 
   useEffect(() => {
@@ -457,100 +505,86 @@ export const CreatorCampaigns = () => {
               </section>
             )}
 
-            <section className="rounded-lg border border-[#d2d2d7] bg-white">
-              <div className="border-b border-[#e5e5ea] px-3 py-2.5 md:px-4 md:py-3">
+            <section className="space-y-2 md:space-y-3">
+              <div className="px-1">
                 <h2 className="m-0 text-sm font-semibold text-black">My Campaigns</h2>
               </div>
               {assignedCampaigns.length > 0 ? (
-                <div className="grid gap-2 p-3 md:gap-3 md:p-4 lg:grid-cols-2">
-                  {assignedCampaigns.map((camp) => {
-                    const verifiedCount = (camp.channels || []).filter((ch) => ch.isVerified).length;
-                    const campaignPosts = getCampaignCreatorPosts(camp._id);
-                    const campaignNextPost = campaignPosts.find(isCreatorActionable) || null;
-                    const campaignPrimaryAccount = getPostAccounts(campaignNextPost || {})[0] || (camp.channels || [])[0] || null;
-                    const campaignExtraAccountCount = Math.max(getPostAccounts(campaignNextPost || {}).length - 1, 0);
-                    const campaignPostPosition = campaignNextPost
-                      ? Math.max(creatorQueuePosts.findIndex((post) => post._id === campaignNextPost._id) + 1, 1)
-                      : 0;
-                    const campaignMedia = getPrimaryMedia(campaignNextPost || {});
-                    const campaignMediaUrl = getProxyUrl(campaignMedia?.url);
-                    return (
-                      <div key={camp._id} className="rounded-lg border border-[#e5e5ea] bg-[#fbfbfb] p-3">
-                        <div className="flex flex-col gap-1.5 border-b border-[#e5e5ea] pb-2.5">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="truncate text-base font-semibold text-black">{camp.name}</span>
-                              {campaignNextPost && (
-                                <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold text-[#1d1d1f]">
-                                  Post {campaignPostPosition}/{creatorQueueTotal}
-                                </span>
-                              )}
-                            </div>
-                            <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold capitalize text-[#6e6e73] border border-[#e5e5ea]">
+                <div className="grid gap-2 md:gap-3 lg:grid-cols-2">
+                  {assignedCampaigns.flatMap((camp) => {
+                    const accountQueues = getAccountQueueGroups(camp);
+                    if (accountQueues.length === 0) {
+                      return (
+                        <div key={`${camp._id}-empty`} className="rounded-lg border border-[#e5e5ea] bg-white p-3">
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <span className="truncate text-sm font-semibold text-black">{camp.name}</span>
+                            <span className="shrink-0 rounded-full border border-[#e5e5ea] bg-white px-2 py-0.5 text-[10px] font-bold capitalize text-[#6e6e73]">
                               {camp.status || 'active'}
                             </span>
                           </div>
-                          {(camp.channels || []).length > 0 && (
-                            <div className="flex flex-wrap items-center gap-1">
-                              {(camp.channels || []).map((ch) => (
-                                <span
-                                  key={`${camp._id}-${ch.platform}-${ch.handle || ch.username}`}
-                                  className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium border ${
-                                    ch.isVerified
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                      : 'bg-amber-50 text-amber-700 border-amber-100'
-                                  }`}
-                                >
-                                  <PlatformLogo platform={ch.platform} className="h-3 w-3 shrink-0" />
-                                  <span className="truncate max-w-[100px]">
-                                    {(ch.handle || ch.username || '').startsWith('@')
-                                      ? (ch.handle || ch.username)
-                                      : `@${ch.handle || ch.username || 'channel'}`}
-                                  </span>
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          <div className="py-2 text-center">
+                            <p className="m-0 text-[10px] font-bold uppercase text-[#6e6e73]">Videos</p>
+                            <p className="m-0 mt-0.5 text-xs font-semibold text-[#1d1d1f]">No videos yet</p>
+                          </div>
                         </div>
-                        <div className="mt-2.5 rounded-lg border border-[#e5e5ea] bg-white p-2.5">
-                          {campaignNextPost ? (
-                            <div className="flex flex-col items-center">
-                              <div className="w-full max-w-[150px] overflow-hidden rounded-md border border-[#e5e5ea] bg-black">
-                                {!campaignMedia?.url ? (
-                                  <div className="flex aspect-[9/16] items-center justify-center bg-[#f5f5f7] p-2 text-center text-xs font-semibold text-[#6e6e73]">
-                                    No media
-                                  </div>
-                                ) : campaignMedia.type === 'video' || campaignMedia.url.endsWith('.mp4') ? (
-                                  <video
-                                    src={campaignMediaUrl}
-                                    controls
-                                    playsInline
-                                    preload="metadata"
-                                    className="aspect-[9/16] w-full object-cover"
-                                  />
-                                ) : (
-                                  <img src={campaignMediaUrl} alt="" className="aspect-[9/16] w-full object-cover" />
-                                )}
+                      );
+                    }
+
+                    return accountQueues.map((queue) => {
+                      const queuePost = queue.nextPost;
+                      const queuePosition = queuePost
+                        ? Math.max(queue.posts.findIndex((post) => post._id === queuePost._id) + 1, 1)
+                        : 0;
+
+                      return (
+                        <div key={`${camp._id}-${queue.accountId}`} className="rounded-lg border border-[#e5e5ea] bg-white p-3">
+                          <div className="mb-2 flex items-center justify-between gap-3 border-b border-[#e5e5ea] pb-2">
+                            <span className="truncate text-sm font-semibold text-black">{camp.name}</span>
+                            <span className="shrink-0 rounded-full border border-[#e5e5ea] bg-white px-2 py-0.5 text-[10px] font-bold capitalize text-[#6e6e73]">
+                              {camp.status || 'active'}
+                            </span>
+                          </div>
+
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <PlatformLogo platform={queue.account?.platform} className="h-6 w-6 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="m-0 truncate text-xs font-semibold text-[#1d1d1f]">
+                                  {getAccountLabel(queue.account).startsWith('@')
+                                    ? getAccountLabel(queue.account)
+                                    : `@${getAccountLabel(queue.account)}`}
+                                </p>
+                                <p className="m-0 text-[10px] font-semibold text-[#8e8e93]">
+                                  {queue.nextPost ? `Post ${queuePosition}/${queue.actionableQueue.length}` : 'No videos yet'}
+                                </p>
                               </div>
-                              <div className="mt-2.5 grid grid-cols-2 gap-2 w-full">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSharePost(campaignNextPost)}
-                                  disabled={sharingPostId === campaignNextPost._id}
-                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg bg-[#1d1d1f] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60 hover:bg-black transition-colors"
-                                >
-                                  <Share2 className="h-3.5 w-3.5" />
-                                  {sharingPostId === campaignNextPost._id ? 'Opening' : 'Share Video'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleMarkManualPosted(campaignNextPost)}
-                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
-                                >
-                                  <CheckCircle className="h-3.5 w-3.5" />
-                                  Mark Posted
-                                </button>
-                              </div>
+                            </div>
+                            {queue.nextPost && (
+                              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                {queue.actionableQueue.length} left
+                              </span>
+                            )}
+                          </div>
+
+                          {queuePost ? (
+                            <div className="grid w-full grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleSharePost(queuePost)}
+                                disabled={sharingPostId === queuePost._id}
+                                className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg bg-[#1d1d1f] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black disabled:opacity-60"
+                              >
+                                <Share2 className="h-3.5 w-3.5" />
+                                {sharingPostId === queuePost._id ? 'Opening' : 'Share Video'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMarkManualPosted(queuePost)}
+                                className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                              >
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                Mark Posted
+                              </button>
                             </div>
                           ) : (
                             <div className="py-2 text-center">
@@ -559,8 +593,8 @@ export const CreatorCampaigns = () => {
                             </div>
                           )}
                         </div>
-                      </div>
-                    );
+                      );
+                    });
                   })}
                 </div>
               ) : (
