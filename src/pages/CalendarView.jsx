@@ -3,11 +3,16 @@ import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Plus, Check, Clock, AlertCircle, Folder, Users, Save, Trash2 } from 'lucide-react';
+import { Plus, Check, Clock, AlertCircle, Folder, Images, Users, Save, Trash2 } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { getProxiedMediaUrl } from '../utils/mediaUrls';
 
 const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
+
+const naturalFolderCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+});
 
 const VideoThumbnail = ({ url, className }) => {
   const [poster, setPoster] = useState('');
@@ -157,6 +162,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const [caption, setCaption] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
   const [scheduleMode, setScheduleMode] = useState('auto');
+  const [scheduleContentMode, setScheduleContentMode] = useState('assets');
   const [postType, setPostType] = useState('reels');
   const [youtubeTitle, setYoutubeTitle] = useState('');
   const [youtubePrivacy, setYoutubePrivacy] = useState('private');
@@ -167,6 +173,7 @@ const CalendarView = ({ selectedAccounts }) => {
 
   const [bulkInterval, setBulkInterval] = useState('2');
   const [activeFolderId, setActiveFolderId] = useState('root');
+  const [selectedCarouselSets, setSelectedCarouselSets] = useState([]);
 
   const isViewer = user?.role === 'viewer';
   const selectedChannelObjects = channels.filter(chan => selectedChannels.includes(chan._id));
@@ -255,13 +262,14 @@ const CalendarView = ({ selectedAccounts }) => {
       return itemFolderId === activeFolderId;
     });
   }, [mediaList, selectedChannels, activeFolderId]);
-  const isBulk = selectedMedia.length > 1;
+  const isCarouselMode = scheduleContentMode === 'carousel';
+  const isBulk = !isCarouselMode && selectedMedia.length > 1;
   const activeFolderName = activeFolderId === 'root'
     ? 'Campaign Library'
     : folders.find(folder => folder._id === activeFolderId)?.name || 'Selected Folder';
   const folderOptions = useMemo(() => [
     { _id: 'root', name: 'Campaign Library' },
-    ...folders,
+    ...[...folders].sort((a, b) => naturalFolderCollator.compare(a.name || '', b.name || '')),
   ], [folders]);
   const getFolderAssetCount = (folderId) => mediaList.filter(item => {
     if (!isMediaAvailableForChannels(item, selectedChannels)) return false;
@@ -275,13 +283,57 @@ const CalendarView = ({ selectedAccounts }) => {
       .filter(Boolean),
     [mediaList, selectedMedia]
   );
+  const mediaByFolderId = useMemo(() => {
+    const map = new Map();
+    mediaList.forEach((item) => {
+      const folderId = item.folderId?._id || item.folderId || 'root';
+      if (!map.has(folderId)) map.set(folderId, []);
+      map.get(folderId).push(item);
+    });
+    return map;
+  }, [mediaList]);
+  const carouselSetFolders = useMemo(() => (
+    folders
+      .filter((folder) => folder.kind === 'carousel_set' && (folder.parentFolderId?._id || folder.parentFolderId || 'root') === activeFolderId)
+      .sort((a, b) => naturalFolderCollator.compare(a.name || '', b.name || ''))
+      .map((folder) => {
+        const mediaItems = mediaByFolderId.get(folder._id) || [];
+        const mediaById = new Map(mediaItems.map((item) => [String(item._id), item]));
+        const orderedItems = (folder.carouselOrder || [])
+          .map((mediaId) => mediaById.get(String(mediaId)))
+          .filter(Boolean);
+        const unorderedItems = mediaItems.filter((item) => !orderedItems.some((ordered) => ordered._id === item._id));
+        return {
+          ...folder,
+          mediaItems: [...orderedItems, ...unorderedItems],
+        };
+      })
+      .filter((folder) => folder.mediaItems.length > 0)
+  ), [activeFolderId, folders, mediaByFolderId]);
+  const selectedCarouselSetItems = useMemo(
+    () => carouselSetFolders.filter((set) => selectedCarouselSets.includes(set._id)),
+    [carouselSetFolders, selectedCarouselSets]
+  );
   const schedulePlan = useMemo(() => {
     const baseDate = scheduleTime ? new Date(scheduleTime) : null;
     const hasValidDate = baseDate && !Number.isNaN(baseDate.getTime());
     const intervalMs = (parseFloat(bulkInterval) || 2) * 60 * 60 * 1000;
     const rows = [];
 
-    if (isBulk) {
+    if (isCarouselMode) {
+      selectedChannelObjects.forEach((channel) => {
+        selectedCarouselSetItems.forEach((set, setIndex) => {
+          rows.push({
+            channel,
+            carouselSet: set,
+            mediaItem: set.mediaItems[0],
+            slidesCount: set.mediaItems.length,
+            caption: (set.carouselCaption || '').trim() || caption.trim(),
+            scheduledAt: hasValidDate ? new Date(baseDate.getTime() + (setIndex * intervalMs)) : null,
+          });
+        });
+      });
+    } else if (isBulk) {
       selectedChannelObjects.forEach((channel) => {
         selectedMediaItems.forEach((mediaItem, mediaIndex) => {
           rows.push({
@@ -310,7 +362,7 @@ const CalendarView = ({ selectedAccounts }) => {
         return aTime - bTime;
       })
       .map((row, index) => ({ ...row, index: index + 1 }));
-  }, [bulkInterval, caption, captionDrafts, isBulk, scheduleTime, selectedChannelObjects, selectedChannels.length, selectedMediaItems]);
+  }, [bulkInterval, caption, captionDrafts, isBulk, isCarouselMode, scheduleTime, selectedCarouselSetItems, selectedChannelObjects, selectedChannels.length, selectedMediaItems]);
   const manualTaskButtonLabel = (() => {
     const count = schedulePlan.length || selectedMedia.length;
     return count > 0
@@ -388,13 +440,25 @@ const CalendarView = ({ selectedAccounts }) => {
   }, [selectedChannels, mediaList, activeFolderId]);
 
   useEffect(() => {
+    setSelectedCarouselSets((current) => (
+      current.filter((setId) => carouselSetFolders.some((set) => set._id === setId))
+    ));
+  }, [carouselSetFolders]);
+
+  useEffect(() => {
     if (selectedChannels.length === 0) {
       setSelectedMedia([]);
+      setSelectedCarouselSets([]);
+      return;
+    }
+
+    if (isCarouselMode) {
+      setSelectedCarouselSets(carouselSetFolders.map(set => set._id));
       return;
     }
 
     setSelectedMedia(availableMediaList.map(item => item._id));
-  }, [availableMediaList, selectedChannels.length]);
+  }, [availableMediaList, carouselSetFolders, isCarouselMode, selectedChannels.length]);
 
   const fetchPosts = async ({ force = false } = {}) => {
     try {
@@ -591,11 +655,19 @@ const CalendarView = ({ selectedAccounts }) => {
       alert('Select at least one publishing channel');
       return;
     }
-    if (selectedMedia.length === 0) {
+    if (isCarouselMode && selectedCarouselSets.length === 0) {
+      alert('Select at least one carousel set');
+      return;
+    }
+    if (isCarouselMode && selectedChannelObjects.some((channel) => channel.platform !== 'instagram')) {
+      alert('Carousel Sets v1 supports Instagram accounts only.');
+      return;
+    }
+    if (!isCarouselMode && selectedMedia.length === 0) {
       alert('Select at least one media asset');
       return;
     }
-    const unavailableMedia = selectedMedia.some((mediaId) => {
+    const unavailableMedia = !isCarouselMode && selectedMedia.some((mediaId) => {
       const item = mediaList.find(media => media._id === mediaId);
       return !item || !isMediaAvailableForChannels(item, selectedChannels);
     });
@@ -605,6 +677,10 @@ const CalendarView = ({ selectedAccounts }) => {
     }
     if (requiresScheduleTime && !scheduleTime) {
       alert('Pick a scheduling date and time');
+      return;
+    }
+    if (isCarouselMode && selectedCarouselSetItems.some((set) => set.mediaItems.length < 2 || set.mediaItems.length > 10)) {
+      alert('Each Instagram carousel set must have 2 to 10 slides.');
       return;
     }
     if (shouldUseYoutubePublishing) {
@@ -620,8 +696,10 @@ const CalendarView = ({ selectedAccounts }) => {
     }
 
     try {
-      const captionsSaved = await saveDirtyCaptionDrafts();
-      if (!captionsSaved) return;
+      if (!isCarouselMode) {
+        const captionsSaved = await saveDirtyCaptionDrafts();
+        if (!captionsSaved) return;
+      }
 
       const token = localStorage.getItem('tw_token');
       const effectiveScheduleDate = isPureManualMode ? new Date() : new Date(scheduleTime);
@@ -649,7 +727,15 @@ const CalendarView = ({ selectedAccounts }) => {
       };
 
       let url = `${API_BASE_URL}/api/scheduler`;
-      if (isBulk) {
+      if (isCarouselMode) {
+        url = `${API_BASE_URL}/api/scheduler/carousels`;
+        body.carouselSetIds = selectedCarouselSetItems.map((set) => set._id);
+        body.startDate = effectiveScheduleDate;
+        body.intervalHours = parseFloat(bulkInterval);
+        body.platformSpecifics = { type: 'carousel' };
+        delete body.mediaIds;
+        delete body.scheduledAt;
+      } else if (isBulk) {
         url = `${API_BASE_URL}/api/scheduler/bulk`;
         body.startDate = effectiveScheduleDate;
         body.intervalHours = parseFloat(bulkInterval);
@@ -671,9 +757,11 @@ const CalendarView = ({ selectedAccounts }) => {
         setShowComposer(false);
         setSelectedChannels([]);
         setSelectedMedia([]);
+        setSelectedCarouselSets([]);
         setCaption('');
         setScheduleTime('');
         setScheduleMode('auto');
+        setScheduleContentMode('assets');
         setYoutubeTitle('');
         setYoutubePrivacy('private');
         setYoutubeTags('');
@@ -710,6 +798,14 @@ const CalendarView = ({ selectedAccounts }) => {
       current.includes(mediaId)
         ? current.filter(id => id !== mediaId)
         : [...current, mediaId]
+    ));
+  };
+
+  const toggleCarouselSet = (setId) => {
+    setSelectedCarouselSets((current) => (
+      current.includes(setId)
+        ? current.filter(id => id !== setId)
+        : [...current, setId]
     ));
   };
 
@@ -819,19 +915,39 @@ const CalendarView = ({ selectedAccounts }) => {
                     );
                   })}
                 </div>
-                <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">Selected folder: {activeFolderName}</div>
-              </div>
+	                <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">Selected folder: {activeFolderName}</div>
+	              </div>
 
-              <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
-                <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2 flex items-center justify-between">
-                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">3. Select Matching Assets</h4>
-                  <span className="text-[10px] font-semibold text-[#15803d]">{selectedMedia.length}/{availableMediaList.length} selected</span>
-                </div>
-                <div className="p-3">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-[308px] overflow-y-auto pr-1">
-                    {selectedChannels.length > 0 && availableMediaList.map(item => {
-                      const isSelected = selectedMedia.includes(item._id);
-                      return (
+	              <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
+	                <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2 flex items-center justify-between">
+	                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">3. Select Content</h4>
+	                  <span className="text-[10px] font-semibold text-[#15803d]">
+	                    {isCarouselMode ? `${selectedCarouselSets.length}/${carouselSetFolders.length} sets` : `${selectedMedia.length}/${availableMediaList.length} selected`}
+	                  </span>
+	                </div>
+	                <div className="p-3">
+                    <div className="mb-2 grid grid-cols-2 gap-1.5">
+                      {[
+                        { id: 'assets', label: 'Assets' },
+                        { id: 'carousel', label: 'Carousel Sets' },
+                      ].map((mode) => (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          onClick={() => setScheduleContentMode(mode.id)}
+                          className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold transition-all ${scheduleContentMode === mode.id
+                            ? 'border-[#4f46e5] bg-[#eef2ff] text-[#0b1645]'
+                            : 'border-[#d8e0f4] bg-white text-[#536079] hover:text-[#0b1645]'
+                          }`}
+                        >
+                          {mode.label}
+                        </button>
+                      ))}
+                    </div>
+	                  <div className={`${isCarouselMode ? 'space-y-2' : 'grid grid-cols-2 md:grid-cols-3 gap-2'} max-h-[308px] overflow-y-auto pr-1`}>
+	                    {!isCarouselMode && selectedChannels.length > 0 && availableMediaList.map(item => {
+	                      const isSelected = selectedMedia.includes(item._id);
+	                      return (
                         <button
                           key={item._id}
                           type="button"
@@ -851,23 +967,66 @@ const CalendarView = ({ selectedAccounts }) => {
                             <p className="m-0 truncate text-[10px] font-semibold text-[#1d1d1f]" title={getMediaLabel(item)}>{getMediaLabel(item)}</p>
                             
                           </div>
-                        </button>
-                      );
-                    })}
-                    {selectedChannels.length === 0 && (
-                      <div className="col-span-full h-32 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] flex items-center justify-center text-xs text-[#6b7280] text-center p-4">
-                        Select accounts to reveal matching assets.
-                      </div>
-                    )}
-                    {selectedChannels.length > 0 && availableMediaList.length === 0 && (
-                      <div className="col-span-full h-32 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] flex items-center justify-center text-xs text-[#6b7280] text-center p-4">
-                        No matching assets in this folder.
-                      </div>
-                    )}
+	                        </button>
+	                      );
+	                    })}
+                      {isCarouselMode && selectedChannels.length > 0 && carouselSetFolders.map((set) => {
+                        const isSelected = selectedCarouselSets.includes(set._id);
+                        return (
+                          <button
+                            key={set._id}
+                            type="button"
+                            onClick={() => toggleCarouselSet(set._id)}
+                            className={`block w-full rounded-lg border p-2 text-left transition-all ${isSelected
+                              ? 'border-[#4f46e5] bg-[#eef2ff] ring-1 ring-[#4f46e5]/20'
+                              : 'border-[#d8e0f4] bg-[#f8fafc] hover:border-[#9aaee8]'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className={`flex h-4 w-4 items-center justify-center rounded border ${isSelected ? 'bg-[#4f46e5] border-[#4f46e5]' : 'bg-white border-[#c7c7cc]'}`}>
+                                {isSelected && <Check className="h-3 w-3 text-white" />}
+                              </span>
+                              <Images className="h-4 w-4 text-[#4f46e5]" />
+                              <div className="min-w-0 flex-1">
+                                <p className="m-0 truncate text-xs font-bold text-[#0b1645]">{set.name}</p>
+                                <p className="m-0 text-[10px] font-semibold text-[#536079]">{set.mediaItems.length} slides</p>
+                              </div>
+                            </div>
+                            <div className="mt-2 flex gap-1 overflow-hidden">
+                              {set.mediaItems.slice(0, 6).map((item, index) => (
+                                <div key={item._id} className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded border border-white bg-[#eef2ff]">
+                                  <MediaPreview item={item} />
+                                  <span className="absolute left-0.5 top-0.5 rounded bg-black/70 px-1 text-[8px] font-bold text-white">{index + 1}</span>
+                                </div>
+                              ))}
+                              {set.mediaItems.length > 6 && (
+                                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded border border-[#d8e0f4] bg-white text-[10px] font-bold text-[#536079]">+{set.mediaItems.length - 6}</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+	                    {selectedChannels.length === 0 && (
+	                      <div className="col-span-full h-32 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] flex items-center justify-center text-xs text-[#6b7280] text-center p-4">
+	                        Select accounts to reveal matching assets.
+	                      </div>
+	                    )}
+	                    {!isCarouselMode && selectedChannels.length > 0 && availableMediaList.length === 0 && (
+	                      <div className="col-span-full h-32 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] flex items-center justify-center text-xs text-[#6b7280] text-center p-4">
+	                        No matching assets in this folder.
+	                      </div>
+	                    )}
+	                    {isCarouselMode && selectedChannels.length > 0 && carouselSetFolders.length === 0 && (
+	                      <div className="h-32 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] flex items-center justify-center text-xs text-[#6b7280] text-center p-4">
+	                        No carousel sets inside this folder.
+	                      </div>
+	                    )}
+	                  </div>
+	                </div>
+	                <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">
+                    {isCarouselMode ? 'Each selected set becomes one carousel post.' : 'Click assets to include or remove them from this schedule.'}
                   </div>
-                </div>
-                <div className="border-t border-[#e5e5ea] px-3 py-2 text-[10px] font-semibold text-[#536079]">Click assets to include or remove them from this schedule.</div>
-              </div>
+	              </div>
 
               <div className="space-y-4">
                 <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
@@ -894,11 +1053,11 @@ const CalendarView = ({ selectedAccounts }) => {
                   </div>
                 </div>
 
-                <div className={`rounded-lg border bg-white overflow-hidden ${isPureManualMode ? 'border-[#f4d7a1]' : isBulk ? 'border-[#bdd0f4]' : 'border-[#bfe4ca]'}`}>
-                  <div className={`${isPureManualMode ? 'bg-[#fffaf0]' : isBulk ? 'bg-[#f8fbff]' : 'bg-[#f8fff9]'} border-b border-[#e5e5ea] px-3 py-2`}>
-                    <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">
-                      {isPureManualMode ? '5. Manual Posting' : isBulk ? '5B. Set Start Time & Interval' : '5A. Set Post Time'}
-                    </h4>
+	                <div className={`rounded-lg border bg-white overflow-hidden ${isPureManualMode ? 'border-[#f4d7a1]' : (isBulk || isCarouselMode) ? 'border-[#bdd0f4]' : 'border-[#bfe4ca]'}`}>
+	                  <div className={`${isPureManualMode ? 'bg-[#fffaf0]' : (isBulk || isCarouselMode) ? 'bg-[#f8fbff]' : 'bg-[#f8fff9]'} border-b border-[#e5e5ea] px-3 py-2`}>
+	                    <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">
+	                      {isPureManualMode ? '5. Manual Posting' : (isBulk || isCarouselMode) ? '5B. Set Start Time & Interval' : '5A. Set Post Time'}
+	                    </h4>
                   </div>
                   <div className="p-3 space-y-3">
                     {isPureManualMode ? (
@@ -907,7 +1066,7 @@ const CalendarView = ({ selectedAccounts }) => {
                       </div>
                     ) : (
                       <label className="block">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">{isBulk ? 'Start Time' : 'Post Time'}</span>
+	                        <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">{(isBulk || isCarouselMode) ? 'Start Time' : 'Post Time'}</span>
                         <input
                           type="datetime-local"
                           value={scheduleTime}
@@ -916,7 +1075,7 @@ const CalendarView = ({ selectedAccounts }) => {
                         />
                       </label>
                     )}
-                    {isBulk && !isPureManualMode && (
+	                    {(isBulk || isCarouselMode) && !isPureManualMode && (
                       <label className="block">
                         <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">Interval</span>
                         <select
@@ -932,8 +1091,9 @@ const CalendarView = ({ selectedAccounts }) => {
                         </select>
                       </label>
                     )}
-                    <div>
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">Post Format</span>
+	                    {!isCarouselMode && (
+	                      <div>
+	                        <span className="block text-[10px] font-bold uppercase tracking-wider text-[#536079] mb-1">Post Format</span>
                       <div className={`grid ${hasYoutubeSelected ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5`}>
                         {(hasYoutubeSelected ? ['video', 'short'] : ['reels', 'post', 'story']).map(t => (
                           <button
@@ -948,12 +1108,13 @@ const CalendarView = ({ selectedAccounts }) => {
                             {t}
                           </button>
                         ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+		                    </div>
+	                      </div>
+	                    )}
+	                  </div>
+	                </div>
 
-                {shouldUseYoutubePublishing && (
+	                {shouldUseYoutubePublishing && (
                   <div className="rounded-lg border border-[#f1c6c6] bg-white overflow-hidden">
                     <div className="bg-[#fff8f8] border-b border-[#f1c6c6] px-3 py-2">
                       <h4 className="m-0 text-[11px] font-bold text-[#991b1b]">YouTube Upload Options</h4>
@@ -999,13 +1160,37 @@ const CalendarView = ({ selectedAccounts }) => {
             </section>
 
             <section className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-4">
-              <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
-                <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2 flex items-center justify-between">
-                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">Media & Caption Management</h4>
-                  <span className="text-[10px] font-semibold text-[#536079]">Per-asset captions</span>
-                </div>
-                <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto">
-                  {selectedMediaItems.map(item => {
+	              <div className="rounded-lg border border-[#d8e0f4] bg-white overflow-hidden">
+	                <div className="bg-[#fbfaff] border-b border-[#e5e5ea] px-3 py-2 flex items-center justify-between">
+	                  <h4 className="m-0 text-[11px] font-bold text-[#0b1645]">{isCarouselMode ? 'Carousel Set Review' : 'Media & Caption Management'}</h4>
+	                  <span className="text-[10px] font-semibold text-[#536079]">{isCarouselMode ? 'Set captions' : 'Per-asset captions'}</span>
+	                </div>
+	                <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto">
+                    {isCarouselMode && selectedCarouselSetItems.map((set) => (
+                      <div key={set._id} className="rounded-lg border border-[#d8e0f4] bg-white p-2">
+                        <div className="flex items-center gap-2">
+                          <Images className="h-4 w-4 text-[#4f46e5]" />
+                          <div className="min-w-0 flex-1">
+                            <p className="m-0 truncate text-xs font-semibold text-[#0b1645]">{set.name}</p>
+                            <p className={`m-0 mt-1 text-[9px] font-semibold ${(set.carouselCaption || '').trim() ? 'text-[#15803d]' : 'text-[#b45309]'}`}>
+                              {(set.carouselCaption || '').trim() ? 'Set caption saved' : 'Uses fallback caption'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex gap-1 overflow-hidden">
+                          {set.mediaItems.slice(0, 8).map((item, index) => (
+                            <div key={item._id} className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded border border-[#e5e5ea] bg-[#f5f5f7]">
+                              <MediaPreview item={item} />
+                              <span className="absolute left-0.5 top-0.5 rounded bg-black/70 px-1 text-[8px] font-bold text-white">{index + 1}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="m-0 mt-2 line-clamp-2 text-[10px] leading-relaxed text-[#536079]">
+                          {(set.carouselCaption || '').trim() || caption.trim() || 'No caption drafted'}
+                        </p>
+                      </div>
+                    ))}
+	                  {!isCarouselMode && selectedMediaItems.map(item => {
                     const draft = getAssetCaptionDraft(item);
                     const isDirty = captionDrafts[item._id] !== undefined && captionDrafts[item._id] !== (item.caption || '');
                     return (
@@ -1040,11 +1225,11 @@ const CalendarView = ({ selectedAccounts }) => {
                       </div>
                     );
                   })}
-                  {selectedMediaItems.length === 0 && (
-                    <div className="md:col-span-2 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] p-6 text-center text-xs text-[#6b7280]">
-                      Matching assets will appear here after selecting accounts and a folder.
-                    </div>
-                  )}
+	                  {((isCarouselMode && selectedCarouselSetItems.length === 0) || (!isCarouselMode && selectedMediaItems.length === 0)) && (
+	                    <div className="md:col-span-2 rounded-lg border border-dashed border-[#d8e0f4] bg-[#f8fafc] p-6 text-center text-xs text-[#6b7280]">
+	                      {isCarouselMode ? 'Carousel sets will appear here after selecting accounts and a folder.' : 'Matching assets will appear here after selecting accounts and a folder.'}
+	                    </div>
+	                  )}
                 </div>
               </div>
 
@@ -1074,7 +1259,7 @@ const CalendarView = ({ selectedAccounts }) => {
                   <thead className="bg-[#f8fafc] text-[#0b1645]">
                     <tr>
                       <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">#</th>
-                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Asset</th>
+	                      <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">{isCarouselMode ? 'Carousel Set' : 'Asset'}</th>
                       <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Account</th>
                       <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Handler</th>
                       <th className="border-b border-[#e5e5ea] px-3 py-2 font-bold">Caption Source</th>
@@ -1083,16 +1268,19 @@ const CalendarView = ({ selectedAccounts }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {schedulePlan.map(row => (
-                      <tr key={`${row.channel?._id || 'multi'}-${row.mediaItem?._id}-${row.index}`} className="border-b border-[#f0f2f7] last:border-b-0">
+	                    {schedulePlan.map(row => (
+	                      <tr key={`${row.channel?._id || 'multi'}-${row.carouselSet?._id || row.mediaItem?._id}-${row.index}`} className="border-b border-[#f0f2f7] last:border-b-0">
                         <td className="px-3 py-2 font-semibold text-[#0b1645]">{row.index}</td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <div className="h-8 w-10 overflow-hidden rounded border border-[#e5e5ea] bg-[#f5f5f7] flex-shrink-0">
                               <MediaPreview item={row.mediaItem} />
                             </div>
-                            <span className="truncate font-semibold text-[#1d1d1f]">{getMediaLabel(row.mediaItem)}</span>
-                          </div>
+	                            <span className="min-w-0">
+                                <span className="block truncate font-semibold text-[#1d1d1f]">{row.carouselSet ? row.carouselSet.name : getMediaLabel(row.mediaItem)}</span>
+                                {row.carouselSet && <span className="block text-[9px] font-semibold text-[#536079]">{row.slidesCount} slides</span>}
+                              </span>
+	                          </div>
                         </td>
                         <td className="px-3 py-2 text-[#536079]">{getAccountLabel(row.channel) || 'Selected portal'}</td>
                         <td className="px-3 py-2">
@@ -1100,7 +1288,7 @@ const CalendarView = ({ selectedAccounts }) => {
                             {getScheduleModeLabel(scheduleMode)}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-[#536079]">{getCaptionSource(row.mediaItem)}</td>
+	                        <td className="px-3 py-2 text-[#536079]">{row.carouselSet ? ((row.carouselSet.carouselCaption || '').trim() ? 'Set caption' : 'Fallback composer') : getCaptionSource(row.mediaItem)}</td>
                         <td className="px-3 py-2 text-[#536079]">{getScheduleTimingLabel(row.scheduledAt)}</td>
                         <td className="px-3 py-2 max-w-[240px] truncate text-[#536079]" title={row.caption}>{row.caption || 'No caption drafted'}</td>
                       </tr>
@@ -1108,7 +1296,7 @@ const CalendarView = ({ selectedAccounts }) => {
                     {schedulePlan.length === 0 && (
                       <tr>
                         <td colSpan="7" className="px-3 py-8 text-center text-xs text-[#6b7280]">
-                          {isPureManualMode ? 'Select accounts and media to create manual tasks.' : 'Select accounts, a folder, and a time to preview the schedule.'}
+	                          {isPureManualMode ? 'Select accounts and content to create manual tasks.' : 'Select accounts, a folder, and a time to preview the schedule.'}
                         </td>
                       </tr>
                     )}
@@ -1120,7 +1308,7 @@ const CalendarView = ({ selectedAccounts }) => {
                   <span>{selectedChannels.length} account{selectedChannels.length === 1 ? '' : 's'}</span>
                   <span>{activeFolderName}</span>
                   <span>{getScheduleModeLabel(scheduleMode)} handler</span>
-                  <span>{isBulk ? `${selectedMedia.length} asset sequence` : 'single asset post'}</span>
+	                  <span>{isCarouselMode ? `${selectedCarouselSets.length} carousel set${selectedCarouselSets.length === 1 ? '' : 's'}` : isBulk ? `${selectedMedia.length} asset sequence` : 'single asset post'}</span>
                 </div>
                 <div className="flex justify-end gap-2">
                   <button
@@ -1134,11 +1322,11 @@ const CalendarView = ({ selectedAccounts }) => {
                     type="submit"
                     className="px-4 py-2 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-lg text-xs font-semibold transition-all shadow-sm"
                   >
-                    {isPureManualMode
-                      ? manualTaskButtonLabel
-                      : schedulePlan.length > 0
-                      ? `Schedule ${schedulePlan.length} Post${schedulePlan.length === 1 ? '' : 's'}`
-                      : 'Schedule Posts'}
+	                    {isPureManualMode
+	                      ? (isCarouselMode ? `Create ${schedulePlan.length || selectedCarouselSets.length} Manual Carousel Task${(schedulePlan.length || selectedCarouselSets.length) === 1 ? '' : 's'}` : manualTaskButtonLabel)
+	                      : schedulePlan.length > 0
+	                      ? `Schedule ${schedulePlan.length} ${isCarouselMode ? 'Carousel' : 'Post'}${schedulePlan.length === 1 ? '' : 's'}`
+	                      : 'Schedule Posts'}
                   </button>
                 </div>
               </div>

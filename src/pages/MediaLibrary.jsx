@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertTriangle, Folder, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles } from 'lucide-react';
+import { AlertTriangle, Folder, Images, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
@@ -73,6 +73,115 @@ const getImportedCaption = (captionMap, mediaFile) => {
   return '';
 };
 
+const getPathParts = (file) => (file.webkitRelativePath || file.name || '')
+  .split('/')
+  .filter(Boolean);
+
+const naturalFileCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+const getSlideSortKey = (slide) => {
+  const parts = getPathParts(slide.file);
+  return parts[parts.length - 1] || slide.name || '';
+};
+
+const getCarouselSetSortKey = (set) => set.id || set.name || '';
+
+const buildCarouselSetDrafts = async (files) => {
+  const mediaFiles = files.filter(file => (
+    file.type.startsWith('image/') || file.type.startsWith('video/')
+  ));
+  const captionMap = await buildCaptionFileMap(files);
+  const groups = new Map();
+
+  mediaFiles.forEach((file, uploadIndex) => {
+    const parts = getPathParts(file);
+    const setName = parts.length >= 2 ? parts[parts.length - 2] : 'Carousel Set';
+    const parentName = parts.length >= 3 ? parts[0] : 'Carousel Sets';
+    const setPath = parts.length >= 2 ? parts.slice(0, -1).join('/') : setName;
+    if (!groups.has(setPath)) {
+      groups.set(setPath, {
+        id: setPath,
+        name: setName,
+        parentName,
+        caption: '',
+        slides: [],
+      });
+    }
+    const group = groups.get(setPath);
+    group.slides.push({
+      id: `${setPath}-${uploadIndex}`,
+      file,
+      name: file.name,
+      uploadIndex,
+      previewUrl: URL.createObjectURL(file),
+    });
+  });
+
+  const drafts = Array.from(groups.values())
+    .map((group) => {
+      const captionFile = files.find((file) => {
+        const parts = getPathParts(file);
+        if (parts.length < 2 || !file.name.toLowerCase().endsWith('.txt')) return false;
+        return parts.slice(0, -1).join('/') === group.id;
+      });
+      return {
+        ...group,
+        caption: captionFile ? '' : group.caption,
+        slides: group.slides.sort((a, b) => naturalFileCollator.compare(
+          getSlideSortKey(a),
+          getSlideSortKey(b)
+        )),
+        getCaption: (file) => getImportedCaption(captionMap, file),
+      };
+    })
+    .filter((group) => group.slides.length > 0)
+    .sort((a, b) => naturalFileCollator.compare(
+      getCarouselSetSortKey(a),
+      getCarouselSetSortKey(b)
+    ));
+
+  await Promise.all(drafts.map(async (group) => {
+    const setCaptionFile = files.find((file) => {
+      const parts = getPathParts(file);
+      if (parts.length < 2 || !file.name.toLowerCase().endsWith('.txt')) return false;
+      const filename = parts[parts.length - 1].toLowerCase();
+      const directory = parts.slice(0, -1).join('/');
+      return directory === group.id && ['caption.txt', 'captions.txt'].includes(filename);
+    });
+    if (setCaptionFile) {
+      group.caption = (await setCaptionFile.text()).trim();
+    }
+  }));
+
+  return drafts;
+};
+
+const buildSingleCarouselDraft = (files, setName = 'Carousel Set') => {
+  const slides = files
+    .filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'))
+    .map((file, uploadIndex) => ({
+      id: `carousel-file-${uploadIndex}`,
+      file,
+      name: file.name,
+      uploadIndex,
+      previewUrl: URL.createObjectURL(file),
+    }));
+
+  if (slides.length === 0) return [];
+
+  return [{
+    id: `carousel-${Date.now()}`,
+    name: setName,
+    parentName: 'Carousel Uploads',
+    caption: '',
+    slides,
+    getCaption: () => '',
+  }];
+};
+
 const UPLOAD_CONCURRENCY = 20;
 
 const runWithConcurrency = async (items, limit, worker) => {
@@ -126,6 +235,10 @@ export const MediaLibrary = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [carouselDrafts, setCarouselDrafts] = useState([]);
+  const [carouselParentName, setCarouselParentName] = useState('');
+  const [carouselUploadInputKey, setCarouselUploadInputKey] = useState(0);
+  const [draggingSlide, setDraggingSlide] = useState(null);
 
   const authToken = token || localStorage.getItem('tw_token');
   const canUpload = ['owner', 'admin', 'editor'].includes(user?.role);
@@ -150,6 +263,16 @@ export const MediaLibrary = () => {
     queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
   ]);
 
+  const clearCarouselDrafts = () => {
+    carouselDrafts.forEach((set) => {
+      set.slides.forEach((slide) => URL.revokeObjectURL(slide.previewUrl));
+    });
+    setCarouselDrafts([]);
+    setCarouselParentName('');
+    setDraggingSlide(null);
+    setCarouselUploadInputKey((current) => current + 1);
+  };
+
   const uploadMediaFiles = async ({
     files,
     folderId,
@@ -157,6 +280,7 @@ export const MediaLibrary = () => {
     progressLabel = 'Uploading',
   }) => {
     const failedFiles = [];
+    const uploadedMedia = [];
     let completed = 0;
     let failed = 0;
     let active = 0;
@@ -192,6 +316,7 @@ export const MediaLibrary = () => {
       if (!response.ok) {
         throw new Error(await getErrorMessage(response, 'Upload failed.'));
       }
+      return response.json();
     };
 
     const uploadDirectToR2 = async (file, caption) => {
@@ -252,6 +377,7 @@ export const MediaLibrary = () => {
       if (!completeResponse.ok) {
         throw new Error(await getErrorMessage(completeResponse, 'Could not save uploaded media.'));
       }
+      return completeResponse.json();
     };
 
     updateProgress('');
@@ -264,14 +390,16 @@ export const MediaLibrary = () => {
         const caption = getCaption(file);
         if (shouldAttemptDirectUpload) {
           try {
-            await uploadDirectToR2(file, caption);
+            const uploaded = await uploadDirectToR2(file, caption);
+            uploadedMedia.push({ file, media: uploaded });
             return;
           } catch (directError) {
             shouldAttemptDirectUpload = false;
             console.warn('Direct R2 upload failed, using Node upload fallback for this batch:', directError.message);
           }
         }
-        await uploadViaNode(file, caption);
+        const uploaded = await uploadViaNode(file, caption);
+        uploadedMedia.push({ file, media: uploaded });
       } catch (error) {
         failed += 1;
         failedFiles.push(`${file.name} (${error.message || 'Upload failed'})`);
@@ -282,7 +410,7 @@ export const MediaLibrary = () => {
       }
     });
 
-    return failedFiles;
+    return { failedFiles, uploadedMedia };
   };
 
   const fetchFolders = useCallback(async () => {
@@ -394,7 +522,7 @@ export const MediaLibrary = () => {
     resetUploadProgress();
 
     try {
-      const failedFiles = await uploadMediaFiles({
+      const { failedFiles } = await uploadMediaFiles({
         files: selectedFiles,
         folderId: activeFolderId === 'root' ? 'null' : activeFolderId,
         progressLabel: 'Uploading file',
@@ -458,7 +586,7 @@ export const MediaLibrary = () => {
       const createdFolder = await folderResponse.json();
       const targetFolderId = createdFolder._id;
 
-      const failedFiles = await uploadMediaFiles({
+      const { failedFiles } = await uploadMediaFiles({
         files: mediaFiles,
         folderId: targetFolderId,
         getCaption: (file) => getImportedCaption(captionMap, file),
@@ -480,6 +608,194 @@ export const MediaLibrary = () => {
       resetUploadProgress();
       e.target.value = '';
       setShowUploadModal(false);
+    }
+  };
+
+  const handleCarouselFolderSelect = async (e) => {
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length === 0) return;
+
+    try {
+      clearCarouselDrafts();
+      const drafts = await buildCarouselSetDrafts(selectedFiles);
+      if (drafts.length === 0) {
+        alert('No supported image or video files were found in these carousel folders.');
+        e.target.value = '';
+        return;
+      }
+
+      const firstParts = getPathParts(drafts[0].slides[0].file);
+      setCarouselParentName(firstParts.length >= 3 ? firstParts[0] : 'Carousel Sets');
+      setCarouselDrafts(drafts);
+      setShowUploadModal(false);
+    } catch (error) {
+      console.error('Failed preparing carousel sets:', error);
+      alert(`Carousel import failed: ${error.message || 'Unable to read this folder.'}`);
+      e.target.value = '';
+    }
+  };
+
+  const handleCarouselFilesSelect = (e) => {
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length === 0) return;
+
+    try {
+      clearCarouselDrafts();
+      const activeName = activeFolder?.name || 'Carousel Set';
+      const drafts = buildSingleCarouselDraft(selectedFiles, activeName);
+      if (drafts.length === 0) {
+        alert('Select at least two supported image or video files for this carousel.');
+        e.target.value = '';
+        return;
+      }
+      if (drafts[0].slides.length < 2) {
+        drafts.forEach((set) => set.slides.forEach((slide) => URL.revokeObjectURL(slide.previewUrl)));
+        alert('A carousel needs at least two image or video files.');
+        e.target.value = '';
+        return;
+      }
+
+      setCarouselParentName('Carousel Uploads');
+      setCarouselDrafts(drafts);
+      setShowUploadModal(false);
+    } catch (error) {
+      console.error('Failed preparing carousel files:', error);
+      alert(`Carousel import failed: ${error.message || 'Unable to read these files.'}`);
+      e.target.value = '';
+    }
+  };
+
+  const moveCarouselSlideToIndex = (setId, fromIndex, toIndex) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    setCarouselDrafts((current) => current.map((set) => {
+      if (set.id !== setId) return set;
+      if (fromIndex >= set.slides.length || toIndex >= set.slides.length) return set;
+      const nextSlides = [...set.slides];
+      const [moved] = nextSlides.splice(fromIndex, 1);
+      nextSlides.splice(toIndex, 0, moved);
+      return { ...set, slides: nextSlides };
+    }));
+    setDraggingSlide({ setId, index: toIndex });
+  };
+
+  const handleSlideDragStart = (event, setId, index) => {
+    setDraggingSlide({ setId, index });
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', JSON.stringify({ setId, index }));
+  };
+
+  const handleSlideDragOver = (event, setId, index) => {
+    event.preventDefault();
+    if (!draggingSlide || draggingSlide.setId !== setId || draggingSlide.index === index) return;
+    moveCarouselSlideToIndex(setId, draggingSlide.index, index);
+  };
+
+  const handleSlideDrop = (event) => {
+    event.preventDefault();
+    setDraggingSlide(null);
+  };
+
+  const updateCarouselCaption = (setId, nextCaption) => {
+    setCarouselDrafts((current) => current.map((set) => (
+      set.id === setId ? { ...set, caption: nextCaption } : set
+    )));
+  };
+
+  const handleSaveCarouselSets = async () => {
+    if (carouselDrafts.length === 0) return;
+
+    const invalidSet = carouselDrafts.find((set) => set.slides.length < 2 || set.slides.length > 10);
+    if (invalidSet) {
+      alert(`${invalidSet.name} needs 2 to 10 slides for Instagram carousel publishing.`);
+      return;
+    }
+
+    setUploading(true);
+    resetUploadProgress();
+
+    try {
+      const parentResponse = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          campaignId: getActiveCampaignId(),
+          name: carouselParentName || 'Carousel Sets',
+          parentFolderId: activeFolderId === 'root' ? null : activeFolderId,
+        }),
+      });
+      if (!parentResponse.ok) {
+        throw new Error(await getErrorMessage(parentResponse, 'Could not create carousel parent folder.'));
+      }
+      const parentFolder = await parentResponse.json();
+
+      let firstSetFolderId = null;
+      for (const set of carouselDrafts) {
+        const setResponse = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            campaignId: getActiveCampaignId(),
+            name: set.name,
+            parentFolderId: parentFolder._id,
+            kind: 'carousel_set',
+            carouselCaption: set.caption || '',
+          }),
+        });
+        if (!setResponse.ok) {
+          throw new Error(await getErrorMessage(setResponse, `Could not create ${set.name}.`));
+        }
+        const setFolder = await setResponse.json();
+        if (!firstSetFolderId) firstSetFolderId = setFolder._id;
+
+        const { failedFiles, uploadedMedia } = await uploadMediaFiles({
+          files: set.slides.map((slide) => slide.file),
+          folderId: setFolder._id,
+          getCaption: (file) => set.getCaption(file),
+          progressLabel: `Uploading ${set.name}`,
+        });
+
+        if (failedFiles.length > 0) {
+          throw new Error(`${failedFiles.length} files in ${set.name} could not be uploaded: ${failedFiles.slice(0, 3).join(', ')}`);
+        }
+
+        const mediaByFile = new Map(uploadedMedia.map(({ file, media: uploaded }) => [file, uploaded]));
+        const carouselOrder = set.slides
+          .map((slide) => mediaByFile.get(slide.file)?._id)
+          .filter(Boolean);
+
+        const orderResponse = await fetch(`${API_BASE_URL}/api/media/folders/${setFolder._id}/carousel${withCampaignScope()}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            campaignId: getActiveCampaignId(),
+            carouselCaption: set.caption || '',
+            carouselOrder,
+          }),
+        });
+        if (!orderResponse.ok) {
+          throw new Error(await getErrorMessage(orderResponse, `Could not save slide order for ${set.name}.`));
+        }
+      }
+
+      await invalidateMediaCaches();
+      await fetchFolders();
+      setActiveFolderId(parentFolder._id || firstSetFolderId || activeFolderId);
+      clearCarouselDrafts();
+    } catch (error) {
+      console.error('Failed saving carousel sets:', error);
+      alert(`Carousel set upload failed: ${error.message || 'Unable to save carousel sets.'}`);
+    } finally {
+      setUploading(false);
+      resetUploadProgress();
     }
   };
 
@@ -758,7 +1074,9 @@ export const MediaLibrary = () => {
   };
 
   const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
-  const visibleFolders = folders.filter((folder) => getFolderParentId(folder) === activeFolderId);
+  const visibleFolders = folders
+    .filter((folder) => getFolderParentId(folder) === activeFolderId)
+    .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
   const activeFolder = folders.find((folder) => folder._id === activeFolderId);
   const breadcrumbFolders = [];
   let breadcrumbFolder = activeFolder;
@@ -779,6 +1097,147 @@ export const MediaLibrary = () => {
     ].filter(Boolean).join(' ').toLowerCase();
     return searchable.includes(normalizedSearch);
   });
+
+  if (carouselDrafts.length > 0) {
+    const totalSlides = carouselDrafts.reduce((sum, set) => sum + set.slides.length, 0);
+
+    return (
+      <div className="min-h-screen bg-[#f5f5f7] p-6 text-[#1d1d1f]">
+        <div className="mb-5 rounded-xl border border-[#e5e5ea] bg-white px-5 py-4 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <button
+              type="button"
+              onClick={clearCarouselDrafts}
+              className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-3 py-1.5 text-xs font-semibold text-[#536079] hover:border-[#c7c7cc] hover:text-black"
+            >
+              <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+              Back to Media Library
+            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="m-0 text-xl font-semibold tracking-tight text-black">Review Carousel Sets</h2>
+              <span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#4f46e5]">
+                Draft
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-[#6e6e73]">Confirm slide order and captions before saving.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-1 text-[11px] font-semibold text-[#536079]">{carouselDrafts.length} set{carouselDrafts.length === 1 ? '' : 's'}</span>
+              <span className="rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-1 text-[11px] font-semibold text-[#536079]">{totalSlides} slides</span>
+              <span className="max-w-[260px] truncate rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-1 text-[11px] font-semibold text-[#536079]">{carouselParentName || 'Carousel Sets'}</span>
+            </div>
+          </div>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={clearCarouselDrafts}
+              disabled={uploading}
+              className="rounded-lg border border-[#e5e5ea] bg-white px-4 py-2 text-xs font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveCarouselSets}
+              disabled={uploading}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#4f46e5] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#4338ca] disabled:bg-[#c7c7cc]"
+            >
+              <Save className="h-3.5 w-3.5" />
+              {uploading ? 'Saving...' : 'Save Carousel Sets'}
+            </button>
+          </div>
+          </div>
+        </div>
+
+        {uploading && (
+          <div className="rounded-xl border border-[#d8e0f4] bg-white px-4 py-3 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 rounded-full border-2 border-[#4f46e5] border-t-transparent animate-spin" />
+              <div className="min-w-0">
+                <p className="m-0 text-xs font-semibold text-black">{getUploadProgressText()}</p>
+                {uploadProgress?.currentFile && (
+                  <p className="m-0 mt-0.5 truncate text-[10px] font-medium text-[#6b7280]">{uploadProgress.currentFile}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5">
+          <div className="grid grid-cols-[180px_minmax(0,1fr)_260px] gap-4 border-b border-[#ececf1] bg-[#fbfbfd] px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-[#6e6e73] max-lg:hidden">
+            <span>Carousel</span>
+            <span>Slide Order</span>
+            <span>Caption</span>
+          </div>
+          {carouselDrafts.map((set) => (
+            <section key={set.id} className="grid grid-cols-[180px_minmax(0,1fr)_260px] gap-4 border-b border-[#f0f0f3] px-4 py-4 last:border-b-0 max-lg:grid-cols-1">
+              <div className="flex min-w-0 items-start gap-2">
+                <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#eef2ff] text-[#4f46e5]">
+                  <Images className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="m-0 truncate text-sm font-semibold text-[#111827]">{set.name}</h3>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span className="rounded-md bg-[#f5f5f7] px-1.5 py-0.5 text-[10px] font-semibold text-[#6e6e73]">{set.slides.length} slides</span>
+                    {(set.caption || '').trim() && (
+                      <span className="rounded-md bg-[#ecfdf3] px-1.5 py-0.5 text-[10px] font-semibold text-[#15803d]">Caption ready</span>
+                    )}
+                    {(set.slides.length < 2 || set.slides.length > 10) && (
+                      <span className="rounded-md bg-[#fff7ed] px-1.5 py-0.5 text-[10px] font-semibold text-[#b45309]">Needs 2-10</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0">
+                <div className="mb-1 hidden text-[10px] font-bold uppercase tracking-wider text-[#6e6e73] max-lg:block">Slide Order</div>
+                <div className="flex gap-2.5 overflow-x-auto pb-1">
+                  {set.slides.map((slide, index) => {
+                    const isDragging = draggingSlide?.setId === set.id && draggingSlide?.index === index;
+                    return (
+                      <div
+                        key={slide.id}
+                        draggable={!uploading}
+                        onDragStart={(event) => handleSlideDragStart(event, set.id, index)}
+                        onDragOver={(event) => handleSlideDragOver(event, set.id, index)}
+                        onDrop={handleSlideDrop}
+                        onDragEnd={() => setDraggingSlide(null)}
+	                        className={`group w-24 flex-shrink-0 overflow-hidden rounded-xl bg-[#f8f8fa] p-1.5 transition-all ${isDragging ? 'opacity-60 ring-2 ring-[#4f46e5]/30' : 'hover:bg-[#eef2ff]'} ${uploading ? '' : 'cursor-grab active:cursor-grabbing'}`}
+	                        title={slide.name}
+	                      >
+	                        <div className="relative aspect-square overflow-hidden rounded-lg bg-[#ececf1]">
+	                          {slide.file.type.startsWith('video/') ? (
+	                            <video src={slide.previewUrl} muted playsInline className="h-full w-full object-cover" />
+	                          ) : (
+	                            <img src={slide.previewUrl} className="h-full w-full object-cover" alt="" />
+	                          )}
+                            <span className="absolute left-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-md bg-white/95 px-1.5 text-[10px] font-bold text-[#4f46e5] shadow-sm">
+                              {index + 1}
+                            </span>
+	                        </div>
+	                        <span className="mt-1 block truncate px-0.5 text-[10px] font-semibold text-[#374151]">{slide.name}</span>
+	                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <label className="block">
+                <span className="mb-1 hidden text-[10px] font-bold uppercase tracking-wider text-[#6e6e73] max-lg:block">Caption</span>
+                <textarea
+                  value={set.caption}
+                  onChange={(e) => updateCarouselCaption(set.id, e.target.value)}
+                  disabled={uploading}
+                  placeholder="Caption for this carousel..."
+                  className="h-16 w-full resize-none rounded-lg border-0 bg-[#f8f8fa] p-2 text-[11px] leading-relaxed text-[#111827] placeholder:text-[#9ca3af] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4f46e5]/25"
+                />
+              </label>
+            </section>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f]">
@@ -862,8 +1321,19 @@ export const MediaLibrary = () => {
               className="relative bg-white border border-[#e5e5ea] hover:border-gray-400 p-4 rounded-xl flex items-center justify-between cursor-pointer group transition-all shadow-sm"
             >
               <div className="flex items-center gap-3">
-                <Folder className="w-5 h-5 text-gray-400" />
-                <span className="text-xs font-semibold text-black group-hover:text-black transition-colors">{folder.name}</span>
+                {folder.kind === 'carousel_set' ? (
+                  <Images className="w-5 h-5 text-[#4f46e5]" />
+                ) : (
+                  <Folder className="w-5 h-5 text-gray-400" />
+                )}
+                <div className="min-w-0">
+                  <span className="block truncate text-xs font-semibold text-black group-hover:text-black transition-colors">{folder.name}</span>
+                  {folder.kind === 'carousel_set' && (
+                    <span className="mt-0.5 block text-[9px] font-bold uppercase tracking-wide text-[#4f46e5]">
+                      Carousel · {(folder.carouselOrder || []).length || 'set'} slides
+                    </span>
+                  )}
+                </div>
               </div>
               {(canManageFolders || canDelete) && (
                 <div className="relative">
@@ -1134,7 +1604,10 @@ export const MediaLibrary = () => {
               <h3 className="text-sm font-semibold text-black">Upload Campaign Assets</h3>
               {!uploading && (
                 <button 
-                  onClick={() => setShowUploadModal(false)}
+                  onClick={() => {
+                    clearCarouselDrafts();
+                    setShowUploadModal(false);
+                  }}
                   className="text-gray-400 hover:text-black text-xs font-semibold"
                 >
                   Close
@@ -1170,10 +1643,10 @@ export const MediaLibrary = () => {
                     </div>
                   </div>
 
-                  <div className="border border-dashed border-[#d2d2d7] rounded-xl p-5 text-center hover:border-gray-400 cursor-pointer relative group transition-all bg-white">
-                    <input
-                      type="file"
-                      accept="image/*,video/*,audio/*"
+		                  <div className="border border-dashed border-[#d2d2d7] rounded-xl p-5 text-center hover:border-gray-400 cursor-pointer relative group transition-all bg-white">
+		                    <input
+		                      type="file"
+	                      accept="image/*,video/*,audio/*"
                       multiple
                       webkitdirectory="true"
                       directory="true"
@@ -1184,10 +1657,43 @@ export const MediaLibrary = () => {
                       <Folder className="w-6 h-6 mx-auto text-gray-400" />
                       <p className="text-xs font-semibold text-black">Import campaign folder</p>
                       <p className="text-[10px] text-gray-500">Supports uploading entire nested folder structure</p>
-                    </div>
-                  </div>
+	                    </div>
+		                  </div>
 
-                  <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-100 p-3.5 text-[11px] text-blue-800 leading-relaxed shadow-sm">
+			                  <div className="border border-dashed border-[#c7d2fe] rounded-xl p-5 text-center hover:border-[#4f46e5] cursor-pointer relative group transition-all bg-[#f8f7ff]">
+			                    <input
+			                      type="file"
+			                      accept="image/*,video/*"
+			                      multiple
+			                      webkitdirectory="true"
+			                      directory="true"
+			                      onChange={handleCarouselFolderSelect}
+			                      className="absolute inset-0 opacity-0 cursor-pointer"
+			                    />
+			                    <div className="space-y-2 text-gray-400">
+			                      <Images className="w-6 h-6 mx-auto text-[#4f46e5]" />
+			                      <p className="text-xs font-semibold text-black">Import carousel folders</p>
+			                      <p className="text-[10px] text-gray-500">Choose a parent folder containing one folder per carousel</p>
+			                    </div>
+			                  </div>
+
+			                  <div className="border border-dashed border-[#c7d2fe] rounded-xl p-5 text-center hover:border-[#4f46e5] cursor-pointer relative group transition-all bg-[#f8f7ff]">
+			                    <input
+			                      key={carouselUploadInputKey}
+			                      type="file"
+		                      accept="image/*,video/*"
+		                      multiple
+		                      onChange={handleCarouselFilesSelect}
+		                      className="absolute inset-0 opacity-0 cursor-pointer"
+		                    />
+		                    <div className="space-y-2 text-gray-400">
+		                      <Images className="w-6 h-6 mx-auto text-[#4f46e5]" />
+		                      <p className="text-xs font-semibold text-black">Create carousel from files</p>
+		                      <p className="text-[10px] text-gray-500">Select multiple images/videos in the order you want</p>
+		                    </div>
+		                  </div>
+
+	                  <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-100 p-3.5 text-[11px] text-blue-800 leading-relaxed shadow-sm">
                     <Info className="h-4.5 w-4.5 shrink-0 text-[#0071e3] mt-0.5" />
                     <div>
                       <span className="font-semibold block text-black mb-0.5">Caption Auto-matching:</span>
