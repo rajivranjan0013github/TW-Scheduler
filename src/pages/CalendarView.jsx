@@ -269,7 +269,11 @@ const CalendarView = ({ selectedAccounts }) => {
     : folders.find(folder => folder._id === activeFolderId)?.name || 'Selected Folder';
   const folderOptions = useMemo(() => [
     { _id: 'root', name: 'Campaign Library' },
-    ...[...folders].sort((a, b) => naturalFolderCollator.compare(a.name || '', b.name || '')),
+    // Exclude carousel_set folders — they are not browsable campaign folders.
+    // Carousel sets are handled separately in carousel content mode via carouselSetFolders.
+    ...[...folders]
+      .filter((f) => f.kind !== 'carousel_set')
+      .sort((a, b) => naturalFolderCollator.compare(a.name || '', b.name || '')),
   ], [folders]);
   const getFolderAssetCount = (folderId) => mediaList.filter(item => {
     if (!isMediaAvailableForChannels(item, selectedChannels)) return false;
@@ -1536,6 +1540,7 @@ const CalendarView = ({ selectedAccounts }) => {
                             usedFolderMap[fId] = {
                               id: fId,
                               name: folderObj?.name || 'Campaign Folder',
+                              kind: folderObj?.kind || 'folder',
                               filesLeft: queuedCount
                             };
                           }
@@ -1607,16 +1612,29 @@ const CalendarView = ({ selectedAccounts }) => {
                               <span className="text-[10px] text-slate-400 italic">No folder content queued</span>
                             ) : (
                               <div className="flex flex-wrap gap-1.5">
-                                {channelFolders.map(folder => (
-                                  <div
-                                    key={folder.id}
-                                    className="bg-indigo-50/50 border border-indigo-100 rounded-lg px-2 py-0.5 flex items-center gap-1 shadow-sm"
-                                  >
-                                    <Folder className="w-3 h-3 text-indigo-500 flex-shrink-0" />
-                                    <span className="text-[9px] font-bold text-indigo-950 truncate max-w-[100px]">{folder.name}</span>
-                                    <span className="text-[8px] bg-indigo-100 text-indigo-700 px-1 rounded-full font-extrabold">{folder.filesLeft}</span>
-                                  </div>
-                                ))}
+                                {channelFolders.map(folder => {
+                                  const isCarouselSet = folder.kind === 'carousel_set';
+                                  return (
+                                    <div
+                                      key={folder.id}
+                                      className={`border rounded-lg px-2 py-0.5 flex items-center gap-1 shadow-sm ${
+                                        isCarouselSet
+                                          ? 'bg-purple-50/50 border-purple-100 text-purple-950'
+                                          : 'bg-indigo-50/50 border-indigo-100 text-indigo-950'
+                                      }`}
+                                    >
+                                      {isCarouselSet ? (
+                                        <Images className="w-3 h-3 text-purple-500 flex-shrink-0" />
+                                      ) : (
+                                        <Folder className="w-3 h-3 text-indigo-500 flex-shrink-0" />
+                                      )}
+                                      <span className="text-[9px] font-bold truncate max-w-[100px]">{folder.name}</span>
+                                      <span className={`text-[8px] px-1 rounded-full font-extrabold ${
+                                        isCarouselSet ? 'bg-purple-100 text-purple-700' : 'bg-indigo-100 text-indigo-700'
+                                      }`}>{folder.filesLeft}</span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
