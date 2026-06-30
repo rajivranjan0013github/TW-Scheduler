@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Folder, Loader2, X, Music, CheckSquare, Square, Check, Layers, Search } from 'lucide-react';
+import { ChevronRight, Folder, Loader2, X, Music, CheckSquare, Square, Check, Layers, Search } from 'lucide-react';
 import { API_BASE_URL, PLATFORM_AUDIO_FOLDER_ID } from '../videoEditor/videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 
@@ -8,6 +8,14 @@ const proxiedMediaUrl = (url) => {
   if (url.startsWith('blob:') || url.includes('/api/media/proxy')) return url;
   return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
 };
+
+const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
+const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
+
+const naturalFileCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+});
 
 export const BulkAssetPickerDialog = ({
   token,
@@ -42,9 +50,36 @@ export const BulkAssetPickerDialog = ({
 
   const filteredFolders = useMemo(() => {
     const query = folderSearch.trim().toLowerCase();
-    if (!query) return folders;
-    return folders.filter((folder) => (folder.name || '').toLowerCase().includes(query));
+    const rootFolders = folders
+      .filter((folder) => getFolderParentId(folder) === 'root')
+      .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
+    if (!query) return rootFolders;
+    return rootFolders.filter((folder) => (folder.name || '').toLowerCase().includes(query));
   }, [folderSearch, folders]);
+
+  const activeChildFolders = useMemo(() => {
+    if (!activeFolderId) return [];
+    return folders
+      .filter((folder) => getFolderParentId(folder) === activeFolderId)
+      .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
+  }, [activeFolderId, folders]);
+
+  const breadcrumbPath = useMemo(() => {
+    if (!activeFolderId) return [];
+    const crumbs = [];
+    let currentId = activeFolderId;
+    const folderMap = new Map(folders.map((f) => [f._id, f]));
+    const visited = new Set();
+    while (currentId && currentId !== 'root' && !visited.has(currentId)) {
+      visited.add(currentId);
+      const folder = folderMap.get(currentId);
+      if (!folder) break;
+      crumbs.unshift({ id: folder._id, name: folder.name || 'Untitled' });
+      currentId = normalizeFolderId(folder.parentFolderId) || 'root';
+    }
+    crumbs.unshift({ id: 'root', name: 'Library Root' });
+    return crumbs;
+  }, [activeFolderId, folders]);
 
   const openFolder = useCallback(async (folderId, folderName) => {
     setActiveFolderId(folderId);
@@ -346,24 +381,45 @@ export const BulkAssetPickerDialog = ({
 
             {activeTab !== 'audio' ? (
               <>
-                <div className="mb-4 flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500" style={{ color: '#71717a' }}>
-                    {activeFolderName || 'Choose a folder'}
-                  </h4>
-                  {activeFolderId && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-semibold text-gray-500">{media.length} videos</span>
-                      {media.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleSelectAllVideosInFolder}
-                          className="rounded-lg border border-[#2d2d30] bg-[#27272a] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-[#3f3f46] active:scale-95"
-                        >
-                          Select All
-                        </button>
-                      )}
-                    </div>
-                  )}
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  {/* Breadcrumb path */}
+                  <div className="flex items-center gap-1 flex-wrap text-[11px] min-w-0">
+                    {breadcrumbPath.map((crumb, idx) => {
+                      const isLast = idx === breadcrumbPath.length - 1;
+                      return (
+                        <span key={crumb.id} className="flex items-center gap-1">
+                          {idx > 0 && <ChevronRight className="h-3 w-3 text-gray-600 flex-shrink-0" />}
+                          {isLast ? (
+                            <span className="font-bold text-white">{crumb.name}</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openFolder(crumb.id, crumb.name)}
+                              className="font-semibold text-gray-500 hover:text-[#ff5500] transition-colors"
+                            >
+                              {crumb.name}
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {activeFolderId && (
+                      <>
+                        <span className="text-[11px] font-semibold text-gray-500">{media.length} videos</span>
+                        {media.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleSelectAllVideosInFolder}
+                            className="rounded-lg border border-[#2d2d30] bg-[#27272a] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-[#3f3f46] active:scale-95"
+                          >
+                            Select All
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {!activeFolderId ? (
@@ -375,11 +431,33 @@ export const BulkAssetPickerDialog = ({
                     <Loader2 className="h-5 w-5 animate-spin" />
                     Loading videos...
                   </div>
-                ) : media.length === 0 ? (
+                ) : media.length === 0 && activeChildFolders.length === 0 ? (
                   <div className="flex h-full min-h-[280px] items-center justify-center rounded-xl border border-dashed border-[#2d2d30] text-sm font-semibold text-gray-500">
                     No videos found in this folder.
                   </div>
                 ) : (
+                  <div className="space-y-5">
+                    {activeChildFolders.length > 0 && (
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                        {activeChildFolders.map((folder) => (
+                          <button
+                            key={folder._id}
+                            type="button"
+                            onClick={() => openFolder(folder._id, folder.name)}
+                            className="flex items-center gap-2 rounded-xl border border-[#2d2d30] bg-[#27272a] px-3 py-3 text-left text-xs font-bold text-gray-300 transition-colors hover:border-[#ff5500]/40 hover:bg-[#3f3f46] hover:text-white"
+                          >
+                            <Folder className="h-4 w-4 text-gray-500" />
+                            <span className="truncate">{folder.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                  {media.length === 0 ? (
+                    <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-[#2d2d30] text-sm font-semibold text-gray-500">
+                      Open a child folder to view its videos.
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {media.map((item) => {
                       const selected = isVideoSelected(item, activeTab);
@@ -418,6 +496,8 @@ export const BulkAssetPickerDialog = ({
                         </button>
                       );
                     })}
+                  </div>
+                  )}
                   </div>
                 )}
               </>

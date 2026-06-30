@@ -1408,7 +1408,7 @@ export const MediaLibrary = () => {
                   return (
                     <>
                       {/* Media Preview Box */}
-                      <div className="aspect-[9/16] bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center">
+                      <div className={`${item.type === 'audio' ? 'aspect-square' : 'aspect-[9/16]'} bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center`}>
                         {item.type === 'video' ? (
                           <video 
                             src={getProxyUrl(item.url)} 
@@ -1429,9 +1429,58 @@ export const MediaLibrary = () => {
                             }}
                           />
                         ) : item.type === 'audio' ? (
-                          <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center">
-                            <Music className="h-8 w-8 text-gray-400" />
-                            <audio src={getProxyUrl(item.url)} controls preload="metadata" className="w-full max-w-[180px]" />
+                          <div className="flex h-full w-full flex-col relative overflow-hidden"
+                            style={{ background: 'linear-gradient(160deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)' }}
+                          >
+                            {/* Top section — icon + name */}
+                            <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
+                              <div className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl"
+                                style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)' }}
+                              >
+                                <Music className="h-4 w-4 text-white" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-white text-[11px] font-semibold truncate leading-tight">
+                                  {item.name?.replace(/\.[^.]+$/, '') || 'Audio'}
+                                </p>
+                                <p className="text-white/40 text-[9px] mt-0.5 uppercase tracking-wider font-medium">Audio file</p>
+                              </div>
+                            </div>
+
+                            {/* Waveform visualization */}
+                            <div className="flex-1 flex items-center justify-center px-3 py-1">
+                              <svg viewBox="0 0 200 60" className="w-full h-full" preserveAspectRatio="xMidYMid meet" style={{ maxHeight: '60px' }}>
+                                {[3,8,5,14,8,20,12,25,18,30,22,35,28,38,32,40,35,42,38,40,35,38,32,30,28,35,40,38,34,30,25,20,28,35,30,25,18,22,15,12,8,14,10,6,4,8,12,6,3,5].map((h, i) => (
+                                  <rect
+                                    key={i}
+                                    x={i * 4}
+                                    y={30 - h / 2}
+                                    width="2.5"
+                                    height={h}
+                                    rx="1.25"
+                                    fill={`url(#audioWaveGrad-${item._id})`}
+                                    opacity="0.85"
+                                  />
+                                ))}
+                                <defs>
+                                  <linearGradient id={`audioWaveGrad-${item._id}`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#a78bfa" />
+                                    <stop offset="100%" stopColor="#667eea" />
+                                  </linearGradient>
+                                </defs>
+                              </svg>
+                            </div>
+
+                            {/* Audio controls at bottom */}
+                            <div className="px-2 pb-2 pt-1">
+                              <audio
+                                src={getProxyUrl(item.url)}
+                                controls
+                                preload="metadata"
+                                className="w-full"
+                                style={{ height: '26px', borderRadius: '6px', filter: 'invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.85)' }}
+                              />
+                            </div>
                           </div>
                         ) : (
                           <img src={getProxyUrl(item.thumbnailUrl || item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />

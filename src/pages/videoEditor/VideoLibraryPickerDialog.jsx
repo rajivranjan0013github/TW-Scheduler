@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Folder, Loader2, Play, X, Search, Video } from 'lucide-react';
+import { ChevronRight, Folder, Loader2, Play, X, Search, Video } from 'lucide-react';
 import { API_BASE_URL } from './videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 import { getProxiedMediaUrl } from '../../utils/mediaUrls';
@@ -80,7 +80,13 @@ export const VideoLibraryPickerDialog = ({
 
   const filteredFolders = useMemo(() => {
     const query = folderSearchQuery.trim().toLowerCase();
-    return buildFolderRows(folders, 'root', 0, query);
+    const rootFolders = folders
+      .filter((folder) => getFolderParentId(folder) === 'root')
+      .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
+    if (!query) return rootFolders.map((folder) => ({ folder, depth: 0 }));
+    return rootFolders
+      .filter((folder) => (folder.name || '').toLowerCase().includes(query))
+      .map((folder) => ({ folder, depth: 0 }));
   }, [folders, folderSearchQuery]);
 
   const activeChildFolders = useMemo(() => {
@@ -88,6 +94,23 @@ export const VideoLibraryPickerDialog = ({
     return folders
       .filter((folder) => getFolderParentId(folder) === activeFolderId)
       .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
+  }, [activeFolderId, folders]);
+
+  const breadcrumbPath = useMemo(() => {
+    if (!activeFolderId) return [];
+    const crumbs = [];
+    let currentId = activeFolderId;
+    const folderMap = new Map(folders.map((f) => [f._id, f]));
+    const visited = new Set();
+    while (currentId && currentId !== 'root' && !visited.has(currentId)) {
+      visited.add(currentId);
+      const folder = folderMap.get(currentId);
+      if (!folder) break;
+      crumbs.unshift({ id: folder._id, name: folder.name || 'Untitled' });
+      currentId = normalizeFolderId(folder.parentFolderId) || 'root';
+    }
+    crumbs.unshift({ id: 'root', name: 'Library Root' });
+    return crumbs;
   }, [activeFolderId, folders]);
 
   useEffect(() => {
@@ -254,23 +277,44 @@ export const VideoLibraryPickerDialog = ({
           </aside>
 
           <main className="min-h-0 overflow-y-auto p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h4 className="text-sm font-bold text-gray-900">
-                {activeFolderName || 'Choose a folder'}
-              </h4>
-              {activeFolderId && media.length > 0 && mediaMissingThumbnails && (
-                <button
-                  type="button"
-                  onClick={handleGenerateThumbnails}
-                  disabled={generatingThumbnails}
-                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {generatingThumbnails ? 'Generating...' : 'Generate Thumbnails'}
-                </button>
-              )}
-              {activeFolderId && !mediaMissingThumbnails && (
-                <span className="text-[11px] font-semibold text-gray-400">{media.length} videos</span>
-              )}
+            <div className="mb-4 flex items-center justify-between gap-3">
+              {/* Breadcrumb path */}
+              <div className="flex items-center gap-1 flex-wrap text-[11px] min-w-0">
+                {breadcrumbPath.map((crumb, idx) => {
+                  const isLast = idx === breadcrumbPath.length - 1;
+                  return (
+                    <span key={crumb.id} className="flex items-center gap-1">
+                      {idx > 0 && <ChevronRight className="h-3 w-3 text-gray-300 flex-shrink-0" />}
+                      {isLast ? (
+                        <span className="font-bold text-gray-900">{crumb.name}</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openFolder(crumb.id, crumb.name)}
+                          className="font-semibold text-gray-500 hover:text-[#ff5500] transition-colors"
+                        >
+                          {crumb.name}
+                        </button>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {activeFolderId && media.length > 0 && mediaMissingThumbnails && (
+                  <button
+                    type="button"
+                    onClick={handleGenerateThumbnails}
+                    disabled={generatingThumbnails}
+                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {generatingThumbnails ? 'Generating...' : 'Generate Thumbnails'}
+                  </button>
+                )}
+                {activeFolderId && (
+                  <span className="text-[11px] font-semibold text-gray-400">{media.length} videos</span>
+                )}
+              </div>
             </div>
 
             {error && (
