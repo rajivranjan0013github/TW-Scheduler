@@ -47,7 +47,12 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
     [campaigns, activeCampaignId]
   );
 
-  const persistCampaign = (campaign) => {
+  const persistCampaign = (campaign, { emitEvent = true } = {}) => {
+    const previousCampaignId =
+      localStorage.getItem(storageKey) ||
+      localStorage.getItem('active-campaign-id') ||
+      '';
+
     localStorage.setItem(storageKey, campaign._id);
     localStorage.setItem('active-campaign-id', campaign._id);
     localStorage.setItem('active-campaign-name', campaign.name || '');
@@ -57,6 +62,8 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
     );
     setActiveCampaignId(campaign._id);
     setSelectedAccounts([]);
+    if (!emitEvent || previousCampaignId === campaign._id) return;
+
     window.dispatchEvent(
       new CustomEvent('campaign-selected', {
         detail: {
@@ -95,12 +102,12 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
         const nextCampaign =
           campaignData.find((campaign) => campaign._id === savedId) ||
           campaignData[0];
-        persistCampaign(nextCampaign);
+        persistCampaign(nextCampaign, { emitEvent: nextCampaign._id !== savedId });
 
-        // Auto-navigate to dashboard if user has exactly 1 campaign
+        // Auto-navigate to the working queue if user has exactly 1 campaign
         // (no reason to make them "pick" when there's nothing to pick)
         if (campaignData.length === 1) {
-          navigate('/dashboard', { replace: true });
+          navigate('/scheduler', { replace: true });
         }
         return;
       }
@@ -129,7 +136,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
 
   const handleSelect = (campaign) => {
     persistCampaign(campaign);
-    navigate('/dashboard');
+    navigate('/scheduler');
   };
 
   const openCreateForm = () => {
@@ -181,7 +188,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
       setCampaigns((current) => [data, ...current]);
       persistCampaign(data);
       setIsCreating(false);
-      navigate('/dashboard');
+      navigate('/scheduler');
     } catch (err) {
       setCreateError(err.message || 'Failed to create workspace.');
     } finally {

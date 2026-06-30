@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertTriangle, Folder, Images, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles } from 'lucide-react';
+import { AlertTriangle, Folder, GripVertical, Images, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
@@ -239,6 +239,8 @@ export const MediaLibrary = () => {
   const [carouselParentName, setCarouselParentName] = useState('');
   const [carouselUploadInputKey, setCarouselUploadInputKey] = useState(0);
   const [draggingSlide, setDraggingSlide] = useState(null);
+  // Per-set save progress: { [setId]: 'pending' | 'uploading' | 'done' | 'error' }
+  const [setProgress, setSetProgress] = useState({});
 
   const authToken = token || localStorage.getItem('tw_token');
   const canUpload = ['owner', 'admin', 'editor'].includes(user?.role);
@@ -701,6 +703,10 @@ export const MediaLibrary = () => {
     )));
   };
 
+  const applyToAll = (caption) => {
+    setCarouselDrafts((current) => current.map((set) => ({ ...set, caption })));
+  };
+
   const handleSaveCarouselSets = async () => {
     if (carouselDrafts.length === 0) return;
 
@@ -712,14 +718,14 @@ export const MediaLibrary = () => {
 
     setUploading(true);
     resetUploadProgress();
+    // Initialise all sets as 'pending'
+    setSetProgress(Object.fromEntries(carouselDrafts.map((s) => [s.id, 'pending'])));
 
     try {
+      // ── Step 1: Create parent folder ─────────────────────────────────────
       const parentResponse = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({
           campaignId: getActiveCampaignId(),
           name: carouselParentName || 'Carousel Sets',
@@ -731,64 +737,85 @@ export const MediaLibrary = () => {
       }
       const parentFolder = await parentResponse.json();
 
-      let firstSetFolderId = null;
-      for (const set of carouselDrafts) {
-        const setResponse = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            campaignId: getActiveCampaignId(),
-            name: set.name,
-            parentFolderId: parentFolder._id,
-            kind: 'carousel_set',
-            carouselCaption: set.caption || '',
-          }),
-        });
-        if (!setResponse.ok) {
-          throw new Error(await getErrorMessage(setResponse, `Could not create ${set.name}.`));
+      // ── Step 2: Create ALL set sub-folders in parallel ───────────────────
+      const setFolderResults = await Promise.all(
+        carouselDrafts.map(async (set) => {
+          const res = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({
+              campaignId: getActiveCampaignId(),
+              name: set.name,
+              parentFolderId: parentFolder._id,
+              kind: 'carousel_set',
+              carouselCaption: set.caption || '',
+            }),
+          });
+          if (!res.ok) throw new Error(await getErrorMessage(res, `Could not create ${set.name}.`));
+          return { set, setFolder: await res.json() };
+        })
+      );
+
+      // ── Step 3: Upload files & save order — up to 3 sets concurrently ────
+      const SET_UPLOAD_CONCURRENCY = 3;
+      const errors = [];
+      const createdSetFolders = [];
+
+      await runWithConcurrency(setFolderResults, SET_UPLOAD_CONCURRENCY, async ({ set, setFolder }) => {
+        setSetProgress((prev) => ({ ...prev, [set.id]: 'uploading' }));
+        try {
+          const { failedFiles, uploadedMedia } = await uploadMediaFiles({
+            files: set.slides.map((slide) => slide.file),
+            folderId: setFolder._id,
+            getCaption: (file) => set.getCaption(file),
+            progressLabel: `Uploading ${set.name}`,
+          });
+
+          if (failedFiles.length > 0) {
+            throw new Error(`${failedFiles.length} files in ${set.name} could not be uploaded: ${failedFiles.slice(0, 3).join(', ')}`);
+          }
+
+          const mediaByFile = new Map(uploadedMedia.map(({ file, media: uploaded }) => [file, uploaded]));
+          const carouselOrder = set.slides
+            .map((slide) => mediaByFile.get(slide.file)?._id)
+            .filter(Boolean);
+
+          const orderRes = await fetch(`${API_BASE_URL}/api/media/folders/${setFolder._id}/carousel${withCampaignScope()}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({
+              campaignId: getActiveCampaignId(),
+              carouselCaption: set.caption || '',
+              carouselOrder,
+            }),
+          });
+          if (!orderRes.ok) throw new Error(await getErrorMessage(orderRes, `Could not save slide order for ${set.name}.`));
+
+          const updatedSetFolder = await orderRes.json();
+          createdSetFolders.push(updatedSetFolder);
+          setSetProgress((prev) => ({ ...prev, [set.id]: 'done' }));
+        } catch (err) {
+          errors.push(err.message);
+          setSetProgress((prev) => ({ ...prev, [set.id]: 'error' }));
         }
-        const setFolder = await setResponse.json();
-        if (!firstSetFolderId) firstSetFolderId = setFolder._id;
+      });
 
-        const { failedFiles, uploadedMedia } = await uploadMediaFiles({
-          files: set.slides.map((slide) => slide.file),
-          folderId: setFolder._id,
-          getCaption: (file) => set.getCaption(file),
-          progressLabel: `Uploading ${set.name}`,
-        });
-
-        if (failedFiles.length > 0) {
-          throw new Error(`${failedFiles.length} files in ${set.name} could not be uploaded: ${failedFiles.slice(0, 3).join(', ')}`);
-        }
-
-        const mediaByFile = new Map(uploadedMedia.map(({ file, media: uploaded }) => [file, uploaded]));
-        const carouselOrder = set.slides
-          .map((slide) => mediaByFile.get(slide.file)?._id)
-          .filter(Boolean);
-
-        const orderResponse = await fetch(`${API_BASE_URL}/api/media/folders/${setFolder._id}/carousel${withCampaignScope()}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            campaignId: getActiveCampaignId(),
-            carouselCaption: set.caption || '',
-            carouselOrder,
-          }),
-        });
-        if (!orderResponse.ok) {
-          throw new Error(await getErrorMessage(orderResponse, `Could not save slide order for ${set.name}.`));
-        }
+      if (errors.length > 0) {
+        throw new Error(errors.join(' | '));
       }
 
+      // ── Step 4: Optimistic folder state update — no full refetch ─────────
+      // Inject the parent folder and all set sub-folders directly into state.
+      setFolders((prev) => {
+        const existingIds = new Set(prev.map((f) => String(f._id)));
+        const toAdd = [parentFolder, ...createdSetFolders].filter(
+          (f) => !existingIds.has(String(f._id))
+        );
+        return [...prev, ...toAdd];
+      });
+
       await invalidateMediaCaches();
-      await fetchFolders();
-      setActiveFolderId(parentFolder._id || firstSetFolderId || activeFolderId);
+      setActiveFolderId(parentFolder._id);
       clearCarouselDrafts();
     } catch (error) {
       console.error('Failed saving carousel sets:', error);
@@ -796,6 +823,7 @@ export const MediaLibrary = () => {
     } finally {
       setUploading(false);
       resetUploadProgress();
+      setSetProgress({});
     }
   };
 
@@ -1100,207 +1128,302 @@ export const MediaLibrary = () => {
 
   if (carouselDrafts.length > 0) {
     const totalSlides = carouselDrafts.reduce((sum, set) => sum + set.slides.length, 0);
+    const validSets = carouselDrafts.filter((set) => set.slides.length >= 2 && set.slides.length <= 10).length;
 
     return (
-      <div className="min-h-screen bg-[#f5f5f7] p-6 text-[#1d1d1f]">
-        <div className="mb-5 rounded-xl border border-[#e5e5ea] bg-white px-5 py-4 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <button
-              type="button"
-              onClick={clearCarouselDrafts}
-              className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-3 py-1.5 text-xs font-semibold text-[#536079] hover:border-[#c7c7cc] hover:text-black"
-            >
-              <ChevronRight className="h-3.5 w-3.5 rotate-180" />
-              Back to Media Library
-            </button>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="m-0 text-xl font-semibold tracking-tight text-black">Review Carousel Sets</h2>
-              <span className="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#4f46e5]">
-                Draft
-              </span>
+      <div className="min-h-screen bg-[#f0f2f5] text-[#1d1d1f]">
+        {/* Sticky Header Bar */}
+        <div className="sticky top-0 z-10 bg-white border-b border-[#e5e7eb] px-6 py-3 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left: Back + Title + Stats */}
+            <div className="flex items-center gap-4 min-w-0">
+              <button
+                type="button"
+                onClick={clearCarouselDrafts}
+                className="flex items-center gap-1.5 rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#f9fafb] transition-colors flex-shrink-0 shadow-sm"
+              >
+                <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+                Back
+              </button>
+              <div className="min-w-0">
+                <h2 className="m-0 text-xl font-bold tracking-tight text-[#111827] leading-tight">{carouselParentName || 'Carousel Sets'}</h2>
+                <p className="m-0 text-xs text-[#6b7280] mt-0.5">
+                  {carouselDrafts.length} sets &bull; {totalSlides} slides &bull; {validSets}/{carouselDrafts.length} ready
+                </p>
+              </div>
             </div>
-            <p className="mt-1 text-xs text-[#6e6e73]">Confirm slide order and captions before saving.</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-1 text-[11px] font-semibold text-[#536079]">{carouselDrafts.length} set{carouselDrafts.length === 1 ? '' : 's'}</span>
-              <span className="rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-1 text-[11px] font-semibold text-[#536079]">{totalSlides} slides</span>
-              <span className="max-w-[260px] truncate rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-1 text-[11px] font-semibold text-[#536079]">{carouselParentName || 'Carousel Sets'}</span>
+            {/* Right: Action Buttons */}
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={clearCarouselDrafts}
+                disabled={uploading}
+                className="rounded-lg border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-semibold text-[#374151] hover:bg-[#f9fafb] transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCarouselSets}
+                disabled={uploading}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#4f46e5] px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#4338ca] transition-colors disabled:bg-[#a5b4fc] disabled:cursor-not-allowed"
+              >
+                {uploading ? (
+                  <div className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                {uploading ? 'Saving...' : 'Save Carousel Sets'}
+              </button>
             </div>
-          </div>
-          <div className="flex flex-shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={clearCarouselDrafts}
-              disabled={uploading}
-              className="rounded-lg border border-[#e5e5ea] bg-white px-4 py-2 text-xs font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveCarouselSets}
-              disabled={uploading}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#4f46e5] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#4338ca] disabled:bg-[#c7c7cc]"
-            >
-              <Save className="h-3.5 w-3.5" />
-              {uploading ? 'Saving...' : 'Save Carousel Sets'}
-            </button>
-          </div>
           </div>
         </div>
 
+        {/* Upload progress panel — per-set breakdown */}
         {uploading && (
-          <div className="rounded-xl border border-[#d8e0f4] bg-white px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="h-5 w-5 rounded-full border-2 border-[#4f46e5] border-t-transparent animate-spin" />
-              <div className="min-w-0">
-                <p className="m-0 text-xs font-semibold text-black">{getUploadProgressText()}</p>
+          <div className="mx-6 mt-4 rounded-xl border border-[#c7d2fe] bg-[#eef2ff] overflow-hidden">
+            {/* Header row */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-[#c7d2fe]/60">
+              <div className="h-4 w-4 rounded-full border-2 border-[#4f46e5] border-t-transparent animate-spin flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="m-0 text-xs font-semibold text-[#3730a3]">
+                  {(() => {
+                    const done = Object.values(setProgress).filter(s => s === 'done').length;
+                    const total = carouselDrafts.length;
+                    const fileDone = uploadProgress?.completed || 0;
+                    const fileTotal = uploadProgress?.total || 0;
+                    if (total > 0) return `Saving sets… ${done}/${total} complete`;
+                    if (fileTotal > 0) return `Uploading files… ${fileDone}/${fileTotal}`;
+                    return 'Preparing upload…';
+                  })()}
+                </p>
                 {uploadProgress?.currentFile && (
-                  <p className="m-0 mt-0.5 truncate text-[10px] font-medium text-[#6b7280]">{uploadProgress.currentFile}</p>
+                  <p className="m-0 mt-0.5 truncate text-[11px] text-[#6366f1]">{uploadProgress.currentFile}</p>
                 )}
               </div>
+              {/* Overall progress fraction */}
+              {uploadProgress?.total > 0 && (
+                <span className="flex-shrink-0 text-[11px] font-bold text-[#4f46e5]">
+                  {uploadProgress.completed}/{uploadProgress.total}
+                </span>
+              )}
             </div>
+
+            {/* Overall file progress bar */}
+            {uploadProgress?.total > 0 && (
+              <div className="h-1 w-full bg-[#c7d2fe]/40">
+                <div
+                  className="h-full bg-[#4f46e5] transition-all duration-300"
+                  style={{ width: `${Math.round(((uploadProgress.completed || 0) / uploadProgress.total) * 100)}%` }}
+                />
+              </div>
+            )}
+
+            {/* Per-set status rows */}
+            {carouselDrafts.length > 0 && (
+              <div className="px-4 py-2 space-y-1.5">
+                {carouselDrafts.map((set) => {
+                  const status = setProgress[set.id] || 'pending';
+                  return (
+                    <div key={set.id} className="flex items-center gap-2.5">
+                      {/* Status icon */}
+                      <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+                        {status === 'done' && (
+                          <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        {status === 'uploading' && (
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-[#4f46e5] border-t-transparent animate-spin" />
+                        )}
+                        {status === 'error' && (
+                          <svg className="w-4 h-4 text-[#dc2626]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
+                        {status === 'pending' && (
+                          <div className="w-3 h-3 rounded-full border-2 border-[#c7d2fe]" />
+                        )}
+                      </span>
+                      <span className={`text-[11px] font-semibold truncate flex-1 ${
+                        status === 'done' ? 'text-[#15803d]'
+                        : status === 'error' ? 'text-[#dc2626]'
+                        : status === 'uploading' ? 'text-[#3730a3]'
+                        : 'text-[#9ca3af]'
+                      }`}>
+                        {set.name}
+                        <span className="ml-1.5 font-normal opacity-70">· {set.slides.length} slides</span>
+                      </span>
+                      <span className={`flex-shrink-0 text-[10px] font-bold uppercase tracking-wide ${
+                        status === 'done' ? 'text-[#16a34a]'
+                        : status === 'error' ? 'text-[#dc2626]'
+                        : status === 'uploading' ? 'text-[#4f46e5]'
+                        : 'text-[#d1d5db]'
+                      }`}>
+                        {status === 'done' ? 'Done' : status === 'error' ? 'Failed' : status === 'uploading' ? 'Uploading' : 'Waiting'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
-        <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5">
-          <div className="grid grid-cols-[180px_minmax(0,1fr)_260px] gap-4 border-b border-[#ececf1] bg-[#fbfbfd] px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-[#6e6e73] max-lg:hidden">
-            <span>Carousel</span>
-            <span>Slide Order</span>
-            <span>Caption</span>
-          </div>
-          {carouselDrafts.map((set) => (
-            <section key={set.id} className="grid grid-cols-[180px_minmax(0,1fr)_260px] gap-4 border-b border-[#f0f0f3] px-4 py-4 last:border-b-0 max-lg:grid-cols-1">
-              <div className="flex min-w-0 items-start gap-2">
-                <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-[#eef2ff] text-[#4f46e5]">
-                  <Images className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <h3 className="m-0 truncate text-sm font-semibold text-[#111827]">{set.name}</h3>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-md bg-[#f5f5f7] px-1.5 py-0.5 text-[10px] font-semibold text-[#6e6e73]">{set.slides.length} slides</span>
-                    {(set.caption || '').trim() && (
-                      <span className="rounded-md bg-[#ecfdf3] px-1.5 py-0.5 text-[10px] font-semibold text-[#15803d]">Caption ready</span>
+        {/* Carousel Set Cards */}
+        <div className="p-4 space-y-2">
+          {carouselDrafts.map((set, setIndex) => {
+            const hasCaption = Boolean((set.caption || '').trim());
+            const hasSlideWarning = set.slides.length < 2 || set.slides.length > 10;
+
+            return (
+              <section key={set.id} className="rounded-xl bg-white border border-[#e5e7eb] shadow-sm overflow-hidden">
+                {/* Top header: number + name + badges — compact single row */}
+                <div className="flex items-center gap-2.5 px-4 py-1.5 border-b border-[#f3f4f6]">
+                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[#f3f4f6] text-xs font-bold text-[#374151]">
+                    {setIndex + 1}
+                  </span>
+                  <h3 className="m-0 flex-1 min-w-0 truncate text-sm font-semibold text-[#111827]">{set.name}</h3>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="rounded-full bg-[#dbeafe] px-2 py-0.5 text-[11px] font-semibold text-[#1d4ed8]">
+                      {set.slides.length} slides
+                    </span>
+                    {hasCaption && (
+                      <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-[11px] font-semibold text-[#15803d]">Caption ✓</span>
                     )}
-                    {(set.slides.length < 2 || set.slides.length > 10) && (
-                      <span className="rounded-md bg-[#fff7ed] px-1.5 py-0.5 text-[10px] font-semibold text-[#b45309]">Needs 2-10</span>
+                    {hasSlideWarning && (
+                      <span className="rounded-full bg-[#fef3c7] px-2 py-0.5 text-[11px] font-semibold text-[#b45309]">2–10 needed</span>
                     )}
                   </div>
                 </div>
-              </div>
 
-              <div className="min-w-0">
-                <div className="mb-1 hidden text-[10px] font-bold uppercase tracking-wider text-[#6e6e73] max-lg:block">Slide Order</div>
-                <div className="flex gap-2.5 overflow-x-auto pb-1">
-                  {set.slides.map((slide, index) => {
-                    const isDragging = draggingSlide?.setId === set.id && draggingSlide?.index === index;
-                    return (
-                      <div
-                        key={slide.id}
-                        draggable={!uploading}
-                        onDragStart={(event) => handleSlideDragStart(event, set.id, index)}
-                        onDragOver={(event) => handleSlideDragOver(event, set.id, index)}
-                        onDrop={handleSlideDrop}
-                        onDragEnd={() => setDraggingSlide(null)}
-	                        className={`group w-24 flex-shrink-0 overflow-hidden rounded-xl bg-[#f8f8fa] p-1.5 transition-all ${isDragging ? 'opacity-60 ring-2 ring-[#4f46e5]/30' : 'hover:bg-[#eef2ff]'} ${uploading ? '' : 'cursor-grab active:cursor-grabbing'}`}
-	                        title={slide.name}
-	                      >
-	                        <div className="relative aspect-square overflow-hidden rounded-lg bg-[#ececf1]">
-	                          {slide.file.type.startsWith('video/') ? (
-	                            <video src={slide.previewUrl} muted playsInline className="h-full w-full object-cover" />
-	                          ) : (
-	                            <img src={slide.previewUrl} className="h-full w-full object-cover" alt="" />
-	                          )}
-                            <span className="absolute left-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-md bg-white/95 px-1.5 text-[10px] font-bold text-[#4f46e5] shadow-sm">
+                {/* Bottom body: thumbnails + caption side by side */}
+                <div className="flex items-stretch">
+                  {/* Thumbnails */}
+                  <div className="flex-1 min-w-0 p-2 flex items-center">
+                    <div className="flex gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                      {set.slides.map((slide, index) => {
+                        const isDragging = draggingSlide?.setId === set.id && draggingSlide?.index === index;
+                        return (
+                          <div
+                            key={slide.id}
+                            draggable={!uploading}
+                            onDragStart={(event) => handleSlideDragStart(event, set.id, index)}
+                            onDragOver={(event) => handleSlideDragOver(event, set.id, index)}
+                            onDrop={handleSlideDrop}
+                            onDragEnd={() => setDraggingSlide(null)}
+                            className={`group relative flex-shrink-0 rounded-lg overflow-hidden ${isDragging ? 'opacity-50' : ''} ${uploading ? '' : 'cursor-grab active:cursor-grabbing'}`}
+                            style={{ width: '96px' }}
+                            title={slide.name}
+                          >
+                            {slide.file.type.startsWith('video/') ? (
+                              <video src={slide.previewUrl} muted playsInline className="w-full h-auto block" />
+                            ) : (
+                              <img src={slide.previewUrl} className="w-full h-auto block" alt="" />
+                            )}
+                            <span className="absolute left-1 top-1 rounded bg-white/90 px-1 py-0.5 text-[9px] font-bold text-[#374151] shadow-sm">
                               {index + 1}
                             </span>
-	                        </div>
-	                        <span className="mt-1 block truncate px-0.5 text-[10px] font-semibold text-[#374151]">{slide.name}</span>
-	                      </div>
-                    );
-                  })}
-                </div>
-              </div>
 
-              <label className="block">
-                <span className="mb-1 hidden text-[10px] font-bold uppercase tracking-wider text-[#6e6e73] max-lg:block">Caption</span>
-                <textarea
-                  value={set.caption}
-                  onChange={(e) => updateCarouselCaption(set.id, e.target.value)}
-                  disabled={uploading}
-                  placeholder="Caption for this carousel..."
-                  className="h-16 w-full resize-none rounded-lg border-0 bg-[#f8f8fa] p-2 text-[11px] leading-relaxed text-[#111827] placeholder:text-[#9ca3af] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4f46e5]/25"
-                />
-              </label>
-            </section>
-          ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Caption */}
+                  <div className="flex-shrink-0 w-[380px] p-2 border-l border-[#f3f4f6] flex flex-col gap-1">
+                    <p className="m-0 text-[11px] font-semibold text-[#374151]">Caption</p>
+                    <textarea
+                      value={set.caption}
+                      onChange={(e) => updateCarouselCaption(set.id, e.target.value)}
+                      disabled={uploading}
+                      placeholder="Caption..."
+                      className="flex-1 w-full resize-none rounded-lg border border-[#e5e7eb] bg-[#f9fafb] p-2.5 text-xs leading-relaxed text-[#111827] placeholder:text-[#9ca3af] focus:border-[#6366f1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4f46e5]/10 transition-all disabled:opacity-50"
+                    />
+                    {carouselDrafts.length > 1 && set.caption.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => applyToAll(set.caption)}
+                        disabled={uploading}
+                        className="self-end text-[11px] font-semibold text-[#4f46e5] hover:text-[#4338ca] disabled:opacity-40 transition-colors"
+                      >
+                        Apply to all sets ↓
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </section>
+            );
+          })}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f]">
-      
-      {/* Title */}
-      <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">
-        <div>
-          <h2 className="text-xl font-semibold text-black tracking-tight m-0">Media Library</h2>
-          <p className="text-[#8e8e93] text-xs mt-1">Store campaign media in R2 with captions saved to the library</p>
-        </div>
+    <div className="p-4 space-y-3 bg-[#f5f5f7] min-h-screen text-[#1d1d1f]">
 
-        {canManageFolders && (
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setShowUploadModal(true)}
-              className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Upload Assets</span>
-            </button>
-            <button 
-              onClick={() => setShowNewFolderModal(true)}
-              className="flex items-center gap-1.5 bg-white border border-[#e5e5ea] hover:bg-[#f5f5f7] text-[#1d1d1f] px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>New Folder</span>
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Single compact header row: title · breadcrumbs · actions */}
+      <div className="flex items-center gap-3 border-b border-[#e5e5ea] pb-2.5">
+        {/* Title */}
+        <h2 className="m-0 text-sm font-bold text-black tracking-tight flex-shrink-0">Media Library</h2>
 
-      {/* Directory Breadcrumbs & Search */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-[11px] text-[#8e8e93]">
-          <span 
+        {/* Breadcrumb divider */}
+        <ChevronRight className="w-3 h-3 text-gray-300 flex-shrink-0" />
+
+        {/* Breadcrumbs */}
+        <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] flex-1 min-w-0 overflow-hidden">
+          <span
             onClick={() => { setActiveFolderId('root'); setSearchQuery(''); }}
-            className={`cursor-pointer hover:text-black ${activeFolderId === 'root' ? 'text-black font-semibold' : ''}`}
+            className={`cursor-pointer hover:text-black flex-shrink-0 ${activeFolderId === 'root' ? 'text-black font-semibold' : ''}`}
           >
-            Campaign Library
+            All
           </span>
           {breadcrumbFolders.map((folder) => (
             <React.Fragment key={folder._id}>
-              <ChevronRight className="w-3 h-3 text-gray-300" />
+              <ChevronRight className="w-3 h-3 text-gray-300 flex-shrink-0" />
               <span
                 onClick={() => setActiveFolderId(folder._id)}
-                className={`cursor-pointer hover:text-black ${folder._id === activeFolderId ? 'text-black font-semibold' : ''}`}
+                title={folder.name}
+                className={`cursor-pointer hover:text-black truncate max-w-[120px] ${folder._id === activeFolderId ? 'text-black font-semibold' : ''}`}
               >
-                {folder.name || 'Campaign View'}
+                {folder.name || 'Folder'}
               </span>
             </React.Fragment>
           ))}
         </div>
 
-        {/* Search Media Input */}
-        <div className="relative w-48 sm:w-64">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input 
-            type="text"
-            placeholder="Search media..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#f5f5f7] border border-[#e5e5ea] pl-8 pr-2.5 py-1 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black placeholder:text-gray-400"
-          />
+        {/* Right: search + actions */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-white border border-[#e5e5ea] pl-6 pr-2.5 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-[#0071e3] text-[11px] text-black placeholder:text-gray-400 w-36"
+            />
+          </div>
+          {canManageFolders && (
+            <>
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-1 bg-[#0071e3] hover:bg-[#147ce5] text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
+              >
+                <Upload className="w-3 h-3" />
+                <span>Upload Assets</span>
+              </button>
+              <button
+                onClick={() => setShowNewFolderModal(true)}
+                className="flex items-center gap-1 bg-white border border-[#e5e5ea] hover:bg-[#f5f5f7] text-[#1d1d1f] px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Folder</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1313,51 +1436,59 @@ export const MediaLibrary = () => {
 
       {/* Folders List Grid */}
       {!searchQuery && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
           {visibleFolders.map(folder => (
-            <div 
+            <div
               key={folder._id}
               onClick={() => setActiveFolderId(folder._id)}
-              className="relative bg-white border border-[#e5e5ea] hover:border-gray-400 p-4 rounded-xl flex items-center justify-between cursor-pointer group transition-all shadow-sm"
+              className="relative bg-white border border-[#e5e5ea] hover:border-[#c7c7cc] hover:shadow-sm p-3 rounded-lg flex items-center gap-2.5 cursor-pointer group transition-all min-w-0"
             >
-              <div className="flex items-center gap-3">
+              {/* Icon */}
+              <span className="flex-shrink-0">
                 {folder.kind === 'carousel_set' ? (
-                  <Images className="w-5 h-5 text-[#4f46e5]" />
+                  <Images className="w-4 h-4 text-[#4f46e5]" />
                 ) : (
-                  <Folder className="w-5 h-5 text-gray-400" />
+                  <Folder className="w-4 h-4 text-gray-400 group-hover:text-gray-500" />
                 )}
-                <div className="min-w-0">
-                  <span className="block truncate text-xs font-semibold text-black group-hover:text-black transition-colors">{folder.name}</span>
-                  {folder.kind === 'carousel_set' && (
-                    <span className="mt-0.5 block text-[9px] font-bold uppercase tracking-wide text-[#4f46e5]">
-                      Carousel · {(folder.carouselOrder || []).length || 'set'} slides
-                    </span>
-                  )}
-                </div>
+              </span>
+              {/* Name + subtitle — takes all remaining width */}
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <span
+                  className="block truncate text-[11px] font-semibold text-[#1d1d1f] leading-tight"
+                  title={folder.name}
+                >
+                  {folder.name}
+                </span>
+                {folder.kind === 'carousel_set' && (
+                  <span className="block truncate text-[9px] font-semibold uppercase tracking-wide text-[#4f46e5] opacity-80 leading-tight mt-0.5">
+                    {(folder.carouselOrder || []).length || '—'} slides
+                  </span>
+                )}
               </div>
+              {/* Actions kebab — only visible on hover to save space */}
               {(canManageFolders || canDelete) && (
-                <div className="relative">
+                <div className="relative flex-shrink-0">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setOpenFolderMenuId((current) => (current === folder._id ? null : folder._id));
                     }}
-                    className="p-1.5 hover:bg-[#f5f5f7] hover:text-black rounded-md transition-all text-gray-400"
+                    className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[#f5f5f7] text-gray-400 hover:text-black transition-all"
                     title="Folder actions"
                     aria-label="Folder actions"
                   >
-                    <MoreVertical className="w-3.5 h-3.5" />
+                    <MoreVertical className="w-3 h-3" />
                   </button>
                   {openFolderMenuId === folder._id && (
-                    <div className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
+                    <div className="absolute right-0 top-6 z-20 w-32 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
                       {canManageFolders && (
                         <button
                           type="button"
                           onClick={(e) => openRenameFolderModal(folder, e)}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
                         >
-                          <Pencil className="h-3.5 w-3.5" />
+                          <Pencil className="h-3 w-3" />
                           <span>Rename</span>
                         </button>
                       )}
@@ -1365,9 +1496,9 @@ export const MediaLibrary = () => {
                         <button
                           type="button"
                           onClick={(e) => handleDeleteFolder(folder._id, e)}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50"
+                          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-3 w-3" />
                           <span>Delete</span>
                         </button>
                       )}
@@ -1378,12 +1509,12 @@ export const MediaLibrary = () => {
             </div>
           ))}
           {loadingFolders && (
-            <div className="col-span-full border border-dashed border-[#e5e5ea] p-6 rounded-xl text-center text-[#8e8e93] text-xs">
+            <div className="col-span-full border border-dashed border-[#e5e5ea] py-3 rounded-lg text-center text-[#8e8e93] text-[11px]">
               Loading folders...
             </div>
           )}
           {!loadingFolders && activeFolderId === 'root' && folders.length === 0 && (
-            <div className="col-span-full border border-dashed border-[#e5e5ea] p-6 rounded-xl text-center text-[#8e8e93] text-xs">
+            <div className="col-span-full border border-dashed border-[#e5e5ea] py-3 rounded-lg text-center text-[#8e8e93] text-[11px]">
               No campaigns created.
             </div>
           )}
@@ -1391,8 +1522,8 @@ export const MediaLibrary = () => {
       )}
 
       {/* Media Files Grid */}
-      <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+      <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {loadingMedia && (
               <div className="col-span-full border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm">
                 Loading media assets...
@@ -1647,111 +1778,88 @@ export const MediaLibrary = () => {
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-md text-black shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#e5e5ea] pb-3">
-              <h3 className="text-sm font-semibold text-black">Upload Campaign Assets</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white border border-[#e5e5ea] rounded-xl w-full max-w-sm text-black shadow-xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#e5e5ea]">
+              <h3 className="text-xs font-bold text-black">Upload Assets</h3>
               {!uploading && (
-                <button 
-                  onClick={() => {
-                    clearCarouselDrafts();
-                    setShowUploadModal(false);
-                  }}
-                  className="text-gray-400 hover:text-black text-xs font-semibold"
+                <button
+                  onClick={() => { clearCarouselDrafts(); setShowUploadModal(false); }}
+                  className="text-gray-400 hover:text-black transition-colors"
                 >
-                  Close
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               )}
             </div>
-            
-            <div className="space-y-4">
-              {uploading ? (
-                <div className="py-8 flex flex-col items-center justify-center gap-3 text-center">
-                  <div className="w-8 h-8 border-3 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-xs font-semibold text-[#1d1d1f]">{getUploadProgressText()}</span>
-                  {uploadProgress?.currentFile && (
-                    <span className="max-w-[320px] truncate text-[10px] font-medium text-gray-500">
-                      {uploadProgress.currentFile}
-                    </span>
-                  )}
+
+            {uploading ? (
+              <div className="px-4 py-6 flex flex-col items-center gap-2 text-center">
+                <div className="w-7 h-7 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs font-semibold text-[#1d1d1f]">{getUploadProgressText()}</span>
+                {uploadProgress?.currentFile && (
+                  <span className="max-w-[260px] truncate text-[10px] text-gray-500">{uploadProgress.currentFile}</span>
+                )}
+              </div>
+            ) : (
+              <div className="p-2 space-y-1.5">
+                {/* Row: Files */}
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-[#e5e5ea] hover:border-[#0071e3] hover:bg-[#f0f7ff] cursor-pointer transition-all group relative">
+                  <input type="file" accept="image/*,video/*,audio/*" multiple onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#f5f5f7] flex items-center justify-center group-hover:bg-[#dbeafe] transition-colors">
+                    <Upload className="w-4 h-4 text-gray-500 group-hover:text-[#0071e3]" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Upload files</p>
+                    <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Images, videos, audio · up to 100MB</p>
+                  </div>
+                </label>
+
+                {/* Row: Folder */}
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-[#e5e5ea] hover:border-[#0071e3] hover:bg-[#f0f7ff] cursor-pointer transition-all group relative">
+                  <input type="file" accept="image/*,video/*,audio/*" multiple webkitdirectory="true" directory="true" onChange={handleFolderUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#f5f5f7] flex items-center justify-center group-hover:bg-[#dbeafe] transition-colors">
+                    <Folder className="w-4 h-4 text-gray-500 group-hover:text-[#0071e3]" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Import campaign folder</p>
+                    <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Uploads entire nested folder structure</p>
+                  </div>
+                </label>
+
+                {/* Row: Carousel folders */}
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-[#c7d2fe] hover:border-[#4f46e5] hover:bg-[#f5f3ff] cursor-pointer transition-all group relative">
+                  <input type="file" accept="image/*,video/*" multiple webkitdirectory="true" directory="true" onChange={handleCarouselFolderSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
+                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#ede9fe] flex items-center justify-center group-hover:bg-[#ddd6fe] transition-colors">
+                    <Images className="w-4 h-4 text-[#4f46e5]" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Import carousel folders</p>
+                    <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Parent folder · one subfolder per carousel set</p>
+                  </div>
+                </label>
+
+                {/* Row: Carousel from files */}
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-[#c7d2fe] hover:border-[#4f46e5] hover:bg-[#f5f3ff] cursor-pointer transition-all group relative">
+                  <input key={carouselUploadInputKey} type="file" accept="image/*,video/*" multiple onChange={handleCarouselFilesSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
+                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#ede9fe] flex items-center justify-center group-hover:bg-[#ddd6fe] transition-colors">
+                    <Images className="w-4 h-4 text-[#4f46e5]" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Create carousel from files</p>
+                    <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Pick images/videos · drag to reorder</p>
+                  </div>
+                </label>
+
+                {/* Caption hint */}
+                <div className="flex items-center gap-2 rounded-lg bg-[#eff6ff] border border-[#bfdbfe] px-2.5 py-2 text-[10px] text-[#1d4ed8]">
+                  <Info className="w-3 h-3 flex-shrink-0" />
+                  <span><strong>Caption tip:</strong> Include a <code className="font-mono">.txt</code> file with the same name as each media file to auto-match captions.</span>
                 </div>
-              ) : (
-                <>
-                  <div className="border border-dashed border-[#e5e5ea] rounded-xl p-6 text-center hover:border-gray-400 cursor-pointer relative group transition-all bg-[#f5f5f7]">
-                    <input 
-                      type="file" 
-                      accept="image/*,video/*,audio/*"
-                      multiple
-                      onChange={handleFileUpload}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                    />
-                    <div className="space-y-2 text-gray-400">
-                      <Upload className="w-6 h-6 mx-auto text-gray-400" />
-                      <p className="text-xs font-semibold text-black">Click to upload files</p>
-                      <p className="text-[10px] text-gray-500">Supports videos/images/audio up to 100MB</p>
-                    </div>
-                  </div>
-
-		                  <div className="border border-dashed border-[#d2d2d7] rounded-xl p-5 text-center hover:border-gray-400 cursor-pointer relative group transition-all bg-white">
-		                    <input
-		                      type="file"
-	                      accept="image/*,video/*,audio/*"
-                      multiple
-                      webkitdirectory="true"
-                      directory="true"
-                      onChange={handleFolderUpload}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                    />
-                    <div className="space-y-2 text-gray-400">
-                      <Folder className="w-6 h-6 mx-auto text-gray-400" />
-                      <p className="text-xs font-semibold text-black">Import campaign folder</p>
-                      <p className="text-[10px] text-gray-500">Supports uploading entire nested folder structure</p>
-	                    </div>
-		                  </div>
-
-			                  <div className="border border-dashed border-[#c7d2fe] rounded-xl p-5 text-center hover:border-[#4f46e5] cursor-pointer relative group transition-all bg-[#f8f7ff]">
-			                    <input
-			                      type="file"
-			                      accept="image/*,video/*"
-			                      multiple
-			                      webkitdirectory="true"
-			                      directory="true"
-			                      onChange={handleCarouselFolderSelect}
-			                      className="absolute inset-0 opacity-0 cursor-pointer"
-			                    />
-			                    <div className="space-y-2 text-gray-400">
-			                      <Images className="w-6 h-6 mx-auto text-[#4f46e5]" />
-			                      <p className="text-xs font-semibold text-black">Import carousel folders</p>
-			                      <p className="text-[10px] text-gray-500">Choose a parent folder containing one folder per carousel</p>
-			                    </div>
-			                  </div>
-
-			                  <div className="border border-dashed border-[#c7d2fe] rounded-xl p-5 text-center hover:border-[#4f46e5] cursor-pointer relative group transition-all bg-[#f8f7ff]">
-			                    <input
-			                      key={carouselUploadInputKey}
-			                      type="file"
-		                      accept="image/*,video/*"
-		                      multiple
-		                      onChange={handleCarouselFilesSelect}
-		                      className="absolute inset-0 opacity-0 cursor-pointer"
-		                    />
-		                    <div className="space-y-2 text-gray-400">
-		                      <Images className="w-6 h-6 mx-auto text-[#4f46e5]" />
-		                      <p className="text-xs font-semibold text-black">Create carousel from files</p>
-		                      <p className="text-[10px] text-gray-500">Select multiple images/videos in the order you want</p>
-		                    </div>
-		                  </div>
-
-	                  <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-100 p-3.5 text-[11px] text-blue-800 leading-relaxed shadow-sm">
-                    <Info className="h-4.5 w-4.5 shrink-0 text-[#0071e3] mt-0.5" />
-                    <div>
-                      <span className="font-semibold block text-black mb-0.5">Caption Auto-matching:</span>
-                      To automatically apply captions when importing a folder, include a <code className="bg-blue-100/60 px-1 py-0.5 rounded text-[10px] font-mono text-[#0071e3] font-semibold">.txt</code> file matching the exact name of each media file (e.g., <code className="bg-blue-100/60 px-1 py-0.5 rounded text-[10px] font-mono text-[#0071e3]">video.mp4</code> and <code className="bg-blue-100/60 px-1 py-0.5 rounded text-[10px] font-mono text-[#0071e3]">video.txt</code>).
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}

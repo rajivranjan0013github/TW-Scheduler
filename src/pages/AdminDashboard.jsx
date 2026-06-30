@@ -81,11 +81,17 @@ const timeRanges = {
 };
 
 const MetricCard = ({ icon: Icon, label, value, note }) => (
-  <div className="rounded-lg border border-[#e5e5ea] bg-white p-5">
-    <Icon className="h-4 w-4 text-[#3478f6]" />
-    <p className="m-0 mt-4 text-2xl font-semibold text-[#1d1d1f]">{value}</p>
-    <p className="m-0 mt-1 text-[11px] font-semibold uppercase tracking-wider text-[#6e6e73]">{label}</p>
-    {note && <p className="m-0 mt-2 text-xs text-[#8e8e93]">{note}</p>}
+  <div className="rounded-lg border border-[#e5e5ea] bg-white px-3 py-2.5">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">{label}</p>
+        <p className="m-0 mt-1 truncate text-xl font-semibold leading-none text-[#1d1d1f]">{value}</p>
+      </div>
+      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-[#f0f7ff] text-[#3478f6]">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+    </div>
+    {note && <p className="m-0 mt-1.5 truncate text-[10px] text-[#8e8e93]">{note}</p>}
   </div>
 );
 
@@ -112,11 +118,11 @@ const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
   if (selectedTimeRange === 'today' || selectedTimeRange === 'yesterday') {
     const checkedCount = Math.min(Number(account[selectedRange.postsKey] || 0), 3);
     return (
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         {[0, 1, 2].map((slot) => (
           <span
             key={slot}
-            className={`flex h-5 w-5 items-center justify-center rounded border text-[11px] font-bold ${
+            className={`flex h-4 w-4 items-center justify-center rounded border text-[9px] font-bold ${
               slot < checkedCount
                 ? 'border-[#3478f6] bg-[#3478f6] text-white'
                 : 'border-[#d2d2d7] bg-white text-transparent'
@@ -131,12 +137,12 @@ const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
 
   if (selectedTimeRange === 'last7Days') {
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1">
         {(account.last7DaysActivity || []).map((day) => (
           <span
             key={day.dateStr}
             title={getDayTitle(day)}
-            className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-semibold ${
+            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[9px] font-semibold ${
               Number(day.count || 0) >= 3
                 ? 'border-[#34c759] bg-[#34c759] text-white'
                 : 'border-[#d2d2d7] bg-[#f5f5f7] text-[#6e6e73]'
@@ -150,7 +156,7 @@ const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
   }
 
   return (
-    <span className="text-[#515154]">
+    <span className="text-xs text-[#515154]">
       {numberFormat.format(account[selectedRange.postsKey] || 0)} posts
     </span>
   );
@@ -235,16 +241,16 @@ export const AdminDashboard = () => {
   const selectedTimeLabel = selectedRange.label;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] p-8 text-[#1d1d1f]">
-      <div className="mb-6 flex flex-col gap-4 border-b border-[#e5e5ea] pb-5 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-[#f5f5f7] p-4 text-[#1d1d1f]">
+      <div className="mb-3 flex flex-col gap-3 border-b border-[#e5e5ea] pb-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
-          <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">Campaign Overview</h2>
-          <p className="m-0 mt-1 text-xs text-[#8e8e93]">Campaign performance totals from cached published-post insights.</p>
+          <h2 className="m-0 mt-0.5 text-lg font-semibold tracking-tight text-[#1d1d1f]">Campaign Overview</h2>
+          <p className="m-0 mt-0.5 text-[11px] text-[#8e8e93]">Campaign performance totals from cached published-post insights.</p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex flex-col gap-1.5 sm:w-64">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-1 sm:w-60">
             <label htmlFor="campaign-select" className="text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">
               Campaign
             </label>
@@ -268,7 +274,7 @@ export const AdminDashboard = () => {
                 }
               }}
               disabled={campaigns.length === 0}
-              className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6] disabled:bg-[#f5f5f7] disabled:text-[#8e8e93]"
+              className="rounded-lg border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6] disabled:bg-[#f5f5f7] disabled:text-[#8e8e93]"
             >
               {campaigns.length === 0 ? (
                 <option value="">No campaigns</option>
@@ -280,7 +286,7 @@ export const AdminDashboard = () => {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1.5 sm:w-40">
+          <div className="flex flex-col gap-1 sm:w-36">
             <label htmlFor="time-range-select" className="text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">
               Time
             </label>
@@ -288,7 +294,7 @@ export const AdminDashboard = () => {
               id="time-range-select"
               value={selectedTimeRange}
               onChange={(event) => setSelectedTimeRange(event.target.value)}
-              className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
+              className="rounded-lg border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
             >
               {Object.entries(timeRanges).map(([value, config]) => (
                 <option key={value} value={value}>{config.label}</option>
@@ -298,7 +304,7 @@ export const AdminDashboard = () => {
 
           <button
             onClick={() => fetchCampaigns({ force: true })}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#d2d2d7] bg-white px-4 py-2 text-xs font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-xs font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             Refresh
@@ -307,24 +313,24 @@ export const AdminDashboard = () => {
       </div>
 
       {error && (
-        <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="mt-6 rounded-xl border border-[#d2d2d7] bg-white p-10 text-center text-sm text-[#6e6e73]">
+        <div className="rounded-xl border border-[#d2d2d7] bg-white p-8 text-center text-sm text-[#6e6e73]">
           Loading campaign dashboard...
         </div>
       ) : campaigns.length === 0 ? (
-        <div className="mt-6 rounded-xl border border-[#d2d2d7] bg-white p-10 text-center">
-          <Megaphone className="mx-auto h-8 w-8 text-[#c7c7cc]" />
-          <p className="m-0 mt-3 text-sm font-semibold text-[#1d1d1f]">No campaigns yet</p>
+        <div className="rounded-xl border border-[#d2d2d7] bg-white p-8 text-center">
+          <Megaphone className="mx-auto h-7 w-7 text-[#c7c7cc]" />
+          <p className="m-0 mt-2 text-sm font-semibold text-[#1d1d1f]">No campaigns yet</p>
           <p className="m-0 mt-1 text-xs text-[#6e6e73]">Create campaigns from Campaign Setup and attach publishing channels.</p>
         </div>
       ) : (
-        <>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               icon={Eye}
               label={`${selectedTimeLabel} views`}
@@ -351,8 +357,8 @@ export const AdminDashboard = () => {
             />
           </div>
 
-          <div className="mt-6 overflow-hidden rounded-xl border border-[#d2d2d7] bg-white">
-            <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr] gap-5 border-b border-[#e5e5ea] bg-[#fbfbfd] px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+          <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d2d2d7] bg-white">
+            <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr_0.35fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
               <span>Channel</span>
               <span>User</span>
               <span>Activity</span>
@@ -360,74 +366,98 @@ export const AdminDashboard = () => {
               <span>{selectedTimeLabel} views</span>
               <span>Channel insight</span>
               <span>Engagement</span>
+              <span>Feed</span>
             </div>
             {(activeMetrics.accountRows || []).length === 0 ? (
               <div className="px-5 py-8 text-center text-sm text-[#6e6e73]">
                 No publishing channels are associated with this campaign.
               </div>
-            ) : activeMetrics.accountRows.map((account) => (
-              <div
-                key={account._id}
-                onClick={() => {
-                  sessionStorage.setItem('admin_view_context', JSON.stringify({
-                    userId: account.user?._id || account.userId?._id || account.userId || '',
-                    userName: account.user?.name || '',
-                    userEmail: account.user?.email || '',
-                    channelId: account._id,
-                    channel: account,
-                  }));
-                  navigate(`/channels/${account._id}/feed`, {
-                    state: { fromAdmin: true, channel: account },
-                  });
-                }}
-                className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr] items-center gap-5 border-b border-[#e5e5ea] px-5 py-4 text-sm transition hover:bg-[#f5f5f7] last:border-b-0"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    sessionStorage.setItem('admin_view_context', JSON.stringify({
-                      userId: account.user?._id || account.userId?._id || account.userId || '',
-                      userName: account.user?.name || '',
-                      userEmail: account.user?.email || '',
-                      channelId: account._id,
-                      channel: account,
-                    }));
-                    navigate(`/channels/${account._id}/feed`, {
-                      state: { fromAdmin: true, channel: account },
-                    });
-                  }
-                }}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <img
-                    src={account.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-                    crossOrigin="anonymous"
-                    alt=""
-                    className="h-9 w-9 rounded-full border border-black/10 object-cover"
-                  />
-                  <div className="min-w-0">
-                    <p className="m-0 truncate font-semibold text-[#1d1d1f]">{account.name}</p>
-                    <p className="m-0 mt-0.5 truncate text-xs text-[#6e6e73]">
-                      @{account.username || 'account'} · {account.platform}
-                    </p>
+            ) : (
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {activeMetrics.accountRows.map((account) => (
+                  <div
+                    key={account._id}
+                    onClick={() => {
+                      sessionStorage.setItem('admin_view_context', JSON.stringify({
+                        userId: account.user?._id || account.userId?._id || account.userId || '',
+                        userName: account.user?.name || '',
+                        userEmail: account.user?.email || '',
+                        channelId: account._id,
+                        channel: account,
+                      }));
+                      navigate(`/channels/${account._id}/feed`, {
+                        state: { fromAdmin: true, channel: account },
+                      });
+                    }}
+                    className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr_0.35fr] items-center gap-3 border-b border-[#e5e5ea] px-3 py-2 text-xs transition hover:bg-[#f5f5f7] last:border-b-0"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        sessionStorage.setItem('admin_view_context', JSON.stringify({
+                          userId: account.user?._id || account.userId?._id || account.userId || '',
+                          userName: account.user?.name || '',
+                          userEmail: account.user?.email || '',
+                          channelId: account._id,
+                          channel: account,
+                        }));
+                        navigate(`/channels/${account._id}/feed`, {
+                          state: { fromAdmin: true, channel: account },
+                        });
+                      }
+                    }}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <img
+                        src={account.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                        crossOrigin="anonymous"
+                        alt=""
+                        className="h-7 w-7 rounded-full border border-black/10 object-cover"
+                      />
+                      <div className="min-w-0">
+                        <p className="m-0 truncate font-semibold text-[#1d1d1f]">{account.name}</p>
+                        <p className="m-0 truncate text-[10px] text-[#6e6e73]">
+                          @{account.username || 'account'} · {account.platform}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="m-0 truncate font-semibold text-[#1d1d1f]">{account.user?.name || 'Unknown user'}</p>
+                      <p className="m-0 truncate text-[10px] text-[#6e6e73]">{account.user?.email || 'No email'}</p>
+                    </div>
+                    <ActivityCell account={account} selectedTimeRange={selectedTimeRange} selectedRange={selectedRange} />
+                    <span className="text-[#515154]">{account[selectedRange.postsKey] || 0}</span>
+                    <span className="text-[#515154]">{numberFormat.format(account[selectedRange.viewsKey] || 0)}</span>
+                    <span className="text-[#515154]">{numberFormat.format(account[selectedRange.accountInsightKey] || 0)}</span>
+                    <span className="text-[#515154]">
+                      {numberFormat.format(account[selectedRange.likesKey] || 0)} / {numberFormat.format(account[selectedRange.commentsKey] || 0)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        sessionStorage.setItem('admin_view_context', JSON.stringify({
+                          userId: account.user?._id || account.userId?._id || account.userId || '',
+                          userName: account.user?.name || '',
+                          userEmail: account.user?.email || '',
+                          channelId: account._id,
+                          channel: account,
+                        }));
+                        navigate(`/channels/${account._id}/feed`, {
+                          state: { fromAdmin: true, channel: account },
+                        });
+                      }}
+                      className="inline-flex items-center justify-center rounded-md border border-[#d2d2d7] bg-white px-2 py-1 text-[10px] font-semibold text-[#0071e3] transition hover:border-[#0071e3] hover:bg-[#f0f7ff]"
+                    >
+                      Feed
+                    </button>
                   </div>
-                </div>
-                <div className="min-w-0">
-                  <p className="m-0 truncate font-semibold text-[#1d1d1f]">{account.user?.name || 'Unknown user'}</p>
-                  <p className="m-0 mt-0.5 truncate text-xs text-[#6e6e73]">{account.user?.email || 'No email'}</p>
-                </div>
-                <ActivityCell account={account} selectedTimeRange={selectedTimeRange} selectedRange={selectedRange} />
-                <span className="text-[#515154]">{account[selectedRange.postsKey] || 0}</span>
-                <span className="text-[#515154]">{numberFormat.format(account[selectedRange.viewsKey] || 0)}</span>
-                <span className="text-[#515154]">{numberFormat.format(account[selectedRange.accountInsightKey] || 0)}</span>
-                <span className="text-[#515154]">
-                  {numberFormat.format(account[selectedRange.likesKey] || 0)} / {numberFormat.format(account[selectedRange.commentsKey] || 0)}
-                </span>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
