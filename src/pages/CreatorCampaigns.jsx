@@ -377,7 +377,11 @@ export const CreatorCampaigns = () => {
   );
 
   const getPrimaryMedia = (post) => post.mediaIds?.[0] || null;
-  const getPostAccounts = (post) => post.socialAccountIds || [];
+  const getPostAccounts = (post) => (
+    (post.socialAccountIds || []).length > 0
+      ? post.socialAccountIds
+      : post.campaignChannelIds || []
+  );
   const getAccountId = (account) => String(getIdValue(account) || '');
   const getAccountLabel = (account) => account?.username || account?.name || account?.handle || account?.requestedHandle || 'Account';
   const getAccountQueueGroups = (camp) => {

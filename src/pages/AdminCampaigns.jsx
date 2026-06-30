@@ -72,6 +72,7 @@ export const AdminCampaigns = () => {
   const [newChannelPlatform, setNewChannelPlatform] = useState('instagram');
   const [newChannelHandle, setNewChannelHandle] = useState('');
   const [newChannelDisplayName, setNewChannelDisplayName] = useState('');
+  const [newChannelHandlerEmail, setNewChannelHandlerEmail] = useState('');
 
   const [activeTab, setActiveTab] = useState('details');
 
@@ -152,6 +153,7 @@ export const AdminCampaigns = () => {
           platform: newChannelPlatform,
           handle: cleanHandle,
           displayName: newChannelDisplayName.trim(),
+          assignedHandlerEmail: newChannelHandlerEmail.trim().toLowerCase(),
           addedAt: new Date().toISOString(),
         },
       ],
@@ -159,6 +161,7 @@ export const AdminCampaigns = () => {
 
     setNewChannelHandle('');
     setNewChannelDisplayName('');
+    setNewChannelHandlerEmail('');
   };
 
   const removeChannel = (indexToRemove) => {
@@ -192,6 +195,42 @@ export const AdminCampaigns = () => {
       default:
         return '';
     }
+  };
+
+  const updateChannel = (index, updates) => {
+    setForm((current) => ({
+      ...current,
+      channels: current.channels.map((channel, idx) => (
+        idx === index ? { ...channel, ...updates } : channel
+      )),
+    }));
+  };
+
+  const getChannelStatusMeta = (channel) => {
+    if (channel.isVerified) {
+      const verifiedOwner = channel.assignedHandlerName || channel.assignedHandlerEmail || channel.name || channel.username;
+      return {
+        label: 'Verified',
+        className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        detail: verifiedOwner
+          ? `Verified by ${verifiedOwner}`
+          : 'OAuth connected',
+      };
+    }
+
+    if (channel.assignedHandlerEmail) {
+      return {
+        label: 'Manual only',
+        className: 'bg-blue-50 text-blue-700 border-blue-200',
+        detail: `Assigned to ${channel.assignedHandlerEmail}`,
+      };
+    }
+
+    return {
+      label: 'Unassigned',
+      className: 'bg-amber-50 text-amber-700 border-amber-200',
+      detail: 'Add handler email for manual tasks',
+    };
   };
 
   const saveCampaign = async (event) => {
@@ -447,7 +486,7 @@ export const AdminCampaigns = () => {
                       </div>
 
                       {/* Inputs Grid */}
-                      <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="grid gap-4 sm:grid-cols-3">
                         <div>
                           <label className="mb-1.5 block text-xs font-semibold text-[#6e6e73]">
                             Account Handle / Username
@@ -476,6 +515,21 @@ export const AdminCampaigns = () => {
                           />
                           <p className="mt-1 text-[11px] text-[#8e8e93] leading-relaxed">
                             A friendly name to display in lists and reports.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-[#6e6e73]">
+                            Handler Email <span className="text-[#8e8e93] font-normal">(Manual)</span>
+                          </label>
+                          <input
+                            type="email"
+                            value={newChannelHandlerEmail}
+                            onChange={(e) => setNewChannelHandlerEmail(e.target.value)}
+                            placeholder="creator@example.com"
+                            className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm text-[#1d1d1f] outline-none transition focus:border-[#3478f6] focus:ring-2 focus:ring-[#3478f6]/10"
+                          />
+                          <p className="mt-1 text-[11px] text-[#8e8e93] leading-relaxed">
+                            Required only when this unverified handle should receive manual tasks.
                           </p>
                         </div>
                       </div>
@@ -510,51 +564,61 @@ export const AdminCampaigns = () => {
                       </div>
                     ) : (
                       <div className="divide-y divide-[#e5e5ea] rounded-xl border border-[#e5e5ea] bg-white overflow-hidden">
-                        {(form.channels || []).map((ch, idx) => (
-                          <div key={idx} className="flex items-center gap-3 p-4 hover:bg-[#fbfbfb] transition">
-                            <PlatformLogo platform={ch.platform} className="h-8 w-8 shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-baseline gap-2">
-                                <span className="truncate text-sm font-semibold text-[#1d1d1f]">
-                                  {ch.handle.startsWith('@') ? ch.handle : `@${ch.handle}`}
-                                </span>
-                                {ch.displayName && (
-                                  <span className="truncate text-xs text-[#8e8e93]">
-                                    ({ch.displayName})
+                        {(form.channels || []).map((ch, idx) => {
+                          const statusMeta = getChannelStatusMeta(ch);
+                          return (
+                            <div key={idx} className="flex items-center gap-3 p-4 hover:bg-[#fbfbfb] transition">
+                              <PlatformLogo platform={ch.platform} className="h-8 w-8 shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-baseline gap-2">
+                                  <span className="truncate text-sm font-semibold text-[#1d1d1f]">
+                                    {ch.handle.startsWith('@') ? ch.handle : `@${ch.handle}`}
                                   </span>
-                                )}
+                                  {ch.displayName && (
+                                    <span className="truncate text-xs text-[#8e8e93]">
+                                      ({ch.displayName})
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="m-0 mt-0.5 text-[11px] text-[#8e8e93] capitalize">
+                                  {ch.platform} {ch.addedAt && `· Added on ${new Date(ch.addedAt).toLocaleDateString()}`}
+                                </p>
                               </div>
-                              <p className="m-0 mt-0.5 text-[11px] text-[#8e8e93] capitalize">
-                                {ch.platform} {ch.addedAt && `· Added on ${new Date(ch.addedAt).toLocaleDateString()}`}
-                              </p>
-                            </div>
 
-                            {/* Verification badge */}
-                            <div className="flex flex-col items-end gap-1">
-                              <span className={`rounded-md px-2.5 py-1 text-[10px] font-semibold border ${
-                                ch.isVerified
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  : 'bg-amber-50 text-amber-700 border-amber-200'
-                              }`}>
-                                {ch.isVerified ? 'Verified' : 'Unverified'}
-                              </span>
-                              {!ch.isVerified && (
-                                <span className="text-[10px] text-[#8e8e93] max-w-[180px] text-right leading-tight">
-                                  Owner needs to connect under Channels page.
+                              <div className="w-56">
+                                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#8e8e93]">
+                                  Handler Email
+                                </label>
+                                <input
+                                  type="email"
+                                  value={ch.assignedHandlerEmail || ''}
+                                  onChange={(e) => updateChannel(idx, { assignedHandlerEmail: e.target.value.trim().toLowerCase() })}
+                                  placeholder="creator@example.com"
+                                  disabled={ch.isVerified}
+                                  className="w-full rounded-lg border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-xs text-[#1d1d1f] outline-none transition focus:border-[#3478f6] focus:ring-2 focus:ring-[#3478f6]/10 disabled:bg-[#f5f5f7] disabled:text-[#8e8e93]"
+                                />
+                              </div>
+
+                              <div className="flex flex-col items-end gap-1">
+                                <span className={`rounded-md px-2.5 py-1 text-[10px] font-semibold border ${statusMeta.className}`}>
+                                  {statusMeta.label}
                                 </span>
-                              )}
-                            </div>
+                                <span className="text-[10px] text-[#8e8e93] max-w-[190px] text-right leading-tight">
+                                  {statusMeta.detail}
+                                </span>
+                              </div>
 
-                            <button
-                              type="button"
-                              onClick={() => removeChannel(idx)}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8e8e93] transition hover:bg-red-50 hover:text-red-600 ml-2"
-                              aria-label={`Remove ${ch.handle}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
+                              <button
+                                type="button"
+                                onClick={() => removeChannel(idx)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8e8e93] transition hover:bg-red-50 hover:text-red-600 ml-2"
+                                aria-label={`Remove ${ch.handle}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

@@ -5,7 +5,7 @@ import { User, Mail, Save, Check, Trash2 } from 'lucide-react';
 export const Settings = () => {
   const { user, updateProfile, deleteAccount } = useAuth();
   const [name, setName] = useState(user?.name || '');
-  const [userType, setUserType] = useState(user?.userType || 'campaign_maker');
+  const [userType, setUserType] = useState(user?.userType || 'account_handler');
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');

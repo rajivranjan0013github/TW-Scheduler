@@ -182,6 +182,35 @@ const CalendarView = ({ selectedAccounts }) => {
   const isPureManualMode = scheduleMode === 'manual';
   const requiresScheduleTime = !isPureManualMode;
   const shouldUseYoutubePublishing = hasYoutubeSelected && !isPureManualMode;
+  const isChannelVerified = (channel) => (
+    channel?.isVerified === true
+    || channel?.status === 'verified'
+    || (!getActiveCampaignId() && channel?.isConnected !== false)
+  );
+  const isManualAssignedChannel = (channel) => Boolean(
+    channel?.assignedHandlerEmail || channel?.assignedHandlerUserId
+  );
+  const canUseChannelForMode = (channel) => Boolean(channel?._id) && (
+    isChannelVerified(channel) || isManualAssignedChannel(channel)
+  );
+  const normalizeSchedulingChannel = (channel) => {
+    const activeCampaignId = getActiveCampaignId();
+    const socialAccountId = channel.socialAccountId || channel.matchedAccountId || null;
+    const schedulingId = socialAccountId || channel._id;
+    const verified = channel.isVerified !== undefined
+      ? Boolean(channel.isVerified)
+      : channel.isConnected !== false;
+
+    return {
+      ...channel,
+      _id: String(schedulingId || channel._id),
+      campaignChannelId: activeCampaignId ? String(channel._id) : channel.campaignChannelId,
+      socialAccountId,
+      isVerified: verified,
+      isConnected: channel.isConnected !== undefined ? channel.isConnected : verified,
+      status: channel.status || (verified ? 'verified' : 'disconnected'),
+    };
+  };
   const getMediaAccountIds = (item) => (item?.socialAccountIds || []).map(account => account._id || account);
   const getFolderName = (folderId) => {
     if (!folderId) return 'Campaign Library';
@@ -249,6 +278,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const isMediaAvailableForChannels = (item, channelIds) => {
     return true;
   };
+
   const availableMediaList = useMemo(() => {
     return mediaList.filter(item => {
       // 1. Must match target channel
@@ -540,6 +570,10 @@ const CalendarView = ({ selectedAccounts }) => {
       setQueueError('');
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('tw_token')}` };
       const scope = withCampaignScope();
+      const activeCampaignId = getActiveCampaignId();
+      const accountsEndpoint = activeCampaignId
+        ? `${API_BASE_URL}/api/accounts/publishing-channels${scope}`
+        : `${API_BASE_URL}/api/accounts${scope}`;
       const fetchJson = async (url) => {
         const response = await fetch(url, { headers });
         const data = await response.json().catch(() => null);
@@ -554,13 +588,13 @@ const CalendarView = ({ selectedAccounts }) => {
       };
       const [accounts, data] = force
         ? await Promise.all([
-          fetchFreshJson(`${API_BASE_URL}/api/accounts${scope}`),
+          fetchFreshJson(accountsEndpoint),
           fetchFreshJson(`${API_BASE_URL}/api/scheduler${scope}`),
         ])
         : await Promise.all([
           queryClient.fetchQuery({
-          queryKey: ['scheduler', 'accounts', scope],
-          queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts${scope}`),
+          queryKey: ['scheduler', 'accounts', activeCampaignId ? 'publishing-channels' : 'connected', scope],
+          queryFn: () => fetchJson(accountsEndpoint),
           staleTime: 2 * 60 * 1000,
           }),
           queryClient.fetchQuery({
@@ -570,13 +604,19 @@ const CalendarView = ({ selectedAccounts }) => {
           }),
         ]);
       if (force) {
-        queryClient.setQueryData(['scheduler', 'accounts', scope], accounts);
+        queryClient.setQueryData(['scheduler', 'accounts', activeCampaignId ? 'publishing-channels' : 'connected', scope], accounts);
         queryClient.setQueryData(['scheduler', 'posts', scope], data);
       }
-      const scopedAccountIds = selectedAccounts.length > 0 ? selectedAccounts : accounts.map(account => account._id);
+      const normalizedAccountIds = accounts
+        .map(normalizeSchedulingChannel)
+        .map(account => account._id);
+      const scopedAccountIds = activeCampaignId || selectedAccounts.length === 0
+        ? normalizedAccountIds
+        : selectedAccounts;
       const filtered = data.filter(p => {
         const accId = p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0];
-        return scopedAccountIds.includes(accId);
+        const channelId = p.campaignChannelIds?.[0]?._id || p.campaignChannelIds?.[0];
+        return scopedAccountIds.includes(accId) || scopedAccountIds.includes(channelId);
       });
       setPosts(filtered);
     } catch (error) {
@@ -596,10 +636,15 @@ const CalendarView = ({ selectedAccounts }) => {
         return response.json();
       };
 
+      const activeCampaignId = getActiveCampaignId();
+      const accountsEndpoint = activeCampaignId
+        ? `${API_BASE_URL}/api/accounts/publishing-channels${scope}`
+        : `${API_BASE_URL}/api/accounts${scope}`;
+
       const [accData, medData, folderData] = await Promise.all([
         queryClient.fetchQuery({
-          queryKey: ['scheduler', 'accounts', scope],
-          queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts${scope}`),
+          queryKey: ['scheduler', 'accounts', activeCampaignId ? 'publishing-channels' : 'connected', scope],
+          queryFn: () => fetchJson(accountsEndpoint),
           staleTime: 2 * 60 * 1000,
         }),
         queryClient.fetchQuery({
@@ -613,10 +658,11 @@ const CalendarView = ({ selectedAccounts }) => {
           staleTime: 2 * 60 * 1000,
         }),
       ]);
+      const normalizedChannels = accData.map(normalizeSchedulingChannel);
       setChannels(
-        selectedAccounts.length > 0
-          ? accData.filter(account => selectedAccounts.includes(account._id))
-          : accData
+        !activeCampaignId && selectedAccounts.length > 0
+          ? normalizedChannels.filter(account => selectedAccounts.includes(account._id))
+          : normalizedChannels.filter((channel) => !activeCampaignId || canUseChannelForMode(channel))
       );
       setMediaList(medData);
       setFolders(folderData);
@@ -793,7 +839,16 @@ const CalendarView = ({ selectedAccounts }) => {
       };
       const body = {
         campaignId: getActiveCampaignId(),
-        socialAccountIds: selectedChannels,
+        socialAccountIds: selectedChannelObjects
+          .map((channel) => channel.socialAccountId)
+          .filter(Boolean),
+        campaignChannelIds: selectedChannelObjects
+          .map((channel) => channel.campaignChannelId)
+          .filter(Boolean),
+        channelTargets: selectedChannelObjects.map((channel) => ({
+          socialAccountId: channel.socialAccountId || null,
+          campaignChannelId: channel.campaignChannelId || null,
+        })),
         mediaIds: selectedMedia,
         caption: caption.trim(),
         scheduledAt: effectiveScheduleDate,
@@ -861,11 +916,29 @@ const CalendarView = ({ selectedAccounts }) => {
   };
 
   const toggleChannel = (channelId) => {
+    const channel = channels.find((chan) => chan._id === channelId);
+    if (!channel || !canUseChannelForMode(channel)) return;
+    if (!isChannelVerified(channel) && scheduleMode !== 'manual') {
+      setScheduleMode('manual');
+    }
+
     setSelectedChannels((current) => (
       current.includes(channelId)
         ? current.filter(id => id !== channelId)
         : [...current, channelId]
     ));
+  };
+
+  const handleScheduleModeChange = (mode) => {
+    setScheduleMode(mode);
+    if (mode !== 'manual') {
+      setSelectedChannels((current) => (
+        current.filter((channelId) => {
+          const channel = channels.find((chan) => chan._id === channelId);
+          return channel && isChannelVerified(channel);
+        })
+      ));
+    }
   };
 
   const toggleMedia = (mediaId) => {
@@ -990,15 +1063,20 @@ const CalendarView = ({ selectedAccounts }) => {
                 <div className="p-2 space-y-1 flex-1 overflow-y-auto">
                   {channels.map(chan => {
                     const isSelected = selectedChannels.includes(chan._id);
+                    const isVerified = isChannelVerified(chan);
+                    const canSelect = canUseChannelForMode(chan);
                     return (
                       <button
                         key={chan._id}
                         type="button"
                         onClick={() => toggleChannel(chan._id)}
+                        disabled={!canSelect}
                         className={`w-full flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all ${
                           isSelected
                             ? 'border-[#2563eb] bg-[#f0f7ff] text-[#0f172a] shadow-sm'
-                            : 'border-[#e5e7eb] bg-white text-[#334155] hover:border-[#cbd5e1]'
+                            : canSelect
+                              ? 'border-[#e5e7eb] bg-white text-[#334155] hover:border-[#cbd5e1]'
+                              : 'border-[#e5e7eb] bg-[#f8fafc] text-[#94a3b8] opacity-80 cursor-not-allowed'
                         }`}
                       >
                         {chan.avatarUrl ? (
@@ -1012,6 +1090,15 @@ const CalendarView = ({ selectedAccounts }) => {
                           <span className="block truncate text-xs font-semibold leading-tight">{getAccountLabel(chan)}</span>
                           <span className="block truncate text-[9px] capitalize text-[#6b7280] leading-none mt-0.5">{chan.platform}</span>
                         </div>
+                        {!isVerified && (
+                          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${
+                            isPureManualMode && canSelect
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-slate-100 text-slate-500 border border-slate-200'
+                          }`}>
+                            Manual
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -1181,7 +1268,7 @@ const CalendarView = ({ selectedAccounts }) => {
                           <button
                             key={mode}
                             type="button"
-                            onClick={() => setScheduleMode(mode)}
+                            onClick={() => handleScheduleModeChange(mode)}
                             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-all ${
                               isActive
                                 ? 'border-[#2563eb] bg-[#f0f7ff] text-[#0f172a]'
@@ -1381,7 +1468,9 @@ const CalendarView = ({ selectedAccounts }) => {
         // 1. Group active queued posts by account
         const accountMap = {};
         activeQueuePosts.forEach(post => {
-          const accountIds = (post.socialAccountIds || []).map(a => a._id || a);
+          const accountIds = (post.socialAccountIds || []).length > 0
+            ? (post.socialAccountIds || []).map(a => a._id || a)
+            : (post.campaignChannelIds || []).map(ch => ch.socialAccountId || ch.matchedAccountId || ch._id || ch);
           accountIds.forEach(accId => {
             if (!accountMap[accId]) accountMap[accId] = [];
             accountMap[accId].push(post);

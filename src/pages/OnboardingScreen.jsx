@@ -4,7 +4,7 @@ import { Briefcase, Radio, ArrowRight, Sparkles, CheckCircle2 } from 'lucide-rea
 
 export const OnboardingScreen = () => {
   const { updateProfile } = useAuth();
-  const [selectedRole, setSelectedRole] = useState('campaign_maker');
+  const [selectedRole, setSelectedRole] = useState('account_handler');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
