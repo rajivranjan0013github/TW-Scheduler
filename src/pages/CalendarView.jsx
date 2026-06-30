@@ -344,6 +344,56 @@ const CalendarView = ({ selectedAccounts }) => {
         };
       });
   }, [folders, selectedCarouselSets, mediaList, mediaByFolderId]);
+  const folderById = useMemo(() => {
+    return new Map(folders.map((folder) => [String(folder._id), folder]));
+  }, [folders]);
+  const getQueueDisplayFolder = (folderRef) => {
+    const folderId = normalizeFolderId(folderRef);
+    if (!folderId) return { id: 'root', name: 'Campaign Library' };
+
+    const folder = folderById.get(String(folderId)) || (typeof folderRef === 'object' ? folderRef : null);
+    if (!folder) return { id: String(folderId), name: 'Unknown folder' };
+
+    if (folder.kind === 'carousel_set') {
+      const parentId = normalizeFolderId(folder.parentFolderId);
+      if (!parentId) return { id: 'root', name: 'Campaign Library' };
+      const parentFolder = folderById.get(String(parentId));
+      return {
+        id: String(parentId),
+        name: parentFolder?.name || 'Parent folder',
+      };
+    }
+
+    return {
+      id: String(folder._id || folderId),
+      name: folder.name || 'Untitled folder',
+    };
+  };
+  const getQueueSourceFolders = (queuePosts) => {
+    const sourceMap = new Map();
+    queuePosts.forEach((post) => {
+      const carouselSetId = post.platformSpecifics?.type === 'carousel'
+        ? post.platformSpecifics?.carouselSetId
+        : null;
+      if (carouselSetId) {
+        const source = getQueueDisplayFolder(carouselSetId);
+        sourceMap.set(source.id, source);
+        return;
+      }
+
+      (post.mediaIds || []).forEach((mediaItem) => {
+        const source = getQueueDisplayFolder(mediaItem?.folderId);
+        sourceMap.set(source.id, source);
+      });
+    });
+    return [...sourceMap.values()].sort((a, b) => naturalFolderCollator.compare(a.name || '', b.name || ''));
+  };
+  const getQueueSourceLabel = (queuePosts) => {
+    const sourceFolders = getQueueSourceFolders(queuePosts);
+    if (sourceFolders.length === 0) return 'No folder';
+    if (sourceFolders.length === 1) return sourceFolders[0].name;
+    return `${sourceFolders[0].name} +${sourceFolders.length - 1}`;
+  };
   const schedulePlan = useMemo(() => {
     const baseDate = scheduleTime ? new Date(scheduleTime) : null;
     const hasValidDate = baseDate && !Number.isNaN(baseDate.getTime());
@@ -1352,8 +1402,9 @@ const CalendarView = ({ selectedAccounts }) => {
 
             const queuePosts = scheduled.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
             const nextPost = queuePosts.find(p => new Date(p.scheduledAt) >= now) || queuePosts[0];
+            const sourceLabel = getQueueSourceLabel(queuePosts);
 
-            return { accId, channel, total, done, left, failed: failed.length, isActive, nextPost };
+            return { accId, channel, total, done, left, failed: failed.length, isActive, nextPost, sourceLabel };
           })
           .sort((a, b) => getAccountLabel(a.channel).localeCompare(getAccountLabel(b.channel)));
 
@@ -1370,7 +1421,7 @@ const CalendarView = ({ selectedAccounts }) => {
 
         // Simple Solid Circular Progress
         const CircularProgress = ({ done, total, themeColor }) => {
-          const size = 48;
+          const size = 42;
           const stroke = 4;
           const radius = (size - stroke) / 2;
           const circumference = 2 * Math.PI * radius;
@@ -1415,7 +1466,7 @@ const CalendarView = ({ selectedAccounts }) => {
                 <span className="text-slate-400 text-xs">Create a new schedule queue to establish a flow</span>
               </div>
             ) : (
-              <div ref={canvasRef} className="max-w-3xl mx-auto pt-6 space-y-6 relative" style={{ minHeight: '600px' }}>
+              <div ref={canvasRef} className="w-full max-w-none pt-6 space-y-6 relative" style={{ minHeight: '600px' }}>
                
 
                  {/* SVG Connections Layer */}
@@ -1424,9 +1475,9 @@ const CalendarView = ({ selectedAccounts }) => {
                     const { accId } = summary;
                     const theme = getPlatformTheme(summary.channel?.platform);
 
-                    // Connection 1: Channel Out directly to Stats In
+                    // Connection 1: Channel Out to Source In
                     const fromPort1 = `acc-port-out-${accId}`;
-                    const toPort1 = `stats-port-in-${accId}`;
+                    const toPort1 = `source-port-in-${accId}`;
                     const fromPos1 = portPositions[fromPort1];
                     const toPos1 = portPositions[toPort1];
 
@@ -1434,27 +1485,37 @@ const CalendarView = ({ selectedAccounts }) => {
                       ? `M ${fromPos1.x} ${fromPos1.y} C ${fromPos1.x + Math.abs(toPos1.x - fromPos1.x) * 0.4} ${fromPos1.y}, ${toPos1.x - Math.abs(toPos1.x - fromPos1.x) * 0.4} ${toPos1.y}, ${toPos1.x} ${toPos1.y}`
                       : null;
 
+                    // Connection 2: Source Out to Stats In
+                    const fromPort2 = `source-port-out-${accId}`;
+                    const toPort2 = `stats-port-in-${accId}`;
+                    const fromPos2 = portPositions[fromPort2];
+                    const toPos2 = portPositions[toPort2];
+
+                    const path2 = fromPos2 && toPos2 && typeof fromPos2.x === 'number' && typeof fromPos2.y === 'number' && typeof toPos2.x === 'number' && typeof toPos2.y === 'number'
+                      ? `M ${fromPos2.x} ${fromPos2.y} C ${fromPos2.x + Math.abs(toPos2.x - fromPos2.x) * 0.4} ${fromPos2.y}, ${toPos2.x - Math.abs(toPos2.x - fromPos2.x) * 0.4} ${toPos2.y}, ${toPos2.x} ${toPos2.y}`
+                      : null;
+
                     return (
                       <g key={accId} className="opacity-80">
-                        {path1 && (
-                          <>
+                        {[path1, path2].filter(Boolean).map((path, index) => (
+                          <g key={`path-${accId}-${index}`}>
                             <path
-                              d={path1}
+                              d={path}
                               fill="none"
                               stroke={theme.accent}
                               strokeWidth="4"
                               className="opacity-15 blur-[2px]"
                             />
                             <path
-                              d={path1}
+                              d={path}
                               fill="none"
                               stroke={summary.isActive ? theme.accent : '#94a3b8'}
                               strokeWidth={summary.isActive ? "2.5" : "1.5"}
                               strokeDasharray={summary.isActive ? "6, 4" : "4, 4"}
                               style={summary.isActive ? { animation: 'dash 25s linear infinite' } : {}}
                             />
-                          </>
-                        )}
+                          </g>
+                        ))}
                       </g>
                     );
                   })}
@@ -1462,7 +1523,7 @@ const CalendarView = ({ selectedAccounts }) => {
 
                 <div className="space-y-12 relative z-10">
                   {accountSummaries.map((summary) => {
-                    const { accId, channel, total, done, left, failed: failedCount, isActive, nextPost } = summary;
+                    const { accId, channel, total, done, left, failed: failedCount, isActive, nextPost, sourceLabel } = summary;
                     const theme = getPlatformTheme(channel?.platform);
                     const progress = total > 0 ? Math.round((done / total) * 100) : 0;
                     const deletingAccountQueue = deletingAccountQueueIds.includes(accId);
@@ -1470,7 +1531,7 @@ const CalendarView = ({ selectedAccounts }) => {
                     return (
                       <div
                         key={accId}
-                        className="flex flex-col md:flex-row items-center md:justify-between gap-8 md:gap-4 relative"
+                        className="flex flex-col md:flex-row items-center md:justify-between gap-8 md:gap-6 relative"
                       >
                         {/* Channel Node */}
                         <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl px-4 py-3 shadow-sm hover:shadow hover:border-indigo-400 hover:scale-[1.02] transition-all duration-300 w-full md:w-[220px]">
@@ -1512,16 +1573,47 @@ const CalendarView = ({ selectedAccounts }) => {
                           </div>
                         </div>
 
+                        {/* Source Folder Node */}
+                        <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl px-4 py-3 shadow-sm hover:shadow hover:border-indigo-400 hover:scale-[1.02] transition-all duration-300 w-full md:w-[220px]">
+                          <div
+                            data-port-id={`source-port-in-${accId}`}
+                            className="hidden md:block absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
+                          />
+                          <div
+                            data-port-id={`source-port-out-${accId}`}
+                            className="hidden md:block absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
+                            style={{ backgroundColor: theme.accent }}
+                          />
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
+                              <Folder className="w-4 h-4 text-slate-500" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-xs font-bold text-slate-800 m-0 truncate" title={sourceLabel}>{sourceLabel}</h4>
+                              <p className="m-0 mt-0.5 text-[8px] font-bold uppercase tracking-wider text-slate-400">Source folder</p>
+                            </div>
+                          </div>
+                        </div>
+
                         {/* Stats Node */}
-                        <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl p-3.5 shadow-sm hover:shadow hover:border-indigo-400 hover:scale-[1.02] transition-all duration-300 w-full md:w-[280px]">
+                        <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl px-3.5 py-3 shadow-sm hover:shadow hover:border-indigo-400 hover:scale-[1.02] transition-all duration-300 w-full md:w-[320px]">
                           {/* Incoming Port Left */}
                           <div
                             data-port-id={`stats-port-in-${accId}`}
                             className="hidden md:block absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
                           />
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex-1">
-                              <div className="grid grid-cols-3 gap-1 bg-slate-50 border border-slate-100 rounded-xl p-1.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAccountQueue(accId, getAccountLabel(channel))}
+                            disabled={deletingAccountQueue}
+                            className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-rose-200 bg-white text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            title={`Delete ${left} queued post${left === 1 ? '' : 's'} for this account`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                          <div className="flex items-center justify-between gap-3 pr-6">
+                            <div className="min-w-0 flex-1">
+                              <div className="grid grid-cols-3 gap-1 bg-slate-50 border border-slate-100 rounded-lg p-1.5 text-center">
                                 <div>
                                   <p className="m-0 text-xs font-bold text-indigo-600">{left}</p>
                                   <p className="m-0 text-[7px] font-bold uppercase text-slate-400">Left</p>
@@ -1538,21 +1630,12 @@ const CalendarView = ({ selectedAccounts }) => {
                               
                               {/* Next Post Foot */}
                               {nextPost && (
-                                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                                  <p className="m-0 text-[8px] text-slate-500 flex items-center gap-1">
-                                    <Clock className="w-2.5 h-2.5 text-slate-400" /> {getScheduleModeLabel(nextPost.scheduleMode)} - {getPostStatusLabel(nextPost)} - {new Date(nextPost.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                  </p>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteAccountQueue(accId, getAccountLabel(channel))}
-                                    disabled={deletingAccountQueue}
-                                    className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                                    title="Delete this account's queued schedule"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                    {deletingAccountQueue ? 'Deleting' : `Delete queue (${left})`}
-                                  </button>
-                                </div>
+                                <p className="m-0 mt-1.5 flex min-w-0 items-center gap-1 text-[8px] text-slate-500">
+                                  <Clock className="h-2.5 w-2.5 flex-shrink-0 text-slate-400" />
+                                  <span className="truncate">
+                                    {deletingAccountQueue ? 'Deleting queue' : `${getScheduleModeLabel(nextPost.scheduleMode)} - ${getPostStatusLabel(nextPost)} - ${new Date(nextPost.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                                  </span>
+                                </p>
                               )}
                             </div>
 

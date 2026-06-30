@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Clock, FolderHeart, LayoutDashboard, Link2, Megaphone, Settings as SettingsIcon } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
+import { PwaInstallButton } from './components/PwaInstallButton';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -48,6 +49,11 @@ function MobileNav({ isCreator }) {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#d2d2d7] bg-white/95 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
+      <PwaInstallButton
+        collapsed
+        className="absolute -top-11 right-3"
+        popoverClassName="right-0"
+      />
       <div className={`mx-auto grid gap-1 ${isCreator ? 'max-w-sm grid-cols-3' : 'max-w-md grid-cols-5'}`}>
         {items.map((item) => (
           <NavLink
@@ -72,8 +78,18 @@ function MobileNav({ isCreator }) {
 function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const { user } = useAuth();
   const location = useLocation();
+  const [campaignVersion, setCampaignVersion] = useState(0);
   const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
   const isCreator = user?.userType === 'account_handler';
+
+  useEffect(() => {
+    const refreshCampaignScopedRoutes = () => {
+      setCampaignVersion((version) => version + 1);
+    };
+
+    window.addEventListener('campaign-selected', refreshCampaignScopedRoutes);
+    return () => window.removeEventListener('campaign-selected', refreshCampaignScopedRoutes);
+  }, []);
 
   // Only hide sidebar when there's no active campaign (first-time welcome screen).
   // Returning users with 2+ campaigns still see sidebar on the campaign picker.
@@ -94,7 +110,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
       )}
 
       <main className={`min-w-0 flex-1 overflow-y-auto ${!hideSidebar ? 'pb-20 md:pb-0' : ''}`}>
-        <Routes>
+        <Routes key={campaignVersion}>
           {isCreator ? (
             <>
               <Route path="/" element={<CreatorCampaigns />} />
@@ -105,7 +121,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
             </>
           ) : (
             <>
-              <Route path="/" element={<CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
+              <Route path="/" element={hasActiveCampaign ? <Navigate to="/scheduler" replace /> : <CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
               <Route path="/campaigns" element={<CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
               <Route path="/dashboard" element={<Dashboard selectedAccounts={selectedAccounts} />} />
               <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />

@@ -52,6 +52,22 @@ const getRowLoadSignature = (row) => JSON.stringify({
   dragPos: row?.dragPos || {},
 });
 
+const normalizeDragPosForCompare = (dragPos) => ({
+  x: Math.round(Number(dragPos?.x ?? DEFAULT_DRAG_POS.x) * 100) / 100,
+  y: Math.round(Number(dragPos?.y ?? DEFAULT_DRAG_POS.y) * 100) / 100,
+});
+
+const getTextSettingsSignature = (settings) => JSON.stringify({
+  fontFamily: settings?.fontFamily || '',
+  fontWeight: settings?.fontWeight || '',
+  fontSize: Number(settings?.fontSize || 0),
+  fontColor: settings?.fontColor || '',
+  strokeWidth: Number(settings?.strokeWidth || 0),
+  strokeColor: settings?.strokeColor || '',
+  bgType: settings?.bgType || '',
+  bgColor: settings?.bgColor || '',
+});
+
 export const VideoEditor = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -93,6 +109,7 @@ export const VideoEditor = () => {
   const bulkResultUrlsRef = useRef([]);
   const activeBulkRunRef = useRef(null);
   const loadedBulkRowSignatureRef = useRef('');
+  const isLoadingBulkRowRef = useRef(false);
 
   // --- Hooks ---
   const {
@@ -693,6 +710,7 @@ export const VideoEditor = () => {
         return;
       }
       loadedBulkRowSignatureRef.current = rowSignature;
+      isLoadingBulkRowRef.current = true;
 
       // Save durations before reset — if a video URL stays the same between
       // rows its <video> element won't remount (same React key) so
@@ -732,8 +750,81 @@ export const VideoEditor = () => {
       setStatusMessage(null);
       preview.setActiveVideo(1);
       preview.resetPlayback();
+      window.setTimeout(() => {
+        isLoadingBulkRowRef.current = false;
+      }, 0);
     }
   }, [currentQueueIndex, bulkRows]);
+
+  // Keep manual edits made in the editor attached to the active bulk row.
+  // Without this, starting/restarting the queue can reload the old row snapshot
+  // and export stale caption text, style, audio, or placement.
+  useEffect(() => {
+    if (!isBulkMode || isQueueRunning || isLoadingBulkRowRef.current) return;
+    if (currentQueueIndex < 0 || currentQueueIndex >= bulkRows.length) return;
+
+    const activeRow = bulkRows[currentQueueIndex];
+    if (!activeRow?.id) return;
+
+    const nextTextSettings = {
+      fontFamily: overlay.fontFamily,
+      fontWeight: overlay.fontWeight,
+      fontSize: overlay.fontSize,
+      fontColor: overlay.fontColor,
+      strokeWidth: overlay.strokeWidth,
+      strokeColor: overlay.strokeColor,
+      bgType: overlay.bgType,
+      bgColor: overlay.bgColor,
+    };
+    const nextDragPos = normalizeDragPosForCompare(overlay.dragPos);
+    const currentDragPos = normalizeDragPosForCompare(activeRow.dragPos);
+    const captionChanged = (activeRow.caption || '') !== (overlay.text || '');
+    const settingsChanged = getTextSettingsSignature(activeRow.textSettings) !== getTextSettingsSignature(nextTextSettings);
+    const dragChanged = currentDragPos.x !== nextDragPos.x || currentDragPos.y !== nextDragPos.y;
+    const audioChanged = getAudioIdentity(activeRow.audio) !== getAudioIdentity(audio.selectedAudio);
+
+    if (!captionChanged && !settingsChanged && !dragChanged && !audioChanged) return;
+
+    const updatedRows = bulkRows.map((row, idx) => {
+      if (idx !== currentQueueIndex) return row;
+      return sanitizeBulkRowForStorage({
+        ...row,
+        caption: overlay.text || '',
+        textSettings: nextTextSettings,
+        dragPos: nextDragPos,
+        audio: audio.selectedAudio,
+        status: row.video1 && row.video2 ? 'ready' : 'draft',
+        resultMediaId: '',
+        resultMediaUrl: '',
+        resultMediaName: '',
+        resultVideoUrl: '',
+      });
+    });
+
+    setBulkRows(updatedRows);
+    try {
+      localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(updatedRows.map(sanitizeBulkRowForStorage)));
+    } catch (err) {
+      console.error('Failed to sync active bulk row edits:', err);
+    }
+    setResultVideoUrl('');
+  }, [
+    isBulkMode,
+    isQueueRunning,
+    currentQueueIndex,
+    bulkRows,
+    overlay.text,
+    overlay.fontFamily,
+    overlay.fontWeight,
+    overlay.fontSize,
+    overlay.fontColor,
+    overlay.strokeWidth,
+    overlay.strokeColor,
+    overlay.bgType,
+    overlay.bgColor,
+    overlay.dragPos,
+    audio.selectedAudio
+  ]);
 
   // Automated queue runner effect
   useEffect(() => {
@@ -777,10 +868,12 @@ export const VideoEditor = () => {
     const input1Duration = videoDurations.input1 || preview.video1Ref.current?.duration || 0;
     const input2Duration = videoDurations.input2 || preview.video2Ref.current?.duration || 0;
     if (input1Duration > 0 && input2Duration > 0) {
-      preview.videoDurationsRef.current = {
-        input1: input1Duration,
-        input2: input2Duration,
-      };
+      if (videoDurations.input1 !== input1Duration) {
+        preview.setVideoDuration('input1', input1Duration);
+      }
+      if (videoDurations.input2 !== input2Duration) {
+        preview.setVideoDuration('input2', input2Duration);
+      }
     } else {
       setProgressMsg('Loading video assets...');
       return;

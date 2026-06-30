@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, BarChart3, ChevronDown, ChevronUp, ExternalLink, Eye, Heart, MessageSquare, Play, RefreshCw } from 'lucide-react';
+import { ArrowLeft, BarChart3, ExternalLink, RefreshCw } from 'lucide-react';
 import { withCampaignScope } from '../utils/campaignScope';
 
 export const PublishedFeed = () => {
@@ -14,7 +14,6 @@ export const PublishedFeed = () => {
   const [loading, setLoading] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [errorPosts, setErrorPosts] = useState(null);
-  const [expandedPostId, setExpandedPostId] = useState(null);
 
   useEffect(() => {
     fetchChannelAndPosts();
@@ -49,147 +48,7 @@ export const PublishedFeed = () => {
     });
   };
 
-  const PostMedia = ({ post }) => {
-    const isVideo = post.mediaType === 'VIDEO' || Boolean(post.videoUrl);
-    const mediaSrc = isVideo ? (post.videoUrl || post.mediaUrl) : post.mediaUrl;
-
-    if (!mediaSrc) {
-      return (
-        <div className="flex aspect-square items-center justify-center bg-[#f5f5f7] text-xs font-semibold text-[#8e8e93]">
-          No media preview
-        </div>
-      );
-    }
-
-    return (
-      <div className="relative aspect-square bg-black">
-        {isVideo ? (
-          <video
-            src={mediaSrc}
-            poster={post.mediaUrl || undefined}
-            crossOrigin="anonymous"
-            className="h-full w-full object-cover"
-            controls
-            playsInline
-            preload="metadata"
-            onClick={(event) => event.stopPropagation()}
-          />
-        ) : (
-          <img src={mediaSrc} crossOrigin="anonymous" className="h-full w-full object-cover" alt="" />
-        )}
-        {isVideo && (
-          <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
-            <Play className="h-3 w-3 fill-white" />
-            Video
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const PostTile = ({ post }) => {
-    const isExpanded = expandedPostId === post.id;
-
-    return (
-      <div className="overflow-hidden rounded-xl border border-[#e5e5ea] bg-white shadow-sm">
-        <div
-          onClick={() => openLivePost(post)}
-          className="group relative cursor-pointer bg-black"
-        >
-          <PostMedia post={post} />
-          <div className="absolute inset-0 flex items-center justify-center gap-5 bg-black/0 text-white opacity-0 transition-all group-hover:bg-black/35 group-hover:opacity-100">
-            <span className="flex items-center gap-1.5 text-sm font-semibold">
-              <Heart className="h-5 w-5 fill-white" />
-              {compactNumber(post.likes)}
-            </span>
-            <span className="flex items-center gap-1.5 text-sm font-semibold">
-              <MessageSquare className="h-5 w-5 fill-white" />
-              {compactNumber(post.comments)}
-            </span>
-          </div>
-          <div className="absolute bottom-2 right-2 flex items-center gap-1">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                openLivePost(post);
-              }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/65 text-white transition hover:bg-black"
-              title="Open live post"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                openInsights(post);
-              }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#0071e3] text-white transition hover:bg-[#147ce5]"
-              title="Open insights"
-            >
-              <BarChart3 className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="px-3 py-2">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3 text-[11px] font-semibold text-[#515154]">
-              <span className="flex items-center gap-1">
-                <Eye className="h-3.5 w-3.5 text-[#6e6e73]" />
-                {compactNumber(post.views)}
-              </span>
-              <span className="flex items-center gap-1">
-                <Heart className="h-3.5 w-3.5 fill-red-500 text-red-500" />
-                {compactNumber(post.likes)}
-              </span>
-              <span className="flex items-center gap-1">
-                <MessageSquare className="h-3.5 w-3.5 text-[#0071e3]" />
-                {compactNumber(post.comments)}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setExpandedPostId(isExpanded ? null : post.id)}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
-            >
-              <span>Details</span>
-              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-            </button>
-          </div>
-
-          {isExpanded && (
-            <div className="mt-2 space-y-2 border-t border-[#e5e5ea] pt-2">
-              <p className="m-0 max-h-28 overflow-y-auto whitespace-pre-wrap text-[11px] leading-relaxed text-[#1d1d1f]">
-                {post.content || 'No caption'}
-              </p>
-              <div className="rounded-lg bg-[#f5f5f7] px-3 py-2">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#6e6e73]">Comments</span>
-                  <span className="text-[9px] font-semibold text-[#8e8e93]">{compactNumber(post.comments)} total</span>
-                </div>
-                {(post.commentsPreview || []).length > 0 ? (
-                  <div className="max-h-24 space-y-1 overflow-y-auto">
-                    {post.commentsPreview.map((comment, index) => (
-                      <p key={comment.id || `${post.id}-comment-${index}`} className="m-0 text-[10px] leading-relaxed text-[#1d1d1f]">
-                        <span className="font-semibold">{comment.username || 'User'}</span>{' '}
-                        <span className="text-[#515154]">{comment.text}</span>
-                      </p>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="m-0 text-[10px] text-[#8e8e93]">
-                    {post.comments > 0 ? 'Refresh from Meta to load comment previews.' : 'No comments yet.'}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
+  const getPublishedDate = (post) => post.publishedAt || post.createdAt || post.timestamp || null;
 
   const fetchChannelAndPosts = async (forceRefresh = false) => {
     if (forceRefresh) {
@@ -251,12 +110,12 @@ export const PublishedFeed = () => {
   };
 
   return (
-    <div className="p-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f] flex flex-col">
+    <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-[#f5f5f7] p-4 text-[#1d1d1f]">
       {/* Header Container */}
-      <div className="max-w-4xl mx-auto w-full mb-6">
+      <div className="mb-3 w-full">
         <button
           onClick={() => navigate(location.state?.fromAdmin ? '/admin' : '/channels')}
-          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-black transition-colors mb-4"
+          className="mb-2 flex items-center gap-1.5 text-xs text-gray-500 transition-colors hover:text-black"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>{location.state?.fromAdmin ? 'Back to Campaign Manager' : 'Back to Channels'}</span>
@@ -267,24 +126,17 @@ export const PublishedFeed = () => {
             <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : channel ? (
-          <div className="bg-white border border-[#e5e5ea] rounded-xl p-5 shadow-sm flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <img
-                src={channel.avatarUrl || 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=150'}
-                crossOrigin="anonymous"
-                className="w-12 h-12 rounded-full object-cover border border-[#d2d2d7]"
-                alt=""
-              />
-              <div>
-                <h2 className="text-base font-semibold text-black leading-tight">
-                  {channel.name}'s Published Feed
-                </h2>
-                <p className="text-xs text-gray-500 mt-1">@{channel.username || 'unspecified'} • {channel.platform}</p>
-              </div>
+          <div className="flex items-center justify-between rounded-xl border border-[#e5e5ea] bg-white px-4 py-3 shadow-sm">
+            <div className="min-w-0">
+              <p className="m-0 text-[10px] font-bold uppercase tracking-wider text-[#6e6e73]">Published feed</p>
+              <h2 className="m-0 mt-0.5 truncate text-base font-semibold leading-tight text-black">
+                {channel.name}
+              </h2>
+              <p className="m-0 mt-0.5 truncate text-xs text-gray-500">@{channel.username || 'unspecified'} • {channel.platform}</p>
             </div>
 
-            <div className="flex items-center gap-4">
-              <span className="text-[10px] text-gray-400 font-medium">
+            <div className="flex flex-shrink-0 items-center gap-3">
+              <span className="text-[10px] font-medium text-gray-400">
                 {publishedPosts.length > 0 && publishedPosts[0].lastSyncedAt
                   ? `Last synced ${getTimeSince(publishedPosts[0].lastSyncedAt)}`
                   : 'Cached data'
@@ -304,7 +156,7 @@ export const PublishedFeed = () => {
       </div>
 
       {/* Body Container */}
-      <div className="mx-auto w-full max-w-6xl flex-1">
+      <div className="min-h-0 w-full flex-1">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-32 gap-3">
             <div className="w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
@@ -320,10 +172,49 @@ export const PublishedFeed = () => {
             No published posts found on this channel.
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 pb-12 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {publishedPosts.map(post => (
-              <PostTile key={post.id} post={post} />
-            ))}
+          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[#d2d2d7] bg-white">
+            <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+              <span>Published</span>
+              <span>Views</span>
+              <span>Likes</span>
+              <span>Comments</span>
+              <span>Actions</span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {publishedPosts.map((post) => {
+                const publishedDate = getPublishedDate(post);
+                return (
+                  <div key={post.id} className="border-b border-[#e5e5ea] last:border-b-0">
+                    <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] items-center gap-3 px-3 py-2 text-xs transition hover:bg-[#f5f5f7]">
+                      <span className="font-semibold text-[#1d1d1f]">
+                        {publishedDate ? new Date(publishedDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown'}
+                      </span>
+                      <span className="font-semibold text-[#515154]">{compactNumber(post.views)}</span>
+                      <span className="font-semibold text-[#515154]">{compactNumber(post.likes)}</span>
+                      <span className="font-semibold text-[#515154]">{compactNumber(post.comments)}</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openLivePost(post)}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#d2d2d7] bg-white text-[#515154] transition hover:border-[#0071e3] hover:text-[#0071e3]"
+                          title="Open live post"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openInsights(post)}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#0071e3] text-white transition hover:bg-[#147ce5]"
+                          title="Open insights"
+                        >
+                          <BarChart3 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

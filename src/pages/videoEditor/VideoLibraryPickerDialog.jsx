@@ -2,12 +2,59 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Folder, Loader2, Play, X, Search, Video } from 'lucide-react';
 import { API_BASE_URL } from './videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
+import { getProxiedMediaUrl } from '../../utils/mediaUrls';
 
-const proxiedMediaUrl = (url) => `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
+const proxiedMediaUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
+const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
+
+const naturalFileCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+});
 
 const getThumbnailUrl = (item) => {
   const url = item.thumbnailUrl || item.thumbnail || item.previewUrl || '';
   return url ? proxiedMediaUrl(url) : '';
+};
+
+const VideoPickerPreview = ({ item }) => {
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const thumbnailUrl = getThumbnailUrl(item);
+
+  if (thumbnailUrl && !thumbnailFailed) {
+    return (
+      <img
+        src={thumbnailUrl}
+        alt={item.name || 'Video thumbnail'}
+        loading="lazy"
+        onError={() => setThumbnailFailed(true)}
+        className="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gray-900 px-3 text-center text-white/70">
+      <Video className="h-8 w-8" />
+      <span className="text-[9px] font-bold uppercase tracking-wider text-white/50">No thumbnail</span>
+    </div>
+  );
+};
+
+const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
+
+const buildFolderRows = (folders, parentId = 'root', depth = 0, query = '') => {
+  const children = folders
+    .filter((folder) => getFolderParentId(folder) === parentId)
+    .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
+
+  return children.flatMap((folder) => {
+    const childRows = buildFolderRows(folders, folder._id, depth + 1, query);
+    const matchesSearch = !query || (folder.name || '').toLowerCase().includes(query);
+    return matchesSearch || childRows.length > 0
+      ? [{ folder, depth }, ...childRows]
+      : [];
+  });
 };
 
 export const VideoLibraryPickerDialog = ({
@@ -22,7 +69,9 @@ export const VideoLibraryPickerDialog = ({
   const [media, setMedia] = useState([]);
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(false);
+  const [generatingThumbnails, setGeneratingThumbnails] = useState(false);
   const [error, setError] = useState('');
+  const [thumbnailMessage, setThumbnailMessage] = useState('');
   const [folderSearchQuery, setFolderSearchQuery] = useState('');
 
   const headers = useMemo(() => (
@@ -30,10 +79,16 @@ export const VideoLibraryPickerDialog = ({
   ), [token]);
 
   const filteredFolders = useMemo(() => {
-    if (!folderSearchQuery.trim()) return folders;
-    const query = folderSearchQuery.toLowerCase();
-    return folders.filter((f) => f.name?.toLowerCase().includes(query));
+    const query = folderSearchQuery.trim().toLowerCase();
+    return buildFolderRows(folders, 'root', 0, query);
   }, [folders, folderSearchQuery]);
+
+  const activeChildFolders = useMemo(() => {
+    if (!activeFolderId) return [];
+    return folders
+      .filter((folder) => getFolderParentId(folder) === activeFolderId)
+      .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
+  }, [activeFolderId, folders]);
 
   useEffect(() => {
     const loadFolders = async () => {
@@ -61,6 +116,7 @@ export const VideoLibraryPickerDialog = ({
     setActiveFolderName(folderName);
     setLoadingMedia(true);
     setError('');
+    setThumbnailMessage('');
 
     try {
       const params = new URLSearchParams();
@@ -82,6 +138,40 @@ export const VideoLibraryPickerDialog = ({
       setLoadingMedia(false);
     }
   }, [headers]);
+
+  const mediaMissingThumbnails = useMemo(() => (
+    media.some((item) => !getThumbnailUrl(item))
+  ), [media]);
+
+  const handleGenerateThumbnails = useCallback(async () => {
+    if (!activeFolderId || generatingThumbnails) return;
+
+    try {
+      setGeneratingThumbnails(true);
+      setError('');
+      setThumbnailMessage('');
+
+      const response = await fetch(`${API_BASE_URL}/api/media/thumbnails/backfill${withCampaignScope()}`, {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ folderId: activeFolderId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || 'Unable to generate thumbnails.');
+      }
+
+      await openFolder(activeFolderId, activeFolderName || 'Library Root');
+      setThumbnailMessage(`${data.generated || 0} thumbnails generated.`);
+    } catch (err) {
+      setError(err.message || 'Unable to generate thumbnails.');
+    } finally {
+      setGeneratingThumbnails(false);
+    }
+  }, [activeFolderId, activeFolderName, generatingThumbnails, headers, openFolder]);
 
   const handleSelectVideo = useCallback((item) => {
     onSelectVideo({
@@ -145,7 +235,7 @@ export const VideoLibraryPickerDialog = ({
                   Library Root
                 </button>
 
-                {filteredFolders.map((folder) => (
+                {filteredFolders.map(({ folder, depth }) => (
                   <button
                     key={folder._id}
                     type="button"
@@ -153,6 +243,7 @@ export const VideoLibraryPickerDialog = ({
                     className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold transition-colors ${
                       activeFolderId === folder._id ? 'bg-[#ff5500] text-white' : 'bg-white text-gray-700 hover:bg-gray-100'
                     }`}
+                    style={{ paddingLeft: `${12 + depth * 14}px` }}
                   >
                     <Folder className="h-4 w-4" />
                     <span className="truncate">{folder.name}</span>
@@ -167,7 +258,17 @@ export const VideoLibraryPickerDialog = ({
               <h4 className="text-sm font-bold text-gray-900">
                 {activeFolderName || 'Choose a folder'}
               </h4>
-              {activeFolderId && (
+              {activeFolderId && media.length > 0 && mediaMissingThumbnails && (
+                <button
+                  type="button"
+                  onClick={handleGenerateThumbnails}
+                  disabled={generatingThumbnails}
+                  className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {generatingThumbnails ? 'Generating...' : 'Generate Thumbnails'}
+                </button>
+              )}
+              {activeFolderId && !mediaMissingThumbnails && (
                 <span className="text-[11px] font-semibold text-gray-400">{media.length} videos</span>
               )}
             </div>
@@ -175,6 +276,11 @@ export const VideoLibraryPickerDialog = ({
             {error && (
               <div className="mb-4 rounded-lg border border-red-100 bg-red-50 p-3 text-xs font-semibold text-red-600">
                 {error}
+              </div>
+            )}
+            {thumbnailMessage && (
+              <div className="mb-4 rounded-lg border border-green-100 bg-green-50 p-3 text-xs font-semibold text-green-700">
+                {thumbnailMessage}
               </div>
             )}
 
@@ -187,45 +293,58 @@ export const VideoLibraryPickerDialog = ({
                 <Loader2 className="h-5 w-5 animate-spin" />
                 Loading videos...
               </div>
-            ) : media.length === 0 ? (
+            ) : media.length === 0 && activeChildFolders.length === 0 ? (
               <div className="flex h-full min-h-[260px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm font-semibold text-gray-400">
                 No videos found in this folder.
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                {media.map((item) => (
-                  <button
-                    key={item._id}
-                    type="button"
-                    onClick={() => handleSelectVideo(item)}
-                    className="group relative overflow-hidden rounded-xl border border-gray-200 bg-black text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md"
-                  >
-                    <div className="relative aspect-[9/16]">
-                      {getThumbnailUrl(item) ? (
-                        <img
-                          src={getThumbnailUrl(item)}
-                          alt={item.name || 'Video thumbnail'}
-                          loading="lazy"
-                          className="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-gray-900 text-white/70">
-                          <Video className="h-8 w-8" />
+              <div className="space-y-5">
+                {activeChildFolders.length > 0 && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    {activeChildFolders.map((folder) => (
+                      <button
+                        key={folder._id}
+                        type="button"
+                        onClick={() => openFolder(folder._id, folder.name)}
+                        className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-left text-xs font-bold text-gray-700 transition-colors hover:border-[#ff5500]/40 hover:bg-white"
+                      >
+                        <Folder className="h-4 w-4 text-gray-400" />
+                        <span className="truncate">{folder.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {media.length === 0 ? (
+                  <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm font-semibold text-gray-400">
+                    Open a child folder to view its videos.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                    {media.map((item) => (
+                      <button
+                        key={item._id}
+                        type="button"
+                        onClick={() => handleSelectVideo(item)}
+                        className="group relative overflow-hidden rounded-xl border border-gray-200 bg-black text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md"
+                      >
+                        <div className="relative aspect-[9/16]">
+                          <VideoPickerPreview item={item} />
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/5 text-white opacity-90 transition-opacity group-hover:opacity-100">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45">
+                              <Play className="h-4 w-4 fill-current" />
+                            </span>
+                          </span>
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2.5">
+                            <p className="truncate text-[10px] font-bold text-white shadow-sm" title={item.name}>
+                              {item.name || 'Untitled video'}
+                            </p>
+                          </div>
                         </div>
-                      )}
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/5 text-white opacity-90 transition-opacity group-hover:opacity-100">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45">
-                          <Play className="h-4 w-4 fill-current" />
-                        </span>
-                      </span>
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2.5">
-                        <p className="truncate text-[10px] font-bold text-white shadow-sm" title={item.name}>
-                          {item.name || 'Untitled video'}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </main>
