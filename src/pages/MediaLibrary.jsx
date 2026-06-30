@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertTriangle, Folder, GripVertical, Images, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles } from 'lucide-react';
+import { AlertTriangle, Folder, GripVertical, Images, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles, Tags, X } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
@@ -19,6 +19,15 @@ const getErrorMessage = async (response, fallback) => {
 };
 
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
+
+const normalizeTagList = (tags) => {
+  const rawTags = Array.isArray(tags) ? tags : String(tags || '').split(',');
+  return Array.from(new Set(
+    rawTags
+      .map((tag) => String(tag).trim().toLowerCase())
+      .filter(Boolean)
+  ));
+};
 
 const getRelativePath = (file) => file.webkitRelativePath || file.name || '';
 
@@ -222,6 +231,10 @@ export const MediaLibrary = () => {
   const [renamingFolder, setRenamingFolder] = useState(null);
   const [renameFolderName, setRenameFolderName] = useState('');
   const [savingFolderId, setSavingFolderId] = useState(null);
+  const [taggingFolder, setTaggingFolder] = useState(null);
+  const [folderTagDrafts, setFolderTagDrafts] = useState([]);
+  const [folderTagInput, setFolderTagInput] = useState('');
+  const [savingFolderTagsId, setSavingFolderTagsId] = useState(null);
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null);
   const [openMediaMenuId, setOpenMediaMenuId] = useState(null);
   const [captionDialogMedia, setCaptionDialogMedia] = useState(null);
@@ -1049,6 +1062,79 @@ export const MediaLibrary = () => {
     }
   };
 
+  const openFolderTagsModal = (folder, e) => {
+    e.stopPropagation();
+    setOpenFolderMenuId(null);
+    setTaggingFolder(folder);
+    setFolderTagDrafts(normalizeTagList(folder.tags || []));
+    setFolderTagInput('');
+  };
+
+  const closeFolderTagsModal = () => {
+    setTaggingFolder(null);
+    setFolderTagDrafts([]);
+    setFolderTagInput('');
+  };
+
+  const addFolderTagDraft = (rawValue = folderTagInput) => {
+    const nextTags = normalizeTagList(rawValue);
+    if (nextTags.length === 0) return;
+    setFolderTagDrafts((current) => normalizeTagList([...current, ...nextTags]));
+    setFolderTagInput('');
+  };
+
+  const removeFolderTagDraft = (tagToRemove) => {
+    setFolderTagDrafts((current) => current.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleFolderTagInputKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addFolderTagDraft();
+    }
+    if (e.key === 'Backspace' && !folderTagInput && folderTagDrafts.length > 0) {
+      removeFolderTagDraft(folderTagDrafts[folderTagDrafts.length - 1]);
+    }
+  };
+
+  const handleSaveFolderTags = async (e) => {
+    e.preventDefault();
+    if (!taggingFolder) return;
+
+    const nextTags = normalizeTagList([...folderTagDrafts, folderTagInput]);
+    setSavingFolderTagsId(taggingFolder._id);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/media/folders/${taggingFolder._id}${withCampaignScope()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          campaignId: getActiveCampaignId(),
+          tags: nextTags,
+        }),
+      });
+
+      if (response.ok) {
+        const updatedFolder = await response.json();
+        setFolders((current) => current.map((folder) => (
+          folder._id === updatedFolder._id ? updatedFolder : folder
+        )));
+        await invalidateMediaCaches();
+        closeFolderTagsModal();
+      } else {
+        throw new Error(await getErrorMessage(response, 'Failed to save folder tags.'));
+      }
+    } catch (error) {
+      console.error('Failed to save folder tags:', error);
+      alert(error.message || 'Failed to save folder tags.');
+    } finally {
+      setSavingFolderTagsId(null);
+    }
+  };
+
   const handleDeleteFolder = async (folderId, e) => {
     e.stopPropagation();
     setOpenFolderMenuId(null);
@@ -1102,8 +1188,17 @@ export const MediaLibrary = () => {
   };
 
   const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
+  const normalizedSearch = searchQuery.trim().toLowerCase();
   const visibleFolders = folders
     .filter((folder) => getFolderParentId(folder) === activeFolderId)
+    .filter((folder) => {
+      if (!normalizedSearch) return true;
+      const searchable = [
+        folder.name,
+        ...(folder.tags || []),
+      ].filter(Boolean).join(' ').toLowerCase();
+      return searchable.includes(normalizedSearch);
+    })
     .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
   const activeFolder = folders.find((folder) => folder._id === activeFolderId);
   const breadcrumbFolders = [];
@@ -1115,7 +1210,6 @@ export const MediaLibrary = () => {
     breadcrumbFolder = folders.find((folder) => folder._id === parentId);
   }
 
-  const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredMedia = media.filter(m => {
     if (!normalizedSearch) return true;
     const searchable = [
@@ -1435,7 +1529,7 @@ export const MediaLibrary = () => {
       )}
 
       {/* Folders List Grid */}
-      {!searchQuery && (
+      {(!searchQuery || visibleFolders.length > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
           {visibleFolders.map(folder => (
             <div
@@ -1464,6 +1558,24 @@ export const MediaLibrary = () => {
                     {(folder.carouselOrder || []).length || '—'} slides
                   </span>
                 )}
+                {(folder.tags || []).length > 0 && (
+                  <div className="mt-1 flex items-center gap-1 overflow-hidden">
+                    {(folder.tags || []).slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="max-w-[76px] truncate rounded bg-[#f2f2f7] px-1.5 py-0.5 text-[9px] font-semibold text-[#6e6e73]"
+                        title={tag}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {(folder.tags || []).length > 2 && (
+                      <span className="text-[9px] font-semibold text-[#8e8e93]">
+                        +{folder.tags.length - 2}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               {/* Actions kebab — only visible on hover to save space */}
               {(canManageFolders || canDelete) && (
@@ -1483,14 +1595,24 @@ export const MediaLibrary = () => {
                   {openFolderMenuId === folder._id && (
                     <div className="absolute right-0 top-6 z-20 w-32 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
                       {canManageFolders && (
-                        <button
-                          type="button"
-                          onClick={(e) => openRenameFolderModal(folder, e)}
-                          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          <span>Rename</span>
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => openRenameFolderModal(folder, e)}
+                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            <span>Rename</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => openFolderTagsModal(folder, e)}
+                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                          >
+                            <Tags className="h-3 w-3" />
+                            <span>Add tags</span>
+                          </button>
+                        </>
                       )}
                       {canDelete && (
                         <button
@@ -1539,7 +1661,7 @@ export const MediaLibrary = () => {
                   return (
                     <>
                       {/* Media Preview Box */}
-                      <div className="aspect-[9/16] bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center">
+                      <div className={`${item.type === 'audio' ? 'aspect-square' : 'aspect-[9/16]'} bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center`}>
                         {item.type === 'video' ? (
                           <video 
                             src={getProxyUrl(item.url)} 
@@ -1560,9 +1682,58 @@ export const MediaLibrary = () => {
                             }}
                           />
                         ) : item.type === 'audio' ? (
-                          <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-4 text-center">
-                            <Music className="h-8 w-8 text-gray-400" />
-                            <audio src={getProxyUrl(item.url)} controls preload="metadata" className="w-full max-w-[180px]" />
+                          <div className="flex h-full w-full flex-col relative overflow-hidden"
+                            style={{ background: 'linear-gradient(160deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)' }}
+                          >
+                            {/* Top section — icon + name */}
+                            <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
+                              <div className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl"
+                                style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)' }}
+                              >
+                                <Music className="h-4 w-4 text-white" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-white text-[11px] font-semibold truncate leading-tight">
+                                  {item.name?.replace(/\.[^.]+$/, '') || 'Audio'}
+                                </p>
+                                <p className="text-white/40 text-[9px] mt-0.5 uppercase tracking-wider font-medium">Audio file</p>
+                              </div>
+                            </div>
+
+                            {/* Waveform visualization */}
+                            <div className="flex-1 flex items-center justify-center px-3 py-1">
+                              <svg viewBox="0 0 200 60" className="w-full h-full" preserveAspectRatio="xMidYMid meet" style={{ maxHeight: '60px' }}>
+                                {[3,8,5,14,8,20,12,25,18,30,22,35,28,38,32,40,35,42,38,40,35,38,32,30,28,35,40,38,34,30,25,20,28,35,30,25,18,22,15,12,8,14,10,6,4,8,12,6,3,5].map((h, i) => (
+                                  <rect
+                                    key={i}
+                                    x={i * 4}
+                                    y={30 - h / 2}
+                                    width="2.5"
+                                    height={h}
+                                    rx="1.25"
+                                    fill={`url(#audioWaveGrad-${item._id})`}
+                                    opacity="0.85"
+                                  />
+                                ))}
+                                <defs>
+                                  <linearGradient id={`audioWaveGrad-${item._id}`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#a78bfa" />
+                                    <stop offset="100%" stopColor="#667eea" />
+                                  </linearGradient>
+                                </defs>
+                              </svg>
+                            </div>
+
+                            {/* Audio controls at bottom */}
+                            <div className="px-2 pb-2 pt-1">
+                              <audio
+                                src={getProxyUrl(item.url)}
+                                controls
+                                preload="metadata"
+                                className="w-full"
+                                style={{ height: '26px', borderRadius: '6px', filter: 'invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.85)' }}
+                              />
+                            </div>
                           </div>
                         ) : (
                           <img src={getProxyUrl(item.thumbnailUrl || item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
@@ -1843,6 +2014,90 @@ export const MediaLibrary = () => {
                 >
                   {savingFolderId === renamingFolder._id ? 'Saving...' : 'Save'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {taggingFolder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-md text-black shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3 border-b border-[#e5e5ea] pb-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-black">Manage Folder Tags</h3>
+                <p className="mt-1 truncate text-[11px] text-[#8e8e93]" title={taggingFolder.name}>
+                  {taggingFolder.name || 'Folder'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeFolderTagsModal}
+                className="rounded-md p-1 text-gray-400 hover:bg-[#f5f5f7] hover:text-black"
+                aria-label="Close folder tags"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFolderTags} className="space-y-4">
+              <div className="rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] p-2">
+                <div className="flex min-h-[38px] flex-wrap items-center gap-1.5">
+                  {folderTagDrafts.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-[#1d1d1f] shadow-sm ring-1 ring-[#e5e5ea]"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeFolderTagDraft(tag)}
+                        className="rounded p-0.5 text-[#8e8e93] hover:bg-[#f5f5f7] hover:text-black"
+                        aria-label={`Remove ${tag}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    value={folderTagInput}
+                    onChange={(e) => setFolderTagInput(e.target.value)}
+                    onKeyDown={handleFolderTagInputKeyDown}
+                    placeholder={folderTagDrafts.length ? 'Add another tag...' : 'Type a tag and press Enter'}
+                    className="min-w-[150px] flex-1 bg-transparent px-1 py-1 text-xs text-black placeholder:text-gray-400 focus:outline-none"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => addFolderTagDraft()}
+                  disabled={!folderTagInput.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 text-xs font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add</span>
+                </button>
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={closeFolderTagsModal}
+                    className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingFolderTagsId === taggingFolder._id}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#0071e3] px-4 py-2 text-xs font-semibold text-white hover:bg-[#147ce5] disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    <span>{savingFolderTagsId === taggingFolder._id ? 'Saving...' : 'Save tags'}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
