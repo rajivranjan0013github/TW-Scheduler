@@ -2,12 +2,10 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ChevronRight, Folder, Loader2, X, Music, CheckSquare, Square, Check, Layers, Search } from 'lucide-react';
 import { API_BASE_URL, PLATFORM_AUDIO_FOLDER_ID } from '../videoEditor/videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
+import { getProxiedMediaUrl } from '../../utils/mediaUrls';
+import LoadingVideoPreview from '../../components/LoadingVideoPreview';
 
-const proxiedMediaUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('blob:') || url.includes('/api/media/proxy')) return url;
-  return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
-};
+const proxiedMediaUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
 
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
 const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
@@ -117,10 +115,7 @@ export const BulkAssetPickerDialog = ({
         const folderData = await response.json();
         const list = Array.isArray(folderData) ? folderData : [];
         setFolders(list);
-        if (list.length > 0) {
-          // Default to root folder
-          openFolder('root', 'Library Root');
-        }
+        openFolder('root', 'Library Root');
       } catch (err) {
         setError(err.message || 'Unable to load folders.');
       } finally {
@@ -471,11 +466,24 @@ export const BulkAssetPickerDialog = ({
                           }`}
                         >
                           <div className="relative aspect-[9/16] bg-zinc-900">
-                            <video
+                            <LoadingVideoPreview
                               src={proxiedMediaUrl(item.url)}
-                              className="h-full w-full object-cover"
+                              className="absolute inset-0"
+                              videoClassName="h-full w-full object-cover"
                               muted
+                              playsInline
                               preload="metadata"
+                              crossOrigin="anonymous"
+                              onMouseEnter={(e) => {
+                                e.currentTarget.muted = false;
+                                e.currentTarget.play().catch((err) => {
+                                  console.warn('Autoplay with audio blocked by browser policy:', err);
+                                });
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.pause();
+                                e.currentTarget.currentTime = 0;
+                              }}
                             />
                             {/* Checkbox badge */}
                             <div className="absolute top-2.5 right-2.5 z-10">

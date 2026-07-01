@@ -10,6 +10,7 @@ import { getOverlayTextHeight, getOverlayTextWidth, hexToRgba } from '../videoEd
 import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
 import { DEFAULT_DRAG_POS } from './useBulkRows';
 import { FloatingTextControls } from './FloatingTextControls';
+import LoadingVideoPreview from '../../components/LoadingVideoPreview';
 
 const SOURCE_PREVIEW_WIDTH = PREVIEW_FRAME_WIDTH;
 const SOURCE_PREVIEW_HEIGHT = PREVIEW_FRAME_HEIGHT;
@@ -74,6 +75,8 @@ export const BulkVideoRow = ({
   const { video1, video1Url, video2, video2Url, audio, caption, textSettings, status, resultMediaUrl } = row;
   const dragPos = { ...DEFAULT_DRAG_POS, ...(row.dragPos || {}) };
   const video1TileRef = useRef(null);
+  const video1PreviewRef = useRef(null);
+  const video2PreviewRef = useRef(null);
   const captionTextRef = useRef(null);
   const dragSessionRef = useRef(null);
   const didDragCaptionRef = useRef(false);
@@ -84,6 +87,7 @@ export const BulkVideoRow = ({
     width: SOURCE_PREVIEW_WIDTH,
     height: SOURCE_PREVIEW_HEIGHT,
   });
+  const [playingPreviewSlot, setPlayingPreviewSlot] = useState(null);
 
   // Calculate layout sizes on mount/resize
   useEffect(() => {
@@ -162,8 +166,15 @@ export const BulkVideoRow = ({
     error: 'Error',
   };
 
-  const resolvedVideo1Url = video1?.sourceType === 'library' ? proxiedMediaUrl(video1.originalUrl || video1.url) : (video1Url || '');
-  const resolvedVideo2Url = video2?.sourceType === 'library' ? proxiedMediaUrl(video2.originalUrl || video2.url) : (video2Url || '');
+  const resolveBulkPreviewUrl = (video, selectedUrl) => {
+    if (selectedUrl) return selectedUrl;
+    if (!video) return '';
+    if (video.sourceType === 'library') return proxiedMediaUrl(video.originalUrl || video.url);
+    return video.url || '';
+  };
+
+  const resolvedVideo1Url = resolveBulkPreviewUrl(video1, video1Url);
+  const resolvedVideo2Url = resolveBulkPreviewUrl(video2, video2Url);
 
   const getCenteredDragPosForBox = (nextMetrics) => {
     const currentCenterX = clampedSourceX + sourceBoxWidth / 2;
@@ -197,6 +208,33 @@ export const BulkVideoRow = ({
       partialSettings,
       getCenteredDragPosForBox(getSourceBoxMetrics(caption, nextSettings))
     );
+  };
+
+  const handleTogglePreviewPlayback = (event, slot) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const videoRef = slot === 'video1' ? video1PreviewRef : video2PreviewRef;
+    const otherRef = slot === 'video1' ? video2PreviewRef : video1PreviewRef;
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    if (videoEl.paused) {
+      if (otherRef.current && !otherRef.current.paused) {
+        otherRef.current.pause();
+      }
+      void videoEl.play()
+        .then(() => setPlayingPreviewSlot(slot))
+        .catch(() => setPlayingPreviewSlot(null));
+      return;
+    }
+
+    videoEl.pause();
+    setPlayingPreviewSlot(null);
+  };
+
+  const handlePreviewStopped = (slot) => {
+    setPlayingPreviewSlot((current) => (current === slot ? null : current));
   };
 
   // Node Drag Handler (Header bar drag movement)
@@ -381,27 +419,46 @@ export const BulkVideoRow = ({
         
         {/* Video 1 Preview Card */}
         <div className="relative">
-          <button
-            type="button"
-            onClick={onPickVideo1}
-            ref={video1TileRef}
-            className="relative w-full aspect-[9/16] rounded-xl border border-[#2d2d30] bg-[#121214] flex flex-col items-center justify-center gap-1.5 overflow-hidden transition-all hover:bg-[#1a1a1e] group"
-          >
-            {resolvedVideo1Url ? (
-              <video
+          {resolvedVideo1Url ? (
+            <div
+              ref={video1TileRef}
+              role="button"
+              tabIndex={0}
+              onClick={(event) => handleTogglePreviewPlayback(event, 'video1')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  handleTogglePreviewPlayback(event, 'video1');
+                }
+              }}
+              className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] transition-all hover:bg-[#1a1a1e]"
+            >
+              <LoadingVideoPreview
+                ref={video1PreviewRef}
                 src={resolvedVideo1Url}
-                className="absolute inset-0 w-full h-full object-cover rounded-xl"
+                className="absolute inset-0"
+                videoClassName="h-full w-full object-cover rounded-xl"
                 muted
+                playsInline
                 preload="metadata"
                 crossOrigin="anonymous"
+                onPlay={() => setPlayingPreviewSlot('video1')}
+                onPause={() => handlePreviewStopped('video1')}
+                onEnded={() => handlePreviewStopped('video1')}
               />
-            ) : (
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onPickVideo1}
+              ref={video1TileRef}
+              className="relative w-full aspect-[9/16] rounded-xl border border-[#2d2d30] bg-[#121214] flex flex-col items-center justify-center gap-1.5 overflow-hidden transition-all hover:bg-[#1a1a1e] group"
+            >
               <>
                 <Video className="h-5 w-5 text-gray-600 group-hover:text-[#ff5500]" />
                 <span className="text-[9px] font-bold text-gray-500 uppercase">Video 1</span>
               </>
-            )}
-          </button>
+            </button>
+          )}
 
           {/* Styled Captions overlay */}
           {caption && resolvedVideo1Url && (
@@ -527,26 +584,44 @@ export const BulkVideoRow = ({
 
         {/* Video 2 Preview Card */}
         <div className="relative">
-          <button
-            type="button"
-            onClick={onPickVideo2}
-            className="w-full aspect-[9/16] rounded-xl border border-[#2d2d30] bg-[#121214] flex flex-col items-center justify-center gap-1.5 overflow-hidden transition-all hover:bg-[#1a1a1e] group"
-          >
-            {resolvedVideo2Url ? (
-              <video
+          {resolvedVideo2Url ? (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={(event) => handleTogglePreviewPlayback(event, 'video2')}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  handleTogglePreviewPlayback(event, 'video2');
+                }
+              }}
+              className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] transition-all hover:bg-[#1a1a1e]"
+            >
+              <LoadingVideoPreview
+                ref={video2PreviewRef}
                 src={resolvedVideo2Url}
-                className="absolute inset-0 w-full h-full object-cover rounded-xl"
+                className="absolute inset-0"
+                videoClassName="h-full w-full object-cover rounded-xl"
                 muted
+                playsInline
                 preload="metadata"
                 crossOrigin="anonymous"
+                onPlay={() => setPlayingPreviewSlot('video2')}
+                onPause={() => handlePreviewStopped('video2')}
+                onEnded={() => handlePreviewStopped('video2')}
               />
-            ) : (
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onPickVideo2}
+              className="w-full aspect-[9/16] rounded-xl border border-[#2d2d30] bg-[#121214] flex flex-col items-center justify-center gap-1.5 overflow-hidden transition-all hover:bg-[#1a1a1e] group"
+            >
               <>
                 <Video className="h-5 w-5 text-gray-600 group-hover:text-[#ff5500]" />
                 <span className="text-[9px] font-bold text-gray-500 uppercase">Video 2</span>
               </>
-            )}
-          </button>
+            </button>
+          )}
           {video2 && (
             <p className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] rounded text-[8px] font-semibold text-gray-300 truncate px-1 py-0.5 text-center" title={video2.name}>
               {video2.name}

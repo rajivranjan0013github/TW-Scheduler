@@ -6,6 +6,7 @@ import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
 import { getProxiedMediaUrl } from '../utils/mediaUrls';
+import LoadingVideoPreview from '../components/LoadingVideoPreview';
 
 const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
 
@@ -1663,11 +1664,10 @@ export const MediaLibrary = () => {
                       {/* Media Preview Box */}
                       <div className={`${item.type === 'audio' ? 'aspect-square' : 'aspect-[9/16]'} bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center`}>
                         {item.type === 'video' ? (
-                          <video 
+                          <LoadingVideoPreview
                             src={getProxyUrl(item.url)} 
-                            poster={item.thumbnailUrl ? getProxyUrl(item.thumbnailUrl) : undefined}
                             crossOrigin="anonymous" 
-                            className="w-full h-full object-cover cursor-pointer" 
+                            videoClassName="w-full h-full object-cover cursor-pointer"
                             playsInline
                             preload="metadata"
                             onMouseEnter={(e) => {
@@ -1736,7 +1736,7 @@ export const MediaLibrary = () => {
                             </div>
                           </div>
                         ) : (
-                          <img src={getProxyUrl(item.thumbnailUrl || item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                          <img src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                         )}
                         <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm">
                           {item.type}

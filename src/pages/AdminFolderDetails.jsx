@@ -286,9 +286,7 @@ export const AdminFolderDetails = () => {
                   >
                     {/* Media Preview */}
                     <div className="aspect-video bg-[#f5f5f7] relative overflow-hidden flex items-center justify-center border-b border-[#e5e5ea]">
-                      {item.type === 'video' && item.thumbnailUrl ? (
-                        <img src={getProxyUrl(item.thumbnailUrl)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
-                      ) : item.type === 'video' ? (
+                      {item.type === 'video' ? (
                         <video src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" controls preload="none" />
                       ) : item.type === 'audio' ? (
                         <div className="flex flex-col items-center justify-center w-full h-full p-3 gap-1 bg-[#f5f5f7]">
@@ -296,7 +294,7 @@ export const AdminFolderDetails = () => {
                           <audio src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full max-w-[95%] scale-90" controls preload="metadata" />
                         </div>
                       ) : (
-                        <img src={getProxyUrl(item.thumbnailUrl || item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                        <img src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                       )}
                       <span className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea]">
                         {item.type}

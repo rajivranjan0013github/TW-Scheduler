@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Folder, Loader2, Play, X, Search, Video } from 'lucide-react';
+import { ChevronRight, Folder, Loader2, Play, X, Search } from 'lucide-react';
 import { API_BASE_URL } from './videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 import { getProxiedMediaUrl } from '../../utils/mediaUrls';
+import LoadingVideoPreview from '../../components/LoadingVideoPreview';
 
 const proxiedMediaUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
@@ -12,32 +13,15 @@ const naturalFileCollator = new Intl.Collator(undefined, {
   sensitivity: 'base',
 });
 
-const getThumbnailUrl = (item) => {
-  const url = item.thumbnailUrl || item.thumbnail || item.previewUrl || '';
-  return url ? proxiedMediaUrl(url) : '';
-};
-
 const VideoPickerPreview = ({ item }) => {
-  const [thumbnailFailed, setThumbnailFailed] = useState(false);
-  const thumbnailUrl = getThumbnailUrl(item);
-
-  if (thumbnailUrl && !thumbnailFailed) {
-    return (
-      <img
-        src={thumbnailUrl}
-        alt={item.name || 'Video thumbnail'}
-        loading="lazy"
-        onError={() => setThumbnailFailed(true)}
-        className="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
-      />
-    );
-  }
-
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gray-900 px-3 text-center text-white/70">
-      <Video className="h-8 w-8" />
-      <span className="text-[9px] font-bold uppercase tracking-wider text-white/50">No thumbnail</span>
-    </div>
+    <LoadingVideoPreview
+      src={proxiedMediaUrl(item.url)}
+      videoClassName="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
+      muted
+      playsInline
+      preload="metadata"
+    />
   );
 };
 
@@ -65,13 +49,10 @@ export const VideoLibraryPickerDialog = ({
 }) => {
   const [folders, setFolders] = useState([]);
   const [activeFolderId, setActiveFolderId] = useState(null);
-  const [activeFolderName, setActiveFolderName] = useState('');
   const [media, setMedia] = useState([]);
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(false);
-  const [generatingThumbnails, setGeneratingThumbnails] = useState(false);
   const [error, setError] = useState('');
-  const [thumbnailMessage, setThumbnailMessage] = useState('');
   const [folderSearchQuery, setFolderSearchQuery] = useState('');
 
   const headers = useMemo(() => (
@@ -134,12 +115,10 @@ export const VideoLibraryPickerDialog = ({
     void loadFolders();
   }, [headers]);
 
-  const openFolder = useCallback(async (folderId, folderName) => {
+  const openFolder = useCallback(async (folderId) => {
     setActiveFolderId(folderId);
-    setActiveFolderName(folderName);
     setLoadingMedia(true);
     setError('');
-    setThumbnailMessage('');
 
     try {
       const params = new URLSearchParams();
@@ -161,40 +140,6 @@ export const VideoLibraryPickerDialog = ({
       setLoadingMedia(false);
     }
   }, [headers]);
-
-  const mediaMissingThumbnails = useMemo(() => (
-    media.some((item) => !getThumbnailUrl(item))
-  ), [media]);
-
-  const handleGenerateThumbnails = useCallback(async () => {
-    if (!activeFolderId || generatingThumbnails) return;
-
-    try {
-      setGeneratingThumbnails(true);
-      setError('');
-      setThumbnailMessage('');
-
-      const response = await fetch(`${API_BASE_URL}/api/media/thumbnails/backfill${withCampaignScope()}`, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ folderId: activeFolderId }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.message || 'Unable to generate thumbnails.');
-      }
-
-      await openFolder(activeFolderId, activeFolderName || 'Library Root');
-      setThumbnailMessage(`${data.generated || 0} thumbnails generated.`);
-    } catch (err) {
-      setError(err.message || 'Unable to generate thumbnails.');
-    } finally {
-      setGeneratingThumbnails(false);
-    }
-  }, [activeFolderId, activeFolderName, generatingThumbnails, headers, openFolder]);
 
   const handleSelectVideo = useCallback((item) => {
     onSelectVideo({
@@ -301,16 +246,6 @@ export const VideoLibraryPickerDialog = ({
                 })}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {activeFolderId && media.length > 0 && mediaMissingThumbnails && (
-                  <button
-                    type="button"
-                    onClick={handleGenerateThumbnails}
-                    disabled={generatingThumbnails}
-                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {generatingThumbnails ? 'Generating...' : 'Generate Thumbnails'}
-                  </button>
-                )}
                 {activeFolderId && (
                   <span className="text-[11px] font-semibold text-gray-400">{media.length} videos</span>
                 )}
@@ -322,12 +257,6 @@ export const VideoLibraryPickerDialog = ({
                 {error}
               </div>
             )}
-            {thumbnailMessage && (
-              <div className="mb-4 rounded-lg border border-green-100 bg-green-50 p-3 text-xs font-semibold text-green-700">
-                {thumbnailMessage}
-              </div>
-            )}
-
             {!activeFolderId ? (
               <div className="flex h-full min-h-[260px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm font-semibold text-gray-400">
                 Select a folder to view videos.

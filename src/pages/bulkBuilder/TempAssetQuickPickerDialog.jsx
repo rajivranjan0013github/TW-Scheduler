@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Video, Music, Play, Plus, Trash2 } from 'lucide-react';
 import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
+import LoadingVideoPreview from '../../components/LoadingVideoPreview';
 
 const proxiedMediaUrl = (url) => {
   if (!url) return '';
@@ -72,10 +73,12 @@ export const TempAssetQuickPickerDialog = ({
                       className="overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md relative"
                     >
                       <div className="relative aspect-[9/16] bg-zinc-900">
-                        <video
+                        <LoadingVideoPreview
                           src={resolvedUrl}
-                          className="h-full w-full object-cover"
+                          className="absolute inset-0"
+                          videoClassName="h-full w-full object-cover"
                           muted
+                          playsInline
                           preload="metadata"
                         />
                         <span className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
@@ -204,7 +207,14 @@ export const TempMediaLibraryDialog = ({
                     className="overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] shadow-sm relative group"
                   >
                     <div className="relative aspect-[9/16] bg-zinc-900">
-                      <video src={resolvedUrl} className="h-full w-full object-cover" muted preload="metadata" />
+                      <LoadingVideoPreview
+                        src={resolvedUrl}
+                        className="absolute inset-0"
+                        videoClassName="h-full w-full object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
                       <span className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/45">
                           <Play className="h-4 w-4 fill-current" />

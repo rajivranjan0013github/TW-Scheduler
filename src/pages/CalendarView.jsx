@@ -6,6 +6,7 @@ import { useLocation } from 'react-router-dom';
 import { Plus, Check, Clock, AlertCircle, Folder, Images, Users, Save, Trash2, ChevronLeft } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { getProxiedMediaUrl } from '../utils/mediaUrls';
+import LoadingVideoPreview from '../components/LoadingVideoPreview';
 
 const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
 
@@ -14,101 +15,22 @@ const naturalFolderCollator = new Intl.Collator(undefined, {
   sensitivity: 'base',
 });
 
-const VideoThumbnail = ({ url, className }) => {
-  const [poster, setPoster] = useState('');
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!url) return undefined;
-
-    let cancelled = false;
-    const video = document.createElement('video');
-    const canvas = document.createElement('canvas');
-    let timeoutId;
-
-    const finishFailed = () => {
-      if (!cancelled) setFailed(true);
-    };
-
-    const captureFrame = () => {
-      if (cancelled || !video.videoWidth || !video.videoHeight) return;
-
-      try {
-        const width = 360;
-        const height = Math.round((video.videoHeight / video.videoWidth) * width);
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext('2d');
-        context.drawImage(video, 0, 0, width, height);
-        setPoster(canvas.toDataURL('image/jpeg', 0.82));
-        setFailed(false);
-      } catch (error) {
-        finishFailed();
-      }
-    };
-
-    const seekIntoVideo = () => {
-      if (cancelled) return;
-      try {
-        const seekTime = Number.isFinite(video.duration) && video.duration > 0
-          ? Math.min(0.5, Math.max(0.08, video.duration * 0.05))
-          : 0.1;
-        video.currentTime = seekTime;
-      } catch (error) {
-        captureFrame();
-      }
-    };
-
-    setPoster('');
-    setFailed(false);
-    video.crossOrigin = 'anonymous';
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'auto';
-    video.addEventListener('loadedmetadata', seekIntoVideo, { once: true });
-    video.addEventListener('loadeddata', seekIntoVideo, { once: true });
-    video.addEventListener('seeked', captureFrame, { once: true });
-    video.addEventListener('error', finishFailed, { once: true });
-    video.src = url;
-    video.load();
-    timeoutId = window.setTimeout(finishFailed, 7000);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-      video.removeAttribute('src');
-      video.load();
-    };
-  }, [url]);
-
-  if (poster) {
-    return <img src={poster} className={className} alt="" />;
-  }
-
-  return (
-    <div className={`${className} flex items-center justify-center bg-[#eef2ff] text-[9px] font-bold uppercase tracking-wider text-[#536079]`}>
-      {failed ? 'Video' : 'Loading'}
-    </div>
-  );
-};
-
 const MediaPreview = ({ item, className = 'h-full w-full object-cover block' }) => {
-  const [thumbnailFailed, setThumbnailFailed] = useState(false);
-  const thumbnailUrl = getProxyUrl(item?.thumbnailUrl);
   const url = getProxyUrl(item?.url);
 
-  useEffect(() => {
-    setThumbnailFailed(false);
-  }, [thumbnailUrl]);
-
-  if (!thumbnailUrl && !url) return null;
-
-  if (thumbnailUrl && !thumbnailFailed) {
-    return <img src={thumbnailUrl} className={className} alt="" onError={() => setThumbnailFailed(true)} />;
-  }
+  if (!url) return null;
 
   if (item?.type === 'video') {
-    return <VideoThumbnail url={url} className={className} />;
+    return (
+      <LoadingVideoPreview
+        src={url}
+        videoClassName={className}
+        crossOrigin="anonymous"
+        muted
+        playsInline
+        preload="metadata"
+      />
+    );
   }
 
   return <img src={url} className={className} alt="" />;
