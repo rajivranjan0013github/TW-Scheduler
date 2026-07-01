@@ -5,10 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { Plus, Check, Clock, AlertCircle, Folder, Images, Users, Save, Trash2, ChevronLeft } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
-import { getProxiedMediaUrl } from '../utils/mediaUrls';
+import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
 
-const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
+const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 
 const naturalFolderCollator = new Intl.Collator(undefined, {
   numeric: true,
@@ -16,7 +16,7 @@ const naturalFolderCollator = new Intl.Collator(undefined, {
 });
 
 const MediaPreview = ({ item, className = 'h-full w-full object-cover block' }) => {
-  const url = getProxyUrl(item?.url);
+  const url = getAssetUrl(item?.url);
 
   if (!url) return null;
 

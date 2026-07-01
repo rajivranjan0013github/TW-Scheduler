@@ -7,10 +7,10 @@ import {
   WEIGHT_MAP,
 } from '../videoEditor/videoEditorConstants';
 import { getOverlayTextHeight, getOverlayTextWidth, hexToRgba } from '../videoEditor/videoEditorUtils';
-import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
 import { DEFAULT_DRAG_POS } from './useBulkRows';
 import { FloatingTextControls } from './FloatingTextControls';
 import LoadingVideoPreview from '../../components/LoadingVideoPreview';
+import { getMediaUrl } from '../../utils/mediaUrls';
 
 const SOURCE_PREVIEW_WIDTH = PREVIEW_FRAME_WIDTH;
 const SOURCE_PREVIEW_HEIGHT = PREVIEW_FRAME_HEIGHT;
@@ -41,12 +41,6 @@ const getSourceBoxMetrics = (text, settings) => {
     boxWidth: textWidth + horizontalPadding,
     boxHeight: textHeight,
   };
-};
-
-const proxiedMediaUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('blob:') || url.includes('/api/media/proxy')) return url;
-  return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
 };
 
 /**
@@ -169,7 +163,7 @@ export const BulkVideoRow = ({
   const resolveBulkPreviewUrl = (video, selectedUrl) => {
     if (selectedUrl) return selectedUrl;
     if (!video) return '';
-    if (video.sourceType === 'library') return proxiedMediaUrl(video.originalUrl || video.url);
+    if (video.sourceType === 'library') return getMediaUrl(video.originalUrl || video.url);
     return video.url || '';
   };
 

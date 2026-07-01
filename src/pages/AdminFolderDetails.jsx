@@ -4,9 +4,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Folder, Upload, X, Tag, AlertTriangle, Music, Save, Trash2 } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
-import { getProxiedMediaUrl } from '../utils/mediaUrls';
+import { getMediaUrl } from '../utils/mediaUrls';
 
-const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
+const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 
 export const AdminFolderDetails = () => {
   const { id } = useParams();
@@ -287,14 +287,14 @@ export const AdminFolderDetails = () => {
                     {/* Media Preview */}
                     <div className="aspect-video bg-[#f5f5f7] relative overflow-hidden flex items-center justify-center border-b border-[#e5e5ea]">
                       {item.type === 'video' ? (
-                        <video src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" controls preload="none" />
+                        <video src={getAssetUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" controls preload="none" />
                       ) : item.type === 'audio' ? (
                         <div className="flex flex-col items-center justify-center w-full h-full p-3 gap-1 bg-[#f5f5f7]">
                           <Music className="h-7 w-7 text-[#ff2d55]" />
-                          <audio src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full max-w-[95%] scale-90" controls preload="metadata" />
+                          <audio src={getAssetUrl(item.url)} crossOrigin="anonymous" className="w-full max-w-[95%] scale-90" controls preload="metadata" />
                         </div>
                       ) : (
-                        <img src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                        <img src={getAssetUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                       )}
                       <span className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea]">
                         {item.type}

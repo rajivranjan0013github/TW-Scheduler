@@ -17,6 +17,7 @@ import { AudioDialog } from './videoEditor/AudioDialog';
 import { VideoLibraryPickerDialog } from './videoEditor/VideoLibraryPickerDialog';
 import { TextGeneratorDialog } from './videoEditor/TextGeneratorDialog';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
+import { getMediaUrl } from '../utils/mediaUrls';
 import {
   BULK_ROWS_STORAGE_KEY,
   DEFAULT_DRAG_POS,
@@ -24,19 +25,13 @@ import {
   sanitizeBulkRowForStorage,
 } from './bulkBuilder/useBulkRows';
 
-const proxiedMediaUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('blob:') || url.includes('/api/media/proxy')) return url;
-  return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
-};
-
 const getUploadedMediaSummary = (media) => ({
   resultMediaId: media?._id || media?.id || media?.mediaId || '',
   resultMediaUrl: media?.url || '',
   resultMediaName: media?.name || media?.filename || '',
 });
 
-const getBulkResultUrl = (row) => row.resultVideoUrl || proxiedMediaUrl(row.resultMediaUrl);
+const getBulkResultUrl = (row) => row.resultVideoUrl || getMediaUrl(row.resultMediaUrl);
 
 const getAudioIdentity = (track) => (
   track ? `${track.sourceType || ''}:${track.id || track.mediaId || track.url || track.name || ''}` : ''
@@ -746,7 +741,7 @@ export const VideoEditor = () => {
       overlay.setBgType(row.textSettings.bgType);
       overlay.setBgColor(row.textSettings.bgColor);
       overlay.setDragPos({ ...DEFAULT_DRAG_POS, ...(row.dragPos || {}) });
-      setResultVideoUrl(row.resultVideoUrl || proxiedMediaUrl(row.resultMediaUrl) || '');
+      setResultVideoUrl(row.resultVideoUrl || getMediaUrl(row.resultMediaUrl) || '');
       setStatusMessage(null);
       preview.setActiveVideo(1);
       preview.resetPlayback();

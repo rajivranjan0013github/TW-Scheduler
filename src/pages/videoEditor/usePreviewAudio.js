@@ -5,6 +5,7 @@ import {
   PLATFORM_AUDIO_FOLDER_ID,
 } from './videoEditorConstants';
 import { getActiveCampaignId } from '../../utils/campaignScope';
+import { getMediaUrl } from '../../utils/mediaUrls';
 
 const AUDIO_EXTENSION_PATTERN = /\.(mp3|wav|m4a|aac|ogg|oga|flac|webm)$/i;
 
@@ -19,15 +20,13 @@ const isAudioMediaItem = (item) => {
 };
 
 const mediaItemToAudioTrack = (item) => {
-  const proxiedUrl = `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(item.url)}`;
-
   return {
     id: `platform-${item._id}`,
     mediaId: item._id,
     name: item.name || 'Platform audio',
     description: item.caption || (item.tags?.length ? item.tags.join(', ') : 'Platform audio'),
     sourceType: 'library',
-    url: proxiedUrl,
+    url: getMediaUrl(item.url, { apiBaseUrl: API_BASE_URL }),
     originalUrl: item.url,
     savedAt: item.createdAt || '',
   };

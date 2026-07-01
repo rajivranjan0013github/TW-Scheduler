@@ -5,10 +5,10 @@ import { AlertTriangle, Folder, GripVertical, Images, Info, MessageSquareCheck, 
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
-import { getProxiedMediaUrl } from '../utils/mediaUrls';
+import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
 
-const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
+const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 
 const getErrorMessage = async (response, fallback) => {
   try {
@@ -1665,7 +1665,7 @@ export const MediaLibrary = () => {
                       <div className={`${item.type === 'audio' ? 'aspect-square' : 'aspect-[9/16]'} bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center`}>
                         {item.type === 'video' ? (
                           <LoadingVideoPreview
-                            src={getProxyUrl(item.url)} 
+                            src={getAssetUrl(item.url)} 
                             crossOrigin="anonymous" 
                             videoClassName="w-full h-full object-cover cursor-pointer"
                             playsInline
@@ -1727,7 +1727,7 @@ export const MediaLibrary = () => {
                             {/* Audio controls at bottom */}
                             <div className="px-2 pb-2 pt-1">
                               <audio
-                                src={getProxyUrl(item.url)}
+                                src={getAssetUrl(item.url)}
                                 controls
                                 preload="metadata"
                                 className="w-full"
@@ -1736,7 +1736,7 @@ export const MediaLibrary = () => {
                             </div>
                           </div>
                         ) : (
-                          <img src={getProxyUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                          <img src={getAssetUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                         )}
                         <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm">
                           {item.type}

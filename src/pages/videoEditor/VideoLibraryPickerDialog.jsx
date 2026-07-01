@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Folder, Loader2, Play, X, Search } from 'lucide-react';
 import { API_BASE_URL } from './videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
-import { getProxiedMediaUrl } from '../../utils/mediaUrls';
+import { getMediaUrl } from '../../utils/mediaUrls';
 import LoadingVideoPreview from '../../components/LoadingVideoPreview';
 
-const proxiedMediaUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
+const mediaUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
 
 const naturalFileCollator = new Intl.Collator(undefined, {
@@ -16,7 +16,7 @@ const naturalFileCollator = new Intl.Collator(undefined, {
 const VideoPickerPreview = ({ item }) => {
   return (
     <LoadingVideoPreview
-      src={proxiedMediaUrl(item.url)}
+      src={mediaUrl(item.url)}
       videoClassName="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
       muted
       playsInline
@@ -146,7 +146,7 @@ export const VideoLibraryPickerDialog = ({
       id: item._id,
       name: item.name || 'Library video',
       sourceType: 'library',
-      url: proxiedMediaUrl(item.url),
+      url: mediaUrl(item.url),
       originalUrl: item.url,
     });
   }, [onSelectVideo]);

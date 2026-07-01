@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ChevronRight, Folder, Loader2, X, Music, CheckSquare, Square, Check, Layers, Search } from 'lucide-react';
 import { API_BASE_URL, PLATFORM_AUDIO_FOLDER_ID } from '../videoEditor/videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
-import { getProxiedMediaUrl } from '../../utils/mediaUrls';
+import { getMediaUrl } from '../../utils/mediaUrls';
 import LoadingVideoPreview from '../../components/LoadingVideoPreview';
 
-const proxiedMediaUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
+const mediaUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
 const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
@@ -143,7 +143,7 @@ export const BulkAssetPickerDialog = ({
           mediaId: item._id,
           name: item.name || 'Platform audio',
           sourceType: 'library',
-          url: proxiedMediaUrl(item.url),
+          url: mediaUrl(item.url),
           originalUrl: item.url,
         }));
         setAudioTracks(tracks);
@@ -166,7 +166,7 @@ export const BulkAssetPickerDialog = ({
       id: item._id,
       name: item.name || 'Library video',
       sourceType: 'library',
-      url: proxiedMediaUrl(item.url),
+      url: mediaUrl(item.url),
       originalUrl: item.url,
     };
 
@@ -191,7 +191,7 @@ export const BulkAssetPickerDialog = ({
       id: item._id,
       name: item.name || 'Library video',
       sourceType: 'library',
-      url: proxiedMediaUrl(item.url),
+      url: mediaUrl(item.url),
       originalUrl: item.url,
     }));
 
@@ -467,7 +467,7 @@ export const BulkAssetPickerDialog = ({
                         >
                           <div className="relative aspect-[9/16] bg-zinc-900">
                             <LoadingVideoPreview
-                              src={proxiedMediaUrl(item.url)}
+                              src={mediaUrl(item.url)}
                               className="absolute inset-0"
                               videoClassName="h-full w-full object-cover"
                               muted

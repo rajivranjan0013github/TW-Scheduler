@@ -1,13 +1,7 @@
 import { useState } from 'react';
 import { X, Video, Music, Play, Plus, Trash2 } from 'lucide-react';
-import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
 import LoadingVideoPreview from '../../components/LoadingVideoPreview';
-
-const proxiedMediaUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('blob:') || url.includes('/api/media/proxy')) return url;
-  return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(url)}`;
-};
+import { getMediaUrl } from '../../utils/mediaUrls';
 
 export const TempAssetQuickPickerDialog = ({
   type,
@@ -63,7 +57,7 @@ export const TempAssetQuickPickerDialog = ({
               {items.map((item) => {
                 if (type === 'video') {
                   const resolvedUrl = item.sourceType === 'library'
-                    ? proxiedMediaUrl(item.originalUrl || item.url)
+                    ? getMediaUrl(item.originalUrl || item.url)
                     : (item.url || '');
                   return (
                     <button
@@ -199,7 +193,7 @@ export const TempMediaLibraryDialog = ({
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {items.map((item) => {
                 const resolvedUrl = item.sourceType === 'library'
-                  ? proxiedMediaUrl(item.originalUrl || item.url)
+                  ? getMediaUrl(item.originalUrl || item.url)
                   : (item.url || '');
                 return (
                   <div

@@ -4,9 +4,9 @@ import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AlertCircle, Calendar, CheckCircle, Share2 } from 'lucide-react';
-import { getProxiedMediaUrl } from '../utils/mediaUrls';
+import { getMediaUrl } from '../utils/mediaUrls';
 
-const getProxyUrl = (url) => getProxiedMediaUrl(url, API_BASE_URL);
+const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 
 const copyToClipboard = (text) => {
   if (navigator.clipboard && window.isSecureContext) {
@@ -225,7 +225,7 @@ export const CreatorCampaigns = () => {
             : null;
 
           if (!blob) {
-            const response = await fetch(getProxyUrl(media.url));
+            const response = await fetch(getAssetUrl(media.url));
             blob = response.ok ? await response.blob() : null;
           }
 
@@ -441,7 +441,7 @@ export const CreatorCampaigns = () => {
     }
 
     let cancelled = false;
-    fetch(getProxyUrl(nextShareMedia.url))
+    fetch(getAssetUrl(nextShareMedia.url))
       .then((response) => (response.ok ? response.blob() : null))
       .then((blob) => {
         if (!cancelled && blob) {
