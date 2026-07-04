@@ -3,10 +3,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Plus, Check, Clock, AlertCircle, Folder, Images, Users, Save, Trash2, ChevronLeft } from 'lucide-react';
+import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
+import PlatformIcon from '../components/PlatformIcon';
+import AccountQueueEditor from '../components/AccountQueueEditor';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 
@@ -41,8 +43,6 @@ const CalendarView = ({ selectedAccounts }) => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [posts, setPosts] = useState([]);
-  const canvasRef = useRef(null);
-  const [portPositions, setPortPositions] = useState({});
 
   // Composer data
   const [showComposer, setShowComposer] = useState(false);
@@ -51,32 +51,38 @@ const CalendarView = ({ selectedAccounts }) => {
   const [channels, setChannels] = useState([]);
   const [queueError, setQueueError] = useState('');
   const [deletingAccountQueueIds, setDeletingAccountQueueIds] = useState([]);
-
-  useEffect(() => {
-    const updatePositions = () => {
-      if (!canvasRef.current) return;
-      const parentRect = canvasRef.current.getBoundingClientRect();
-      const newPositions = {};
-      const portElements = canvasRef.current.querySelectorAll('[data-port-id]');
-      portElements.forEach(el => {
-        const portId = el.getAttribute('data-port-id');
-        const rect = el.getBoundingClientRect();
-        newPositions[portId] = {
-          x: rect.left - parentRect.left + rect.width / 2,
-          y: rect.top - parentRect.top + rect.height / 2
-        };
-      });
-      setPortPositions(newPositions);
-    };
-
-    updatePositions();
-    window.addEventListener('resize', updatePositions);
-    const timer = setTimeout(updatePositions, 150);
-    return () => {
-      window.removeEventListener('resize', updatePositions);
-      clearTimeout(timer);
-    };
-  }, [posts, folders, channels, showComposer]);
+  const today = new Date();
+  const toInputDate = (date) => {
+    const safeDate = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
+    const year = safeDate.getFullYear();
+    const month = String(safeDate.getMonth() + 1).padStart(2, '0');
+    const day = String(safeDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const [calendarMode, setCalendarMode] = useState('week');
+  const [calendarRangeStart, setCalendarRangeStart] = useState(() => {
+    const start = new Date(today);
+    start.setDate(start.getDate() - start.getDay());
+    return toInputDate(start);
+  });
+  const [calendarRangeEnd, setCalendarRangeEnd] = useState(() => {
+    const end = new Date(today);
+    end.setDate(end.getDate() + (6 - end.getDay()));
+    return toInputDate(end);
+  });
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => toInputDate(today));
+  const [selectedCalendarAccountIds, setSelectedCalendarAccountIds] = useState([]);
+  const [selectedCalendarStatus, setSelectedCalendarStatus] = useState('all');
+  const [activeTooltipDay, setActiveTooltipDay] = useState(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  const [showCalendarAccountMenu, setShowCalendarAccountMenu] = useState(false);
+  const [showQueueEditor, setShowQueueEditor] = useState(false);
+  const [queueEditorPosts, setQueueEditorPosts] = useState([]);
+  const [loadingQueueEditor, setLoadingQueueEditor] = useState(false);
+  const [queueEditDrafts, setQueueEditDrafts] = useState({});
+  const [savingQueuePostIds, setSavingQueuePostIds] = useState([]);
+  const [deletingQueuePostIds, setDeletingQueuePostIds] = useState([]);
+  const calendarAccountMenuRef = useRef(null);
 
   // Post Composer form states
   const [selectedChannels, setSelectedChannels] = useState([]);
@@ -92,6 +98,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const [youtubeMadeForKids, setYoutubeMadeForKids] = useState(false);
   const [captionDrafts, setCaptionDrafts] = useState({});
   const [savingCaptionId, setSavingCaptionId] = useState(null);
+  const [deselectedPlanRows, setDeselectedPlanRows] = useState([]);
 
   const [bulkInterval, setBulkInterval] = useState('2');
   const [activeFolderId, setActiveFolderId] = useState('root');
@@ -104,6 +111,10 @@ const CalendarView = ({ selectedAccounts }) => {
   const isPureManualMode = scheduleMode === 'manual';
   const requiresScheduleTime = !isPureManualMode;
   const shouldUseYoutubePublishing = hasYoutubeSelected && !isPureManualMode;
+  const getPlanRowKey = useCallback((row) => [
+    row?.channel?._id || 'channel',
+    row?.carouselSet?._id || row?.mediaItem?._id || 'content',
+  ].join(':'), []);
   const isChannelVerified = (channel) => (
     channel?.isVerified === true
     || channel?.status === 'verified'
@@ -140,6 +151,31 @@ const CalendarView = ({ selectedAccounts }) => {
     return folders.find(folder => folder._id === id)?.name || 'Unknown folder';
   };
   const getAccountLabel = (account) => account?.username || account?.handle || account?.name || 'Account';
+  const getAccountAvatarUrl = (account) => (
+    account?.avatarUrl
+    || account?.profilePictureUrl
+    || account?.profile_picture_url
+    || account?.picture
+    || ''
+  );
+  const AccountAvatar = ({ account, sizeClass = 'h-5 w-5', textClass = 'text-[9px]' }) => {
+    const label = getAccountLabel(account);
+    const avatarUrl = getAccountAvatarUrl(account);
+    return (
+      <span className={`${sizeClass} inline-flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-black/10 bg-[#eef2ff] ${textClass} font-black uppercase text-[#4f46e5]`}>
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            crossOrigin="anonymous"
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          label.charAt(0)
+        )}
+      </span>
+    );
+  };
   const getMediaLabel = (item) => item?.name || 'Untitled media';
   const getMediaLocationLabel = (item) => getFolderName(item?.folderId);
   const getAssetCaptionDraft = (item) => (
@@ -161,7 +197,14 @@ const CalendarView = ({ selectedAccounts }) => {
     if (!value) return '--:--';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '--:--';
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+  const toDateTimeLocalValue = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 16);
   };
   const getScheduleModeLabel = (mode) => {
     switch (mode) {
@@ -185,13 +228,14 @@ const CalendarView = ({ selectedAccounts }) => {
       case 'published_auto': return 'Published Auto';
       case 'published': return 'Published';
       case 'publishing': return 'Publishing';
+      case 'paused': return 'Paused';
       case 'failed': return 'Failed';
       case 'cancelled': return 'Cancelled';
       default: return 'Scheduled';
     }
   };
   const isActiveQueuePost = (post) => (
-    ['scheduled', 'manual_ready', 'downloaded', 'publishing'].includes(post?.status)
+    ['scheduled', 'manual_ready', 'downloaded', 'publishing', 'paused'].includes(post?.status)
   );
   const getScheduleTimingLabel = (value) => {
     if (isPureManualMode) return 'Manual queue';
@@ -393,16 +437,73 @@ const CalendarView = ({ selectedAccounts }) => {
         const bTime = b.scheduledAt?.getTime?.() ?? Number.MAX_SAFE_INTEGER;
         return aTime - bTime;
       })
-      .map((row, index) => ({ ...row, index: index + 1 }));
-  }, [bulkInterval, caption, captionDrafts, isBulk, isCarouselMode, scheduleTime, selectedCarouselSetItems, selectedChannelObjects, selectedChannels.length, selectedMediaItems]);
+      .map((row, index) => ({ ...row, index: index + 1, planKey: getPlanRowKey(row) }));
+  }, [bulkInterval, caption, captionDrafts, getPlanRowKey, isBulk, isCarouselMode, scheduleTime, selectedCarouselSetItems, selectedChannelObjects, selectedChannels.length, selectedMediaItems]);
+  const activeSchedulePlan = useMemo(() => {
+    const baseDate = scheduleTime ? new Date(scheduleTime) : null;
+    const hasValidDate = baseDate && !Number.isNaN(baseDate.getTime());
+    const intervalMs = (parseFloat(bulkInterval) || 2) * 60 * 60 * 1000;
+
+    return schedulePlan
+      .filter((row) => !deselectedPlanRows.includes(row.planKey))
+      .map((row, activeIndex) => ({
+        ...row,
+        activeIndex: activeIndex + 1,
+        effectiveScheduledAt: hasValidDate
+          ? new Date(baseDate.getTime() + (activeIndex * intervalMs))
+          : row.scheduledAt,
+      }));
+  }, [bulkInterval, deselectedPlanRows, schedulePlan, scheduleTime]);
+  const activeSchedulePlanByKey = useMemo(() => (
+    new Map(activeSchedulePlan.map((row) => [row.planKey, row]))
+  ), [activeSchedulePlan]);
+  const hasDeselectedPlanRows = activeSchedulePlan.length !== schedulePlan.length;
+  const activeScheduleTimeLabel = useMemo(() => {
+    if (isPureManualMode) return 'Manual queue';
+    const datedRows = activeSchedulePlan.filter((row) => row.effectiveScheduledAt);
+    if (datedRows.length === 0) return 'Pick time';
+
+    const firstTime = datedRows[0].effectiveScheduledAt;
+    const formatTime = (date) => date.toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    return formatTime(firstTime);
+  }, [activeSchedulePlan, isPureManualMode]);
+  useEffect(() => {
+    setDeselectedPlanRows((current) => {
+      const visibleKeys = new Set(schedulePlan.map((row) => row.planKey));
+      const next = current.filter((key) => visibleKeys.has(key));
+      return next.length === current.length ? current : next;
+    });
+  }, [schedulePlan]);
+  const togglePlanRow = (planKey) => {
+    setDeselectedPlanRows((current) => (
+      current.includes(planKey)
+        ? current.filter((key) => key !== planKey)
+        : [...current, planKey]
+    ));
+  };
   const manualTaskButtonLabel = (() => {
-    const count = schedulePlan.length || selectedMedia.length;
+    const count = schedulePlan.length > 0 ? activeSchedulePlan.length : selectedMedia.length;
     return count > 0
       ? `Create ${count} Manual Task${count === 1 ? '' : 's'}`
       : 'Create Manual Tasks';
   })();
   useEffect(() => {
+    if (!showComposer) {
+      setDeselectedPlanRows([]);
+    }
+  }, [showComposer]);
+  useEffect(() => {
     fetchPosts();
+  }, [selectedAccounts, calendarRangeStart, calendarRangeEnd]);
+
+  useEffect(() => {
     fetchComposerData();
   }, [selectedAccounts]);
 
@@ -492,6 +593,13 @@ const CalendarView = ({ selectedAccounts }) => {
       setQueueError('');
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('tw_token')}` };
       const scope = withCampaignScope();
+      const rangeStartDate = parseInputDate(calendarRangeStart);
+      const rangeEndDate = parseInputDate(calendarRangeEnd);
+      if (rangeEndDate) rangeEndDate.setHours(23, 59, 59, 999);
+      const schedulerRangeParams = new URLSearchParams();
+      if (rangeStartDate) schedulerRangeParams.set('from', rangeStartDate.toISOString());
+      if (rangeEndDate) schedulerRangeParams.set('to', rangeEndDate.toISOString());
+      const schedulerScope = withCampaignScope(schedulerRangeParams.toString());
       const activeCampaignId = getActiveCampaignId();
       const accountsEndpoint = activeCampaignId
         ? `${API_BASE_URL}/api/accounts/publishing-channels${scope}`
@@ -511,7 +619,7 @@ const CalendarView = ({ selectedAccounts }) => {
       const [accounts, data] = force
         ? await Promise.all([
           fetchFreshJson(accountsEndpoint),
-          fetchFreshJson(`${API_BASE_URL}/api/scheduler${scope}`),
+          fetchFreshJson(`${API_BASE_URL}/api/scheduler${schedulerScope}`),
         ])
         : await Promise.all([
           queryClient.fetchQuery({
@@ -520,14 +628,14 @@ const CalendarView = ({ selectedAccounts }) => {
           staleTime: 2 * 60 * 1000,
           }),
           queryClient.fetchQuery({
-          queryKey: ['scheduler', 'posts', scope],
-          queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler${scope}`),
+          queryKey: ['scheduler', 'posts', schedulerScope],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler${schedulerScope}`),
           staleTime: 20 * 1000,
           }),
         ]);
       if (force) {
         queryClient.setQueryData(['scheduler', 'accounts', activeCampaignId ? 'publishing-channels' : 'connected', scope], accounts);
-        queryClient.setQueryData(['scheduler', 'posts', scope], data);
+        queryClient.setQueryData(['scheduler', 'posts', schedulerScope], data);
       }
       const normalizedAccountIds = accounts
         .map(normalizeSchedulingChannel)
@@ -722,6 +830,10 @@ const CalendarView = ({ selectedAccounts }) => {
       alert('Pick a scheduling date and time');
       return;
     }
+    if (schedulePlan.length > 0 && activeSchedulePlan.length === 0) {
+      alert('Select at least one planned post');
+      return;
+    }
     if (isCarouselMode && selectedCarouselSetItems.some((set) => set.mediaItems.length < 2 || set.mediaItems.length > 10)) {
       alert('Each Instagram carousel set must have 2 to 10 slides.');
       return;
@@ -779,6 +891,7 @@ const CalendarView = ({ selectedAccounts }) => {
       };
 
       let url = `${API_BASE_URL}/api/scheduler`;
+      let requestBodies = [body];
       if (isCarouselMode) {
         url = `${API_BASE_URL}/api/scheduler/carousels`;
         body.carouselSetIds = selectedCarouselSetItems.map((set) => set._id);
@@ -794,14 +907,60 @@ const CalendarView = ({ selectedAccounts }) => {
         body.type = postType;
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(body),
-      });
+      if (hasDeselectedPlanRows) {
+        url = `${API_BASE_URL}/api/scheduler`;
+        requestBodies = activeSchedulePlan.map((row) => {
+          const rowMediaIds = row.carouselSet
+            ? row.carouselSet.mediaItems.map((item) => item._id).filter(Boolean)
+            : [row.mediaItem?._id].filter(Boolean);
+          const rowCaption = row.caption || caption.trim();
+          const rowPlatformSpecifics = row.carouselSet
+            ? {
+                type: 'carousel',
+                carouselSetId: row.carouselSet._id,
+                carouselSetName: row.carouselSet.name,
+                carouselOrder: rowMediaIds,
+              }
+            : {
+                ...platformSpecifics,
+                ...(shouldUseYoutubePublishing ? {
+                  youtube: {
+                    ...platformSpecifics.youtube,
+                    description: rowCaption,
+                  },
+                } : {}),
+              };
+
+          return {
+            campaignId: getActiveCampaignId(),
+            socialAccountIds: row.channel?.socialAccountId ? [row.channel.socialAccountId] : [],
+            campaignChannelIds: row.channel?.campaignChannelId ? [row.channel.campaignChannelId] : [],
+            channelTargets: [{
+              socialAccountId: row.channel?.socialAccountId || null,
+              campaignChannelId: row.channel?.campaignChannelId || null,
+            }],
+            mediaIds: rowMediaIds,
+            caption: rowCaption,
+            scheduledAt: isPureManualMode ? effectiveScheduleDate : row.effectiveScheduledAt,
+            scheduleMode,
+            platformSpecifics: rowPlatformSpecifics,
+          };
+        });
+      }
+
+      let response;
+      for (const requestBody of requestBodies) {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) break;
+      }
 
       if (response.ok) {
         await queryClient.invalidateQueries({ queryKey: ['scheduler'] });
@@ -810,6 +969,7 @@ const CalendarView = ({ selectedAccounts }) => {
         setSelectedChannels([]);
         setSelectedMedia([]);
         setSelectedCarouselSets([]);
+        setDeselectedPlanRows([]);
         setCaption('');
         setScheduleTime('');
         setScheduleMode('auto');
@@ -818,7 +978,7 @@ const CalendarView = ({ selectedAccounts }) => {
         setYoutubePrivacy('private');
         setYoutubeTags('');
         setYoutubeMadeForKids(false);
-        fetchPosts();
+        await fetchPosts({ force: true });
       } else {
         const error = await response.json();
         alert(`Scheduling failed: ${error.message || 'Unable to save scheduled post'}`);
@@ -878,6 +1038,601 @@ const CalendarView = ({ selectedAccounts }) => {
         : [...current, setId]
     ));
   };
+
+  const parseInputDate = (value) => {
+    if (!value) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+  };
+
+  const getDateKey = (value) => {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return toInputDate(date);
+  };
+
+  const addDays = (date, days) => {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
+  };
+
+  const startOfWeek = (date) => addDays(date, -date.getDay());
+  const endOfWeek = (date) => addDays(date, 6 - date.getDay());
+
+  const setCalendarPreset = (mode) => {
+    const base = parseInputDate(selectedCalendarDate) || new Date();
+    setCalendarMode(mode);
+    if (mode === 'week') {
+      setCalendarRangeStart(toInputDate(startOfWeek(base)));
+      setCalendarRangeEnd(toInputDate(endOfWeek(base)));
+      return;
+    }
+    setCalendarRangeStart(toInputDate(new Date(base.getFullYear(), base.getMonth(), 1)));
+    setCalendarRangeEnd(toInputDate(new Date(base.getFullYear(), base.getMonth() + 1, 0)));
+  };
+
+  const moveCalendarRange = (direction) => {
+    const start = parseInputDate(calendarRangeStart) || new Date();
+    const end = parseInputDate(calendarRangeEnd) || start;
+    if (calendarMode === 'week') {
+      const nextStart = addDays(start, direction * 7);
+      const nextEnd = addDays(end, direction * 7);
+      setCalendarRangeStart(toInputDate(nextStart));
+      setCalendarRangeEnd(toInputDate(nextEnd));
+      setSelectedCalendarDate(toInputDate(nextStart));
+      return;
+    }
+    const nextMonth = new Date(start.getFullYear(), start.getMonth() + direction, 1);
+    setCalendarRangeStart(toInputDate(new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1)));
+    setCalendarRangeEnd(toInputDate(new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0)));
+    setSelectedCalendarDate(toInputDate(nextMonth));
+  };
+
+  const getPostStatusGroup = (post) => {
+    switch (post?.status) {
+      case 'manual_ready':
+      case 'downloaded':
+        return 'manual';
+      case 'published_auto':
+      case 'published':
+      case 'posted_manual':
+        return 'done';
+      case 'failed':
+        return 'failed';
+      case 'paused':
+      case 'cancelled':
+        return 'cancelled';
+      default:
+        return 'scheduled';
+    }
+  };
+
+  const getStatusChipClasses = (group) => {
+    switch (group) {
+      case 'manual':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'done':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'failed':
+        return 'bg-red-50 text-red-700 border-red-200';
+      case 'cancelled':
+        return 'bg-slate-100 text-slate-500 border-slate-200';
+      default:
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+    }
+  };
+
+  const findChannelForRef = (ref) => {
+    const refId = String(ref?._id || ref || '');
+    const socialAccountId = String(ref?.socialAccountId?._id || ref?.socialAccountId || '');
+    return channels.find((channel) => (
+      String(channel._id) === refId
+      || String(channel.socialAccountId || '') === refId
+      || String(channel.campaignChannelId || '') === refId
+      || (socialAccountId && (
+        String(channel._id) === socialAccountId
+        || String(channel.socialAccountId || '') === socialAccountId
+      ))
+    ));
+  };
+
+  const getPostAccountRefs = (post) => {
+    const refs = new Map();
+    const addRef = (key, channel, fallback) => {
+      if (!key || refs.has(key)) return;
+      refs.set(key, {
+        id: key,
+        channel: channel || fallback || null,
+      });
+    };
+
+    (post?.socialAccountIds || []).forEach((account) => {
+      const key = String(account?._id || account);
+      addRef(key, findChannelForRef(account), account);
+    });
+
+    (post?.campaignChannelIds || []).forEach((channelRef) => {
+      const key = String(channelRef?.socialAccountId?._id || channelRef?.socialAccountId || channelRef?.matchedAccountId || channelRef?._id || channelRef);
+      addRef(key, findChannelForRef(channelRef), channelRef);
+    });
+
+    if (refs.size === 0) {
+      addRef('unknown', null, { username: 'Unknown account', platform: 'unknown' });
+    }
+
+    return [...refs.values()];
+  };
+
+  const getPostMediaLabel = (post) => {
+    const firstMedia = post?.mediaIds?.[0];
+    if (post?.platformSpecifics?.type === 'carousel') {
+      const setId = post.platformSpecifics?.carouselSetId;
+      const setFolder = setId ? folderById.get(String(setId)) : null;
+      return setFolder?.name || firstMedia?.name || 'Carousel set';
+    }
+    return firstMedia?.name || 'Scheduled media';
+  };
+
+  const normalizedCalendarPosts = useMemo(() => {
+    const rangeStart = parseInputDate(calendarRangeStart);
+    const rangeEnd = parseInputDate(calendarRangeEnd);
+    if (rangeEnd) rangeEnd.setHours(23, 59, 59, 999);
+    const selectedAccountSet = new Set(selectedCalendarAccountIds.map(String));
+
+    return posts
+      .map((post) => {
+        const scheduledDate = new Date(post.scheduledAt);
+        const accountRefs = getPostAccountRefs(post);
+        const statusGroup = getPostStatusGroup(post);
+        return {
+          post,
+          accountRefs,
+          statusGroup,
+          scheduledDate,
+          dateKey: getDateKey(scheduledDate),
+          timeLabel: formatScheduleTime(post.scheduledAt),
+          mediaItem: post.mediaIds?.[0],
+          mediaLabel: getPostMediaLabel(post),
+        };
+      })
+      .filter((item) => {
+        if (!item.dateKey || Number.isNaN(item.scheduledDate.getTime())) return false;
+        if (rangeStart && item.scheduledDate < rangeStart) return false;
+        if (rangeEnd && item.scheduledDate > rangeEnd) return false;
+        if (selectedCalendarStatus !== 'all' && item.statusGroup !== selectedCalendarStatus) return false;
+        if (selectedAccountSet.size > 0 && !item.accountRefs.some((ref) => selectedAccountSet.has(String(ref.id)))) return false;
+        return true;
+      })
+      .sort((a, b) => a.scheduledDate - b.scheduledDate);
+  }, [calendarRangeEnd, calendarRangeStart, folderById, posts, selectedCalendarAccountIds, selectedCalendarStatus, channels]);
+
+  const calendarStats = useMemo(() => {
+    const stats = {
+      total: normalizedCalendarPosts.length,
+      scheduled: 0,
+      manual: 0,
+      done: 0,
+      failed: 0,
+    };
+    normalizedCalendarPosts.forEach((item) => {
+      if (stats[item.statusGroup] !== undefined) stats[item.statusGroup] += 1;
+    });
+    return stats;
+  }, [normalizedCalendarPosts]);
+
+  const calendarPostsByDate = useMemo(() => {
+    const map = new Map();
+    normalizedCalendarPosts.forEach((item) => {
+      if (!map.has(item.dateKey)) map.set(item.dateKey, []);
+      map.get(item.dateKey).push(item);
+    });
+    return map;
+  }, [normalizedCalendarPosts]);
+
+  const calendarDays = useMemo(() => {
+    const start = parseInputDate(calendarRangeStart) || new Date();
+    const end = parseInputDate(calendarRangeEnd) || start;
+    const paddedStart = startOfWeek(start);
+    const paddedEnd = endOfWeek(end);
+    const days = [];
+    for (let cursor = paddedStart; cursor <= paddedEnd; cursor = addDays(cursor, 1)) {
+      const date = new Date(cursor);
+      const key = toInputDate(date);
+      days.push({
+        date,
+        key,
+        inRange: date >= start && date <= end,
+        isToday: key === toInputDate(new Date()),
+        isSelected: key === selectedCalendarDate,
+        posts: calendarPostsByDate.get(key) || [],
+      });
+    }
+    return days;
+  }, [calendarPostsByDate, calendarRangeEnd, calendarRangeStart, selectedCalendarDate]);
+
+  const selectedDayPosts = calendarPostsByDate.get(selectedCalendarDate) || [];
+  const selectedDayGroups = useMemo(() => {
+    const groups = new Map();
+    selectedDayPosts.forEach((item) => {
+      item.accountRefs.forEach((ref) => {
+        const key = String(ref.id);
+        if (!groups.has(key)) {
+          groups.set(key, {
+            id: key,
+            channel: ref.channel,
+            posts: [],
+          });
+        }
+        groups.get(key).posts.push(item);
+      });
+    });
+    return [...groups.values()].sort((a, b) => getAccountLabel(a.channel).localeCompare(getAccountLabel(b.channel)));
+  }, [selectedDayPosts]);
+
+  const accountFilterOptions = useMemo(() => {
+    const optionsById = new Map();
+    channels.forEach((channel) => {
+      const id = String(channel._id);
+      if (!id || optionsById.has(id)) return;
+      optionsById.set(id, {
+        id,
+        label: getAccountLabel(channel),
+        platform: channel.platform || 'unknown',
+        channel,
+      });
+    });
+    return [...optionsById.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [channels]);
+  const queueEditorAccountId = selectedCalendarAccountIds.length === 1 ? String(selectedCalendarAccountIds[0]) : '';
+  const queueEditorAccount = useMemo(() => (
+    accountFilterOptions.find((option) => String(option.id) === queueEditorAccountId) || null
+  ), [accountFilterOptions, queueEditorAccountId]);
+  const queueEditorItems = useMemo(() => {
+    if (!queueEditorAccountId) return [];
+    return queueEditorPosts
+      .map((post) => {
+        const scheduledDate = new Date(post.scheduledAt);
+        const accountRefs = getPostAccountRefs(post);
+        const statusGroup = getPostStatusGroup(post);
+        return {
+          post,
+          accountRefs,
+          statusGroup,
+          scheduledDate,
+          mediaItem: post.mediaIds?.[0],
+          mediaLabel: getPostMediaLabel(post),
+        };
+      })
+      .filter((item) => {
+        if (Number.isNaN(item.scheduledDate.getTime())) return false;
+        return item.accountRefs.some((ref) => String(ref.id) === queueEditorAccountId);
+      })
+      .sort((a, b) => a.scheduledDate - b.scheduledDate)
+      .map((item, index) => ({ ...item, queueIndex: index + 1 }));
+  }, [queueEditorPosts, queueEditorAccountId, channels, folderById]);
+
+  const fetchQueueEditorPosts = useCallback(async (accountId) => {
+    if (!accountId) {
+      setQueueEditorPosts([]);
+      return;
+    }
+
+    setLoadingQueueEditor(true);
+    setQueueError('');
+    try {
+      const params = new URLSearchParams();
+      params.set('from', new Date().toISOString());
+      params.set('accountIds', accountId);
+      params.set('statuses', 'scheduled,manual_ready,downloaded,publishing,paused');
+      const response = await fetch(`${API_BASE_URL}/api/scheduler${withCampaignScope(params.toString())}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
+        },
+        cache: 'no-store',
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || `Queue load failed: ${response.status}`);
+      }
+      setQueueEditorPosts(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to load account queue:', error);
+      setQueueEditorPosts([]);
+      setQueueError(error.message || 'Failed to load account queue.');
+    } finally {
+      setLoadingQueueEditor(false);
+    }
+  }, []);
+
+  const openQueueEditor = () => {
+    if (!queueEditorAccountId) return;
+    setShowQueueEditor(true);
+    fetchQueueEditorPosts(queueEditorAccountId);
+  };
+
+  const toggleCalendarAccount = (accountId) => {
+    setSelectedCalendarAccountIds((current) => (
+      current.includes(accountId)
+        ? current.filter((id) => id !== accountId)
+        : [...current, accountId]
+    ));
+  };
+
+  useEffect(() => {
+    if (!showQueueEditor) return;
+    setQueueEditDrafts((current) => {
+      const next = {};
+      queueEditorItems.forEach((item) => {
+        const postId = item.post._id;
+        next[postId] = current[postId] || {
+          scheduledAt: toDateTimeLocalValue(item.post.scheduledAt),
+          caption: item.post.caption || '',
+          status: item.post.status || 'scheduled',
+        };
+      });
+      return next;
+    });
+  }, [showQueueEditor, queueEditorItems]);
+
+  useEffect(() => {
+    if (selectedCalendarAccountIds.length !== 1) {
+      setShowQueueEditor(false);
+    }
+  }, [selectedCalendarAccountIds.length]);
+
+  const updateQueueDraft = (postId, updates) => {
+    setQueueEditDrafts((current) => ({
+      ...current,
+      [postId]: {
+        ...(current[postId] || {}),
+        ...updates,
+      },
+    }));
+  };
+
+  const buildQueueUpdatePayload = (item, overrides = {}) => {
+    const postId = item?.post?._id;
+    const draft = queueEditDrafts[postId] || {};
+    return {
+      scheduledAt: overrides.scheduledAt || (draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : item.post.scheduledAt),
+      caption: overrides.caption ?? draft.caption ?? '',
+      status: overrides.status || draft.status || item.post.status || 'scheduled',
+    };
+  };
+
+  const saveQueuePostUpdate = async (item, payload) => {
+    const postId = item?.post?._id;
+    const response = await fetch(`${API_BASE_URL}/api/scheduler/${postId}${withCampaignScope()}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(data?.message || `Update failed: ${response.status}`);
+    }
+    return data;
+  };
+
+  const invalidateQueueRelatedQueries = () => {
+    void queryClient.invalidateQueries({ queryKey: ['scheduler'] });
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  };
+
+  const mergeQueuePostPatch = (post, patch = {}) => ({
+    ...post,
+    ...patch,
+    mediaIds: patch.mediaIds || post.mediaIds,
+    socialAccountIds: patch.socialAccountIds || post.socialAccountIds,
+    campaignChannelIds: patch.campaignChannelIds || post.campaignChannelIds,
+    platformSpecifics: patch.platformSpecifics || post.platformSpecifics,
+  });
+
+  const patchQueuePostInState = (postId, patch) => {
+    setQueueEditorPosts((current) => (
+      current.map((post) => (
+        String(post._id) === String(postId)
+          ? mergeQueuePostPatch(post, patch)
+          : post
+      ))
+    ));
+    setPosts((current) => (
+      current.map((post) => (
+        String(post._id) === String(postId)
+          ? mergeQueuePostPatch(post, patch)
+          : post
+      ))
+    ));
+  };
+
+  const patchQueueDraft = (postId, payload) => {
+    setQueueEditDrafts((current) => ({
+      ...current,
+      [postId]: {
+        ...(current[postId] || {}),
+        scheduledAt: toDateTimeLocalValue(payload.scheduledAt),
+        caption: payload.caption ?? '',
+        status: payload.status || 'scheduled',
+      },
+    }));
+  };
+
+  const handleSaveQueuePost = async (item) => {
+    const postId = item?.post?._id;
+    if (!postId || savingQueuePostIds.includes(postId)) return;
+    const payload = buildQueueUpdatePayload(item);
+    const previousQueueEditorPosts = queueEditorPosts;
+    const previousPosts = posts;
+    const previousDrafts = queueEditDrafts;
+
+    setQueueError('');
+    setSavingQueuePostIds((current) => [...current, postId]);
+    patchQueuePostInState(postId, payload);
+    patchQueueDraft(postId, payload);
+    try {
+      const savedPost = await saveQueuePostUpdate(item, payload);
+      if (savedPost?._id) {
+        patchQueuePostInState(postId, savedPost);
+        patchQueueDraft(postId, savedPost);
+      }
+      invalidateQueueRelatedQueries();
+    } catch (error) {
+      console.error('Failed to update queue post:', error);
+      setQueueEditorPosts(previousQueueEditorPosts);
+      setPosts(previousPosts);
+      setQueueEditDrafts(previousDrafts);
+      setQueueError(error.message || 'Failed to update queue post.');
+    } finally {
+      setSavingQueuePostIds((current) => current.filter((id) => id !== postId));
+    }
+  };
+
+  const handleBulkUpdateQueuePosts = async (items, updates = {}) => {
+    const selectedItems = (items || []).filter((item) => item?.post?._id);
+    if (selectedItems.length === 0) return;
+
+    const selectedIds = selectedItems.map((item) => item.post._id);
+    const itemPayloads = selectedItems.map((item) => {
+      const overrides = {};
+      if (updates.status) {
+        overrides.status = updates.status;
+      }
+      return { item, payload: buildQueueUpdatePayload(item, overrides) };
+    });
+    const previousQueueEditorPosts = queueEditorPosts;
+    const previousPosts = posts;
+    const previousDrafts = queueEditDrafts;
+
+    setQueueError('');
+    setSavingQueuePostIds((current) => [...new Set([...current, ...selectedIds])]);
+    itemPayloads.forEach(({ item, payload }) => {
+      patchQueuePostInState(item.post._id, payload);
+      patchQueueDraft(item.post._id, payload);
+    });
+    try {
+      const savedPosts = await Promise.all(
+        itemPayloads.map(({ item, payload }) => saveQueuePostUpdate(item, payload))
+      );
+      savedPosts.forEach((savedPost) => {
+        if (!savedPost?._id) return;
+        patchQueuePostInState(savedPost._id, savedPost);
+        patchQueueDraft(savedPost._id, savedPost);
+      });
+      invalidateQueueRelatedQueries();
+    } catch (error) {
+      console.error('Failed to bulk update queue posts:', error);
+      setQueueEditorPosts(previousQueueEditorPosts);
+      setPosts(previousPosts);
+      setQueueEditDrafts(previousDrafts);
+      setQueueError(error.message || 'Failed to update selected queue posts.');
+    } finally {
+      setSavingQueuePostIds((current) => current.filter((id) => !selectedIds.includes(id)));
+    }
+  };
+
+  const handleBulkSaveQueueCaptions = async (items, captionsByPostId = {}) => {
+    const selectedItems = (items || []).filter((item) => {
+      const postId = item?.post?._id;
+      return postId && Object.prototype.hasOwnProperty.call(captionsByPostId, postId);
+    });
+    if (selectedItems.length === 0) return;
+
+    const selectedIds = selectedItems.map((item) => item.post._id);
+    const itemPayloads = selectedItems.map((item) => {
+      const postId = item.post._id;
+      return {
+        item,
+        payload: buildQueueUpdatePayload(item, { caption: captionsByPostId[postId] ?? '' }),
+      };
+    });
+    const previousQueueEditorPosts = queueEditorPosts;
+    const previousPosts = posts;
+    const previousDrafts = queueEditDrafts;
+
+    setQueueError('');
+    setSavingQueuePostIds((current) => [...new Set([...current, ...selectedIds])]);
+    itemPayloads.forEach(({ item, payload }) => {
+      patchQueuePostInState(item.post._id, payload);
+      patchQueueDraft(item.post._id, payload);
+    });
+    try {
+      const savedPosts = await Promise.all(
+        itemPayloads.map(({ item, payload }) => saveQueuePostUpdate(item, payload))
+      );
+      savedPosts.forEach((savedPost) => {
+        if (!savedPost?._id) return;
+        patchQueuePostInState(savedPost._id, savedPost);
+        patchQueueDraft(savedPost._id, savedPost);
+      });
+      invalidateQueueRelatedQueries();
+    } catch (error) {
+      console.error('Failed to save queue captions:', error);
+      setQueueEditorPosts(previousQueueEditorPosts);
+      setPosts(previousPosts);
+      setQueueEditDrafts(previousDrafts);
+      setQueueError(error.message || 'Failed to save selected captions.');
+    } finally {
+      setSavingQueuePostIds((current) => current.filter((id) => !selectedIds.includes(id)));
+    }
+  };
+
+  const handleDeleteQueuePost = async (item) => {
+    const postId = item?.post?._id;
+    if (!postId || deletingQueuePostIds.includes(postId)) return;
+    if (!window.confirm(`Remove "${item.mediaLabel || 'this post'}" from the queue?`)) return;
+
+    const previousPosts = posts;
+    const previousQueueEditorPosts = queueEditorPosts;
+    setQueueError('');
+    setDeletingQueuePostIds((current) => [...current, postId]);
+    setPosts((current) => current.filter((post) => post._id !== postId));
+    setQueueEditorPosts((current) => current.filter((post) => post._id !== postId));
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/scheduler/${postId}${withCampaignScope()}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
+        },
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || `Delete failed: ${response.status}`);
+      }
+      invalidateQueueRelatedQueries();
+    } catch (error) {
+      console.error('Failed to delete queue post:', error);
+      setPosts(previousPosts);
+      setQueueEditorPosts(previousQueueEditorPosts);
+      setQueueError(error.message || 'Failed to delete queue post.');
+    } finally {
+      setDeletingQueuePostIds((current) => current.filter((id) => id !== postId));
+    }
+  };
+  useEffect(() => {
+    if (!showCalendarAccountMenu) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (calendarAccountMenuRef.current?.contains(event.target)) return;
+      setShowCalendarAccountMenu(false);
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowCalendarAccountMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showCalendarAccountMenu]);
 
   return (
     <div className="py-2 px-0 bg-[#f5f5f7] h-screen text-[#1d1d1f] font-sans flex flex-col overflow-hidden">
@@ -1010,7 +1765,9 @@ const CalendarView = ({ selectedAccounts }) => {
                         )}
                         <div className="min-w-0 flex-1">
                           <span className="block truncate text-xs font-semibold leading-tight">{getAccountLabel(chan)}</span>
-                          <span className="block truncate text-[9px] capitalize text-[#6b7280] leading-none mt-0.5">{chan.platform}</span>
+                          <span className="mt-0.5 flex items-center leading-none">
+                            <PlatformIcon platform={chan.platform} className="h-3.5 w-3.5" />
+                          </span>
                         </div>
                         {!isVerified && (
                           <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${
@@ -1238,6 +1995,7 @@ const CalendarView = ({ selectedAccounts }) => {
                         <option value="1">Every 1 hour</option>
                         <option value="2">Every 2 hours</option>
                         <option value="4">Every 4 hours</option>
+                        <option value="6">Every 6 hours</option>
                         <option value="12">Every 12 hours</option>
                         <option value="24">Every 1 day</option>
                       </select>
@@ -1307,9 +2065,9 @@ const CalendarView = ({ selectedAccounts }) => {
                     <span className="font-bold text-[#0f172a]">{selectedChannels.length}</span>
                   </div>
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Selected Content:</span>
+                    <span className="text-slate-500 font-medium">Selected Posts:</span>
                     <span className="font-bold text-[#0f172a]">
-                      {isCarouselMode ? selectedCarouselSets.length : selectedMedia.length}
+                      {schedulePlan.length > 0 ? `${activeSchedulePlan.length}/${schedulePlan.length}` : 0}
                     </span>
                   </div>
                   <div className="flex justify-between text-[11px]">
@@ -1318,42 +2076,65 @@ const CalendarView = ({ selectedAccounts }) => {
                   </div>
                   <div className="flex justify-between text-[11px]">
                     <span className="text-slate-500 font-medium">Schedule Time:</span>
-                    <span className="font-bold text-blue-600 truncate max-w-[140px]" title={scheduleTime}>
-                      {isPureManualMode ? 'Manual queue' : scheduleTime ? new Date(scheduleTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not set'}
+                    <span className="font-bold text-blue-600 truncate max-w-[160px]" title={activeScheduleTimeLabel}>
+                      {activeScheduleTimeLabel}
                     </span>
                   </div>
                 </div>
 
                 {/* Scrollable list of planned posts inside column 4 */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-1.5 bg-slate-50">
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 px-1">Planned Sequence ({schedulePlan.length})</span>
-                  {schedulePlan.map((row) => (
-                    <div
-                      key={`${row.channel?._id || 'multi'}-${row.carouselSet?._id || row.mediaItem?._id}-${row.index}`}
-                      className="bg-white border border-[#e2e8f0] rounded-lg p-2 flex gap-2 items-center shadow-sm relative"
-                    >
-                      <div className="h-8 w-10 overflow-hidden rounded border border-[#e2e8f0] bg-slate-100 flex-shrink-0">
-                        <MediaPreview item={row.mediaItem} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex justify-between items-center gap-1">
-                          <span className="text-[10px] font-bold text-slate-800 truncate">
-                            {row.carouselSet ? row.carouselSet.name : getMediaLabel(row.mediaItem)}
-                          </span>
-                          <span className="text-[8px] font-semibold text-slate-400 flex-shrink-0">
-                            #{row.index}
-                          </span>
+                  <div className="flex items-center justify-between px-1">
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Planned Sequence ({activeSchedulePlan.length}/{schedulePlan.length})</span>
+                    {hasDeselectedPlanRows && (
+                      <button
+                        type="button"
+                        onClick={() => setDeselectedPlanRows([])}
+                        className="text-[9px] font-semibold text-blue-600 hover:text-blue-700"
+                      >
+                        Select all
+                      </button>
+                    )}
+                  </div>
+                  {schedulePlan.map((row) => {
+                    const isRowSelected = !deselectedPlanRows.includes(row.planKey);
+                    const activeRow = activeSchedulePlanByKey.get(row.planKey);
+                    const visibleScheduledAt = activeRow?.effectiveScheduledAt || row.scheduledAt;
+                    return (
+                      <button
+                        type="button"
+                        key={row.planKey}
+                        onClick={() => togglePlanRow(row.planKey)}
+                        aria-pressed={isRowSelected}
+                        className={`w-full text-left rounded-lg p-2 flex gap-2 items-center shadow-sm relative transition-all ${
+                          isRowSelected
+                            ? 'bg-white border border-blue-200 ring-1 ring-blue-100'
+                            : 'bg-slate-100 border border-slate-200 opacity-60'
+                        }`}
+                      >
+                        <div className="h-8 w-10 overflow-hidden rounded border border-[#e2e8f0] bg-slate-100 flex-shrink-0">
+                          <MediaPreview item={row.mediaItem} />
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5 text-[8px] text-slate-500">
-                          <span className="font-medium truncate max-w-[70px]">{getAccountLabel(row.channel)}</span>
-                          <span>•</span>
-                          <span className="font-semibold text-blue-600">
-                            {row.scheduledAt ? new Date(row.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Manual'}
-                          </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex justify-between items-center gap-1">
+                            <span className={`text-[10px] font-bold truncate ${isRowSelected ? 'text-slate-800' : 'text-slate-500 line-through'}`}>
+                              {row.carouselSet ? row.carouselSet.name : getMediaLabel(row.mediaItem)}
+                            </span>
+                            <span className={`text-[8px] font-semibold flex-shrink-0 ${isRowSelected ? 'text-slate-400' : 'text-slate-500'}`}>
+                              #{row.index}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-[8px] text-slate-500">
+                            <span className="font-medium truncate max-w-[70px]">{getAccountLabel(row.channel)}</span>
+                            <span>•</span>
+                            <span className={`font-semibold ${isRowSelected ? 'text-blue-600' : 'text-slate-500'}`}>
+                              {isRowSelected ? (visibleScheduledAt ? formatScheduleTime(visibleScheduledAt) : 'Manual') : 'Skipped'}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ))}
+                      </button>
+                    );
+                  })}
 
                   {schedulePlan.length === 0 && (
                     <div className="h-32 flex items-center justify-center text-[10px] text-slate-400 text-center p-4 border border-dashed border-slate-300 rounded-lg">
@@ -1366,12 +2147,13 @@ const CalendarView = ({ selectedAccounts }) => {
                 <div className="p-3 border-t border-[#e5e7eb] flex-shrink-0">
                   <button
                     type="submit"
-                    className="w-full py-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2"
+                    disabled={schedulePlan.length > 0 && activeSchedulePlan.length === 0}
+                    className="w-full py-2 bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2"
                   >
                     <span>
                       {isPureManualMode
-                        ? 'Create Manual Tasks'
-                        : `Schedule ${schedulePlan.length} Post${schedulePlan.length === 1 ? '' : 's'}`}
+                        ? manualTaskButtonLabel
+                        : `Schedule ${activeSchedulePlan.length} Post${activeSchedulePlan.length === 1 ? '' : 's'}`}
                     </span>
                   </button>
                 </div>
@@ -1382,290 +2164,511 @@ const CalendarView = ({ selectedAccounts }) => {
         </section>
       )}
 
-      {/* Schedule Overview — Visual Row Board */}
-      {!showComposer && (() => {
-        const now = new Date();
-        const activeQueuePosts = posts.filter(isActiveQueuePost);
+      {showQueueEditor && (
+        <AccountQueueEditor
+          account={queueEditorAccount}
+          items={queueEditorItems}
+          drafts={queueEditDrafts}
+          loading={loadingQueueEditor}
+          savingPostIds={savingQueuePostIds}
+          deletingPostIds={deletingQueuePostIds}
+          onBulkSave={handleBulkUpdateQueuePosts}
+          onBulkCaptionSave={handleBulkSaveQueueCaptions}
+          onClose={() => setShowQueueEditor(false)}
+          getStatusLabel={getPostStatusLabel}
+        />
+      )}
 
-        // 1. Group active queued posts by account
-        const accountMap = {};
-        activeQueuePosts.forEach(post => {
-          const accountIds = (post.socialAccountIds || []).length > 0
-            ? (post.socialAccountIds || []).map(a => a._id || a)
-            : (post.campaignChannelIds || []).map(ch => ch.socialAccountId || ch.matchedAccountId || ch._id || ch);
-          accountIds.forEach(accId => {
-            if (!accountMap[accId]) accountMap[accId] = [];
-            accountMap[accId].push(post);
-          });
-        });
-
-        // 2. Build Account Summaries (Destinations)
-        const accountSummaries = Object.entries(accountMap)
-          .map(([accId, accPosts]) => {
-            const channel = channels.find(c => c._id === accId);
-            const scheduled = accPosts.filter(isActiveQueuePost);
-            const failed = accPosts.filter(p => p.status === 'failed');
-            const total = scheduled.length;
-            const done = 0;
-            const left = scheduled.length;
-            const hasUpcoming = scheduled.some(p => new Date(p.scheduledAt) >= now);
-            const isActive = hasUpcoming && left > 0;
-
-            const queuePosts = scheduled.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
-            const nextPost = queuePosts.find(p => new Date(p.scheduledAt) >= now) || queuePosts[0];
-            const sourceLabel = getQueueSourceLabel(queuePosts);
-
-            return { accId, channel, total, done, left, failed: failed.length, isActive, nextPost, sourceLabel };
-          })
-          .sort((a, b) => getAccountLabel(a.channel).localeCompare(getAccountLabel(b.channel)));
-
-        const getPlatformTheme = (platform) => {
-          switch (platform) {
-            case 'instagram': return { accent: '#e1306c', bg: '#fdf2f8', border: '#fbcfe8' };
-            case 'youtube': return { accent: '#ff0000', bg: '#fef2f2', border: '#fecaca' };
-            case 'twitter': case 'x': return { accent: '#1da1f2', bg: '#f0f9ff', border: '#bae6fd' };
-            case 'facebook': return { accent: '#1877f2', bg: '#eff6ff', border: '#bfdbfe' };
-            case 'tiktok': return { accent: '#00f2fe', bg: '#f0fdfa', border: '#ccfbf1' };
-            default: return { accent: '#6b7280', bg: '#f3f4f6', border: '#e5e7eb' };
-          }
-        };
-
-        // Simple Solid Circular Progress
-        const CircularProgress = ({ done, total, themeColor }) => {
-          const size = 42;
-          const stroke = 4;
-          const radius = (size - stroke) / 2;
-          const circumference = 2 * Math.PI * radius;
-          const pct = total > 0 ? (done / total) : 0;
-          const strokeDashoffset = circumference - pct * circumference;
-
-          return (
-            <svg width={size} height={size} className="transform -rotate-90">
-              <circle
-                cx={size / 2} cy={size / 2} r={radius}
-                fill="none" stroke="#e5e7eb" strokeWidth={stroke}
-              />
-              <circle
-                cx={size / 2} cy={size / 2} r={radius}
-                fill="none" stroke={themeColor} strokeWidth={stroke}
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                className="transition-all duration-500"
-              />
-            </svg>
-          );
-        };
-
-        return (
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-8 bg-slate-50 relative bg-[radial-gradient(#e2e8f0_1.5px,transparent_1.5px)] [background-size:24px_24px]">
-            {/* Inject keyframes style for moving cable animation */}
-            <style dangerouslySetInnerHTML={{__html: `
-              @keyframes dash {
-                to {
-                  stroke-dashoffset: -1000;
-                }
-              }
-            `}} />
-
-            {activeQueuePosts.length === 0 ? (
-              <div className="max-w-4xl mx-auto border border-dashed border-slate-200 p-16 rounded-2xl text-center text-slate-500 bg-white flex flex-col items-center gap-3 mt-8 shadow-sm">
-                <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-                  <Clock className="w-7 h-7 text-slate-400" />
+      {/* Schedule Overview — Calendar */}
+      {!showComposer && !showQueueEditor && (
+        <section className="flex-1 min-h-0 bg-white flex flex-col overflow-hidden">
+          {/* Clean Filter Bar */}
+          <div className="border-b border-[#e8eaed] bg-white px-4 py-2.5 flex-shrink-0">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h3 className="m-0 text-base font-bold text-[#1a1a2e] tracking-tight">Scheduler Calendar</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => moveCalendarRange(-1)}
+                    className="h-7 w-7 rounded-md border border-[#dadce0] bg-white text-[#5f6368] hover:bg-[#f8f9fa] flex items-center justify-center transition-colors"
+                    title="Previous range"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <div className="flex items-center gap-1.5 h-8 rounded-lg border border-[#dadce0] bg-white px-3 text-[12px] font-medium text-[#3c4043]">
+                    <svg className="h-3.5 w-3.5 text-[#5f6368]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                    <span>
+                      {(() => {
+                        const s = parseInputDate(calendarRangeStart);
+                        const e = parseInputDate(calendarRangeEnd);
+                        if (!s || !e) return 'Select range';
+                        return `${s.toLocaleDateString([], { month: 'short', day: 'numeric' })} - ${e.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+                      })()}
+                    </span>
+                    <ChevronLeft className="h-3 w-3 -rotate-90 text-[#80868b]" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => moveCalendarRange(1)}
+                    className="h-7 w-7 rounded-md border border-[#dadce0] bg-white text-[#5f6368] hover:bg-[#f8f9fa] flex items-center justify-center transition-colors"
+                    title="Next range"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5 rotate-180" />
+                  </button>
                 </div>
-                <span className="font-semibold text-slate-700 text-sm">No active schedule flows</span>
-                <span className="text-slate-400 text-xs">Create a new schedule queue to establish a flow</span>
-              </div>
-            ) : (
-              <div ref={canvasRef} className="w-full max-w-none pt-6 space-y-6 relative" style={{ minHeight: '600px' }}>
-               
-
-                 {/* SVG Connections Layer */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
-                  {accountSummaries.map((summary) => {
-                    const { accId } = summary;
-                    const theme = getPlatformTheme(summary.channel?.platform);
-
-                    // Connection 1: Channel Out to Source In
-                    const fromPort1 = `acc-port-out-${accId}`;
-                    const toPort1 = `source-port-in-${accId}`;
-                    const fromPos1 = portPositions[fromPort1];
-                    const toPos1 = portPositions[toPort1];
-
-                    const path1 = fromPos1 && toPos1 && typeof fromPos1.x === 'number' && typeof fromPos1.y === 'number' && typeof toPos1.x === 'number' && typeof toPos1.y === 'number'
-                      ? `M ${fromPos1.x} ${fromPos1.y} C ${fromPos1.x + Math.abs(toPos1.x - fromPos1.x) * 0.4} ${fromPos1.y}, ${toPos1.x - Math.abs(toPos1.x - fromPos1.x) * 0.4} ${toPos1.y}, ${toPos1.x} ${toPos1.y}`
-                      : null;
-
-                    // Connection 2: Source Out to Stats In
-                    const fromPort2 = `source-port-out-${accId}`;
-                    const toPort2 = `stats-port-in-${accId}`;
-                    const fromPos2 = portPositions[fromPort2];
-                    const toPos2 = portPositions[toPort2];
-
-                    const path2 = fromPos2 && toPos2 && typeof fromPos2.x === 'number' && typeof fromPos2.y === 'number' && typeof toPos2.x === 'number' && typeof toPos2.y === 'number'
-                      ? `M ${fromPos2.x} ${fromPos2.y} C ${fromPos2.x + Math.abs(toPos2.x - fromPos2.x) * 0.4} ${fromPos2.y}, ${toPos2.x - Math.abs(toPos2.x - fromPos2.x) * 0.4} ${toPos2.y}, ${toPos2.x} ${toPos2.y}`
-                      : null;
-
-                    return (
-                      <g key={accId} className="opacity-80">
-                        {[path1, path2].filter(Boolean).map((path, index) => (
-                          <g key={`path-${accId}-${index}`}>
-                            <path
-                              d={path}
-                              fill="none"
-                              stroke={theme.accent}
-                              strokeWidth="4"
-                              className="opacity-15 blur-[2px]"
-                            />
-                            <path
-                              d={path}
-                              fill="none"
-                              stroke={summary.isActive ? theme.accent : '#94a3b8'}
-                              strokeWidth={summary.isActive ? "2.5" : "1.5"}
-                              strokeDasharray={summary.isActive ? "6, 4" : "4, 4"}
-                              style={summary.isActive ? { animation: 'dash 25s linear infinite' } : {}}
-                            />
-                          </g>
-                        ))}
-                      </g>
-                    );
-                  })}
-                </svg>
-
-                <div className="space-y-12 relative z-10">
-                  {accountSummaries.map((summary) => {
-                    const { accId, channel, total, done, left, failed: failedCount, isActive, nextPost, sourceLabel } = summary;
-                    const theme = getPlatformTheme(channel?.platform);
-                    const progress = total > 0 ? Math.round((done / total) * 100) : 0;
-                    const deletingAccountQueue = deletingAccountQueueIds.includes(accId);
-
-                    return (
-                      <div
-                        key={accId}
-                        className="flex flex-col md:flex-row items-center md:justify-between gap-8 md:gap-6 relative"
-                      >
-                        {/* Channel Node */}
-                        <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl px-4 py-3 shadow-sm hover:shadow hover:border-indigo-400 hover:scale-[1.02] transition-all duration-300 w-full md:w-[220px]">
-                          {/* Outgoing Connection Port Dot */}
-                          <div
-                            data-port-id={`acc-port-out-${accId}`}
-                            className="hidden md:block absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
-                            style={{ backgroundColor: theme.accent }}
-                          />
-                          <div className="flex items-center gap-3">
-                            {channel?.avatarUrl ? (
-                              <img
-                                src={channel.avatarUrl}
-                                crossOrigin="anonymous"
-                                className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                                alt=""
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
-                                <Users className="w-4 h-4 text-slate-400" />
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <h4 className="text-xs font-bold text-slate-800 m-0 truncate">{getAccountLabel(channel)}</h4>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span
-                                  className="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded text-white"
-                                  style={{ backgroundColor: theme.accent }}
-                                >
-                                  {channel?.platform || 'unknown'}
-                                </span>
-                                {isActive && (
-                                  <span className="flex items-center gap-0.5 text-[8px] font-bold text-emerald-500 uppercase tracking-wider">
-                                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" /> Active
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Source Folder Node */}
-                        <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl px-4 py-3 shadow-sm hover:shadow hover:border-indigo-400 hover:scale-[1.02] transition-all duration-300 w-full md:w-[220px]">
-                          <div
-                            data-port-id={`source-port-in-${accId}`}
-                            className="hidden md:block absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
-                          />
-                          <div
-                            data-port-id={`source-port-out-${accId}`}
-                            className="hidden md:block absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
-                            style={{ backgroundColor: theme.accent }}
-                          />
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
-                              <Folder className="w-4 h-4 text-slate-500" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h4 className="text-xs font-bold text-slate-800 m-0 truncate" title={sourceLabel}>{sourceLabel}</h4>
-                              <p className="m-0 mt-0.5 text-[8px] font-bold uppercase tracking-wider text-slate-400">Source folder</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Stats Node */}
-                        <div className="relative flex-shrink-0 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-2xl px-3.5 py-3 shadow-sm hover:shadow hover:border-indigo-400 hover:scale-[1.02] transition-all duration-300 w-full md:w-[320px]">
-                          {/* Incoming Port Left */}
-                          <div
-                            data-port-id={`stats-port-in-${accId}`}
-                            className="hidden md:block absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white bg-indigo-500 shadow-sm transition-transform hover:scale-125 cursor-crosshair z-30"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteAccountQueue(accId, getAccountLabel(channel))}
-                            disabled={deletingAccountQueue}
-                            className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-rose-200 bg-white text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                            title={`Delete ${left} queued post${left === 1 ? '' : 's'} for this account`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                          <div className="flex items-center justify-between gap-3 pr-6">
-                            <div className="min-w-0 flex-1">
-                              <div className="grid grid-cols-3 gap-1 bg-slate-50 border border-slate-100 rounded-lg p-1.5 text-center">
-                                <div>
-                                  <p className="m-0 text-xs font-bold text-indigo-600">{left}</p>
-                                  <p className="m-0 text-[7px] font-bold uppercase text-slate-400">Left</p>
-                                </div>
-                                <div>
-                                  <p className="m-0 text-xs font-bold text-emerald-600">{done}</p>
-                                  <p className="m-0 text-[7px] font-bold uppercase text-slate-400">Done</p>
-                                </div>
-                                <div>
-                                  <p className="m-0 text-xs font-bold text-rose-600">{failedCount}</p>
-                                  <p className="m-0 text-[7px] font-bold uppercase text-slate-400">Fail</p>
-                                </div>
-                              </div>
-                              
-                              {/* Next Post Foot */}
-                              {nextPost && (
-                                <p className="m-0 mt-1.5 flex min-w-0 items-center gap-1 text-[8px] text-slate-500">
-                                  <Clock className="h-2.5 w-2.5 flex-shrink-0 text-slate-400" />
-                                  <span className="truncate">
-                                    {deletingAccountQueue ? 'Deleting queue' : `${getScheduleModeLabel(nextPost.scheduleMode)} - ${getPostStatusLabel(nextPost)} - ${new Date(nextPost.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
-                                  </span>
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="flex-shrink-0 flex items-center justify-center relative">
-                              <CircularProgress done={done} total={total} themeColor={theme.accent} />
-                              <span className="absolute text-[8px] font-extrabold text-slate-800">{progress}%</span>
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-                    );
-                  })}
+		                <div ref={calendarAccountMenuRef} className="relative group">
+	                  <button
+	                    type="button"
+	                    onClick={() => setShowCalendarAccountMenu((open) => !open)}
+	                    className="flex items-center gap-1.5 h-8 rounded-lg border border-[#dadce0] bg-white px-3 text-[12px] font-medium text-[#3c4043] hover:bg-[#f8f9fa] transition-colors"
+	                  >
+	                    <svg className="h-3.5 w-3.5 text-[#5f6368]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+	                    <span>{selectedCalendarAccountIds.length === 0 ? 'All accounts' : `${selectedCalendarAccountIds.length} account${selectedCalendarAccountIds.length === 1 ? '' : 's'}`}</span>
+	                    <ChevronLeft className="h-3 w-3 -rotate-90 text-[#80868b]" />
+	                  </button>
+	                  {showCalendarAccountMenu && (
+                    <div className="absolute left-0 top-9 z-[9999] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-[#dadce0] bg-white shadow-lg">
+	                      <button
+	                        type="button"
+	                        onClick={() => setSelectedCalendarAccountIds([])}
+	                        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[12px] font-semibold hover:bg-[#f8f9fa] ${
+	                          selectedCalendarAccountIds.length === 0 ? 'text-[#1a73e8]' : 'text-[#3c4043]'
+	                        }`}
+	                      >
+	                        <span>All accounts</span>
+	                        {selectedCalendarAccountIds.length === 0 && <span className="text-[10px]">Selected</span>}
+	                      </button>
+	                      <div className="max-h-64 overflow-y-auto border-t border-[#f1f3f4] py-1">
+	                        {accountFilterOptions.map((option) => {
+	                          const selected = selectedCalendarAccountIds.includes(option.id);
+	                          return (
+	                            <button
+	                              key={option.id}
+	                              type="button"
+	                              onClick={() => toggleCalendarAccount(option.id)}
+	                              className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[#f8f9fa] ${
+	                                selected ? 'text-[#1a73e8]' : 'text-[#3c4043]'
+	                              }`}
+	                            >
+	                              <span className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${
+	                                selected ? 'border-[#1a73e8] bg-[#1a73e8]' : 'border-[#dadce0] bg-white'
+	                              }`}>
+	                                {selected && <span className="h-1.5 w-1.5 rounded-sm bg-white" />}
+	                              </span>
+	                              <PlatformIcon platform={option.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
+	                              <AccountAvatar account={option.channel} sizeClass="h-6 w-6" textClass="text-[9px]" />
+	                              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">@{option.label}</span>
+	                              <span className="flex-shrink-0 text-[9px] font-bold uppercase text-[#80868b]">{option.platform}</span>
+	                            </button>
+	                          );
+	                        })}
+	                        {accountFilterOptions.length === 0 && (
+	                          <div className="px-3 py-3 text-[12px] font-medium text-[#80868b]">
+	                            No campaign accounts
+	                          </div>
+	                        )}
+	                      </div>
+	                    </div>
+	                  )}
+	                </div>
+                <div className="flex items-center gap-1.5 h-8 rounded-lg border border-[#dadce0] bg-white px-3">
+                  <svg className="h-3.5 w-3.5 text-[#5f6368]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                  <select
+                    value={selectedCalendarStatus}
+                    onChange={(e) => setSelectedCalendarStatus(e.target.value)}
+                    className="border-0 bg-transparent text-[12px] font-medium text-[#3c4043] outline-none cursor-pointer appearance-none pr-4"
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="manual">Manual Ready</option>
+                    <option value="done">Published</option>
+                    <option value="failed">Failed</option>
+                    <option value="cancelled">Paused / Cancelled</option>
+                  </select>
+                  <ChevronLeft className="h-3 w-3 -rotate-90 text-[#80868b] -ml-3" />
                 </div>
+                {queueEditorAccountId && (
+                  <button
+                    type="button"
+                    onClick={openQueueEditor}
+                    className="flex h-8 items-center gap-1.5 rounded-lg border border-[#1a73e8] bg-[#eff6ff] px-3 text-[12px] font-semibold text-[#1a73e8] transition-colors hover:bg-[#dbeafe]"
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>Edit Queue</span>
+                  </button>
+                )}
               </div>
-            )}
+
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center rounded-lg border border-[#dadce0] overflow-hidden">
+                  {['month', 'week'].map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setCalendarPreset(mode)}
+                      className={`h-8 px-4 text-[12px] font-semibold capitalize transition-colors ${
+                        calendarMode === mode
+                          ? 'bg-[#1a73e8] text-white'
+                          : 'bg-white text-[#3c4043] hover:bg-[#f8f9fa]'
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+                {!isViewer && (
+                  <button
+                    onClick={() => setShowComposer(true)}
+                    className="flex items-center gap-1.5 bg-[#1a73e8] hover:bg-[#1557b0] text-white px-4 h-8 rounded-lg text-[12px] font-semibold transition-all shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>New Schedule</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-        );
-      })()}
+
+          {/* Calendar Grid + Sidebar */}
+          <div className="flex-1 min-h-0 flex overflow-hidden">
+            {/* Calendar Grid */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden border-r border-[#e8eaed] relative">
+              {activeTooltipDay && (
+                <button
+                  type="button"
+                  aria-label="Close schedule tooltip"
+                  className="fixed inset-0 z-[9998] cursor-default bg-transparent"
+                  onClick={() => setActiveTooltipDay(null)}
+                />
+              )}
+              {/* Day Headers */}
+              <div className="grid grid-cols-7 border-b border-[#e8eaed] bg-white flex-shrink-0">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                  <div key={day} className="px-3 py-2 text-[11px] font-semibold text-[#70757a] text-center border-r border-[#e8eaed] last:border-r-0">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Cells */}
+              <div className={`flex-1 min-h-0 grid grid-cols-7 overflow-y-auto ${
+                calendarMode === 'week' ? 'auto-rows-fr' : 'auto-rows-[160px]'
+              }`}>
+                {calendarDays.map((day) => {
+                  const previewLimit = calendarMode === 'week' ? day.posts.length : 4;
+                  const visibleDayPosts = day.posts.slice(0, previewLimit);
+                  const moreCount = Math.max(day.posts.length - visibleDayPosts.length, 0);
+                  const isTooltipOpen = activeTooltipDay === day.key;
+
+                  const getStatusRowStyle = (group) => {
+                    switch (group) {
+                      case 'manual': return 'bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa]';
+                      case 'done': return 'bg-[#ecfdf5] text-[#047857] border border-[#a7f3d0]';
+                      case 'failed': return 'bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca]';
+                      case 'cancelled': return 'bg-[#f9fafb] text-[#6b7280] border border-[#e5e7eb]';
+                      default: return 'bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]';
+                    }
+                  };
+
+                  return (
+	                    <div
+	                      key={day.key}
+	                      onClick={() => setSelectedCalendarDate(day.key)}
+	                      className={`relative border-b border-r border-[#e8eaed] p-1 text-left transition-colors flex flex-col cursor-pointer ${
+		                        calendarMode === 'week' ? 'min-h-full' : 'min-h-[160px]'
+		                      } ${
+	                        isTooltipOpen ? 'z-[9999] overflow-visible shadow-md' : 'z-0 overflow-hidden'
+	                      } ${
+	                        day.isSelected
+	                          ? 'bg-[#e8f0fe]'
+                          : day.inRange
+                            ? 'bg-white hover:bg-[#f8f9fa]'
+                            : 'bg-[#f8f9fa]'
+                      }`}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          setSelectedCalendarDate(day.key);
+                        }
+                      }}
+                    >
+                      {/* Date Number + Post Count */}
+	                      <div className="mb-0.5 flex items-center justify-between">
+	                        <span className={`inline-flex items-center justify-center h-5 min-w-5 rounded-full text-[11px] font-bold ${
+                          day.isToday
+                            ? 'bg-[#1a73e8] text-white'
+                            : day.inRange
+                              ? 'text-[#202124]'
+                              : 'text-[#bdc1c6]'
+                        }`}>
+                          {day.date.getDate()}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {moreCount > 0 ? (
+                            <button
+                              type="button"
+	                              onClick={(e) => {
+	                                e.stopPropagation();
+	                                setSelectedCalendarDate(day.key);
+	                                if (isTooltipOpen) {
+	                                  setActiveTooltipDay(null);
+	                                  return;
+	                                }
+	                                const rect = e.currentTarget.getBoundingClientRect();
+	                                const tooltipWidth = 360;
+	                                const margin = 12;
+	                                const alignRight = rect.left + tooltipWidth > window.innerWidth - margin;
+	                                setTooltipPosition({
+	                                  top: Math.min(rect.bottom + 8, window.innerHeight - margin),
+	                                  left: alignRight
+	                                    ? Math.max(margin, rect.right - tooltipWidth)
+	                                    : Math.min(rect.left, window.innerWidth - tooltipWidth - margin),
+	                                });
+	                                setActiveTooltipDay(day.key);
+	                              }}
+		                              className="rounded-full bg-blue-50 px-1 py-0 text-[9px] font-black text-blue-700 hover:bg-blue-100"
+	                            >
+                              +{moreCount} more
+                            </button>
+                          ) : day.posts.length > 0 ? (
+	                            <span className="text-[9px] font-bold text-[#5f6368] bg-[#f1f3f4] rounded-full px-1 py-0">
+                              {day.posts.length}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Post Entries — compact preview */}
+	                      <div className="min-h-0 space-y-1 overflow-hidden flex-1">
+                        {visibleDayPosts.map((item) => {
+                          const primaryChannel = item.accountRefs[0]?.channel;
+                          return (
+	                            <div
+	                              key={`${item.post._id}-${item.accountRefs[0]?.id || 'account'}`}
+		                              className={`flex h-7 min-w-0 items-center gap-1 rounded-md px-1 shadow-sm ${getStatusRowStyle(item.statusGroup)}`}
+	                            >
+	                              <PlatformIcon platform={primaryChannel?.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
+	                              <AccountAvatar account={primaryChannel} sizeClass="h-5 w-5" textClass="text-[8px]" />
+	                              <span className="truncate text-[11px] font-bold">{item.timeLabel}</span>
+	                            </div>
+                          );
+	                        })}
+	                      </div>
+		                      {isTooltipOpen && (
+		                        <div
+		                          onClick={(e) => e.stopPropagation()}
+		                          onWheel={(e) => e.stopPropagation()}
+		                          className="fixed z-[9999] flex max-h-[460px] w-[360px] flex-col rounded-xl border border-[#dfe3ea] bg-white p-3 shadow-[0_18px_48px_rgba(15,23,42,0.2)]"
+		                          style={{
+		                            top: `${tooltipPosition.top}px`,
+		                            left: `${tooltipPosition.left}px`,
+		                          }}
+		                        >
+		                          <div className="mb-2 flex flex-shrink-0 items-center justify-between gap-2 border-b border-[#eef1f5] pb-1.5">
+	                            <div className="min-w-0">
+	                              <p className="m-0 truncate text-[11px] font-black text-[#202124]">
+	                                {day.date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+	                              </p>
+	                              <p className="m-0 text-[9px] font-semibold text-[#70757a]">
+	                                {day.posts.length} scheduled item{day.posts.length === 1 ? '' : 's'}
+	                              </p>
+	                            </div>
+	                            <button
+	                              type="button"
+	                              onClick={() => setActiveTooltipDay(null)}
+	                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#70757a] hover:bg-[#f1f3f4] hover:text-[#202124]"
+	                              title="Close"
+	                            >
+	                              <X className="h-3.5 w-3.5" />
+	                            </button>
+	                          </div>
+		                          <div
+		                            className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain pr-1"
+		                            onWheel={(e) => e.stopPropagation()}
+		                          >
+	                            {day.posts.map((item) => {
+	                              const primaryChannel = item.accountRefs[0]?.channel;
+	                              return (
+		                                <div
+		                                  key={`tooltip-${item.post._id}-${item.accountRefs[0]?.id || 'account'}`}
+		                                  className={`flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 shadow-sm ${getStatusRowStyle(item.statusGroup)}`}
+		                                >
+		                                  <div className="flex shrink-0 items-center gap-1.5">
+		                                    <PlatformIcon platform={primaryChannel?.platform} className="h-6 w-6 shrink-0" showFallback={true} />
+		                                    <AccountAvatar account={primaryChannel} sizeClass="h-8 w-8" textClass="text-[11px]" />
+		                                  </div>
+		                                  <div className="min-w-0 flex-1">
+		                                    <div className="flex min-w-0 items-center gap-1.5">
+		                                      <span className="shrink-0 text-[12px] font-black">{item.timeLabel}</span>
+		                                      <span className="truncate text-[11px] font-bold opacity-80">{getPostStatusLabel(item.post)}</span>
+		                                    </div>
+		                                    <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+		                                      <span className="truncate text-[11px] font-bold opacity-80">@{getAccountLabel(primaryChannel)}</span>
+		                                    </div>
+		                                    <p className="m-0 mt-0.5 truncate text-[10px] font-semibold opacity-70">{item.mediaLabel}</p>
+		                                  </div>
+		                                </div>
+	                              );
+	                            })}
+	                          </div>
+	                        </div>
+	                      )}
+	                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Status Legend */}
+              <div className="flex items-center gap-4 px-4 py-2 border-t border-[#e8eaed] bg-white flex-shrink-0">
+                {[
+                  ['Scheduled', 'bg-[#1a73e8]'],
+                  ['Manual Ready', 'bg-[#f59e0b]'],
+                  ['Published', 'bg-[#34a853]'],
+                  ['Failed', 'bg-[#ea4335]'],
+                  ['Paused / Cancelled', 'bg-[#9aa0a6]'],
+                ].map(([label, dotColor]) => (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                    <span className="text-[11px] font-medium text-[#5f6368]">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right Sidebar — Selected Date Detail */}
+            <aside className="w-[260px] xl:w-[300px] min-h-0 flex flex-col overflow-hidden bg-white flex-shrink-0">
+              {/* Sidebar Header */}
+              <div className="border-b border-[#e8eaed] px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0">
+                <div className="min-w-0 flex items-center gap-2">
+                  <h3 className="m-0 text-[13px] font-bold text-[#1a1a2e] truncate">
+                    {(() => {
+                      const d = parseInputDate(selectedCalendarDate) || new Date();
+                      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                    })()}
+                  </h3>
+                  <span className="rounded-full border border-[#dadce0] bg-[#f8f9fa] px-1.5 py-0.5 text-[10px] font-semibold text-[#5f6368]">
+                    {selectedDayPosts.length}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCalendarDate('')}
+                  className="h-6 w-6 rounded-full hover:bg-[#f1f3f4] flex items-center justify-center text-[#5f6368] transition-colors flex-shrink-0"
+                  title="Close"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              {/* Sidebar Content */}
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                {selectedDayGroups.length === 0 && (
+	                  <div className="h-32 flex flex-col items-center justify-center gap-1.5 text-center px-3">
+	                    <Clock className="h-6 w-6 text-[#dadce0]" />
+	                    <p className="m-0 text-[12px] font-semibold text-[#5f6368]">No posts</p>
+	                  </div>
+                )}
+
+                {selectedDayGroups.map((group) => {
+                  const activePostIds = group.posts
+                    .filter((item) => (
+                      isActiveQueuePost(item.post)
+                      && (item.post.socialAccountIds || []).some((account) => String(account?._id || account) === String(group.id))
+                    ))
+                    .map((item) => item.post._id);
+                  const deletingAccountQueue = deletingAccountQueueIds.includes(group.id);
+
+                  return (
+                    <div key={group.id} className="border-b border-[#e8eaed]">
+                      {/* Account Header */}
+	                      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[#f8f9fa]">
+	                        <div className="min-w-0 flex items-center gap-2">
+	                          <PlatformIcon platform={group.channel?.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
+	                          <AccountAvatar account={group.channel} sizeClass="h-8 w-8" textClass="text-[10px]" />
+	                          <span className="text-[12px] font-semibold text-[#3c4043] truncate">@{getAccountLabel(group.channel)}</span>
+	                        </div>
+	                        <div className="flex items-center gap-1.5">
+	                          <span className="text-[10px] font-semibold text-[#5f6368] bg-white border border-[#dadce0] rounded-full px-1.5 py-0.5">{group.posts.length}</span>
+                          {activePostIds.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAccountQueue(group.id, getAccountLabel(group.channel))}
+                              disabled={deletingAccountQueue}
+                              className="text-[#5f6368] hover:text-[#ea4335] transition-colors"
+                              title="Expand"
+                            >
+                              <ChevronLeft className="h-3.5 w-3.5 -rotate-90" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Posts List */}
+                      <div className="divide-y divide-[#f1f3f4]">
+                        {group.posts.map((item) => {
+                          const getStatusDotBg = (statusGroup) => {
+                            switch (statusGroup) {
+                              case 'manual': return 'bg-[#f59e0b]';
+                              case 'done': return 'bg-[#34a853]';
+                              case 'failed': return 'bg-[#ea4335]';
+                              case 'cancelled': return 'bg-[#9aa0a6]';
+                              default: return 'bg-[#1a73e8]';
+                            }
+                          };
+
+                          const getStatusPillStyle = (statusGroup) => {
+                            switch (statusGroup) {
+                              case 'manual': return 'bg-[#fff7ed] text-[#c2410c] border-[#fed7aa]';
+                              case 'done': return 'bg-[#ecfdf5] text-[#047857] border-[#a7f3d0]';
+                              case 'failed': return 'bg-[#fef2f2] text-[#b91c1c] border-[#fecaca]';
+                              case 'cancelled': return 'bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]';
+                              default: return 'bg-[#eff6ff] text-[#1d4ed8] border-[#bfdbfe]';
+                            }
+                          };
+
+                          return (
+	                            <div key={`${group.id}-${item.post._id}`} className="flex items-center gap-2 px-3 py-2">
+	                              {/* Media Thumbnail */}
+	                              <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-[#f1f3f4] relative">
+	                                <MediaPreview item={item.mediaItem} />
+	                              </div>
+	                              {/* Post Info */}
+	                              <div className="min-w-0 flex-1">
+	                                <p className="m-0 text-[11px] font-semibold text-[#1a1a2e] truncate leading-tight">{item.mediaLabel}</p>
+	                                <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+	                                  <PlatformIcon platform={group.channel?.platform} className="h-4 w-4 flex-shrink-0" showFallback={true} />
+	                                  <AccountAvatar account={group.channel} sizeClass="h-5 w-5" textClass="text-[8px]" />
+	                                  <span className="truncate text-[11px] font-semibold text-[#5f6368]">@{getAccountLabel(group.channel)}</span>
+	                                  <span className="text-[10px] font-semibold text-[#5f6368] flex-shrink-0">{item.timeLabel}</span>
+	                                  <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border truncate ${getStatusPillStyle(item.statusGroup)}`}>
+	                                    <span className={`w-1 h-1 rounded-full flex-shrink-0 ${getStatusDotBg(item.statusGroup)}`} />
+	                                    {getPostStatusLabel(item.post)}
+	                                  </span>
+	                                </div>
+	                              </div>
+	                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Full selected-day count */}
+              {selectedDayPosts.length > 0 && (
+	                <div className="border-t border-[#e8eaed] px-3 py-2 flex-shrink-0">
+	                  <div className="flex h-7 items-center justify-center rounded-md border border-[#dadce0] bg-[#f8f9fa] text-[11px] font-semibold text-[#3c4043]">
+	                    {selectedDayPosts.length} item{selectedDayPosts.length === 1 ? '' : 's'}
+	                  </div>
+	                </div>
+              )}
+            </aside>
+          </div>
+        </section>
+      )}
 
 
 

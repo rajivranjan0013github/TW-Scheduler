@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../config';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Eye, Heart, MessageSquare, ExternalLink, Calendar } from 'lucide-react';
 import { withCampaignScope } from '../utils/campaignScope';
+import PlatformIcon from '../components/PlatformIcon';
 
 export const PostDetails = () => {
   const { id: accountId, metaPostId } = useParams();
@@ -83,7 +84,8 @@ export const PostDetails = () => {
         {channel && (
           <div className="flex items-center gap-2 text-[10px] text-gray-500 font-semibold bg-white border border-[#e5e5ea] px-3 py-1 rounded-full shadow-sm">
             <img src={channel.avatarUrl} crossOrigin="anonymous" className="w-4 h-4 rounded-full object-cover" alt="" />
-            <span>{channel.name} ({channel.platform})</span>
+            <PlatformIcon platform={channel.platform} className="h-4 w-4" />
+            <span>{channel.name}</span>
           </div>
         )}
       </div>

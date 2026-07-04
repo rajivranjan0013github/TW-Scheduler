@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { Clock, FolderHeart, LayoutDashboard, Link2, Megaphone, Settings as SettingsIcon } from 'lucide-react';
+import { BarChart3, Clock, FolderHeart, Link2, Megaphone, Settings as SettingsIcon } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
 import { PwaInstallButton } from './components/PwaInstallButton';
 import Home from './pages/Home';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
 import CampaignSelector from './pages/CampaignSelector';
 import MediaLibrary from './pages/MediaLibrary';
 import CalendarView from './pages/CalendarView';
@@ -41,7 +40,7 @@ function MobileNav({ isCreator }) {
       ]
     : [
         { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
-        { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { name: 'Performance', path: '/dashboard', icon: BarChart3 },
         { name: 'Queue', path: '/scheduler', icon: Clock },
         { name: 'Media', path: '/media', icon: FolderHeart },
         { name: 'Channels', path: '/channels', icon: Link2 },
@@ -101,7 +100,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const hideSidebar = isCreator ? false : (isBulkBuilderPage || (isOnCampaignPage && !hasActiveCampaign));
 
   return (
-    <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-hidden font-sans">
+    <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-x-visible overflow-y-hidden font-sans">
       {!hideSidebar && (
         <Sidebar
           selectedAccounts={selectedAccounts}
@@ -123,7 +122,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
             <>
               <Route path="/" element={hasActiveCampaign ? <Navigate to="/scheduler" replace /> : <CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
               <Route path="/campaigns" element={<CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
-              <Route path="/dashboard" element={<Dashboard selectedAccounts={selectedAccounts} />} />
+              <Route path="/dashboard" element={<AdminDashboard />} />
               <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
               <Route path="/media" element={<MediaLibrary />} />
               <Route path="/media/editor" element={<VideoEditor />} />
@@ -132,7 +131,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
               <Route path="/channels/:id/feed" element={<PublishedFeed />} />
               <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
               <Route path="/settings" element={<Settings />} />
-              {canViewAdmin && <Route path="/admin" element={<AdminDashboard />} />}
+              {canViewAdmin && <Route path="/admin" element={<Navigate to="/dashboard" replace />} />}
               {canViewAdmin && <Route path="/admin/users" element={<AdminUsers />} />}
               {canViewAdmin && <Route path="/admin/campaign" element={<AdminCampaigns />} />}
               {canViewAdmin && <Route path="/admin/folders" element={<AdminFolders />} />}

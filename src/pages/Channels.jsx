@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Share2, Trash2, ShieldCheck, Link2, Eye, Trash } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
+import PlatformIcon from '../components/PlatformIcon';
 
 export const Channels = ({ selectedAccounts = [] }) => {
   const { user } = useAuth();
@@ -109,7 +110,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
     if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
     const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
-    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
+    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
     window.location.href = oauthUrl;
   };
@@ -151,11 +152,6 @@ export const Channels = ({ selectedAccounts = [] }) => {
     }
   };
 
-  const getPlatformBadgeClasses = (platform) => {
-    if (platform === 'instagram') return 'bg-purple-50 text-purple-600 border-purple-200';
-    if (platform === 'youtube') return 'bg-red-50 text-red-600 border-red-200';
-    return 'bg-blue-50 text-blue-600 border-blue-200';
-  };
   const getStatusBadgeClasses = (status) => {
     if (status === 'verified') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
     if (status === 'disconnected') return 'bg-red-50 text-red-700 border-red-200';
@@ -245,9 +241,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-semibold text-black truncate">{chan.name || chan.displayName || chan.handle}</span>
-                        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border uppercase flex-shrink-0 ${getPlatformBadgeClasses(chan.platform)}`}>
-                          {chan.platform}
-                        </span>
+                        <PlatformIcon platform={chan.platform} className="h-4 w-4" />
                         <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border uppercase flex-shrink-0 ${getStatusBadgeClasses(chan.status)}`}>
                           {getStatusLabel(chan.status)}
                         </span>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, RefreshCw, Shield, UserCog, Users } from 'lucide-react';
@@ -62,6 +62,7 @@ export const AdminUsers = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [users, setUsers] = useState([]);
+  const hasLoadedUsersRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -74,12 +75,13 @@ export const AdminUsers = () => {
   }, { users: 0, connectedAccounts: 0, failedPosts: 0, media: 0 }), [users]);
 
   const fetchUsers = useCallback(async ({ force = false } = {}) => {
-    if (users.length === 0) setLoading(true);
+    if (!hasLoadedUsersRef.current) setLoading(true);
     setError('');
     try {
       const campaignId = getActiveCampaignId();
       if (!campaignId) {
         setUsers([]);
+        hasLoadedUsersRef.current = true;
         setError('Select a campaign workspace before managing team access.');
         return;
       }
@@ -107,12 +109,13 @@ export const AdminUsers = () => {
       });
 
       setUsers(data);
+      hasLoadedUsersRef.current = true;
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [queryClient, users.length]);
+  }, [queryClient]);
 
   useEffect(() => {
     const refreshUsers = () => fetchUsers();

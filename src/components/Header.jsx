@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, ChevronDown, Check, Globe, X } from 'lucide-react';
 import { withCampaignScope } from '../utils/campaignScope';
+import PlatformIcon from './PlatformIcon';
 
 export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
   const { user, logout } = useAuth();
@@ -132,7 +133,10 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
                     <img src={acc.avatarUrl} crossOrigin="anonymous" className="w-6 h-6 rounded-full object-cover border border-black/10" alt="" />
                     <div>
                       <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">{acc.name}</p>
-                      <p className="text-[9px] text-gray-500">@{acc.username} ({acc.platform})</p>
+                      <p className="flex items-center gap-1 text-[9px] text-gray-500">
+                        <PlatformIcon platform={acc.platform} className="h-3 w-3" />
+                        <span className="truncate">@{acc.username}</span>
+                      </p>
                     </div>
                   </div>
                   {selectedAccounts.includes(acc._id) && (

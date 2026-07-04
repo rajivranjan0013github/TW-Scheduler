@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Eye, Megaphone, RefreshCw, Rows3 } from 'lucide-react';
 import { getActiveCampaignId } from '../utils/campaignScope';
+import PlatformIcon from '../components/PlatformIcon';
 
 const numberFormat = new Intl.NumberFormat();
 
@@ -169,6 +170,8 @@ export const AdminDashboard = () => {
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [selectedTimeRange, setSelectedTimeRange] = useState('today');
   const [loading, setLoading] = useState(true);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [campaignMetricsById, setCampaignMetricsById] = useState({});
   const [error, setError] = useState('');
 
   const fetchCampaigns = async ({ force = false } = {}) => {
@@ -182,7 +185,7 @@ export const AdminDashboard = () => {
       const data = await queryClient.fetchQuery({
         queryKey,
         queryFn: async () => {
-          const response = await fetch(`${API_BASE_URL}/api/admin/campaigns`, {
+          const response = await fetch(`${API_BASE_URL}/api/admin/campaigns/list`, {
             headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
           });
           const payload = await response.json();
@@ -211,9 +214,49 @@ export const AdminDashboard = () => {
     }
   };
 
+  const fetchCampaignMetrics = async (campaignId, { force = false } = {}) => {
+    if (!campaignId) return;
+    setMetricsLoading(true);
+    setError('');
+    try {
+      const queryKey = ['admin', 'campaign', campaignId, 'metrics'];
+      if (force) {
+        await queryClient.invalidateQueries({ queryKey });
+      }
+      const data = await queryClient.fetchQuery({
+        queryKey,
+        queryFn: async () => {
+          const response = await fetch(`${API_BASE_URL}/api/admin/campaigns/${campaignId}/metrics`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.message || 'Failed to load campaign metrics.');
+          }
+          return payload;
+        },
+        staleTime: 60 * 1000,
+      });
+      setCampaignMetricsById((current) => ({
+        ...current,
+        [campaignId]: data.metrics || emptyMetrics,
+      }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchCampaigns();
   }, []);
+
+  useEffect(() => {
+    if (selectedCampaignId) {
+      fetchCampaignMetrics(selectedCampaignId);
+    }
+  }, [selectedCampaignId]);
 
   useEffect(() => {
     const syncSelectedCampaign = (event) => {
@@ -231,7 +274,7 @@ export const AdminDashboard = () => {
     [campaigns, selectedCampaignId]
   );
 
-  const activeMetrics = selectedCampaign?.metrics || emptyMetrics;
+  const activeMetrics = campaignMetricsById[selectedCampaignId] || emptyMetrics;
   const selectedRange = timeRanges[selectedTimeRange];
   const selectedViews = activeMetrics[selectedRange.viewsKey] || 0;
   const selectedAccountInsight = activeMetrics[selectedRange.accountInsightKey] || 0;
@@ -239,13 +282,23 @@ export const AdminDashboard = () => {
   const selectedLikes = activeMetrics[selectedRange.likesKey] || 0;
   const selectedComments = activeMetrics[selectedRange.commentsKey] || 0;
   const selectedTimeLabel = selectedRange.label;
+  const openAccountFeed = (account) => {
+    sessionStorage.removeItem('admin_view_context');
+    navigate(`/channels/${account._id}/feed`, {
+      state: {
+        fromAdmin: true,
+        preserveWorkspace: true,
+        channel: account,
+      },
+    });
+  };
 
   return (
     <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-[#f5f5f7] p-4 text-[#1d1d1f]">
       <div className="mb-3 flex flex-col gap-3 border-b border-[#e5e5ea] pb-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
-          <h2 className="m-0 mt-0.5 text-lg font-semibold tracking-tight text-[#1d1d1f]">Campaign Overview</h2>
+          <h2 className="m-0 mt-0.5 text-lg font-semibold tracking-tight text-[#1d1d1f]">Performance</h2>
           <p className="m-0 mt-0.5 text-[11px] text-[#8e8e93]">Campaign performance totals from cached published-post insights.</p>
         </div>
 
@@ -303,7 +356,12 @@ export const AdminDashboard = () => {
           </div>
 
           <button
-            onClick={() => fetchCampaigns({ force: true })}
+            onClick={() => {
+              fetchCampaigns({ force: true });
+              if (selectedCampaignId) {
+                fetchCampaignMetrics(selectedCampaignId, { force: true });
+              }
+            }}
             className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-xs font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -330,12 +388,17 @@ export const AdminDashboard = () => {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
+          {metricsLoading && (
+            <div className="mb-2 rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs font-semibold text-[#6e6e73]">
+              Loading selected campaign metrics...
+            </div>
+          )}
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               icon={Eye}
               label={`${selectedTimeLabel} views`}
               value={numberFormat.format(selectedViews)}
-              note={selectedTimeRange === 'lifetimeViews' ? 'Current total on cached posts' : 'Based on daily snapshots when available'}
+              note={selectedTimeRange === 'lifetime' ? 'Current total on cached posts' : 'Based on daily snapshots when available'}
             />
             <MetricCard
               icon={Eye}
@@ -377,34 +440,14 @@ export const AdminDashboard = () => {
                 {activeMetrics.accountRows.map((account) => (
                   <div
                     key={account._id}
-                    onClick={() => {
-                      sessionStorage.setItem('admin_view_context', JSON.stringify({
-                        userId: account.user?._id || account.userId?._id || account.userId || '',
-                        userName: account.user?.name || '',
-                        userEmail: account.user?.email || '',
-                        channelId: account._id,
-                        channel: account,
-                      }));
-                      navigate(`/channels/${account._id}/feed`, {
-                        state: { fromAdmin: true, channel: account },
-                      });
-                    }}
+                    onClick={() => openAccountFeed(account)}
                     className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr_0.35fr] items-center gap-3 border-b border-[#e5e5ea] px-3 py-2 text-xs transition hover:bg-[#f5f5f7] last:border-b-0"
                     role="button"
                     tabIndex={0}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
-                        sessionStorage.setItem('admin_view_context', JSON.stringify({
-                          userId: account.user?._id || account.userId?._id || account.userId || '',
-                          userName: account.user?.name || '',
-                          userEmail: account.user?.email || '',
-                          channelId: account._id,
-                          channel: account,
-                        }));
-                        navigate(`/channels/${account._id}/feed`, {
-                          state: { fromAdmin: true, channel: account },
-                        });
+                        openAccountFeed(account);
                       }
                     }}
                   >
@@ -417,8 +460,9 @@ export const AdminDashboard = () => {
                       />
                       <div className="min-w-0">
                         <p className="m-0 truncate font-semibold text-[#1d1d1f]">{account.name}</p>
-                        <p className="m-0 truncate text-[10px] text-[#6e6e73]">
-                          @{account.username || 'account'} · {account.platform}
+                        <p className="m-0 flex items-center gap-1 truncate text-[10px] text-[#6e6e73]">
+                          <PlatformIcon platform={account.platform} className="h-3.5 w-3.5" />
+                          <span className="truncate">@{account.username || 'account'}</span>
                         </p>
                       </div>
                     </div>
@@ -437,16 +481,7 @@ export const AdminDashboard = () => {
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
-                        sessionStorage.setItem('admin_view_context', JSON.stringify({
-                          userId: account.user?._id || account.userId?._id || account.userId || '',
-                          userName: account.user?.name || '',
-                          userEmail: account.user?.email || '',
-                          channelId: account._id,
-                          channel: account,
-                        }));
-                        navigate(`/channels/${account._id}/feed`, {
-                          state: { fromAdmin: true, channel: account },
-                        });
+                        openAccountFeed(account);
                       }}
                       className="inline-flex items-center justify-center rounded-md border border-[#d2d2d7] bg-white px-2 py-1 text-[10px] font-semibold text-[#0071e3] transition hover:border-[#0071e3] hover:bg-[#f0f7ff]"
                     >

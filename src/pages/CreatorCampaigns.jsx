@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AlertCircle, Calendar, CheckCircle, Share2 } from 'lucide-react';
 import { getMediaUrl } from '../utils/mediaUrls';
+import PlatformIcon from '../components/PlatformIcon';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 
@@ -29,42 +30,6 @@ const copyToClipboard = (text) => {
       document.body.removeChild(textarea);
     }
   });
-};
-
-const PlatformLogo = ({ platform, className = 'h-7 w-7' }) => {
-  if (platform === 'instagram') {
-    return (
-      <span className={`${className} inline-flex items-center justify-center rounded-lg bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5] text-white`}>
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[70%] w-[70%]">
-          <rect x="6" y="6" width="12" height="12" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-          <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
-          <circle cx="16" cy="8" r="1.1" fill="currentColor" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (platform === 'facebook') {
-    return (
-      <span className={`${className} inline-flex items-center justify-center rounded-full bg-[#1877f2] text-white`}>
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[72%] w-[72%]">
-          <path fill="currentColor" d="M14.2 8.1h2.2V4.4c-.4-.1-1.7-.2-3.2-.2-3.2 0-5.4 1.9-5.4 5.4v3H4.3v4.1h3.5V24h4.3v-7.3h3.4l.5-4.1h-3.9V10c0-1.2.3-1.9 2.1-1.9Z" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (platform === 'youtube') {
-    return (
-      <span className={`${className} inline-flex items-center justify-center rounded-lg bg-[#ff0000] text-white`}>
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[68%] w-[68%]">
-          <path fill="currentColor" d="M23 12a30.1 30.1 0 0 0-.5-4.6 3 3 0 0 0-2.1-2.1C18.5 4.8 12 4.8 12 4.8s-6.5 0-8.4.5A3 3 0 0 0 1.5 7.4 31.4 31.4 0 0 0 1 12a31.4 31.4 0 0 0 .5 4.6 3 3 0 0 0 2.1 2.1c1.9.5 8.4.5 8.4.5s6.5 0 8.4-.5a3 3 0 0 0 2.1-2.1.3.3 0 0 0 .5-4.6ZM9.5 15.5V8.5l6.5 3.5-6.5 3.5Z" />
-        </svg>
-      </span>
-    );
-  }
-
-  return <span className={`${className} inline-flex items-center justify-center rounded-full bg-gray-200`} />;
 };
 
 export const CreatorCampaigns = () => {
@@ -98,7 +63,7 @@ export const CreatorCampaigns = () => {
     prepareVerificationRedirect(campaignId);
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
     const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
-    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
+    const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
     window.location.href = oauthUrl;
   };
@@ -488,7 +453,7 @@ export const CreatorCampaigns = () => {
                   {pendingVerifications.map((ch) => (
                     <div key={`${ch.campaignId}-${ch.platform}-${ch.handle}`} className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 md:p-3">
                       <div className="flex min-w-0 items-center gap-3">
-                        <PlatformLogo platform={ch.platform} className="h-7 w-7 shrink-0 md:h-8 md:w-8" />
+                        <PlatformIcon platform={ch.platform} className="h-7 w-7 md:h-8 md:w-8" />
                         <div className="min-w-0">
                           <p className="m-0 truncate text-sm font-semibold text-[#1d1d1f]">
                             {ch.handle.startsWith('@') ? ch.handle : `@${ch.handle}`}
@@ -551,7 +516,7 @@ export const CreatorCampaigns = () => {
 
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <div className="flex min-w-0 items-center gap-2">
-                              <PlatformLogo platform={queue.account?.platform} className="h-6 w-6 shrink-0" />
+                              <PlatformIcon platform={queue.account?.platform} className="h-6 w-6" />
                               <div className="min-w-0">
                                 <p className="m-0 truncate text-xs font-semibold text-[#1d1d1f]">
                                   {getAccountLabel(queue.account).startsWith('@')

@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BarChart3, ExternalLink, RefreshCw } from 'lucide-react';
 import { withCampaignScope } from '../utils/campaignScope';
+import PlatformIcon from '../components/PlatformIcon';
 
 export const PublishedFeed = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   const [channel, setChannel] = useState(null);
   const [publishedPosts, setPublishedPosts] = useState([]);
@@ -49,6 +52,14 @@ export const PublishedFeed = () => {
   };
 
   const getPublishedDate = (post) => post.publishedAt || post.createdAt || post.timestamp || null;
+  const getFeedSyncedAt = () => {
+    const syncTimes = publishedPosts
+      .map((post) => (post.lastSyncedAt ? new Date(post.lastSyncedAt).getTime() : null))
+      .filter((time) => Number.isFinite(time));
+
+    if (syncTimes.length === 0) return null;
+    return new Date(Math.min(...syncTimes)).toISOString();
+  };
 
   const fetchChannelAndPosts = async (forceRefresh = false) => {
     if (forceRefresh) {
@@ -96,6 +107,9 @@ export const PublishedFeed = () => {
       if (response.ok) {
         const data = await response.json();
         setPublishedPosts(data);
+        if (forceRefresh) {
+          await queryClient.invalidateQueries({ queryKey: ['admin'] });
+        }
       } else {
         const errData = await response.json();
         setErrorPosts(errData.message || 'Failed to retrieve published posts.');
@@ -114,7 +128,7 @@ export const PublishedFeed = () => {
       {/* Header Container */}
       <div className="mb-3 w-full">
         <button
-          onClick={() => navigate(location.state?.fromAdmin ? '/admin' : '/channels')}
+          onClick={() => navigate(location.state?.fromAdmin ? '/dashboard' : '/channels')}
           className="mb-2 flex items-center gap-1.5 text-xs text-gray-500 transition-colors hover:text-black"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -132,13 +146,16 @@ export const PublishedFeed = () => {
               <h2 className="m-0 mt-0.5 truncate text-base font-semibold leading-tight text-black">
                 {channel.name}
               </h2>
-              <p className="m-0 mt-0.5 truncate text-xs text-gray-500">@{channel.username || 'unspecified'} • {channel.platform}</p>
+              <p className="m-0 mt-0.5 flex items-center gap-1 truncate text-xs text-gray-500">
+                <PlatformIcon platform={channel.platform} className="h-3.5 w-3.5" />
+                <span className="truncate">@{channel.username || 'unspecified'}</span>
+              </p>
             </div>
 
             <div className="flex flex-shrink-0 items-center gap-3">
               <span className="text-[10px] font-medium text-gray-400">
-                {publishedPosts.length > 0 && publishedPosts[0].lastSyncedAt
-                  ? `Last synced ${getTimeSince(publishedPosts[0].lastSyncedAt)}`
+                {getFeedSyncedAt()
+                  ? `Last synced ${getTimeSince(getFeedSyncedAt())}`
                   : 'Cached data'
                 }
               </span>

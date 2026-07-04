@@ -13,45 +13,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getActiveCampaignId } from '../utils/campaignScope';
+import PlatformIcon from '../components/PlatformIcon';
 
 const statusOptions = ['active', 'paused', 'archived'];
 const platformOptions = ['instagram', 'facebook', 'youtube'];
-
-const PlatformLogo = ({ platform, className = 'h-7 w-7' }) => {
-  if (platform === 'instagram') {
-    return (
-      <span className={`${className} inline-flex items-center justify-center rounded-lg bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5] text-white`}>
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[70%] w-[70%]">
-          <rect x="6" y="6" width="12" height="12" rx="4" fill="none" stroke="currentColor" strokeWidth="2" />
-          <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
-          <circle cx="16" cy="8" r="1.1" fill="currentColor" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (platform === 'facebook') {
-    return (
-      <span className={`${className} inline-flex items-center justify-center rounded-full bg-[#1877f2] text-white`}>
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[72%] w-[72%]">
-          <path fill="currentColor" d="M14.2 8.1h2.2V4.4c-.4-.1-1.7-.2-3.2-.2-3.2 0-5.4 1.9-5.4 5.4v3H4.3v4.1h3.5V24h4.3v-7.3h3.4l.5-4.1h-3.9V10c0-1.2.3-1.9 2.1-1.9Z" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (platform === 'youtube') {
-    return (
-      <span className={`${className} inline-flex items-center justify-center rounded-lg bg-[#ff0000] text-white`}>
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[68%] w-[68%]">
-          <path fill="currentColor" d="M22 7.4a3 3 0 0 0-2.1-2.1C18 4.8 12 4.8 12 4.8s-6 0-7.9.5A3 3 0 0 0 2 7.4 31.4 31.4 0 0 0 1.5 12c0 1.6.2 3.2.5 4.6a3 3 0 0 0 2.1 2.1c1.9.5 7.9.5 7.9.5s6 0 7.9-.5a3 3 0 0 0 2.1-2.1c.3-1.4.5-3 .5-4.6s-.2-3.2-.5-4.6ZM10 15.3V8.7l5.7 3.3-5.7 3.3Z" />
-        </svg>
-      </span>
-    );
-  }
-
-  return <span className={`${className} inline-flex items-center justify-center rounded-full bg-[#e5e5ea]`} />;
-};
 
 const tabConfig = [
   { id: 'details', label: 'Details', icon: Settings },
@@ -108,19 +73,18 @@ export const AdminCampaigns = () => {
       setError('');
       try {
         const headers = { Authorization: `Bearer ${localStorage.getItem('tw_token')}` };
-        const campaignList = await queryClient.fetchQuery({
-          queryKey: ['admin', 'campaigns', 'workspace'],
+        const campaign = await queryClient.fetchQuery({
+          queryKey: ['admin', 'campaign', campaignId, 'detail'],
           queryFn: async () => {
-            const campaignRes = await fetch(`${API_BASE_URL}/api/admin/campaigns?scope=workspace`, { headers });
+            const campaignRes = await fetch(`${API_BASE_URL}/api/admin/campaigns/${campaignId}?scope=workspace`, { headers });
             const payload = await campaignRes.json();
-            if (!campaignRes.ok) throw new Error(payload.message || 'Failed to load campaigns.');
+            if (!campaignRes.ok) throw new Error(payload.message || 'Failed to load campaign.');
             return payload;
           },
           staleTime: 2 * 60 * 1000,
         });
 
-        const found = (Array.isArray(campaignList) ? campaignList : []).find((c) => c._id === campaignId);
-        applyCampaignToForm(found || null);
+        applyCampaignToForm(campaign || null);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -258,6 +222,7 @@ export const AdminCampaigns = () => {
 
       setCampaign(data);
       applyCampaignToForm(data);
+      queryClient.setQueryData(['admin', 'campaign', campaignId, 'detail'], data);
       queryClient.setQueryData(['admin', 'campaigns', 'workspace'], (current = []) => {
         if (!Array.isArray(current)) return current;
         return current.map((item) => (item._id === data._id ? data : item));
@@ -477,7 +442,7 @@ export const AdminCampaigns = () => {
                                 onClick={() => setNewChannelPlatform(platform)}
                                 className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-semibold capitalize transition ${activeStyle}`}
                               >
-                                <PlatformLogo platform={platform} className="h-4 w-4 shrink-0" />
+                                <PlatformIcon platform={platform} className="h-4 w-4" />
                                 {platform === 'youtube' ? 'YouTube' : platform}
                               </button>
                             );
@@ -568,7 +533,23 @@ export const AdminCampaigns = () => {
                           const statusMeta = getChannelStatusMeta(ch);
                           return (
                             <div key={idx} className="flex items-center gap-3 p-4 hover:bg-[#fbfbfb] transition">
-                              <PlatformLogo platform={ch.platform} className="h-8 w-8 shrink-0" />
+                              <div className="relative h-10 w-10 shrink-0">
+                                {ch.avatarUrl ? (
+                                  <img
+                                    src={ch.avatarUrl}
+                                    crossOrigin="anonymous"
+                                    alt=""
+                                    className="h-10 w-10 rounded-full border border-black/10 object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e5e5ea] bg-[#f5f5f7] text-[#8e8e93]">
+                                    <Users className="h-4 w-4" />
+                                  </div>
+                                )}
+                                <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white shadow-sm">
+                                  <PlatformIcon platform={ch.platform} className="h-3.5 w-3.5" />
+                                </span>
+                              </div>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-baseline gap-2">
                                   <span className="truncate text-sm font-semibold text-[#1d1d1f]">
@@ -580,8 +561,8 @@ export const AdminCampaigns = () => {
                                     </span>
                                   )}
                                 </div>
-                                <p className="m-0 mt-0.5 text-[11px] text-[#8e8e93] capitalize">
-                                  {ch.platform} {ch.addedAt && `· Added on ${new Date(ch.addedAt).toLocaleDateString()}`}
+                                <p className="m-0 mt-0.5 text-[11px] text-[#8e8e93]">
+                                  {ch.addedAt ? `Added on ${new Date(ch.addedAt).toLocaleDateString()}` : 'Publishing channel'}
                                 </p>
                               </div>
 
