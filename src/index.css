@@ -64,6 +64,15 @@ h1, h2, h3, h4, h5, h6 {
   background: #8e8e93; 
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 .video-preview-flow {
   background:
     linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.14) 42%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0.14) 58%, transparent 100%),

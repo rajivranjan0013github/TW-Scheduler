@@ -187,6 +187,7 @@ export const VideoPreview = ({
             key={video1Url}
             ref={video1Ref}
             src={video1Url}
+            crossOrigin="anonymous"
             preload="auto"
             onEnded={onVideo1Ended}
             onLoadedMetadata={(e) => onLoadedMetadata('input1', e)}
@@ -200,6 +201,7 @@ export const VideoPreview = ({
             key={video2Url}
             ref={video2Ref}
             src={video2Url}
+            crossOrigin="anonymous"
             preload="auto"
             onEnded={onVideo2Ended}
             onLoadedMetadata={(e) => onLoadedMetadata('input2', e)}

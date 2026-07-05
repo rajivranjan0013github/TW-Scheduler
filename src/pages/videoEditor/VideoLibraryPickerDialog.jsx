@@ -17,6 +17,7 @@ const VideoPickerPreview = ({ item }) => {
   return (
     <LoadingVideoPreview
       src={mediaUrl(item.url)}
+      crossOrigin="anonymous"
       videoClassName="h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
       muted
       playsInline

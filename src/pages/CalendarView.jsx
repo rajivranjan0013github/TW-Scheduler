@@ -109,7 +109,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const selectedChannelObjects = channels.filter(chan => selectedChannels.includes(chan._id));
   const hasYoutubeSelected = selectedChannelObjects.some(chan => chan.platform === 'youtube');
   const isPureManualMode = scheduleMode === 'manual';
-  const requiresScheduleTime = !isPureManualMode;
+  const requiresScheduleTime = true;
   const shouldUseYoutubePublishing = hasYoutubeSelected && !isPureManualMode;
   const getPlanRowKey = useCallback((row) => [
     row?.channel?._id || 'channel',
@@ -238,7 +238,6 @@ const CalendarView = ({ selectedAccounts }) => {
     ['scheduled', 'manual_ready', 'downloaded', 'publishing', 'paused'].includes(post?.status)
   );
   const getScheduleTimingLabel = (value) => {
-    if (isPureManualMode) return 'Manual queue';
     return `${formatScheduleDate(value)} ${formatScheduleTime(value)}`;
   };
   const isMediaAvailableForChannels = (item, channelIds) => {
@@ -466,7 +465,6 @@ const CalendarView = ({ selectedAccounts }) => {
   ), [activeSchedulePlan]);
   const hasDeselectedPlanRows = activeSchedulePlan.length !== schedulePlan.length;
   const activeScheduleTimeLabel = useMemo(() => {
-    if (isPureManualMode) return 'Manual queue';
     const datedRows = activeSchedulePlan.filter((row) => row.effectiveScheduledAt);
     if (datedRows.length === 0) return 'Pick time';
 
@@ -864,7 +862,7 @@ const CalendarView = ({ selectedAccounts }) => {
       }
 
       const token = localStorage.getItem('tw_token');
-      const effectiveScheduleDate = isPureManualMode ? new Date() : new Date(scheduleTime);
+      const effectiveScheduleDate = new Date(scheduleTime);
       const platformSpecifics = {
         type: postType,
         ...(shouldUseYoutubePublishing ? {
@@ -948,7 +946,7 @@ const CalendarView = ({ selectedAccounts }) => {
             }],
             mediaIds: rowMediaIds,
             caption: rowCaption,
-            scheduledAt: isPureManualMode ? effectiveScheduleDate : row.effectiveScheduledAt,
+            scheduledAt: row.effectiveScheduledAt,
             scheduleMode,
             platformSpecifics: rowPlatformSpecifics,
           };
@@ -1193,6 +1191,7 @@ const CalendarView = ({ selectedAccounts }) => {
         const scheduledDate = new Date(post.scheduledAt);
         const accountRefs = getPostAccountRefs(post);
         const statusGroup = getPostStatusGroup(post);
+        const sourceFolders = getPostSourceFolders(post);
         return {
           post,
           accountRefs,
@@ -1202,7 +1201,12 @@ const CalendarView = ({ selectedAccounts }) => {
           timeLabel: formatScheduleTime(post.scheduledAt),
           mediaItem: post.mediaIds?.[0],
           mediaLabel: getPostMediaLabel(post),
-          folderLabel: getPostSourceLabel(post),
+          sourceFolders,
+          folderLabel: sourceFolders.length === 0
+            ? 'No folder'
+            : sourceFolders.length === 1
+              ? sourceFolders[0].name
+              : `${sourceFolders[0].name} +${sourceFolders.length - 1}`,
         };
       })
       .filter((item) => {
@@ -1696,7 +1700,7 @@ const CalendarView = ({ selectedAccounts }) => {
                   style={{
                     width: selectedChannels.length > 0
                       ? (selectedMedia.length > 0 || selectedCarouselSets.length > 0)
-                        ? (isPureManualMode || scheduleTime)
+                        ? scheduleTime
                           ? '100%'
                           : '66.6%'
                         : '33.3%'
@@ -1719,12 +1723,12 @@ const CalendarView = ({ selectedAccounts }) => {
                   {
                     step: 3,
                     label: '3. Post Settings',
-                    active: selectedChannels.length > 0 && (selectedMedia.length > 0 || selectedCarouselSets.length > 0) && (isPureManualMode || scheduleTime),
+                    active: selectedChannels.length > 0 && (selectedMedia.length > 0 || selectedCarouselSets.length > 0) && scheduleTime,
                   },
                   {
                     step: 4,
                     label: '4. Review & Schedule',
-                    active: selectedChannels.length > 0 && (selectedMedia.length > 0 || selectedCarouselSets.length > 0) && (isPureManualMode || scheduleTime) && schedulePlan.length > 0,
+                    active: selectedChannels.length > 0 && (selectedMedia.length > 0 || selectedCarouselSets.length > 0) && scheduleTime && schedulePlan.length > 0,
                   },
                 ].map((s, idx) => (
                   <div key={s.step} className="flex flex-col items-center z-10 relative">
@@ -1976,24 +1980,24 @@ const CalendarView = ({ selectedAccounts }) => {
                   </div>
 
                   {/* Date & Time Picker */}
-                  {!isPureManualMode && (
-                    <div className="space-y-1.5">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        {isBulk || isCarouselMode ? 'Start Time' : 'Post Time'}
-                      </span>
-                      <div className="relative">
-                        <input
-                          type="datetime-local"
-                          value={scheduleTime}
-                          onChange={(e) => setScheduleTime(e.target.value)}
-                          className="w-full rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#2563eb] focus:border-[#2563eb]"
-                        />
-                      </div>
+                  <div className="space-y-1.5">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      {isPureManualMode
+                        ? (isBulk || isCarouselMode ? 'Target Start' : 'Target Time')
+                        : (isBulk || isCarouselMode ? 'Start Time' : 'Post Time')}
+                    </span>
+                    <div className="relative">
+                      <input
+                        type="datetime-local"
+                        value={scheduleTime}
+                        onChange={(e) => setScheduleTime(e.target.value)}
+                        className="w-full rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#2563eb] focus:border-[#2563eb]"
+                      />
                     </div>
-                  )}
+                  </div>
 
                   {/* Interval selector */}
-                  {(isBulk || isCarouselMode) && !isPureManualMode && (
+                  {(isBulk || isCarouselMode) && (
                     <div className="space-y-1.5">
                       <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Post Interval</span>
                       <select
@@ -2147,7 +2151,7 @@ const CalendarView = ({ selectedAccounts }) => {
 
                   {schedulePlan.length === 0 && (
                     <div className="h-32 flex items-center justify-center text-[10px] text-slate-400 text-center p-4 border border-dashed border-slate-300 rounded-lg">
-                      {isPureManualMode ? 'Select accounts and content to preview.' : 'Select accounts, folder and schedule time.'}
+                      {isPureManualMode ? 'Select accounts, content and target time.' : 'Select accounts, folder and schedule time.'}
                     </div>
                   )}
                 </div>
@@ -2193,8 +2197,8 @@ const CalendarView = ({ selectedAccounts }) => {
         <section className="flex-1 min-h-0 bg-white flex flex-col overflow-hidden">
           {/* Clean Filter Bar */}
           <div className="border-b border-[#e8eaed] bg-white px-4 py-2.5 flex-shrink-0">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
                 <h3 className="m-0 text-base font-bold text-[#1a1a2e] tracking-tight">Scheduler Calendar</h3>
                 <div className="flex items-center gap-2">
                   <button
@@ -2309,7 +2313,7 @@ const CalendarView = ({ selectedAccounts }) => {
                 )}
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-shrink-0 items-center gap-2.5">
                 <div className="flex items-center rounded-lg border border-[#dadce0] overflow-hidden">
                   {['month', 'week'].map((mode) => (
                     <button
@@ -2361,12 +2365,9 @@ const CalendarView = ({ selectedAccounts }) => {
               </div>
 
               {/* Calendar Cells */}
-              <div className={`flex-1 min-h-0 grid grid-cols-7 overflow-y-auto ${
-                calendarMode === 'week' ? 'auto-rows-fr' : 'auto-rows-[160px]'
-              }`}>
+              <div className="grid flex-1 min-h-0 grid-cols-7 auto-rows-fr overflow-hidden">
                 {calendarDays.map((day) => {
-                  const previewLimit = calendarMode === 'week' ? day.posts.length : 4;
-                  const visibleDayPosts = day.posts.slice(0, previewLimit);
+                  const visibleDayPosts = day.posts;
                   const moreCount = Math.max(day.posts.length - visibleDayPosts.length, 0);
                   const isTooltipOpen = activeTooltipDay === day.key;
 
@@ -2385,7 +2386,7 @@ const CalendarView = ({ selectedAccounts }) => {
 	                      key={day.key}
 	                      onClick={() => setSelectedCalendarDate(day.key)}
 	                      className={`relative border-b border-r border-[#e8eaed] p-1 text-left transition-colors flex flex-col cursor-pointer ${
-		                        calendarMode === 'week' ? 'min-h-full' : 'min-h-[160px]'
+		                        calendarMode === 'week' ? 'min-h-full' : 'min-h-0'
 		                      } ${
 	                        isTooltipOpen ? 'z-[9999] overflow-visible shadow-md' : 'z-0 overflow-hidden'
 	                      } ${
@@ -2450,7 +2451,7 @@ const CalendarView = ({ selectedAccounts }) => {
                       </div>
 
                       {/* Post Entries — compact preview */}
-	                      <div className="min-h-0 space-y-1 overflow-hidden flex-1">
+	                      <div className="scrollbar-none min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-0.5">
                         {visibleDayPosts.map((item) => {
                           const primaryChannel = item.accountRefs[0]?.channel;
                           return (
@@ -2647,22 +2648,23 @@ const CalendarView = ({ selectedAccounts }) => {
 	                              <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-[#f1f3f4] relative">
 	                                <MediaPreview item={item.mediaItem} />
 	                              </div>
-	                              {/* Post Info */}
+		                              {/* Post Info */}
 	                              <div className="min-w-0 flex-1">
 	                                <p className="m-0 text-[11px] font-semibold text-[#1a1a2e] truncate leading-tight">{item.mediaLabel}</p>
-	                                <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-	                                  <PlatformIcon platform={group.channel?.platform} className="h-4 w-4 flex-shrink-0" showFallback={true} />
-	                                  <AccountAvatar account={group.channel} sizeClass="h-5 w-5" textClass="text-[8px]" />
-	                                  <span className="truncate text-[11px] font-semibold text-[#5f6368]">@{getAccountLabel(group.channel)}</span>
-	                                  <span className="text-[10px] font-semibold text-[#5f6368] flex-shrink-0">{item.timeLabel}</span>
-	                                  <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border truncate ${getStatusPillStyle(item.statusGroup)}`}>
-	                                    <span className={`w-1 h-1 rounded-full flex-shrink-0 ${getStatusDotBg(item.statusGroup)}`} />
-	                                    {getPostStatusLabel(item.post)}
-	                                  </span>
-	                                </div>
-	                                <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] font-semibold text-[#5f6368]">
-	                                  <Folder className="h-3 w-3 flex-shrink-0 text-[#9aa0a6]" />
-	                                  <span className="truncate">{item.folderLabel}</span>
+	                                <div className="mt-0.5 flex min-w-0 items-start gap-1.5">
+	                                  <div className="min-w-0 flex-1">
+	                                    <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[9px] font-semibold leading-tight text-[#8b9098]">
+	                                      <Folder className="h-2.5 w-2.5 flex-shrink-0 text-[#9aa0a6]" />
+	                                      <span className="truncate">{item.folderLabel}</span>
+	                                    </span>
+	                                  </div>
+	                                  <div className="flex flex-shrink-0 items-center gap-1">
+	                                    <span className="text-[10px] font-semibold text-[#5f6368]">{item.timeLabel}</span>
+	                                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border truncate ${getStatusPillStyle(item.statusGroup)}`}>
+	                                      <span className={`w-1 h-1 rounded-full flex-shrink-0 ${getStatusDotBg(item.statusGroup)}`} />
+	                                      {getPostStatusLabel(item.post)}
+	                                    </span>
+	                                  </div>
 	                                </div>
 	                              </div>
 	                            </div>
