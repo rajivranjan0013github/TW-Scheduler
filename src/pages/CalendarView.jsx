@@ -390,6 +390,13 @@ const CalendarView = ({ selectedAccounts }) => {
     if (sourceFolders.length === 1) return sourceFolders[0].name;
     return `${sourceFolders[0].name} +${sourceFolders.length - 1}`;
   };
+  const getPostSourceFolders = (post) => getQueueSourceFolders(post ? [post] : []);
+  const getPostSourceLabel = (post) => {
+    const sourceFolders = getPostSourceFolders(post);
+    if (sourceFolders.length === 0) return 'No folder';
+    if (sourceFolders.length === 1) return sourceFolders[0].name;
+    return `${sourceFolders[0].name} +${sourceFolders.length - 1}`;
+  };
   const schedulePlan = useMemo(() => {
     const baseDate = scheduleTime ? new Date(scheduleTime) : null;
     const hasValidDate = baseDate && !Number.isNaN(baseDate.getTime());
@@ -1195,6 +1202,7 @@ const CalendarView = ({ selectedAccounts }) => {
           timeLabel: formatScheduleTime(post.scheduledAt),
           mediaItem: post.mediaIds?.[0],
           mediaLabel: getPostMediaLabel(post),
+          folderLabel: getPostSourceLabel(post),
         };
       })
       .filter((item) => {
@@ -1303,6 +1311,7 @@ const CalendarView = ({ selectedAccounts }) => {
           scheduledDate,
           mediaItem: post.mediaIds?.[0],
           mediaLabel: getPostMediaLabel(post),
+          folderLabel: getPostSourceLabel(post),
         };
       })
       .filter((item) => {
@@ -2508,6 +2517,10 @@ const CalendarView = ({ selectedAccounts }) => {
 		                                      <span className="truncate text-[11px] font-bold opacity-80">@{getAccountLabel(primaryChannel)}</span>
 		                                    </div>
 		                                    <p className="m-0 mt-0.5 truncate text-[10px] font-semibold opacity-70">{item.mediaLabel}</p>
+		                                    <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] font-semibold opacity-70">
+		                                      <Folder className="h-3 w-3 shrink-0" />
+		                                      <span className="truncate">{item.folderLabel}</span>
+		                                    </div>
 		                                  </div>
 		                                </div>
 	                              );
@@ -2646,6 +2659,10 @@ const CalendarView = ({ selectedAccounts }) => {
 	                                    <span className={`w-1 h-1 rounded-full flex-shrink-0 ${getStatusDotBg(item.statusGroup)}`} />
 	                                    {getPostStatusLabel(item.post)}
 	                                  </span>
+	                                </div>
+	                                <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] font-semibold text-[#5f6368]">
+	                                  <Folder className="h-3 w-3 flex-shrink-0 text-[#9aa0a6]" />
+	                                  <span className="truncate">{item.folderLabel}</span>
 	                                </div>
 	                              </div>
 	                            </div>
