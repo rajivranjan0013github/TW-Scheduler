@@ -47,6 +47,7 @@ const AudioCard = ({
       {track.url && (
         <audio
           src={track.url}
+          crossOrigin="anonymous"
           preload="metadata"
           className="hidden"
           onLoadedMetadata={(event) => onDuration(track.id, event.currentTarget.duration)}
@@ -89,7 +90,9 @@ export const AudioDialog = ({
     stopHoverAudio();
     if (!track?.url || track.sourceType === 'none') return;
 
-    const audio = new Audio(track.url);
+    const audio = document.createElement('audio');
+    audio.crossOrigin = 'anonymous';
+    audio.src = track.url;
     audio.volume = 0.85;
     hoverAudioRef.current = audio;
     void audio.play().catch(() => {

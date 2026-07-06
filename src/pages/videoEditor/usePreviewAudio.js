@@ -142,7 +142,9 @@ export const usePreviewAudio = () => {
     if (!track) return;
 
     if ((track.sourceType === 'upload' || track.sourceType === 'library') && track.url) {
-      const audio = new Audio(track.url);
+      const audio = document.createElement('audio');
+      audio.crossOrigin = 'anonymous';
+      audio.src = track.url;
       audio.loop = true;
       audio.volume = 1;
       previewAudioRef.current = audio;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Folder, Loader2, Play, X, Search } from 'lucide-react';
+import { ChevronRight, Folder, Loader2, Music, Play, X, Search } from 'lucide-react';
 import { API_BASE_URL } from './videoEditorConstants';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 import { getMediaUrl } from '../../utils/mediaUrls';
@@ -25,6 +25,42 @@ const VideoPickerPreview = ({ item }) => {
     />
   );
 };
+
+const AudioPickerPreview = ({ item }) => (
+  <div className="flex h-full w-full flex-col justify-between bg-[#151519] p-3 text-white">
+    <div className="flex items-center gap-2">
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/10">
+        <Music className="h-4 w-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-[10px] font-bold" title={item.name}>
+          {item.name || 'Untitled audio'}
+        </p>
+        <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/45">Audio</p>
+      </div>
+    </div>
+
+    <div className="flex flex-1 items-center justify-center py-3">
+      <div className="flex h-14 w-full items-center justify-center gap-1">
+        {[18, 28, 12, 36, 22, 44, 30, 20, 38, 16, 26, 34, 14, 30, 22].map((height, index) => (
+          <span
+            key={`${item._id || item.url}-${index}`}
+            className="w-1 rounded-full bg-[#ff5500]/80"
+            style={{ height: `${height}px` }}
+          />
+        ))}
+      </div>
+    </div>
+
+    <audio
+      src={mediaUrl(item.url)}
+      crossOrigin="anonymous"
+      controls
+      preload="metadata"
+      className="w-full"
+    />
+  </div>
+);
 
 const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
 
@@ -130,10 +166,10 @@ export const VideoLibraryPickerDialog = ({
       if (!response.ok) throw new Error('Unable to load folder content.');
 
       const mediaData = await response.json();
-      const videoItems = Array.isArray(mediaData)
-        ? mediaData.filter((item) => item.type === 'video' && item.url)
+      const mediaItems = Array.isArray(mediaData)
+        ? mediaData.filter((item) => ['video', 'audio'].includes(item.type) && item.url)
         : [];
-      setMedia(videoItems);
+      setMedia(mediaItems);
     } catch (err) {
       setError(err.message || 'Unable to load folder content.');
       setMedia([]);
@@ -248,7 +284,7 @@ export const VideoLibraryPickerDialog = ({
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {activeFolderId && (
-                  <span className="text-[11px] font-semibold text-gray-400">{media.length} videos</span>
+                  <span className="text-[11px] font-semibold text-gray-400">{media.length} items</span>
                 )}
               </div>
             </div>
@@ -265,11 +301,11 @@ export const VideoLibraryPickerDialog = ({
             ) : loadingMedia ? (
               <div className="flex h-full min-h-[260px] items-center justify-center gap-2 rounded-xl border border-gray-100 text-sm font-semibold text-gray-500">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Loading videos...
+                Loading media...
               </div>
             ) : media.length === 0 && activeChildFolders.length === 0 ? (
               <div className="flex h-full min-h-[260px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm font-semibold text-gray-400">
-                No videos found in this folder.
+                No media found in this folder.
               </div>
             ) : (
               <div className="space-y-5">
@@ -291,31 +327,40 @@ export const VideoLibraryPickerDialog = ({
 
                 {media.length === 0 ? (
                   <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm font-semibold text-gray-400">
-                    Open a child folder to view its videos.
+                    Open a child folder to view its media.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     {media.map((item) => (
-                      <button
-                        key={item._id}
-                        type="button"
-                        onClick={() => handleSelectVideo(item)}
-                        className="group relative overflow-hidden rounded-xl border border-gray-200 bg-black text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md"
-                      >
-                        <div className="relative aspect-[9/16]">
-                          <VideoPickerPreview item={item} />
-                          <span className="absolute inset-0 flex items-center justify-center bg-black/5 text-white opacity-90 transition-opacity group-hover:opacity-100">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45">
-                              <Play className="h-4 w-4 fill-current" />
-                            </span>
-                          </span>
-                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2.5">
-                            <p className="truncate text-[10px] font-bold text-white shadow-sm" title={item.name}>
-                              {item.name || 'Untitled video'}
-                            </p>
-                          </div>
+                      item.type === 'audio' ? (
+                        <div
+                          key={item._id}
+                          className="relative aspect-[9/16] overflow-hidden rounded-xl border border-gray-200 bg-black shadow-sm"
+                        >
+                          <AudioPickerPreview item={item} />
                         </div>
-                      </button>
+                      ) : (
+                        <button
+                          key={item._id}
+                          type="button"
+                          onClick={() => handleSelectVideo(item)}
+                          className="group relative overflow-hidden rounded-xl border border-gray-200 bg-black text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md"
+                        >
+                          <div className="relative aspect-[9/16]">
+                            <VideoPickerPreview item={item} />
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/5 text-white opacity-90 transition-opacity group-hover:opacity-100">
+                              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45">
+                                <Play className="h-4 w-4 fill-current" />
+                              </span>
+                            </span>
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2.5">
+                              <p className="truncate text-[10px] font-bold text-white shadow-sm" title={item.name}>
+                                {item.name || 'Untitled video'}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      )
                     ))}
                   </div>
                 )}

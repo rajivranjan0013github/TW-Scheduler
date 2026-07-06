@@ -1728,6 +1728,7 @@ export const MediaLibrary = () => {
                             <div className="px-2 pb-2 pt-1">
                               <audio
                                 src={getAssetUrl(item.url)}
+                                crossOrigin="anonymous"
                                 controls
                                 preload="metadata"
                                 className="w-full"
