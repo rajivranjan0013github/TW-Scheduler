@@ -1662,7 +1662,7 @@ export const MediaLibrary = () => {
                   return (
                     <>
                       {/* Media Preview Box */}
-                      <div className={`${item.type === 'audio' ? 'aspect-square' : 'aspect-[9/16]'} bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center`}>
+                      <div className={`${item.type === 'audio' ? 'aspect-[5/2]' : 'aspect-[9/16]'} bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center`}>
                         {item.type === 'video' ? (
                           <LoadingVideoPreview
                             src={getAssetUrl(item.url)} 
@@ -1682,83 +1682,103 @@ export const MediaLibrary = () => {
                             }}
                           />
                         ) : item.type === 'audio' ? (
-                          <div className="flex h-full w-full flex-col relative overflow-hidden"
-                            style={{ background: 'linear-gradient(160deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)' }}
+                          <div
+                            className="flex h-full w-full items-center gap-3 px-4"
+                            onMouseEnter={(e) => {
+                              const container = e.currentTarget;
+                              const audio = container.querySelector('audio');
+                              const overlay = container.querySelector('[data-wave-progress]');
+                              if (!audio) return;
+                              audio.play().catch(() => {});
+                              const update = () => {
+                                if (audio.paused) return;
+                                const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+                                if (overlay) overlay.style.width = `${pct}%`;
+                                requestAnimationFrame(update);
+                              };
+                              requestAnimationFrame(update);
+                            }}
+                            onMouseLeave={(e) => {
+                              const container = e.currentTarget;
+                              const audio = container.querySelector('audio');
+                              const overlay = container.querySelector('[data-wave-progress]');
+                              if (audio) { audio.pause(); audio.currentTime = 0; }
+                              if (overlay) overlay.style.width = '0%';
+                            }}
                           >
-                            {/* Top section — icon + name */}
-                            <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
-                              <div className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl"
-                                style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)' }}
-                              >
-                                <Music className="h-4 w-4 text-white" />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-white text-[11px] font-semibold truncate leading-tight">
-                                  {item.name?.replace(/\.[^.]+$/, '') || 'Audio'}
-                                </p>
-                                <p className="text-white/40 text-[9px] mt-0.5 uppercase tracking-wider font-medium">Audio file</p>
-                              </div>
-                            </div>
-
-                            {/* Waveform visualization */}
-                            <div className="flex-1 flex items-center justify-center px-3 py-1">
-                              <svg viewBox="0 0 200 60" className="w-full h-full" preserveAspectRatio="xMidYMid meet" style={{ maxHeight: '60px' }}>
-                                {[3,8,5,14,8,20,12,25,18,30,22,35,28,38,32,40,35,42,38,40,35,38,32,30,28,35,40,38,34,30,25,20,28,35,30,25,18,22,15,12,8,14,10,6,4,8,12,6,3,5].map((h, i) => (
-                                  <rect
+                            <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+                              <p className="text-xs font-semibold text-[#1d1d1f] truncate leading-tight m-0">
+                                {item.name || 'Audio'}
+                              </p>
+                              {/* Waveform with progress */}
+                              <div className="relative w-full h-6 flex items-end gap-[2px]">
+                                {/* Static gray waveform bars */}
+                                {[3,7,5,12,8,18,10,22,15,28,20,32,25,35,30,38,33,40,36,38,33,35,30,28,25,32,38,35,30,28,22,18,25,32,28,22,15,20,12,10,7,12,8,5,3,7,10,5,3,4].map((h, i) => (
+                                  <div
                                     key={i}
-                                    x={i * 4}
-                                    y={30 - h / 2}
-                                    width="2.5"
-                                    height={h}
-                                    rx="1.25"
-                                    fill={`url(#audioWaveGrad-${item._id})`}
-                                    opacity="0.85"
+                                    className="flex-1 rounded-full bg-[#d1d5db]"
+                                    style={{ height: `${(h / 40) * 100}%`, minWidth: '2px' }}
                                   />
                                 ))}
-                                <defs>
-                                  <linearGradient id={`audioWaveGrad-${item._id}`} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#a78bfa" />
-                                    <stop offset="100%" stopColor="#667eea" />
-                                  </linearGradient>
-                                </defs>
-                              </svg>
+                                {/* Progress overlay — clipped colored bars */}
+                                <div
+                                  data-wave-progress
+                                  className="absolute inset-0 overflow-hidden flex items-end gap-[2px] transition-none"
+                                  style={{ width: '0%' }}
+                                >
+                                  {[3,7,5,12,8,18,10,22,15,28,20,32,25,35,30,38,33,40,36,38,33,35,30,28,25,32,38,35,30,28,22,18,25,32,28,22,15,20,12,10,7,12,8,5,3,7,10,5,3,4].map((h, i) => (
+                                    <div
+                                      key={i}
+                                      className="flex-1 rounded-full bg-[#0071e3]"
+                                      style={{ height: `${(h / 40) * 100}%`, minWidth: '2px' }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-[#8e8e93] m-0 leading-none" data-audio-duration={item._id}></p>
                             </div>
-
-                            {/* Audio controls at bottom */}
-                            <div className="px-2 pb-2 pt-1">
-                              <audio
-                                src={getAssetUrl(item.url)}
-                                crossOrigin="anonymous"
-                                controls
-                                preload="metadata"
-                                className="w-full"
-                                style={{ height: '26px', borderRadius: '6px', filter: 'invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.85)' }}
-                              />
-                            </div>
+                            <audio
+                              src={getAssetUrl(item.url)}
+                              crossOrigin="anonymous"
+                              preload="metadata"
+                              onLoadedMetadata={(e) => {
+                                const dur = e.target.duration;
+                                if (!isFinite(dur)) return;
+                                const mins = Math.floor(dur / 60);
+                                const secs = Math.floor(dur % 60).toString().padStart(2, '0');
+                                const el = e.target.parentElement?.querySelector(`[data-audio-duration="${item._id}"]`);
+                                if (el) el.textContent = `${mins}:${secs}`;
+                              }}
+                              className="hidden"
+                            />
                           </div>
                         ) : (
                           <img src={getAssetUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                         )}
-                        <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm">
-                          {item.type}
-                        </div>
-                        <div
-                          className={`absolute left-2 top-9 inline-flex h-7 w-7 items-center justify-center rounded-lg border shadow-sm ${
-                            item.caption?.trim()
-                              ? 'border-[#34c759]/20 bg-white/95 text-[#15803d]'
-                              : 'border-[#ff9500]/20 bg-white/95 text-[#b45309]'
-                          }`}
-                          title={item.caption?.trim() ? 'Caption saved' : 'No caption saved'}
-                        >
-                          {item.caption?.trim() ? (
-                            <MessageSquareCheck className="h-3.5 w-3.5" />
-                          ) : (
-                            <MessageSquareWarning className="h-3.5 w-3.5" />
-                          )}
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-                          <p className="m-0 truncate" title={item.name}>{item.name || 'Untitled media'}</p>
-                        </div>
+                        {item.type !== 'audio' && (
+                          <>
+                            <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm">
+                              {item.type}
+                            </div>
+                            <div
+                              className={`absolute left-2 top-9 inline-flex h-7 w-7 items-center justify-center rounded-lg border shadow-sm ${
+                                item.caption?.trim()
+                                  ? 'border-[#34c759]/20 bg-white/95 text-[#15803d]'
+                                  : 'border-[#ff9500]/20 bg-white/95 text-[#b45309]'
+                              }`}
+                              title={item.caption?.trim() ? 'Caption saved' : 'No caption saved'}
+                            >
+                              {item.caption?.trim() ? (
+                                <MessageSquareCheck className="h-3.5 w-3.5" />
+                              ) : (
+                                <MessageSquareWarning className="h-3.5 w-3.5" />
+                              )}
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                              <p className="m-0 truncate" title={item.name}>{item.name || 'Untitled media'}</p>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* Media Actions */}

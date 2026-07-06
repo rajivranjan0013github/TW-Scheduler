@@ -1,8 +1,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchFile } from '@ffmpeg/util';
-import { Download, Folder, Layers, Loader2, UploadCloud, X } from 'lucide-react';
+import { Download, Folder, Layers, Loader2, UploadCloud, X, ChevronRight, ChevronDown, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { OUTPUT_WIDTH, OUTPUT_HEIGHT, OUTPUT_FPS, API_BASE_URL } from './videoEditor/videoEditorConstants';
 import { useFFmpeg } from './videoEditor/useFFmpeg';
@@ -63,6 +63,9 @@ const getTextSettingsSignature = (settings) => JSON.stringify({
   bgColor: settings?.bgColor || '',
 });
 
+const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
+const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
+
 export const VideoEditor = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -90,8 +93,22 @@ export const VideoEditor = () => {
   const [folderPickerRowId, setFolderPickerRowId] = useState(null);
   const [folderPickerMode, setFolderPickerMode] = useState('single');
   const [selectedSaveFolderId, setSelectedSaveFolderId] = useState('root');
+  const [expandedFolderIds, setExpandedFolderIds] = useState(new Set());
   const [bulkSavingRowId, setBulkSavingRowId] = useState(null);
   const [folderPickerError, setFolderPickerError] = useState('');
+  const [folderSearch, setFolderSearch] = useState('');
+
+  const toggleFolderExpanded = useCallback((folderId) => {
+    setExpandedFolderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderId)) {
+        next.delete(folderId);
+      } else {
+        next.add(folderId);
+      }
+      return next;
+    });
+  }, []);
 
   // Bulk Queue State
   const [bulkRows, setBulkRows] = useState([]);
@@ -438,6 +455,8 @@ export const VideoEditor = () => {
     setFolderPickerRowId(rowId);
     setFolderPickerMode('single');
     setSelectedSaveFolderId('root');
+    setExpandedFolderIds(new Set());
+    setFolderSearch('');
     void loadMediaFolders();
   }, [loadMediaFolders]);
 
@@ -445,6 +464,8 @@ export const VideoEditor = () => {
     setFolderPickerRowId('all');
     setFolderPickerMode('all');
     setSelectedSaveFolderId('root');
+    setExpandedFolderIds(new Set());
+    setFolderSearch('');
     void loadMediaFolders();
   }, [loadMediaFolders]);
 
@@ -452,8 +473,76 @@ export const VideoEditor = () => {
     setFolderPickerRowId('single-editor');
     setFolderPickerMode('single-editor');
     setSelectedSaveFolderId('root');
+    setExpandedFolderIds(new Set());
+    setFolderSearch('');
     void loadMediaFolders();
   }, [loadMediaFolders]);
+
+  const renderFolderTree = (parentId = 'root', depth = 0) => {
+    const levelFolders = folders
+      .filter((f) => getFolderParentId(f) === parentId)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
+    if (levelFolders.length === 0) return null;
+
+    return (
+      <div className="space-y-1">
+        {levelFolders.map((folder) => {
+          const hasSubfolders = folders.some((f) => getFolderParentId(f) === folder._id);
+          const isExpanded = expandedFolderIds.has(folder._id);
+          const isSelected = selectedSaveFolderId === folder._id;
+
+          return (
+            <div key={folder._id} className="flex flex-col">
+              <div
+                style={{ paddingLeft: `${depth * 16}px` }}
+                className={`flex items-center justify-between rounded-xl px-2 py-1.5 transition-colors border ${
+                  isSelected
+                    ? 'bg-[#ff5500]/10 border-[#ff5500]/25'
+                    : 'bg-gray-50 border-transparent hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  {hasSubfolders ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFolderExpanded(folder._id);
+                      }}
+                      className="flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:bg-black/5 hover:text-gray-600 transition-colors shrink-0"
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  ) : (
+                    <div className="w-5 h-5 shrink-0" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSaveFolderId(folder._id)}
+                    className={`flex flex-1 items-center gap-2 text-left text-xs font-bold ${
+                      isSelected ? 'text-[#ff5500]' : 'text-gray-700'
+                    }`}
+                  >
+                    <Folder className={`h-4 w-4 ${isSelected ? 'text-[#ff5500]' : 'text-gray-400'}`} />
+                    <span className="truncate">{folder.name}</span>
+                  </button>
+                </div>
+              </div>
+              {hasSubfolders && isExpanded && (
+                <div className="mt-1">
+                  {renderFolderTree(folder._id, depth + 1)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   const uploadVideoBlobToFolder = useCallback(async (blob, folderId, filename = `merged_${Date.now()}.mp4`, caption = '') => {
     const file = new File([blob], filename, { type: 'video/mp4' });
@@ -1414,8 +1503,8 @@ export const VideoEditor = () => {
 
       {folderPickerRowId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl h-[520px] flex flex-col">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 shrink-0">
               <div>
                 <h3 className="text-sm font-bold text-gray-950">Choose Save Folder</h3>
                 <p className="mt-0.5 text-[11px] font-medium text-gray-500">
@@ -1433,12 +1522,23 @@ export const VideoEditor = () => {
               </button>
             </div>
 
-            <div className="max-h-[420px] overflow-y-auto p-5">
+            <div className="overflow-y-auto p-5 flex-grow">
               {folderPickerError && (
                 <div className="mb-3 rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-semibold text-red-600">
                   {folderPickerError}
                 </div>
               )}
+
+              <label className="mb-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-400 focus-within:border-[#ff5500]/60">
+                <Search className="h-3.5 w-3.5 shrink-0" />
+                <input
+                  type="search"
+                  value={folderSearch}
+                  onChange={(e) => setFolderSearch(e.target.value)}
+                  placeholder="Search folders..."
+                  className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-gray-700 outline-none placeholder:text-gray-450"
+                />
+              </label>
 
               {foldersLoading ? (
                 <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 p-4 text-xs font-semibold text-gray-500">
@@ -1447,38 +1547,43 @@ export const VideoEditor = () => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSaveFolderId('root')}
-                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-bold transition-colors ${
-                      selectedSaveFolderId === 'root'
-                        ? 'bg-[#ff5500] text-white'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Folder className="h-4 w-4" />
-                    Library Root
-                  </button>
-                  {folders.map((folder) => (
-                    <button
-                      key={folder._id}
-                      type="button"
-                      onClick={() => setSelectedSaveFolderId(folder._id)}
-                      className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-bold transition-colors ${
-                        selectedSaveFolderId === folder._id
-                          ? 'bg-[#ff5500] text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <Folder className="h-4 w-4" />
-                      <span className="truncate">{folder.name}</span>
-                    </button>
-                  ))}
+                  {folderSearch.trim() ? (
+                    <div className="space-y-1">
+                      {folders
+                        .filter((f) => getFolderParentId(f) === 'root' && (f.name || '').toLowerCase().includes(folderSearch.trim().toLowerCase()))
+                        .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }))
+                        .map((folder) => {
+                          const isSelected = selectedSaveFolderId === folder._id;
+                          return (
+                            <button
+                              key={folder._id}
+                              type="button"
+                              onClick={() => setSelectedSaveFolderId(folder._id)}
+                              className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold border transition-colors ${
+                                isSelected
+                                  ? 'bg-[#ff5500]/10 border-[#ff5500]/25 text-[#ff5500]'
+                                  : 'bg-gray-50 border-transparent text-gray-700 hover:bg-gray-100'
+                              }`}
+                            >
+                              <Folder className={`h-4 w-4 ${isSelected ? 'text-[#ff5500]' : 'text-gray-450'}`} />
+                              <span className="truncate">{folder.name}</span>
+                            </button>
+                          );
+                        })}
+                      {folders.filter((f) => getFolderParentId(f) === 'root' && (f.name || '').toLowerCase().includes(folderSearch.trim().toLowerCase())).length === 0 && (
+                        <div className="text-center py-4 text-xs text-gray-400 font-semibold">
+                          No folders match "{folderSearch}"
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    renderFolderTree('root', 0)
+                  )}
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 shrink-0">
               <button
                 type="button"
                 onClick={() => setFolderPickerRowId(null)}

@@ -3,6 +3,14 @@ import { X, Video, Music, Play, Plus, Trash2 } from 'lucide-react';
 import LoadingVideoPreview from '../../components/LoadingVideoPreview';
 import { getMediaUrl } from '../../utils/mediaUrls';
 
+const formatDuration = (seconds) => {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '';
+  const totalSeconds = Math.round(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+};
+
 export const TempAssetQuickPickerDialog = ({
   type,
   slotLabel,
@@ -12,10 +20,19 @@ export const TempAssetQuickPickerDialog = ({
   onClose,
 }) => {
   const assetLabel = slotLabel || (type === 'video' ? 'Video' : 'Audio Track');
+  const [trackDurations, setTrackDurations] = useState({});
+
+  const handleAudioDuration = (trackId, duration) => {
+    setTrackDurations((current) => {
+      const formatted = formatDuration(duration);
+      if (!formatted || current[trackId] === formatted) return current;
+      return { ...current, [trackId]: formatted };
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[78vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[#18181b] border border-[#2d2d30] shadow-2xl text-[#e0e0e5]">
+      <div className="flex min-h-[480px] max-h-[78vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[#18181b] border border-[#2d2d30] shadow-2xl text-[#e0e0e5]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#2d2d30] px-4 py-2.5 bg-[#121214]">
           <div>
@@ -53,7 +70,7 @@ export const TempAssetQuickPickerDialog = ({
               No items in your temporary library.
             </div>
           ) : (
-             <div className={type === 'video' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'space-y-2'}>
+             <div className={type === 'video' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3'}>
               {items.map((item) => {
                 if (type === 'video') {
                   const resolvedUrl = item.sourceType === 'library'
@@ -74,6 +91,7 @@ export const TempAssetQuickPickerDialog = ({
                           muted
                           playsInline
                           preload="metadata"
+                          crossOrigin="anonymous"
                         />
                         <span className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
                           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/45">
@@ -93,12 +111,56 @@ export const TempAssetQuickPickerDialog = ({
                       key={item.id || item.url}
                       type="button"
                       onClick={() => onSelect(item)}
-                      className="flex w-full items-center justify-between rounded-xl border border-[#2d2d30] bg-[#121214] p-3 text-left text-xs font-semibold text-white transition-all hover:border-[#ff5500]/60 hover:bg-[#1a1a1e] active:scale-[0.99]"
+                      onMouseEnter={(e) => {
+                        const button = e.currentTarget;
+                        const audio = button.querySelector('audio');
+                        const progress = button.querySelector('[data-audio-progress]');
+                        if (!audio) return;
+                        audio.play().catch(() => {});
+                        const update = () => {
+                          if (audio.paused) return;
+                          const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+                          if (progress) progress.style.width = `${pct}%`;
+                          requestAnimationFrame(update);
+                        };
+                        requestAnimationFrame(update);
+                      }}
+                      onMouseLeave={(e) => {
+                        const button = e.currentTarget;
+                        const audio = button.querySelector('audio');
+                        const progress = button.querySelector('[data-audio-progress]');
+                        if (audio) { audio.pause(); audio.currentTime = 0; }
+                        if (progress) progress.style.width = '0%';
+                      }}
+                      className="flex w-full items-center justify-between rounded-xl border border-[#2d2d30] bg-[#121214] p-3 text-left text-xs font-semibold text-white transition-all hover:border-[#ff5500]/60 hover:bg-[#1a1a1e] active:scale-[0.99] relative overflow-hidden"
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <Music className="h-4 w-4 flex-shrink-0 text-[#ff5500]" />
-                        <span className="truncate">{item.name}</span>
+                        <span className="flex min-w-0 flex-col">
+                          <span className="truncate">{item.name}</span>
+                          {trackDurations[item.id || item.url] && (
+                            <span className="text-[10px] text-gray-400 font-medium mt-0.5">
+                              {trackDurations[item.id || item.url]}
+                            </span>
+                          )}
+                        </span>
                       </span>
+                      {item.url && (
+                        <audio
+                          src={item.url}
+                          crossOrigin="anonymous"
+                          preload="metadata"
+                          onLoadedMetadata={(e) => handleAudioDuration(item.id || item.url, e.currentTarget.duration)}
+                          className="hidden"
+                        />
+                      )}
+                      {/* Tiny progress line at the bottom edge */}
+                      <div className="absolute bottom-0 left-0 right-0 h-[2.5px] overflow-hidden bg-transparent">
+                        <div
+                          data-audio-progress
+                          className="h-full w-0 bg-[#ff5500] transition-none"
+                        />
+                      </div>
                     </button>
                   );
                 }
@@ -127,6 +189,15 @@ export const TempMediaLibraryDialog = ({
   const [activeTab, setActiveTab] = useState('video1');
   const activeMeta = TEMP_TABS.find((tab) => tab.id === activeTab) || TEMP_TABS[0];
   const items = Array.isArray(library[activeTab]) ? library[activeTab] : [];
+  const [trackDurations, setTrackDurations] = useState({});
+
+  const handleAudioDuration = (trackId, duration) => {
+    setTrackDurations((current) => {
+      const formatted = formatDuration(duration);
+      if (!formatted || current[trackId] === formatted) return current;
+      return { ...current, [trackId]: formatted };
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
@@ -208,6 +279,7 @@ export const TempMediaLibraryDialog = ({
                         muted
                         playsInline
                         preload="metadata"
+                        crossOrigin="anonymous"
                       />
                       <span className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/45">
@@ -235,15 +307,43 @@ export const TempMediaLibraryDialog = ({
               })}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
               {items.map((item) => (
                 <div
                   key={item.id || item.url}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-[#2d2d30] bg-[#121214] p-3 text-xs font-semibold text-white"
+                  onMouseEnter={(e) => {
+                    const button = e.currentTarget;
+                    const audio = button.querySelector('audio');
+                    const progress = button.querySelector('[data-audio-progress]');
+                    if (!audio) return;
+                    audio.play().catch(() => {});
+                    const update = () => {
+                      if (audio.paused) return;
+                      const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+                      if (progress) progress.style.width = `${pct}%`;
+                      requestAnimationFrame(update);
+                    };
+                    requestAnimationFrame(update);
+                  }}
+                  onMouseLeave={(e) => {
+                    const button = e.currentTarget;
+                    const audio = button.querySelector('audio');
+                    const progress = button.querySelector('[data-audio-progress]');
+                    if (audio) { audio.pause(); audio.currentTime = 0; }
+                    if (progress) progress.style.width = '0%';
+                  }}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[#2d2d30] bg-[#121214] p-3 text-xs font-semibold text-white relative overflow-hidden"
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <Music className="h-4 w-4 shrink-0 text-[#ff5500]" />
-                    <span className="truncate">{item.name || 'Untitled audio'}</span>
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">{item.name || 'Untitled audio'}</span>
+                      {trackDurations[item.id || item.url] && (
+                        <span className="text-[10px] text-gray-400 font-medium mt-0.5">
+                          {trackDurations[item.id || item.url]}
+                        </span>
+                      )}
+                    </span>
                   </span>
                   <button
                     type="button"
@@ -253,6 +353,22 @@ export const TempMediaLibraryDialog = ({
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
+                  {item.url && (
+                    <audio
+                      src={item.url}
+                      crossOrigin="anonymous"
+                      preload="metadata"
+                      onLoadedMetadata={(e) => handleAudioDuration(item.id || item.url, e.currentTarget.duration)}
+                      className="hidden"
+                    />
+                  )}
+                  {/* Tiny progress line at the bottom edge */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[2.5px] overflow-hidden bg-transparent">
+                    <div
+                      data-audio-progress
+                      className="h-full w-0 bg-[#ff5500] transition-none"
+                    />
+                  </div>
                 </div>
               ))}
             </div>
