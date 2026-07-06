@@ -238,6 +238,7 @@ export const MediaLibrary = () => {
   const [savingFolderTagsId, setSavingFolderTagsId] = useState(null);
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null);
   const [openMediaMenuId, setOpenMediaMenuId] = useState(null);
+  const [selectedMediaIds, setSelectedMediaIds] = useState([]);
   const [captionDialogMedia, setCaptionDialogMedia] = useState(null);
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(false);
@@ -260,6 +261,7 @@ export const MediaLibrary = () => {
   const canUpload = ['owner', 'admin', 'editor'].includes(user?.role);
   const canDelete = ['owner', 'admin'].includes(user?.role);
   const canManageFolders = canUpload;
+  const canSchedule = canUpload;
   const resetUploadProgress = () => setUploadProgress(null);
   const getUploadProgressText = () => {
     if (!uploadProgress) return 'Uploading to R2...';
@@ -1220,6 +1222,57 @@ export const MediaLibrary = () => {
     ].filter(Boolean).join(' ').toLowerCase();
     return searchable.includes(normalizedSearch);
   });
+  const selectedMediaItems = selectedMediaIds
+    .map((mediaId) => media.find((item) => item._id === mediaId))
+    .filter(Boolean);
+  const selectedMediaType = selectedMediaItems[0]?.type || '';
+  const selectableFilteredMedia = selectedMediaType
+    ? filteredMedia.filter((item) => item.type === selectedMediaType)
+    : filteredMedia;
+  const allSelectableVisibleSelected = selectableFilteredMedia.length > 0
+    && selectableFilteredMedia.every((item) => selectedMediaIds.includes(item._id));
+
+  const toggleMediaSelection = (item) => {
+    setOpenMediaMenuId(null);
+    if (selectedMediaIds.includes(item._id)) {
+      setSelectedMediaIds((current) => current.filter((mediaId) => mediaId !== item._id));
+      return;
+    }
+
+    if (selectedMediaType && item.type !== selectedMediaType) {
+      setErrorMessage(`Selected files must be the same media type. Clear the ${selectedMediaType} selection before selecting ${item.type}.`);
+      return;
+    }
+
+    setErrorMessage('');
+    setSelectedMediaIds((current) => [...current, item._id]);
+  };
+
+  const handleSelectAllVisibleMedia = () => {
+    if (filteredMedia.length === 0) return;
+
+    const currentType = selectedMediaType || filteredMedia[0]?.type;
+    const sameTypeVisible = filteredMedia.filter((item) => item.type === currentType);
+
+    if (sameTypeVisible.length > 0 && sameTypeVisible.every((item) => selectedMediaIds.includes(item._id))) {
+      setSelectedMediaIds((current) => current.filter((mediaId) => !sameTypeVisible.some((item) => item._id === mediaId)));
+      return;
+    }
+
+    const next = new Set(selectedMediaIds);
+    sameTypeVisible.forEach((item) => next.add(item._id));
+    if (filteredMedia.some((item) => item.type !== currentType)) {
+      setErrorMessage(`Select all added only ${currentType} files. Clear selection to select a different media type.`);
+    } else {
+      setErrorMessage('');
+    }
+    setSelectedMediaIds(Array.from(next));
+  };
+
+  const handleScheduleSelectedMedia = () => {
+    if (selectedMediaIds.length === 0) return;
+    navigate('/scheduler', { state: { preselectedMediaIds: selectedMediaIds } });
+  };
 
   if (carouselDrafts.length > 0) {
     const totalSlides = carouselDrafts.reduce((sum, set) => sum + set.slides.length, 0);
@@ -1658,6 +1711,50 @@ export const MediaLibrary = () => {
 
       {/* Media Files Grid */}
       <div className="space-y-3">
+          {canSchedule && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 shadow-sm">
+              <div className="min-w-0">
+                <p className="m-0 text-[11px] font-bold text-[#1d1d1f]">
+                  {selectedMediaIds.length > 0
+                    ? `${selectedMediaIds.length} ${selectedMediaType || 'media'} file${selectedMediaIds.length === 1 ? '' : 's'} selected`
+                    : 'Select media files'}
+                </p>
+                <p className="m-0 mt-0.5 text-[10px] font-medium text-[#6e6e73]">
+                  {selectedMediaIds.length > 0
+                    ? 'Only one media type can be selected per schedule batch.'
+                    : 'Use checkboxes to schedule files directly.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSelectAllVisibleMedia}
+                  disabled={filteredMedia.length === 0}
+                  className="rounded-md border border-[#d1d1d6] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {allSelectableVisibleSelected ? 'Deselect visible' : 'Select visible'}
+                </button>
+                {selectedMediaIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMediaIds([])}
+                    className="rounded-md border border-[#d1d1d6] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#6e6e73] hover:bg-[#f5f5f7]"
+                  >
+                    Clear
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleScheduleSelectedMedia}
+                  disabled={selectedMediaIds.length === 0}
+                  className="inline-flex items-center gap-1 rounded-md bg-[#0071e3] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#147ce5] disabled:cursor-not-allowed disabled:bg-[#c7c7cc]"
+                >
+                  <Clock className="h-3 w-3" />
+                  <span>Schedule selected</span>
+                </button>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {loadingMedia && (
               <div className="col-span-full border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm">
@@ -1665,16 +1762,45 @@ export const MediaLibrary = () => {
               </div>
             )}
 
-            {!loadingMedia && filteredMedia.map(item => (
+            {!loadingMedia && filteredMedia.map(item => {
+              const isSelected = selectedMediaIds.includes(item._id);
+              const selectionLocked = Boolean(selectedMediaType && item.type !== selectedMediaType);
+              return (
               <div
                 key={item._id}
-                className="bg-white border border-[#e5e5ea] rounded-xl overflow-visible group hover:border-gray-400 transition-all flex flex-col relative shadow-sm"
+                className={`bg-white border rounded-xl overflow-visible group transition-all flex flex-col relative shadow-sm ${
+                  isSelected
+                    ? 'border-[#0071e3] ring-2 ring-[#0071e3]/20'
+                    : selectionLocked
+                      ? 'border-[#e5e5ea] opacity-60'
+                      : 'border-[#e5e5ea] hover:border-gray-400'
+                }`}
               >
                 {(() => {
                   return (
                     <>
                       {/* Media Preview Box */}
                       <div className={`${item.type === 'audio' ? 'aspect-square' : 'aspect-[9/16]'} bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center`}>
+                        {canSchedule && (
+                          <label
+                            className={`absolute left-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg border bg-white/95 shadow-sm ${
+                              selectionLocked
+                                ? 'cursor-not-allowed border-[#d1d1d6] text-[#8e8e93]'
+                                : 'cursor-pointer border-[#d1d1d6] text-[#1d1d1f] hover:border-[#0071e3]'
+                            }`}
+                            title={selectionLocked ? `Clear ${selectedMediaType} selection before selecting ${item.type}` : (isSelected ? 'Deselect media' : 'Select media')}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              disabled={selectionLocked}
+                              onChange={() => toggleMediaSelection(item)}
+                              className="h-3.5 w-3.5 accent-[#0071e3]"
+                              aria-label={isSelected ? 'Deselect media' : 'Select media'}
+                            />
+                          </label>
+                        )}
                         {item.type === 'video' ? (
                           <LoadingVideoPreview
                             src={getAssetUrl(item.url)} 
@@ -1751,11 +1877,11 @@ export const MediaLibrary = () => {
                         ) : (
                           <img src={getAssetUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
                         )}
-                        <div className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm">
+                        <div className={`${canSchedule ? 'left-10' : 'left-2'} absolute top-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm`}>
                           {item.type}
                         </div>
                         <div
-                          className={`absolute left-2 top-9 inline-flex h-7 w-7 items-center justify-center rounded-lg border shadow-sm ${
+                          className={`absolute left-2 ${canSchedule ? 'top-11' : 'top-9'} inline-flex h-7 w-7 items-center justify-center rounded-lg border shadow-sm ${
                             item.caption?.trim()
                               ? 'border-[#34c759]/20 bg-white/95 text-[#15803d]'
                               : 'border-[#ff9500]/20 bg-white/95 text-[#b45309]'
@@ -1845,7 +1971,8 @@ export const MediaLibrary = () => {
                   );
                 })()}
               </div>
-            ))}
+              );
+            })}
 
             {!loadingMedia && filteredMedia.length === 0 && (
               <div className="col-span-full border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm">
@@ -1959,7 +2086,7 @@ export const MediaLibrary = () => {
                     <Folder className="w-4 h-4 text-gray-500 group-hover:text-[#0071e3]" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Import campaign folder</p>
+                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Upload folder</p>
                     <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Uploads entire nested folder structure</p>
                   </div>
                 </label>

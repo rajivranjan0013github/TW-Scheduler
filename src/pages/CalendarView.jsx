@@ -289,6 +289,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const [deletingQueuePostIds, setDeletingQueuePostIds] = useState([]);
   const calendarAccountMenuRef = useRef(null);
   const handledPreselectedFolderIdRef = useRef(null);
+  const handledPreselectedMediaKeyRef = useRef('');
 
   // Post Composer form states
   const [selectedChannels, setSelectedChannels] = useState([]);
@@ -297,6 +298,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const [scheduleTime, setScheduleTime] = useState('');
   const [scheduleMode, setScheduleMode] = useState('auto');
   const [scheduleContentMode, setScheduleContentMode] = useState('assets');
+  const [contentSelectionSource, setContentSelectionSource] = useState('library');
   const [postType, setPostType] = useState('reels');
   const [youtubeTitle, setYoutubeTitle] = useState('');
   const [youtubePrivacy, setYoutubePrivacy] = useState('private');
@@ -305,9 +307,10 @@ const CalendarView = ({ selectedAccounts }) => {
   const [captionDrafts, setCaptionDrafts] = useState({});
   const [savingCaptionId, setSavingCaptionId] = useState(null);
   const [deselectedPlanRows, setDeselectedPlanRows] = useState([]);
+  const [submittingSchedule, setSubmittingSchedule] = useState(false);
   const [librarySearchQuery, setLibrarySearchQuery] = useState('');
 
-  const [bulkInterval, setBulkInterval] = useState('2');
+  const [bulkInterval, setBulkInterval] = useState('6');
   const [activeFolderId, setActiveFolderId] = useState('root');
   const [selectedFolderId, setSelectedFolderId] = useState('root');
   const [selectedCarouselSets, setSelectedCarouselSets] = useState([]);
@@ -522,6 +525,11 @@ const CalendarView = ({ selectedAccounts }) => {
       .filter(Boolean),
     [mediaList, selectedMedia]
   );
+  const selectedMediaTypes = useMemo(() => (
+    Array.from(new Set(selectedMediaItems.map((item) => item.type).filter(Boolean)))
+  ), [selectedMediaItems]);
+  const hasMixedSelectedMediaTypes = selectedMediaTypes.length > 1;
+  const directMediaSelection = contentSelectionSource === 'direct' && !isCarouselMode;
   const mediaByFolderId = useMemo(() => {
     const map = new Map();
     mediaList.forEach((item) => {
@@ -710,7 +718,9 @@ const CalendarView = ({ selectedAccounts }) => {
     const signature = schedulePlan.map((row) => row.planKey).join('|');
     if (signature !== schedulePlanSignatureRef.current) {
       schedulePlanSignatureRef.current = signature;
-      setDeselectedPlanRows(schedulePlan.map((row) => row.planKey));
+      setDeselectedPlanRows((directMediaSelection || signature === '')
+        ? []
+        : schedulePlan.map((row) => row.planKey));
       return;
     }
 
@@ -719,7 +729,7 @@ const CalendarView = ({ selectedAccounts }) => {
       const next = current.filter((key) => visibleKeys.has(key));
       return next.length === current.length ? current : next;
     });
-  }, [schedulePlan]);
+  }, [directMediaSelection, schedulePlan]);
   const togglePlanRow = (planKey) => {
     setDeselectedPlanRows((current) => (
       current.includes(planKey)
@@ -737,6 +747,7 @@ const CalendarView = ({ selectedAccounts }) => {
     const folder = folders.find((item) => String(item._id) === String(folderId));
     if (!folder) return false;
 
+    setContentSelectionSource('library');
     const parentId = normalizeFolderId(folder.parentFolderId) || 'root';
     if (folder.kind === 'carousel_set') {
       setScheduleContentMode('carousel');
@@ -783,11 +794,34 @@ const CalendarView = ({ selectedAccounts }) => {
   }, [selectedAccounts]);
 
   useEffect(() => {
-    if (location.state?.preselectedMediaId && mediaList.length > 0) {
-      setSelectedMedia([location.state.preselectedMediaId]);
+    const routeMediaIds = Array.isArray(location.state?.preselectedMediaIds)
+      ? location.state.preselectedMediaIds
+      : location.state?.preselectedMediaId
+        ? [location.state.preselectedMediaId]
+        : [];
+    const mediaKey = routeMediaIds.join('|');
+    if (routeMediaIds.length > 0 && mediaList.length > 0 && handledPreselectedMediaKeyRef.current !== mediaKey) {
+      const routeMediaItems = routeMediaIds
+        .map((mediaId) => mediaList.find((item) => String(item._id) === String(mediaId)))
+        .filter(Boolean);
+      if (routeMediaItems.length === 0) return;
+
+      const firstType = routeMediaItems[0].type;
+      const sameTypeMediaIds = routeMediaItems
+        .filter((item) => item.type === firstType)
+        .map((item) => item._id);
+      if (sameTypeMediaIds.length !== routeMediaItems.length) {
+        setQueueError(`Only ${firstType} files were selected. Mixed media types cannot be scheduled together.`);
+      }
+
+      handledPreselectedMediaKeyRef.current = mediaKey;
+      setSelectedMedia(sameTypeMediaIds);
+      setSelectedCarouselSets([]);
+      setScheduleContentMode('assets');
+      setContentSelectionSource('direct');
       setShowComposer(true);
 
-      const mediaItem = mediaList.find(m => m._id === location.state.preselectedMediaId);
+      const mediaItem = routeMediaItems[0];
       if (mediaItem) {
         const mediaFolderId = mediaItem.folderId?._id || mediaItem.folderId || 'root';
         setActiveFolderId(mediaFolderId);
@@ -795,7 +829,7 @@ const CalendarView = ({ selectedAccounts }) => {
         if (mediaAccountIds.length > 0) {
           setSelectedChannels(mediaAccountIds);
         }
-        setPostType(mediaItem.type === 'video' ? 'reels' : 'post');
+        setPostType(firstType === 'video' ? 'reels' : 'post');
       }
 
       // Clear location state to prevent reopening modal on reload
@@ -819,6 +853,7 @@ const CalendarView = ({ selectedAccounts }) => {
     if (!showComposer) {
       setActiveFolderId('root');
       setLibrarySearchQuery('');
+      setContentSelectionSource('library');
     }
   }, [showComposer]);
 
@@ -1060,6 +1095,7 @@ const CalendarView = ({ selectedAccounts }) => {
 
   const handleComposeSubmit = async (e) => {
     e.preventDefault();
+    if (submittingSchedule) return;
 
     if (selectedChannels.length === 0) {
       alert('Select at least one publishing channel');
@@ -1075,6 +1111,10 @@ const CalendarView = ({ selectedAccounts }) => {
     }
     if (!isCarouselMode && selectedMedia.length === 0) {
       alert('Select at least one media asset');
+      return;
+    }
+    if (!isCarouselMode && hasMixedSelectedMediaTypes) {
+      alert('Select only one media type per schedule batch. Remove mixed image/video/audio files before scheduling.');
       return;
     }
     const unavailableMedia = !isCarouselMode && selectedMedia.some((mediaId) => {
@@ -1109,6 +1149,7 @@ const CalendarView = ({ selectedAccounts }) => {
       }
     }
 
+    setSubmittingSchedule(true);
     try {
       if (!isCarouselMode) {
         const captionsSaved = await saveDirtyCaptionDrafts();
@@ -1244,6 +1285,9 @@ const CalendarView = ({ selectedAccounts }) => {
       }
     } catch (error) {
       console.error('Failed to save scheduled post:', error);
+      alert(error.message || 'Scheduling failed.');
+    } finally {
+      setSubmittingSchedule(false);
     }
   };
 
@@ -1962,7 +2006,8 @@ const CalendarView = ({ selectedAccounts }) => {
             <button
               type="button"
               onClick={() => setShowComposer(false)}
-              className="px-2.5 py-1 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-md text-xs font-semibold border border-[#e5e5ea] transition-all"
+              disabled={submittingSchedule}
+              className="px-2.5 py-1 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-md text-xs font-semibold border border-[#e5e5ea] transition-all disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
@@ -2090,6 +2135,51 @@ const CalendarView = ({ selectedAccounts }) => {
               </div>
 
               <div className="rounded-xl border border-[#e5e7eb] bg-white shadow-sm flex flex-col overflow-hidden h-full">
+                {directMediaSelection ? (
+                  <>
+                    <div className="flex-shrink-0 border-b border-[#e5e7eb] bg-[#f8fafc] px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Selected Files</span>
+                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-700">
+                          {selectedMediaItems.length} {selectedMediaTypes[0] || 'media'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-y-auto bg-[#fafafa] p-2 space-y-1.5">
+                      {selectedMediaItems.map((item) => (
+                        <div key={item._id} className="flex items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white p-2 shadow-sm">
+                          <div className="h-10 w-8 flex-shrink-0 overflow-hidden rounded-md border border-[#e2e8f0] bg-slate-100">
+                            <MediaPreview item={item} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="m-0 truncate text-xs font-bold text-[#0f172a]" title={getMediaLabel(item)}>{getMediaLabel(item)}</p>
+                            <p className="m-0 mt-0.5 truncate text-[9px] font-semibold text-[#64748b]">
+                              {item.type} • {getMediaLocationLabel(item)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedMedia((current) => current.filter((mediaId) => mediaId !== item._id))}
+                            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-[#e5e7eb] bg-white text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]"
+                            title="Remove from schedule"
+                            aria-label="Remove from schedule"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      {selectedMediaItems.length === 0 && (
+                        <div className="h-32 flex items-center justify-center rounded-lg border border-dashed border-slate-300 p-4 text-center text-[10px] text-slate-400">
+                          No selected files.
+                        </div>
+                      )}
+                    </div>
+                    <div className="border-t border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 text-[10px] font-semibold text-[#64748b] truncate">
+                      Direct media selection
+                    </div>
+                  </>
+                ) : (
+                  <>
                 {/* Full-width Nested Content Source List with Back Navigation */}
                 <div className="flex-shrink-0 border-b border-[#e5e7eb]">
                   {activeFolderId !== 'root' ? (
@@ -2234,6 +2324,8 @@ const CalendarView = ({ selectedAccounts }) => {
                     ? `Carousel Set: ${folders.find(f => f._id === selectedCarouselSets[0])?.name || 'None'}` 
                     : `Campaign Folder: ${activeFolderName}`}
                 </div>
+                  </>
+                )}
               </div>
 
               <div className="rounded-xl border border-[#e5e7eb] bg-white shadow-sm flex flex-col overflow-hidden h-full">
@@ -2449,13 +2541,18 @@ const CalendarView = ({ selectedAccounts }) => {
                 <div className="p-3 border-t border-[#e5e7eb] flex-shrink-0">
                   <button
                     type="submit"
-                    disabled={schedulePlan.length > 0 && activeSchedulePlan.length === 0}
+                    disabled={submittingSchedule || (schedulePlan.length > 0 && activeSchedulePlan.length === 0)}
                     className="w-full py-2 bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2"
                   >
+                    {submittingSchedule && (
+                      <span className="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" />
+                    )}
                     <span>
-                      {isPureManualMode
-                        ? manualTaskButtonLabel
-                        : `Schedule ${activeSchedulePlan.length} Post${activeSchedulePlan.length === 1 ? '' : 's'}`}
+                      {submittingSchedule
+                        ? 'Scheduling...'
+                        : isPureManualMode
+                          ? manualTaskButtonLabel
+                          : `Schedule ${activeSchedulePlan.length} Post${activeSchedulePlan.length === 1 ? '' : 's'}`}
                     </span>
                   </button>
                 </div>
