@@ -1139,7 +1139,7 @@ export const MediaLibrary = () => {
   const handleDeleteFolder = async (folderId, e) => {
     e.stopPropagation();
     setOpenFolderMenuId(null);
-    if (!window.confirm('Are you sure you want to delete this campaign folder? Files inside will be moved to the campaign library.')) return;
+    if (!window.confirm('Are you sure you want to delete this campaign folder? Files inside will also be deleted.')) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/media/folders/${folderId}${withCampaignScope()}`, {
@@ -1594,7 +1594,19 @@ export const MediaLibrary = () => {
                     <MoreVertical className="w-3 h-3" />
                   </button>
                   {openFolderMenuId === folder._id && (
-                    <div className="absolute right-0 top-6 z-20 w-32 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
+                    <div className="absolute right-0 top-6 z-20 w-36 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenFolderMenuId(null);
+                          navigate('/scheduler', { state: { preselectedFolderId: folder._id } });
+                        }}
+                        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                      >
+                        <Clock className="h-3 w-3" />
+                        <span>Schedule</span>
+                      </button>
                       {canManageFolders && (
                         <>
                           <button

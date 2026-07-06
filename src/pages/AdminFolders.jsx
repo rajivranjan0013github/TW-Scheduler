@@ -66,7 +66,7 @@ export const AdminFolders = () => {
 
   const handleDeleteFolder = async (folderId, e) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this folder? Files inside will be moved to the root.')) return;
+    if (!window.confirm('Are you sure you want to delete this folder? Files inside will also be deleted.')) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin/folders/${folderId}${withCampaignScope()}`, {

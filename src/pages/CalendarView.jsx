@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X } from 'lucide-react';
+import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
@@ -288,6 +288,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const [savingQueuePostIds, setSavingQueuePostIds] = useState([]);
   const [deletingQueuePostIds, setDeletingQueuePostIds] = useState([]);
   const calendarAccountMenuRef = useRef(null);
+  const handledPreselectedFolderIdRef = useRef(null);
 
   // Post Composer form states
   const [selectedChannels, setSelectedChannels] = useState([]);
@@ -304,6 +305,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const [captionDrafts, setCaptionDrafts] = useState({});
   const [savingCaptionId, setSavingCaptionId] = useState(null);
   const [deselectedPlanRows, setDeselectedPlanRows] = useState([]);
+  const [librarySearchQuery, setLibrarySearchQuery] = useState('');
 
   const [bulkInterval, setBulkInterval] = useState('2');
   const [activeFolderId, setActiveFolderId] = useState('root');
@@ -487,6 +489,14 @@ const CalendarView = ({ selectedAccounts }) => {
       .sort((a, b) => naturalFolderCollator.compare(a.name || '', b.name || ''));
   }, [folders, activeFolderId, normalizeFolderId]);
 
+  const visibleLevelFolders = useMemo(() => {
+    const query = librarySearchQuery.trim().toLowerCase();
+    if (!query) return currentLevelFolders;
+    return currentLevelFolders.filter((folder) => (
+      (folder.name || '').toLowerCase().includes(query)
+    ));
+  }, [currentLevelFolders, librarySearchQuery]);
+
   const currentFolderObj = useMemo(() => {
     return folders.find(f => f._id === activeFolderId);
   }, [folders, activeFolderId]);
@@ -500,6 +510,12 @@ const CalendarView = ({ selectedAccounts }) => {
     const itemFolderId = item.folderId?._id || item.folderId;
     return itemFolderId === folderId;
   }).length;
+  const getFolderAssetIds = (folderId) => mediaList.filter(item => {
+    if (!isMediaAvailableForChannels(item, selectedChannels)) return false;
+    if (folderId === 'root') return !item.folderId;
+    const itemFolderId = item.folderId?._id || item.folderId;
+    return itemFolderId === folderId;
+  }).map((item) => item._id);
   const selectedMediaItems = useMemo(
     () => selectedMedia
       .map(mediaId => mediaList.find(item => item._id === mediaId))
@@ -689,7 +705,15 @@ const CalendarView = ({ selectedAccounts }) => {
 
     return formatTime(firstTime);
   }, [activeSchedulePlan, isPureManualMode]);
+  const schedulePlanSignatureRef = useRef('');
   useEffect(() => {
+    const signature = schedulePlan.map((row) => row.planKey).join('|');
+    if (signature !== schedulePlanSignatureRef.current) {
+      schedulePlanSignatureRef.current = signature;
+      setDeselectedPlanRows(schedulePlan.map((row) => row.planKey));
+      return;
+    }
+
     setDeselectedPlanRows((current) => {
       const visibleKeys = new Set(schedulePlan.map((row) => row.planKey));
       const next = current.filter((key) => visibleKeys.has(key));
@@ -709,6 +733,42 @@ const CalendarView = ({ selectedAccounts }) => {
       ? `Create ${count} Manual Task${count === 1 ? '' : 's'}`
       : 'Create Manual Tasks';
   })();
+  const selectFolderForScheduling = useCallback((folderId) => {
+    const folder = folders.find((item) => String(item._id) === String(folderId));
+    if (!folder) return false;
+
+    const parentId = normalizeFolderId(folder.parentFolderId) || 'root';
+    if (folder.kind === 'carousel_set') {
+      setScheduleContentMode('carousel');
+      setActiveFolderId(parentId);
+      setSelectedFolderId(folder._id);
+      setSelectedCarouselSets([folder._id]);
+      setSelectedMedia([]);
+      return true;
+    }
+
+    const childCarouselSets = folders.filter((item) => (
+      item.kind === 'carousel_set'
+      && (normalizeFolderId(item.parentFolderId) || 'root') === folder._id
+    ));
+
+    if (childCarouselSets.length > 0) {
+      setScheduleContentMode('carousel');
+      setActiveFolderId(folder._id);
+      setSelectedFolderId(folder._id);
+      setSelectedCarouselSets(childCarouselSets.map((item) => item._id));
+      setSelectedMedia([]);
+      return true;
+    }
+
+    setScheduleContentMode('assets');
+    setActiveFolderId(parentId);
+    setSelectedFolderId(folder._id);
+    setSelectedCarouselSets([]);
+    setSelectedMedia(getFolderAssetIds(folder._id));
+    return true;
+  }, [folders, getFolderAssetIds, normalizeFolderId]);
+
   useEffect(() => {
     if (!showComposer) {
       setDeselectedPlanRows([]);
@@ -743,25 +803,24 @@ const CalendarView = ({ selectedAccounts }) => {
     }
   }, [location.state, mediaList]);
 
-  const hasAutoSelected = useRef(false);
+  useEffect(() => {
+    const preselectedFolderId = location.state?.preselectedFolderId;
+    if (!preselectedFolderId || folders.length === 0 || handledPreselectedFolderIdRef.current === preselectedFolderId) return;
+
+    const selected = selectFolderForScheduling(preselectedFolderId);
+    if (!selected) return;
+
+    handledPreselectedFolderIdRef.current = preselectedFolderId;
+    setShowComposer(true);
+    window.history.replaceState({}, document.title);
+  }, [folders.length, location.state, selectFolderForScheduling]);
 
   useEffect(() => {
-    if (showComposer) {
-      if (!hasAutoSelected.current && channels.length > 0) {
-        if (!location.state?.preselectedMediaId && selectedAccounts.length === 1) {
-          const selectedId = selectedAccounts[0];
-          const isValidChannel = channels.some(chan => chan._id === selectedId);
-          if (isValidChannel) {
-            setSelectedChannels([selectedId]);
-          }
-        }
-        hasAutoSelected.current = true;
-      }
-    } else {
-      hasAutoSelected.current = false;
+    if (!showComposer) {
       setActiveFolderId('root');
+      setLibrarySearchQuery('');
     }
-  }, [showComposer, selectedAccounts, channels, location.state]);
+  }, [showComposer]);
 
   useEffect(() => {
     if (hasYoutubeSelected) {
@@ -774,21 +833,6 @@ const CalendarView = ({ selectedAccounts }) => {
       }
     }
   }, [hasYoutubeSelected]);
-
-  useEffect(() => {
-    if (showComposer && !isCarouselMode) {
-      if (selectedFolderId === 'root') {
-        const rootAssets = mediaList.filter(item => !item.folderId).map(item => item._id);
-        setSelectedMedia(rootAssets);
-      } else {
-        const folderAssets = mediaList.filter(item => {
-          const itemFolderId = item.folderId?._id || item.folderId;
-          return itemFolderId === selectedFolderId;
-        }).map(item => item._id);
-        setSelectedMedia(folderAssets);
-      }
-    }
-  }, [showComposer, mediaList, selectedFolderId, isCarouselMode]);
 
   useEffect(() => {
     setSelectedCarouselSets((current) => (
@@ -1224,6 +1268,19 @@ const CalendarView = ({ selectedAccounts }) => {
         ? current.filter(id => id !== channelId)
         : [...current, channelId]
     ));
+  };
+
+  const selectAllChannels = () => {
+    const selectableChannelIds = channels
+      .filter((channel) => canUseChannelForMode(channel))
+      .map((channel) => channel._id);
+    const hasUnverifiedChannel = channels.some((channel) => (
+      selectableChannelIds.includes(channel._id) && !isChannelVerified(channel)
+    ));
+    if (hasUnverifiedChannel && scheduleMode !== 'manual') {
+      setScheduleMode('manual');
+    }
+    setSelectedChannels(selectableChannelIds);
   };
 
   const handleScheduleModeChange = (mode) => {
@@ -1972,6 +2029,16 @@ const CalendarView = ({ selectedAccounts }) => {
             <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-2.5 p-2.5 overflow-hidden">
               
               <div className="rounded-xl border border-[#e5e7eb] bg-white shadow-sm flex flex-col overflow-hidden h-full">
+                <div className="flex items-center justify-between border-b border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Accounts</span>
+                  <button
+                    type="button"
+                    onClick={selectAllChannels}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800"
+                  >
+                    Select all
+                  </button>
+                </div>
                 <div className="p-2 space-y-1 flex-1 overflow-y-auto">
                   {channels.map(chan => {
                     const isSelected = selectedChannels.includes(chan._id);
@@ -2035,16 +2102,7 @@ const CalendarView = ({ selectedAccounts }) => {
                           setSelectedFolderId(parentId);
                           setSelectedCarouselSets([]);
                           setScheduleContentMode('assets');
-                          if (parentId === 'root') {
-                            const rootAssets = mediaList.filter(item => !item.folderId).map(item => item._id);
-                            setSelectedMedia(rootAssets);
-                          } else {
-                            const folderAssets = mediaList.filter(item => {
-                              const itemFolderId = item.folderId?._id || item.folderId;
-                              return itemFolderId === parentId;
-                            }).map(item => item._id);
-                            setSelectedMedia(folderAssets);
-                          }
+                          setSelectedMedia([]);
                         }}
                         className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5"
                       >
@@ -2055,8 +2113,20 @@ const CalendarView = ({ selectedAccounts }) => {
                       <span className="text-[10px] font-bold text-slate-700 truncate max-w-[120px]">{currentFolderObj?.name}</span>
                     </div>
                   ) : (
-                    <div className="bg-[#f8fafc] px-3 py-2">
-                      <span className="text-[10px] font-bold text-slate-700">Campaign Library</span>
+                    <div className="bg-[#f8fafc] px-3 py-2 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold text-slate-700">Campaign Library</span>
+                      </div>
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={librarySearchQuery}
+                          onChange={(e) => setLibrarySearchQuery(e.target.value)}
+                          placeholder="Search campaign library"
+                          className="h-7 w-full rounded-md border border-[#e2e8f0] bg-white pl-7 pr-2 text-[11px] font-semibold text-slate-700 placeholder:text-slate-400 focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]/20"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2065,7 +2135,7 @@ const CalendarView = ({ selectedAccounts }) => {
                   
                   {/* Folders & Sets List */}
                   <div className="w-full flex-1 overflow-y-auto p-2 space-y-1 bg-[#fafafa]">
-                    {currentLevelFolders.map(folder => {
+                    {visibleLevelFolders.map(folder => {
                       const isCarousel = folder.kind === 'carousel_set';
                       
                       // Active state calculation:
@@ -2087,11 +2157,11 @@ const CalendarView = ({ selectedAccounts }) => {
                           onClick={() => {
                             if (isCarousel) {
                               setScheduleContentMode('carousel');
-                              const parentId = normalizeFolderId(folder.parentFolderId) || 'root';
-                              setActiveFolderId(parentId);
-                              setSelectedFolderId(folder._id);
-                              setSelectedCarouselSets([folder._id]);
-                              setSelectedMedia([]);
+                          const parentId = normalizeFolderId(folder.parentFolderId) || 'root';
+                          setActiveFolderId(parentId);
+                          setSelectedFolderId(folder._id);
+                          setSelectedCarouselSets([folder._id]);
+                          setSelectedMedia([]);
                             } else {
                               // Check if this regular folder contains any carousel sets
                               const childCarouselSets = folders.filter(f => 
@@ -2100,22 +2170,18 @@ const CalendarView = ({ selectedAccounts }) => {
                               );
                               
                               if (childCarouselSets.length > 0) {
-                                // It's a Carousel holding folder! Switch to carousel mode, enter it and pre-select all sets
+                                // It's a Carousel holding folder. Show its sets in review, unselected by default.
                                 setScheduleContentMode('carousel');
                                 setActiveFolderId(folder._id);
                                 setSelectedFolderId(folder._id);
                                 setSelectedCarouselSets(childCarouselSets.map(c => c._id));
                                 setSelectedMedia([]);
                               } else {
-                                // Standard campaign folder with regular assets - select it but do not enter it!
+                                // Standard campaign folder: show its assets in review, unselected by default.
                                 setScheduleContentMode('assets');
                                 setSelectedFolderId(folder._id);
                                 setSelectedCarouselSets([]);
-                                const folderAssets = mediaList.filter(item => {
-                                  const itemFolderId = item.folderId?._id || item.folderId;
-                                  return itemFolderId === folder._id;
-                                }).map(item => item._id);
-                                setSelectedMedia(folderAssets);
+                                setSelectedMedia(getFolderAssetIds(folder._id));
                               }
                             }
                           }}
@@ -2155,9 +2221,9 @@ const CalendarView = ({ selectedAccounts }) => {
                       );
                     })}
 
-                    {currentLevelFolders.length === 0 && (
+                    {visibleLevelFolders.length === 0 && (
                       <div className="h-32 flex items-center justify-center text-[10px] text-slate-400 text-center p-4">
-                        Empty folder
+                        {librarySearchQuery.trim() ? 'No matching folders' : 'Empty folder'}
                       </div>
                     )}
                   </div>

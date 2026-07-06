@@ -3,6 +3,7 @@ import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Eye, Megaphone, RefreshCw, Rows3 } from 'lucide-react';
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getActiveCampaignId } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
 
@@ -35,6 +36,7 @@ const emptyMetrics = {
   last7DaysComments: 0,
   thisMonthLikes: 0,
   thisMonthComments: 0,
+  last30DaysPostedViews: [],
   accountRows: [],
 };
 
@@ -95,6 +97,67 @@ const MetricCard = ({ icon: Icon, label, value, note }) => (
     {note && <p className="m-0 mt-1.5 truncate text-[10px] text-[#8e8e93]">{note}</p>}
   </div>
 );
+
+const DailyViewsChart = ({ data = [] }) => {
+  const chartData = data.map((item) => {
+    const date = item.dateStr ? new Date(`${item.dateStr}T00:00:00`) : null;
+    return {
+      ...item,
+      label: date ? `${date.getDate()}` : '',
+      views: Number(item.views || 0),
+      posts: Number(item.posts || 0),
+    };
+  });
+
+  return (
+    <div className="mt-3 rounded-xl border border-[#d2d2d7] bg-white px-3 py-2.5">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Last 30 days</p>
+          <p className="m-0 mt-0.5 text-sm font-semibold text-[#1d1d1f]">Views by publish day</p>
+        </div>
+        <p className="m-0 text-[10px] font-medium text-[#8e8e93]">Published posts only</p>
+      </div>
+      <div className="h-36 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 9, fill: '#6e6e73' }}
+              tickLine={false}
+              axisLine={false}
+              interval={0}
+            />
+            <YAxis
+              tick={{ fontSize: 9, fill: '#6e6e73' }}
+              tickLine={false}
+              axisLine={false}
+              width={36}
+              tickFormatter={(value) => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
+            />
+            <Tooltip
+              cursor={{ fill: 'rgba(52, 120, 246, 0.08)' }}
+              formatter={(value, name, props) => [
+                name === 'views' ? numberFormat.format(value) : value,
+                name === 'views' ? 'Views' : 'Posts',
+              ]}
+              labelFormatter={(_, payload) => {
+                const item = payload?.[0]?.payload;
+                return item?.dateStr || '';
+              }}
+              contentStyle={{
+                borderRadius: 8,
+                border: '1px solid #d2d2d7',
+                fontSize: 11,
+              }}
+            />
+            <Bar dataKey="views" fill="#3478f6" radius={[3, 3, 0, 0]} maxBarSize={14} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+};
 
 const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
   const getDayTitle = (day) => {
@@ -294,7 +357,7 @@ export const AdminDashboard = () => {
   };
 
   return (
-    <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-[#f5f5f7] p-3 text-[#1d1d1f]">
+    <div className="min-h-screen bg-[#f5f5f7] p-3 pb-6 text-[#1d1d1f]">
       <div className="mb-2 flex flex-col gap-2 border-b border-[#e5e5ea] pb-2 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="m-0 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
@@ -386,7 +449,7 @@ export const AdminDashboard = () => {
           <p className="m-0 mt-1 text-xs text-[#6e6e73]">Create campaigns from Campaign Setup and attach publishing channels.</p>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex flex-col">
           {metricsLoading && (
             <div className="mb-2 rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs font-semibold text-[#6e6e73]">
               Loading selected campaign metrics...
@@ -397,7 +460,7 @@ export const AdminDashboard = () => {
               icon={Eye}
               label={`${selectedTimeLabel} views`}
               value={numberFormat.format(selectedViews)}
-              note={selectedTimeRange === 'lifetime' ? 'Current total on cached posts' : 'Based on daily snapshots when available'}
+              note={selectedTimeRange === 'lifetime' ? 'Current total on cached posts' : 'Posts published in selected range'}
             />
             <MetricCard
               icon={Eye}
@@ -419,7 +482,9 @@ export const AdminDashboard = () => {
             />
           </div>
 
-          <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#d2d2d7] bg-white">
+          <DailyViewsChart data={activeMetrics.last30DaysPostedViews || []} />
+
+          <div className="mt-3 rounded-xl border border-[#d2d2d7] bg-white">
             <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr_0.35fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
               <span>Channel</span>
               <span>User</span>
@@ -435,7 +500,7 @@ export const AdminDashboard = () => {
                 No publishing channels are associated with this campaign.
               </div>
             ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div>
                 {activeMetrics.accountRows.map((account) => (
                   <div
                     key={account._id}
