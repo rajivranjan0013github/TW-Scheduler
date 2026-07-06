@@ -38,6 +38,7 @@ export const CreatorCampaigns = () => {
   const queryClient = useQueryClient();
   const [campaigns, setCampaigns] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [todayTracking, setTodayTracking] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sharingPostId, setSharingPostId] = useState(null);
@@ -47,6 +48,45 @@ export const CreatorCampaigns = () => {
     ['manual', 'hybrid'].includes(post.scheduleMode)
     && !['posted_manual', 'published', 'published_auto', 'failed', 'cancelled'].includes(post.status)
   );
+
+  const getTodayTrackingQuery = () => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    return new URLSearchParams({
+      from: start.toISOString(),
+      to: end.toISOString(),
+    }).toString();
+  };
+
+  const formatPostTime = (value) => {
+    if (!value) return '--:--';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '--:--';
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  const fetchTodayTracking = useCallback((headers) => {
+    const query = getTodayTrackingQuery();
+    return queryClient.fetchQuery({
+      queryKey: ['creator', 'today-tracking', query],
+      queryFn: async () => {
+        const response = await fetch(`${API_BASE_URL}/api/scheduler/creator/today-tracking?${query}`, { headers });
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok || !contentType.includes('application/json')) {
+          return { accounts: {} };
+        }
+        try {
+          return await response.json();
+        } catch (error) {
+          console.warn('Creator tracking response was not valid JSON:', error);
+          return { accounts: {} };
+        }
+      },
+      staleTime: 60 * 1000,
+    });
+  }, [queryClient]);
 
   const updatePostInList = (updatedPost) => {
     setPosts((current) => current.map((post) => (
@@ -259,7 +299,7 @@ export const CreatorCampaigns = () => {
         if (!response.ok) throw new Error(`Request failed: ${response.status}`);
         return response.json();
       };
-      const [campData, postData] = await Promise.all([
+      const [campData, postData, trackingData] = await Promise.all([
         queryClient.fetchQuery({
           queryKey: ['creator', 'campaigns'],
           queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
@@ -270,16 +310,18 @@ export const CreatorCampaigns = () => {
           queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler/creator/posts`),
           staleTime: 20 * 1000,
         }),
+        fetchTodayTracking(headers),
       ]);
 
       setCampaigns(campData);
       setPosts(postData);
+      setTodayTracking(trackingData.accounts || {});
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [queryClient, token]);
+  }, [fetchTodayTracking, queryClient, token]);
 
   useEffect(() => {
     let active = true;
@@ -291,7 +333,7 @@ export const CreatorCampaigns = () => {
           if (!response.ok) throw new Error(`Request failed: ${response.status}`);
           return response.json();
         };
-        const [campData, postData] = await Promise.all([
+        const [campData, postData, trackingData] = await Promise.all([
           queryClient.fetchQuery({
             queryKey: ['creator', 'campaigns'],
             queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
@@ -302,12 +344,14 @@ export const CreatorCampaigns = () => {
             queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler/creator/posts`),
             staleTime: 20 * 1000,
           }),
+          fetchTodayTracking(headers),
         ]);
 
         if (!active) return;
 
         setCampaigns(campData);
         setPosts(postData);
+        setTodayTracking(trackingData.accounts || {});
       } catch (err) {
         if (active) setError(err.message);
       } finally {
@@ -322,7 +366,7 @@ export const CreatorCampaigns = () => {
     return () => {
       active = false;
     };
-  }, [queryClient, token]);
+  }, [fetchTodayTracking, queryClient, token]);
 
   const pendingVerifications = campaigns.flatMap((camp) => (
     (camp.channels || [])
@@ -501,6 +545,8 @@ export const CreatorCampaigns = () => {
 
                     return accountQueues.map((queue) => {
                       const queuePost = queue.nextPost;
+                      const tracking = todayTracking[queue.accountId] || { count: 0, posts: [] };
+                      const postedToday = tracking.posts || [];
                       const queuePosition = queuePost
                         ? Math.max(queue.posts.findIndex((post) => post._id === queuePost._id) + 1, 1)
                         : 0;
@@ -532,6 +578,41 @@ export const CreatorCampaigns = () => {
                               <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                                 {queue.actionableQueue.length} left
                               </span>
+                            )}
+                          </div>
+
+                          <div className="mb-2 rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-2">
+                            <div className="mb-1.5 flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-bold uppercase text-[#6e6e73]">Posted today</span>
+                              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-[#1d1d1f]">
+                                {tracking.count || 0}
+                              </span>
+                            </div>
+                            {postedToday.length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {postedToday.slice(0, 6).map((post) => (
+                                  <span
+                                    key={post.id}
+                                    className="inline-flex items-center gap-1 rounded-md border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked
+                                      readOnly
+                                      aria-label={`Posted at ${formatPostTime(post.publishedAt)}`}
+                                      className="h-3 w-3 accent-emerald-600"
+                                    />
+                                    {formatPostTime(post.publishedAt)}
+                                  </span>
+                                ))}
+                                {postedToday.length > 6 && (
+                                  <span className="rounded-md bg-white px-2 py-1 text-[10px] font-bold text-[#6e6e73]">
+                                    +{postedToday.length - 6}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="m-0 text-[10px] font-semibold text-[#8e8e93]">No live posts detected today</p>
                             )}
                           </div>
 

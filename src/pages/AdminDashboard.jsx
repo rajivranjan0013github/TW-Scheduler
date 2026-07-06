@@ -294,17 +294,16 @@ export const AdminDashboard = () => {
   };
 
   return (
-    <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-[#f5f5f7] p-4 text-[#1d1d1f]">
-      <div className="mb-3 flex flex-col gap-3 border-b border-[#e5e5ea] pb-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-[#f5f5f7] p-3 text-[#1d1d1f]">
+      <div className="mb-2 flex flex-col gap-2 border-b border-[#e5e5ea] pb-2 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
-          <h2 className="m-0 mt-0.5 text-lg font-semibold tracking-tight text-[#1d1d1f]">Performance</h2>
-          <p className="m-0 mt-0.5 text-[11px] text-[#8e8e93]">Campaign performance totals from cached published-post insights.</p>
+          <p className="m-0 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
+          <h2 className="m-0 text-base font-semibold tracking-tight text-[#1d1d1f]">Performance</h2>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="flex flex-col gap-1 sm:w-60">
-            <label htmlFor="campaign-select" className="text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-0.5 sm:w-56">
+            <label htmlFor="campaign-select" className="text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
               Campaign
             </label>
             <select
@@ -327,7 +326,7 @@ export const AdminDashboard = () => {
                 }
               }}
               disabled={campaigns.length === 0}
-              className="rounded-lg border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6] disabled:bg-[#f5f5f7] disabled:text-[#8e8e93]"
+              className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6] disabled:bg-[#f5f5f7] disabled:text-[#8e8e93]"
             >
               {campaigns.length === 0 ? (
                 <option value="">No campaigns</option>
@@ -339,15 +338,15 @@ export const AdminDashboard = () => {
             </select>
           </div>
 
-          <div className="flex flex-col gap-1 sm:w-36">
-            <label htmlFor="time-range-select" className="text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+          <div className="flex flex-col gap-0.5 sm:w-32">
+            <label htmlFor="time-range-select" className="text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
               Time
             </label>
             <select
               id="time-range-select"
               value={selectedTimeRange}
               onChange={(event) => setSelectedTimeRange(event.target.value)}
-              className="rounded-lg border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
+              className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
             >
               {Object.entries(timeRanges).map(([value, config]) => (
                 <option key={value} value={value}>{config.label}</option>
@@ -362,9 +361,9 @@ export const AdminDashboard = () => {
                 fetchCampaignMetrics(selectedCampaignId, { force: true });
               }
             }}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-xs font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+            className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-[#d2d2d7] bg-white px-2.5 text-[11px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCw className="h-3 w-3" />
             Refresh
           </button>
         </div>

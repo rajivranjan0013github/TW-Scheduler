@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Check, Clock, Loader2, MessageSquareText, PauseCircle, Save, X } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Loader2, MessageSquareText, PauseCircle, PlayCircle, Save, X } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from './LoadingVideoPreview';
@@ -92,6 +92,7 @@ const AccountQueueEditor = ({
   const selectedDeleting = selectedItems.some((item) => deletingPostIds.includes(item.post._id));
   const bulkBusy = selectedSaving || selectedDeleting;
   const hasUnpausedSelection = selectedItems.some((item) => item.post.status !== 'paused');
+  const allSelectedPaused = selectedCount > 0 && selectedItems.every((item) => item.post.status === 'paused');
   const hasCaptionChanges = selectedItems.some((item) => (
     (captionDrafts[item.post._id] ?? item.post.caption ?? '') !== (item.post.caption ?? '')
   ));
@@ -178,6 +179,17 @@ const AccountQueueEditor = ({
             >
               <PauseCircle className="h-3.5 w-3.5" />
               Pause
+            </button>
+          )}
+          {allSelectedPaused && (
+            <button
+              type="button"
+              onClick={() => saveBulkChanges({ status: 'resume' })}
+              disabled={bulkBusy}
+              className="inline-flex h-7 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <PlayCircle className="h-3.5 w-3.5" />
+              Resume
             </button>
           )}
           {selectedCount > 0 && (
