@@ -2,7 +2,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchFile } from '@ffmpeg/util';
-import { Download, Folder, Layers, Loader2, UploadCloud, X, ChevronRight, ChevronDown, Search } from 'lucide-react';
+import { Download, Folder, Layers, Loader2, UploadCloud, X, ChevronRight, ChevronDown, Search, RotateCcw, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { OUTPUT_WIDTH, OUTPUT_HEIGHT, OUTPUT_FPS, API_BASE_URL } from './videoEditor/videoEditorConstants';
 import { useFFmpeg } from './videoEditor/useFFmpeg';
@@ -115,6 +115,33 @@ export const VideoEditor = () => {
   const [currentQueueIndex, setCurrentQueueIndex] = useState(-1);
   const [isQueueRunning, setIsQueueRunning] = useState(false);
   const [generatingCaptions, setGeneratingCaptions] = useState(false);
+  const [pendingSingleExportRowId, setPendingSingleExportRowId] = useState(null);
+  const [hoveredTooltip, setHoveredTooltip] = useState(null);
+
+  const showTooltip = useCallback((e, text) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoveredTooltip({
+      text,
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+    });
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    setHoveredTooltip(null);
+  }, []);
+
+  useEffect(() => {
+    if (hoveredTooltip) {
+      const handleScroll = () => setHoveredTooltip(null);
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      window.addEventListener('wheel', handleScroll, { passive: true });
+      return () => {
+        window.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('wheel', handleScroll);
+      };
+    }
+  }, [hoveredTooltip]);
 
   // Object URL tracking
   const objectUrlsRef = useRef({ video1: '', video2: '', result: '' });
@@ -716,6 +743,31 @@ export const VideoEditor = () => {
       setStatusMessage(null);
     }, [bulkRows]);
 
+  const resetSingleBulkRow = useCallback((rowId) => {
+    setBulkRows((prev) => {
+      const next = prev.map((row) => (
+        row.id === rowId
+          ? {
+              ...row,
+              status: 'ready',
+              resultMediaId: '',
+              resultMediaUrl: '',
+              resultMediaName: '',
+              resultVideoUrl: '',
+            }
+          : row
+      ));
+      try {
+        localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(next.map(sanitizeBulkRowForStorage)));
+      } catch (err) {
+        console.error('Failed to reset bulk row for re-export:', err);
+      }
+      return next;
+    });
+  }, []);
+
+
+
   const handleGenerateAllCaptions = useCallback(async () => {
     setGeneratingCaptions(true);
     setStatusMessage(null);
@@ -908,6 +960,118 @@ export const VideoEditor = () => {
     overlay.bgColor,
     overlay.dragPos,
     audio.selectedAudio
+  ]);
+
+  // Automated single-row export effect
+  useEffect(() => {
+    if (!pendingSingleExportRowId) return;
+
+    const idx = bulkRows.findIndex((r) => r.id === pendingSingleExportRowId);
+    if (idx < 0) {
+      setPendingSingleExportRowId(null);
+      return;
+    }
+
+    if (idx !== currentQueueIndex) {
+      setCurrentQueueIndex(idx);
+      return;
+    }
+
+    const row = bulkRows[idx];
+    if (row.status === 'processing' || row.status === 'saving') {
+      return;
+    }
+
+    // Wait for current row's video durations to be resolved (> 0)
+    const videoDurations = preview.videoDurationsRef.current;
+    const input1Duration = videoDurations.input1 || preview.video1Ref.current?.duration || 0;
+    const input2Duration = videoDurations.input2 || preview.video2Ref.current?.duration || 0;
+    if (input1Duration > 0 && input2Duration > 0) {
+      if (videoDurations.input1 !== input1Duration) {
+        preview.setVideoDuration('input1', input1Duration);
+      }
+      if (videoDurations.input2 !== input2Duration) {
+        preview.setVideoDuration('input2', input2Duration);
+      }
+    } else {
+      setProgressMsg('Loading video assets...');
+      return;
+    }
+
+    if (video1Url !== row.video1Url || video2Url !== row.video2Url) {
+      setProgressMsg('Loading row into editor...');
+      return;
+    }
+
+    if (getAudioIdentity(audio.selectedAudio) !== getAudioIdentity(row.audio)) {
+      setProgressMsg('Loading row audio...');
+      return;
+    }
+
+    if (processing) return;
+
+    // Reset pending trigger
+    setPendingSingleExportRowId(null);
+
+    // Export single row
+    const runExport = async () => {
+      try {
+        updateBulkRowData(row.id, { status: 'processing' });
+        const result = await processVideo();
+        if (!result?.blob) {
+          throw new Error('Video export did not produce an output file.');
+        }
+        setBulkRows((prev) =>
+          prev.map((r) => (
+            r.id === row.id
+              ? {
+                  ...r,
+                  status: 'done',
+                  resultVideoUrl: result.url,
+                  resultMediaId: '',
+                  resultMediaUrl: '',
+                  resultMediaName: `bulk_video_${idx + 1}.mp4`,
+                }
+              : r
+          ))
+        );
+        try {
+          const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
+          const updated = saved.map((r) => (
+            r.id === row.id
+              ? {
+                  ...r,
+                  status: 'done',
+                  resultVideoUrl: result.url,
+                  resultMediaId: '',
+                  resultMediaUrl: '',
+                  resultMediaName: `bulk_video_${idx + 1}.mp4`,
+                }
+              : r
+          ));
+          localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(updated.map(sanitizeBulkRowForStorage)));
+        } catch (err) {
+          console.error('Failed to save bulk row update in localStorage:', err);
+        }
+        setStatusMessage({ type: 'success', text: `Successfully exported video #${idx + 1}!` });
+      } catch (err) {
+        console.error(err);
+        updateBulkRowData(row.id, { status: 'error' });
+        setStatusMessage({ type: 'error', text: err.message || `Failed to export video #${idx + 1}.` });
+      }
+    };
+    void runExport();
+  }, [
+    pendingSingleExportRowId,
+    currentQueueIndex,
+    bulkRows,
+    video1Url,
+    video2Url,
+    audio.selectedAudio,
+    processing,
+    processVideo,
+    updateBulkRowData,
+    preview
   ]);
 
   // Automated queue runner effect
@@ -1138,6 +1302,7 @@ export const VideoEditor = () => {
                   : `Export Again (${readyBulkCount})`
                 : 'Export Video'}
           </button>
+
           <button
             type="button"
             onClick={handleClearEditor}
@@ -1237,18 +1402,31 @@ export const VideoEditor = () => {
                         : 'cursor-pointer hover:bg-gray-50'
                     } ${isActive ? 'bg-slate-50' : 'bg-white'
                     }`}
-                    title={isQueueRunning ? 'Queue is running' : 'Load this row in the editor'}
                   >
                     {isActive && (
                       <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full bg-[#0071e3]" />
                     )}
                     <div className="flex items-center gap-2 min-w-0">
                       <span className={`text-[9px] font-bold ${isActive ? 'text-[#0071e3]' : 'text-gray-400'}`}>#{idx + 1}</span>
-                      <span className={`text-[11px] font-semibold truncate max-w-[110px] ${isActive ? 'text-gray-900' : 'text-gray-700'}`} title={row.caption}>
+                      <span className={`text-[11px] font-semibold truncate max-w-[110px] ${isActive ? 'text-gray-900' : 'text-gray-700'}`}>
                         {row.caption || '(No caption)'}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
+                      {!isQueueRunning && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingSingleExportRowId(row.id);
+                          }}
+                          disabled={processing}
+                          className="flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:bg-black/5 hover:text-[#0071e3] transition-colors disabled:opacity-50 shrink-0"
+                          title="Export this video only"
+                        >
+                          <Play className="h-3 w-3 fill-current" />
+                        </button>
+                      )}
                       <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
             row.status === 'done' ? 'bg-green-50 text-green-600' :
             row.status === 'processing' ? 'bg-amber-50 text-amber-600 animate-pulse' :
@@ -1489,7 +1667,11 @@ export const VideoEditor = () => {
                       </div>
                     </div>
                     {row.generatedCaption && (
-                      <p className="text-[9px] font-medium text-gray-500 line-clamp-3 whitespace-pre-line border-t border-gray-100 pt-1.5 mt-1" title={row.generatedCaption}>
+                      <p 
+                        className="text-[9px] font-medium text-gray-500 line-clamp-3 whitespace-pre-line border-t border-gray-100 pt-1.5 mt-1 cursor-help"
+                        onMouseEnter={(e) => showTooltip(e, row.generatedCaption)}
+                        onMouseLeave={hideTooltip}
+                      >
                         📝 {row.generatedCaption}
                       </p>
                     )}
@@ -1640,6 +1822,21 @@ export const VideoEditor = () => {
           onClose={() => setShowTextGenerator(false)}
           onSelectText={overlay.setText}
         />
+      )}
+
+      {hoveredTooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${hoveredTooltip.x}px`,
+            top: `${hoveredTooltip.y - 8}px`,
+            transform: 'translate(-50%, -100%)',
+          }}
+          className="pointer-events-none z-[9999] max-w-[240px] w-max rounded-lg bg-gray-950/80 backdrop-blur-md px-2.5 py-1.5 text-left text-[10px] font-medium text-white shadow-xl whitespace-pre-wrap break-words border border-white/10"
+        >
+          {hoveredTooltip.text}
+          <div className="absolute left-1/2 top-full h-1.5 w-1.5 -translate-x-1/2 -translate-y-[4px] rotate-45 bg-gray-950/80 backdrop-blur-md border-r border-b border-white/10" />
+        </div>
       )}
     </div>
   );
