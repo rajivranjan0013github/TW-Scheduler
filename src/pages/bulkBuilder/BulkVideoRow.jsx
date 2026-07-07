@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Video, Music, Type, X, Move } from 'lucide-react';
+import { Video, Music, Type, X, Move, Pencil } from 'lucide-react';
 import {
   FONT_FAMILY_CSS,
   PREVIEW_FRAME_HEIGHT,
@@ -414,32 +414,49 @@ export const BulkVideoRow = ({
         {/* Video 1 Preview Card */}
         <div className="relative">
           {resolvedVideo1Url ? (
-            <div
-              ref={video1TileRef}
-              role="button"
-              tabIndex={0}
-              onClick={(event) => handleTogglePreviewPlayback(event, 'video1')}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  handleTogglePreviewPlayback(event, 'video1');
-                }
-              }}
-              className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] transition-all hover:bg-[#1a1a1e]"
-            >
-              <LoadingVideoPreview
-                ref={video1PreviewRef}
-                src={resolvedVideo1Url}
-                className="absolute inset-0"
-                videoClassName="h-full w-full object-cover rounded-xl"
-                muted
-                playsInline
-                preload="metadata"
-                crossOrigin="anonymous"
-                onPlay={() => setPlayingPreviewSlot('video1')}
-                onPause={() => handlePreviewStopped('video1')}
-                onEnded={() => handlePreviewStopped('video1')}
-              />
-            </div>
+            <>
+              <div
+                ref={video1TileRef}
+                role="button"
+                tabIndex={0}
+                onClick={(event) => handleTogglePreviewPlayback(event, 'video1')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    handleTogglePreviewPlayback(event, 'video1');
+                  }
+                }}
+                className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] transition-all hover:bg-[#1a1a1e]"
+              >
+                <LoadingVideoPreview
+                  ref={video1PreviewRef}
+                  src={resolvedVideo1Url}
+                  className="absolute inset-0"
+                  videoClassName="h-full w-full object-cover rounded-xl"
+                  muted
+                  playsInline
+                  preload="metadata"
+                  crossOrigin="anonymous"
+                  onPlay={() => setPlayingPreviewSlot('video1')}
+                  onPause={() => handlePreviewStopped('video1')}
+                  onEnded={() => handlePreviewStopped('video1')}
+                />
+              </div>
+              {/* Change Video Button Overlay */}
+              <div className="absolute top-2 left-2 z-20">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPickVideo1();
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-black/60 border border-[#2d2d30] text-gray-300 hover:text-white hover:bg-black/85 transition-all shadow-md"
+                  title="Change Video 1"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </>
           ) : (
             <button
               type="button"
@@ -579,31 +596,48 @@ export const BulkVideoRow = ({
         {/* Video 2 Preview Card */}
         <div className="relative">
           {resolvedVideo2Url ? (
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={(event) => handleTogglePreviewPlayback(event, 'video2')}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  handleTogglePreviewPlayback(event, 'video2');
-                }
-              }}
-              className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] transition-all hover:bg-[#1a1a1e]"
-            >
-              <LoadingVideoPreview
-                ref={video2PreviewRef}
-                src={resolvedVideo2Url}
-                className="absolute inset-0"
-                videoClassName="h-full w-full object-cover rounded-xl"
-                muted
-                playsInline
-                preload="metadata"
-                crossOrigin="anonymous"
-                onPlay={() => setPlayingPreviewSlot('video2')}
-                onPause={() => handlePreviewStopped('video2')}
-                onEnded={() => handlePreviewStopped('video2')}
-              />
-            </div>
+            <>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={(event) => handleTogglePreviewPlayback(event, 'video2')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    handleTogglePreviewPlayback(event, 'video2');
+                  }
+                }}
+                className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] transition-all hover:bg-[#1a1a1e]"
+              >
+                <LoadingVideoPreview
+                  ref={video2PreviewRef}
+                  src={resolvedVideo2Url}
+                  className="absolute inset-0"
+                  videoClassName="h-full w-full object-cover rounded-xl"
+                  muted
+                  playsInline
+                  preload="metadata"
+                  crossOrigin="anonymous"
+                  onPlay={() => setPlayingPreviewSlot('video2')}
+                  onPause={() => handlePreviewStopped('video2')}
+                  onEnded={() => handlePreviewStopped('video2')}
+                />
+              </div>
+              {/* Change Video Button Overlay */}
+              <div className="absolute top-2 left-2 z-20">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPickVideo2();
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-black/60 border border-[#2d2d30] text-gray-300 hover:text-white hover:bg-black/85 transition-all shadow-md"
+                  title="Change Video 2"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </>
           ) : (
             <button
               type="button"

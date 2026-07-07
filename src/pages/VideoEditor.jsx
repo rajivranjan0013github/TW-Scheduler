@@ -1,8 +1,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchFile } from '@ffmpeg/util';
-import { Download, Folder, Layers, Loader2, UploadCloud, X } from 'lucide-react';
+import { Download, Folder, Layers, Loader2, UploadCloud, X, ChevronRight, ChevronDown, Search, RotateCcw, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { OUTPUT_WIDTH, OUTPUT_HEIGHT, OUTPUT_FPS, API_BASE_URL } from './videoEditor/videoEditorConstants';
 import { useFFmpeg } from './videoEditor/useFFmpeg';
@@ -63,6 +63,9 @@ const getTextSettingsSignature = (settings) => JSON.stringify({
   bgColor: settings?.bgColor || '',
 });
 
+const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
+const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
+
 export const VideoEditor = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -90,14 +93,55 @@ export const VideoEditor = () => {
   const [folderPickerRowId, setFolderPickerRowId] = useState(null);
   const [folderPickerMode, setFolderPickerMode] = useState('single');
   const [selectedSaveFolderId, setSelectedSaveFolderId] = useState('root');
+  const [expandedFolderIds, setExpandedFolderIds] = useState(new Set());
   const [bulkSavingRowId, setBulkSavingRowId] = useState(null);
   const [folderPickerError, setFolderPickerError] = useState('');
+  const [folderSearch, setFolderSearch] = useState('');
+
+  const toggleFolderExpanded = useCallback((folderId) => {
+    setExpandedFolderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderId)) {
+        next.delete(folderId);
+      } else {
+        next.add(folderId);
+      }
+      return next;
+    });
+  }, []);
 
   // Bulk Queue State
   const [bulkRows, setBulkRows] = useState([]);
   const [currentQueueIndex, setCurrentQueueIndex] = useState(-1);
   const [isQueueRunning, setIsQueueRunning] = useState(false);
   const [generatingCaptions, setGeneratingCaptions] = useState(false);
+  const [pendingSingleExportRowId, setPendingSingleExportRowId] = useState(null);
+  const [hoveredTooltip, setHoveredTooltip] = useState(null);
+
+  const showTooltip = useCallback((e, text) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoveredTooltip({
+      text,
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+    });
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    setHoveredTooltip(null);
+  }, []);
+
+  useEffect(() => {
+    if (hoveredTooltip) {
+      const handleScroll = () => setHoveredTooltip(null);
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      window.addEventListener('wheel', handleScroll, { passive: true });
+      return () => {
+        window.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('wheel', handleScroll);
+      };
+    }
+  }, [hoveredTooltip]);
 
   // Object URL tracking
   const objectUrlsRef = useRef({ video1: '', video2: '', result: '' });
@@ -438,6 +482,8 @@ export const VideoEditor = () => {
     setFolderPickerRowId(rowId);
     setFolderPickerMode('single');
     setSelectedSaveFolderId('root');
+    setExpandedFolderIds(new Set());
+    setFolderSearch('');
     void loadMediaFolders();
   }, [loadMediaFolders]);
 
@@ -445,6 +491,8 @@ export const VideoEditor = () => {
     setFolderPickerRowId('all');
     setFolderPickerMode('all');
     setSelectedSaveFolderId('root');
+    setExpandedFolderIds(new Set());
+    setFolderSearch('');
     void loadMediaFolders();
   }, [loadMediaFolders]);
 
@@ -452,8 +500,76 @@ export const VideoEditor = () => {
     setFolderPickerRowId('single-editor');
     setFolderPickerMode('single-editor');
     setSelectedSaveFolderId('root');
+    setExpandedFolderIds(new Set());
+    setFolderSearch('');
     void loadMediaFolders();
   }, [loadMediaFolders]);
+
+  const renderFolderTree = (parentId = 'root', depth = 0) => {
+    const levelFolders = folders
+      .filter((f) => getFolderParentId(f) === parentId)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }));
+    if (levelFolders.length === 0) return null;
+
+    return (
+      <div className="space-y-1">
+        {levelFolders.map((folder) => {
+          const hasSubfolders = folders.some((f) => getFolderParentId(f) === folder._id);
+          const isExpanded = expandedFolderIds.has(folder._id);
+          const isSelected = selectedSaveFolderId === folder._id;
+
+          return (
+            <div key={folder._id} className="flex flex-col">
+              <div
+                style={{ paddingLeft: `${depth * 16}px` }}
+                className={`flex items-center justify-between rounded-xl px-2 py-1.5 transition-colors border ${
+                  isSelected
+                    ? 'bg-[#ff5500]/10 border-[#ff5500]/25'
+                    : 'bg-gray-50 border-transparent hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  {hasSubfolders ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFolderExpanded(folder._id);
+                      }}
+                      className="flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:bg-black/5 hover:text-gray-600 transition-colors shrink-0"
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  ) : (
+                    <div className="w-5 h-5 shrink-0" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSaveFolderId(folder._id)}
+                    className={`flex flex-1 items-center gap-2 text-left text-xs font-bold ${
+                      isSelected ? 'text-[#ff5500]' : 'text-gray-700'
+                    }`}
+                  >
+                    <Folder className={`h-4 w-4 ${isSelected ? 'text-[#ff5500]' : 'text-gray-400'}`} />
+                    <span className="truncate">{folder.name}</span>
+                  </button>
+                </div>
+              </div>
+              {hasSubfolders && isExpanded && (
+                <div className="mt-1">
+                  {renderFolderTree(folder._id, depth + 1)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   const uploadVideoBlobToFolder = useCallback(async (blob, folderId, filename = `merged_${Date.now()}.mp4`, caption = '') => {
     const file = new File([blob], filename, { type: 'video/mp4' });
@@ -626,6 +742,31 @@ export const VideoEditor = () => {
       setIsQueueRunning(true);
       setStatusMessage(null);
     }, [bulkRows]);
+
+  const resetSingleBulkRow = useCallback((rowId) => {
+    setBulkRows((prev) => {
+      const next = prev.map((row) => (
+        row.id === rowId
+          ? {
+              ...row,
+              status: 'ready',
+              resultMediaId: '',
+              resultMediaUrl: '',
+              resultMediaName: '',
+              resultVideoUrl: '',
+            }
+          : row
+      ));
+      try {
+        localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(next.map(sanitizeBulkRowForStorage)));
+      } catch (err) {
+        console.error('Failed to reset bulk row for re-export:', err);
+      }
+      return next;
+    });
+  }, []);
+
+
 
   const handleGenerateAllCaptions = useCallback(async () => {
     setGeneratingCaptions(true);
@@ -819,6 +960,118 @@ export const VideoEditor = () => {
     overlay.bgColor,
     overlay.dragPos,
     audio.selectedAudio
+  ]);
+
+  // Automated single-row export effect
+  useEffect(() => {
+    if (!pendingSingleExportRowId) return;
+
+    const idx = bulkRows.findIndex((r) => r.id === pendingSingleExportRowId);
+    if (idx < 0) {
+      setPendingSingleExportRowId(null);
+      return;
+    }
+
+    if (idx !== currentQueueIndex) {
+      setCurrentQueueIndex(idx);
+      return;
+    }
+
+    const row = bulkRows[idx];
+    if (row.status === 'processing' || row.status === 'saving') {
+      return;
+    }
+
+    // Wait for current row's video durations to be resolved (> 0)
+    const videoDurations = preview.videoDurationsRef.current;
+    const input1Duration = videoDurations.input1 || preview.video1Ref.current?.duration || 0;
+    const input2Duration = videoDurations.input2 || preview.video2Ref.current?.duration || 0;
+    if (input1Duration > 0 && input2Duration > 0) {
+      if (videoDurations.input1 !== input1Duration) {
+        preview.setVideoDuration('input1', input1Duration);
+      }
+      if (videoDurations.input2 !== input2Duration) {
+        preview.setVideoDuration('input2', input2Duration);
+      }
+    } else {
+      setProgressMsg('Loading video assets...');
+      return;
+    }
+
+    if (video1Url !== row.video1Url || video2Url !== row.video2Url) {
+      setProgressMsg('Loading row into editor...');
+      return;
+    }
+
+    if (getAudioIdentity(audio.selectedAudio) !== getAudioIdentity(row.audio)) {
+      setProgressMsg('Loading row audio...');
+      return;
+    }
+
+    if (processing) return;
+
+    // Reset pending trigger
+    setPendingSingleExportRowId(null);
+
+    // Export single row
+    const runExport = async () => {
+      try {
+        updateBulkRowData(row.id, { status: 'processing' });
+        const result = await processVideo();
+        if (!result?.blob) {
+          throw new Error('Video export did not produce an output file.');
+        }
+        setBulkRows((prev) =>
+          prev.map((r) => (
+            r.id === row.id
+              ? {
+                  ...r,
+                  status: 'done',
+                  resultVideoUrl: result.url,
+                  resultMediaId: '',
+                  resultMediaUrl: '',
+                  resultMediaName: `bulk_video_${idx + 1}.mp4`,
+                }
+              : r
+          ))
+        );
+        try {
+          const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
+          const updated = saved.map((r) => (
+            r.id === row.id
+              ? {
+                  ...r,
+                  status: 'done',
+                  resultVideoUrl: result.url,
+                  resultMediaId: '',
+                  resultMediaUrl: '',
+                  resultMediaName: `bulk_video_${idx + 1}.mp4`,
+                }
+              : r
+          ));
+          localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(updated.map(sanitizeBulkRowForStorage)));
+        } catch (err) {
+          console.error('Failed to save bulk row update in localStorage:', err);
+        }
+        setStatusMessage({ type: 'success', text: `Successfully exported video #${idx + 1}!` });
+      } catch (err) {
+        console.error(err);
+        updateBulkRowData(row.id, { status: 'error' });
+        setStatusMessage({ type: 'error', text: err.message || `Failed to export video #${idx + 1}.` });
+      }
+    };
+    void runExport();
+  }, [
+    pendingSingleExportRowId,
+    currentQueueIndex,
+    bulkRows,
+    video1Url,
+    video2Url,
+    audio.selectedAudio,
+    processing,
+    processVideo,
+    updateBulkRowData,
+    preview
   ]);
 
   // Automated queue runner effect
@@ -1049,6 +1302,7 @@ export const VideoEditor = () => {
                   : `Export Again (${readyBulkCount})`
                 : 'Export Video'}
           </button>
+
           <button
             type="button"
             onClick={handleClearEditor}
@@ -1148,18 +1402,31 @@ export const VideoEditor = () => {
                         : 'cursor-pointer hover:bg-gray-50'
                     } ${isActive ? 'bg-slate-50' : 'bg-white'
                     }`}
-                    title={isQueueRunning ? 'Queue is running' : 'Load this row in the editor'}
                   >
                     {isActive && (
                       <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full bg-[#0071e3]" />
                     )}
                     <div className="flex items-center gap-2 min-w-0">
                       <span className={`text-[9px] font-bold ${isActive ? 'text-[#0071e3]' : 'text-gray-400'}`}>#{idx + 1}</span>
-                      <span className={`text-[11px] font-semibold truncate max-w-[110px] ${isActive ? 'text-gray-900' : 'text-gray-700'}`} title={row.caption}>
+                      <span className={`text-[11px] font-semibold truncate max-w-[110px] ${isActive ? 'text-gray-900' : 'text-gray-700'}`}>
                         {row.caption || '(No caption)'}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
+                      {!isQueueRunning && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingSingleExportRowId(row.id);
+                          }}
+                          disabled={processing}
+                          className="flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:bg-black/5 hover:text-[#0071e3] transition-colors disabled:opacity-50 shrink-0"
+                          title="Export this video only"
+                        >
+                          <Play className="h-3 w-3 fill-current" />
+                        </button>
+                      )}
                       <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
             row.status === 'done' ? 'bg-green-50 text-green-600' :
             row.status === 'processing' ? 'bg-amber-50 text-amber-600 animate-pulse' :
@@ -1400,7 +1667,11 @@ export const VideoEditor = () => {
                       </div>
                     </div>
                     {row.generatedCaption && (
-                      <p className="text-[9px] font-medium text-gray-500 line-clamp-3 whitespace-pre-line border-t border-gray-100 pt-1.5 mt-1" title={row.generatedCaption}>
+                      <p 
+                        className="text-[9px] font-medium text-gray-500 line-clamp-3 whitespace-pre-line border-t border-gray-100 pt-1.5 mt-1 cursor-help"
+                        onMouseEnter={(e) => showTooltip(e, row.generatedCaption)}
+                        onMouseLeave={hideTooltip}
+                      >
                         📝 {row.generatedCaption}
                       </p>
                     )}
@@ -1414,8 +1685,8 @@ export const VideoEditor = () => {
 
       {folderPickerRowId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl h-[520px] flex flex-col">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 shrink-0">
               <div>
                 <h3 className="text-sm font-bold text-gray-950">Choose Save Folder</h3>
                 <p className="mt-0.5 text-[11px] font-medium text-gray-500">
@@ -1433,12 +1704,23 @@ export const VideoEditor = () => {
               </button>
             </div>
 
-            <div className="max-h-[420px] overflow-y-auto p-5">
+            <div className="overflow-y-auto p-5 flex-grow">
               {folderPickerError && (
                 <div className="mb-3 rounded-xl border border-red-100 bg-red-50 p-3 text-xs font-semibold text-red-600">
                   {folderPickerError}
                 </div>
               )}
+
+              <label className="mb-3 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-400 focus-within:border-[#ff5500]/60">
+                <Search className="h-3.5 w-3.5 shrink-0" />
+                <input
+                  type="search"
+                  value={folderSearch}
+                  onChange={(e) => setFolderSearch(e.target.value)}
+                  placeholder="Search folders..."
+                  className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-gray-700 outline-none placeholder:text-gray-450"
+                />
+              </label>
 
               {foldersLoading ? (
                 <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 p-4 text-xs font-semibold text-gray-500">
@@ -1447,38 +1729,43 @@ export const VideoEditor = () => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSaveFolderId('root')}
-                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-bold transition-colors ${
-                      selectedSaveFolderId === 'root'
-                        ? 'bg-[#ff5500] text-white'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Folder className="h-4 w-4" />
-                    Library Root
-                  </button>
-                  {folders.map((folder) => (
-                    <button
-                      key={folder._id}
-                      type="button"
-                      onClick={() => setSelectedSaveFolderId(folder._id)}
-                      className={`flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-xs font-bold transition-colors ${
-                        selectedSaveFolderId === folder._id
-                          ? 'bg-[#ff5500] text-white'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <Folder className="h-4 w-4" />
-                      <span className="truncate">{folder.name}</span>
-                    </button>
-                  ))}
+                  {folderSearch.trim() ? (
+                    <div className="space-y-1">
+                      {folders
+                        .filter((f) => getFolderParentId(f) === 'root' && (f.name || '').toLowerCase().includes(folderSearch.trim().toLowerCase()))
+                        .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' }))
+                        .map((folder) => {
+                          const isSelected = selectedSaveFolderId === folder._id;
+                          return (
+                            <button
+                              key={folder._id}
+                              type="button"
+                              onClick={() => setSelectedSaveFolderId(folder._id)}
+                              className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold border transition-colors ${
+                                isSelected
+                                  ? 'bg-[#ff5500]/10 border-[#ff5500]/25 text-[#ff5500]'
+                                  : 'bg-gray-50 border-transparent text-gray-700 hover:bg-gray-100'
+                              }`}
+                            >
+                              <Folder className={`h-4 w-4 ${isSelected ? 'text-[#ff5500]' : 'text-gray-450'}`} />
+                              <span className="truncate">{folder.name}</span>
+                            </button>
+                          );
+                        })}
+                      {folders.filter((f) => getFolderParentId(f) === 'root' && (f.name || '').toLowerCase().includes(folderSearch.trim().toLowerCase())).length === 0 && (
+                        <div className="text-center py-4 text-xs text-gray-400 font-semibold">
+                          No folders match "{folderSearch}"
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    renderFolderTree('root', 0)
+                  )}
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 shrink-0">
               <button
                 type="button"
                 onClick={() => setFolderPickerRowId(null)}
@@ -1535,6 +1822,21 @@ export const VideoEditor = () => {
           onClose={() => setShowTextGenerator(false)}
           onSelectText={overlay.setText}
         />
+      )}
+
+      {hoveredTooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${hoveredTooltip.x}px`,
+            top: `${hoveredTooltip.y - 8}px`,
+            transform: 'translate(-50%, -100%)',
+          }}
+          className="pointer-events-none z-[9999] max-w-[240px] w-max rounded-lg bg-gray-950/80 backdrop-blur-md px-2.5 py-1.5 text-left text-[10px] font-medium text-white shadow-xl whitespace-pre-wrap break-words border border-white/10"
+        >
+          {hoveredTooltip.text}
+          <div className="absolute left-1/2 top-full h-1.5 w-1.5 -translate-x-1/2 -translate-y-[4px] rotate-45 bg-gray-950/80 backdrop-blur-md border-r border-b border-white/10" />
+        </div>
       )}
     </div>
   );

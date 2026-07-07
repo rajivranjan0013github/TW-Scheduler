@@ -15,6 +15,14 @@ const naturalFileCollator = new Intl.Collator(undefined, {
   sensitivity: 'base',
 });
 
+const formatDuration = (seconds) => {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '';
+  const totalSeconds = Math.round(seconds);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+};
+
 export const BulkAssetPickerDialog = ({
   token,
   onClose,
@@ -36,11 +44,27 @@ export const BulkAssetPickerDialog = ({
   const [audioTracks, setAudioTracks] = useState([]);
   const [myAudioTracks, setMyAudioTracks] = useState([]);
   const [loadingAudio, setLoadingAudio] = useState(false);
+  const [trackDurations, setTrackDurations] = useState({});
+
+  const handleAudioDuration = useCallback((trackId, duration) => {
+    setTrackDurations((current) => {
+      const formatted = formatDuration(duration);
+      if (!formatted || current[trackId] === formatted) return current;
+      return { ...current, [trackId]: formatted };
+    });
+  }, []);
 
   // Multi-select state
   const [selectedVideo1, setSelectedVideo1] = useState([]);
   const [selectedVideo2, setSelectedVideo2] = useState([]);
   const [selectedAudio, setSelectedAudio] = useState([]);
+  const [audioSearch, setAudioSearch] = useState('');
+
+  const filteredAudioTracks = useMemo(() => {
+    const query = audioSearch.trim().toLowerCase();
+    if (!query) return audioTracks;
+    return audioTracks.filter((track) => (track.name || '').toLowerCase().includes(query));
+  }, [audioSearch, audioTracks]);
 
   const headers = useMemo(() => (
     token ? { Authorization: `Bearer ${token}` } : {}
@@ -510,27 +534,62 @@ export const BulkAssetPickerDialog = ({
                 )}
               </>
             ) : (
-              // Audio Tab
+               // Audio Tab
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3" style={{ color: '#71717a' }}>Platform Music Tracks</h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500" style={{ color: '#71717a' }}>Platform Music Tracks</h4>
+                    <label className="flex items-center gap-1.5 rounded-lg border border-[#2d2d30] bg-[#18181b] px-2.5 py-1 text-gray-400 focus-within:border-[#ff5500]/60 max-w-[200px]">
+                      <Search className="h-3 w-3 shrink-0" />
+                      <input
+                        type="search"
+                        value={audioSearch}
+                        onChange={(e) => setAudioSearch(e.target.value)}
+                        placeholder="Search music..."
+                        className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold text-white outline-none placeholder:text-gray-600"
+                      />
+                    </label>
+                  </div>
                   {loadingAudio ? (
                     <div className="flex items-center gap-2 text-xs font-semibold text-gray-400">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading tracks...
                     </div>
-                  ) : audioTracks.length === 0 ? (
-                    <div className="text-xs text-gray-400 font-medium">No tracks found.</div>
+                  ) : filteredAudioTracks.length === 0 ? (
+                    <div className="text-xs text-gray-400 font-medium">
+                      {audioSearch.trim() ? 'No matching tracks found.' : 'No tracks found.'}
+                    </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                      {audioTracks.map((item) => {
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                      {filteredAudioTracks.map((item) => {
                         const selected = isAudioSelected(item);
                         return (
                           <button
                             key={item.id}
                             type="button"
                             onClick={() => handleToggleAudio(item)}
-                            className={`flex items-center justify-between rounded-xl border p-3.5 text-left text-xs font-semibold transition-all hover:shadow-sm ${
+                            onMouseEnter={(e) => {
+                              const button = e.currentTarget;
+                              const audio = button.querySelector('audio');
+                              const progress = button.querySelector('[data-audio-progress]');
+                              if (!audio) return;
+                              audio.play().catch(() => {});
+                              const update = () => {
+                                if (audio.paused) return;
+                                const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+                                if (progress) progress.style.width = `${pct}%`;
+                                requestAnimationFrame(update);
+                              };
+                              requestAnimationFrame(update);
+                            }}
+                            onMouseLeave={(e) => {
+                              const button = e.currentTarget;
+                              const audio = button.querySelector('audio');
+                              const progress = button.querySelector('[data-audio-progress]');
+                              if (audio) { audio.pause(); audio.currentTime = 0; }
+                              if (progress) progress.style.width = '0%';
+                            }}
+                            className={`flex items-center justify-between rounded-xl border p-3.5 text-left text-xs font-semibold transition-all hover:shadow-sm relative overflow-hidden ${
                               selected
                                 ? 'border-[#ff5500] bg-[#ff5500]/10 text-[#ff5500]'
                                 : 'border-[#2d2d30] bg-[#121214] text-white hover:border-[#3a3a3c]'
@@ -538,13 +597,36 @@ export const BulkAssetPickerDialog = ({
                           >
                             <span className="flex min-w-0 items-center gap-2">
                               <Music className={`h-4 w-4 flex-shrink-0 ${selected ? 'text-[#ff5500]' : 'text-gray-500'}`} />
-                              <span className="truncate">{item.name}</span>
+                              <span className="flex min-w-0 flex-col">
+                                <span className="truncate">{item.name}</span>
+                                {trackDurations[item.id] && (
+                                  <span className="text-[10px] text-gray-400 font-medium mt-0.5">
+                                    {trackDurations[item.id]}
+                                  </span>
+                                )}
+                              </span>
                             </span>
                             {selected ? (
                               <CheckSquare className="w-4 h-4 text-[#ff5500] flex-shrink-0" />
                             ) : (
                               <Square className="w-4 h-4 text-gray-600 flex-shrink-0" />
                             )}
+                            {item.url && (
+                              <audio
+                                src={item.url}
+                                crossOrigin="anonymous"
+                                preload="metadata"
+                                onLoadedMetadata={(e) => handleAudioDuration(item.id, e.currentTarget.duration)}
+                                className="hidden"
+                              />
+                            )}
+                            {/* Tiny progress line at the bottom edge */}
+                            <div className="absolute bottom-0 left-0 right-0 h-[2.5px] overflow-hidden bg-transparent">
+                              <div
+                                data-audio-progress
+                                className="h-full w-0 bg-[#ff5500] transition-none"
+                              />
+                            </div>
                           </button>
                         );
                       })}
@@ -555,7 +637,7 @@ export const BulkAssetPickerDialog = ({
                 {myAudioTracks.length > 0 && (
                   <div>
                     <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3" style={{ color: '#71717a' }}>My Uploaded Tracks</h4>
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                       {myAudioTracks.map((item) => {
                         const selected = isAudioSelected(item);
                         return (
@@ -563,7 +645,28 @@ export const BulkAssetPickerDialog = ({
                             key={item.id}
                             type="button"
                             onClick={() => handleToggleAudio(item)}
-                            className={`flex items-center justify-between rounded-xl border p-3.5 text-left text-xs font-semibold transition-all hover:shadow-sm ${
+                            onMouseEnter={(e) => {
+                              const button = e.currentTarget;
+                              const audio = button.querySelector('audio');
+                              const progress = button.querySelector('[data-audio-progress]');
+                              if (!audio) return;
+                              audio.play().catch(() => {});
+                              const update = () => {
+                                if (audio.paused) return;
+                                const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+                                if (progress) progress.style.width = `${pct}%`;
+                                requestAnimationFrame(update);
+                              };
+                              requestAnimationFrame(update);
+                            }}
+                            onMouseLeave={(e) => {
+                              const button = e.currentTarget;
+                              const audio = button.querySelector('audio');
+                              const progress = button.querySelector('[data-audio-progress]');
+                              if (audio) { audio.pause(); audio.currentTime = 0; }
+                              if (progress) progress.style.width = '0%';
+                            }}
+                            className={`flex items-center justify-between rounded-xl border p-3.5 text-left text-xs font-semibold transition-all hover:shadow-sm relative overflow-hidden ${
                               selected
                                 ? 'border-[#ff5500] bg-[#ff5500]/10 text-[#ff5500]'
                                 : 'border-[#2d2d30] bg-[#121214] text-white hover:border-[#3a3a3c]'
@@ -571,13 +674,36 @@ export const BulkAssetPickerDialog = ({
                           >
                             <span className="flex min-w-0 items-center gap-2">
                               <Music className={`h-4 w-4 flex-shrink-0 ${selected ? 'text-[#ff5500]' : 'text-gray-500'}`} />
-                              <span className="truncate">{item.name}</span>
+                              <span className="flex min-w-0 flex-col">
+                                <span className="truncate">{item.name}</span>
+                                {trackDurations[item.id] && (
+                                  <span className="text-[10px] text-gray-400 font-medium mt-0.5">
+                                    {trackDurations[item.id]}
+                                  </span>
+                                )}
+                              </span>
                             </span>
                             {selected ? (
                               <CheckSquare className="w-4 h-4 text-[#ff5500] flex-shrink-0" />
                             ) : (
                               <Square className="w-4 h-4 text-gray-600 flex-shrink-0" />
                             )}
+                            {item.url && (
+                              <audio
+                                src={item.url}
+                                crossOrigin="anonymous"
+                                preload="metadata"
+                                onLoadedMetadata={(e) => handleAudioDuration(item.id, e.currentTarget.duration)}
+                                className="hidden"
+                              />
+                            )}
+                            {/* Tiny progress line at the bottom edge */}
+                            <div className="absolute bottom-0 left-0 right-0 h-[2.5px] overflow-hidden bg-transparent">
+                              <div
+                                data-audio-progress
+                                className="h-full w-0 bg-[#ff5500] transition-none"
+                              />
+                            </div>
                           </button>
                         );
                       })}
