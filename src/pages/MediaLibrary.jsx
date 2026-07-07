@@ -1,7 +1,7 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertTriangle, Folder, GripVertical, Images, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles, Tags, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Folder, GripVertical, Images, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles, Tags, X } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
@@ -82,6 +82,10 @@ const getImportedCaption = (captionMap, mediaFile) => {
   }
   return '';
 };
+
+const isSupportedMediaFile = (file) => (
+  file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')
+);
 
 const getPathParts = (file) => (file.webkitRelativePath || file.name || '')
   .split('/')
@@ -192,6 +196,37 @@ const buildSingleCarouselDraft = (files, setName = 'Carousel Set') => {
   }];
 };
 
+const buildFileUploadDrafts = async (files) => {
+  const captionMap = await buildCaptionFileMap(files);
+  return files
+    .filter(isSupportedMediaFile)
+    .map((file, uploadIndex) => {
+      const caption = getImportedCaption(captionMap, file);
+      return {
+        id: `file-upload-${Date.now()}-${uploadIndex}`,
+        file,
+        name: file.name,
+        uploadIndex,
+        caption,
+        previewUrl: URL.createObjectURL(file),
+      };
+    });
+};
+
+const formatFileSize = (size) => {
+  if (!Number.isFinite(size) || size <= 0) return '';
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`;
+  return `${size} B`;
+};
+
+const createUploadBatchId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 const UPLOAD_CONCURRENCY = 20;
 
 const runWithConcurrency = async (items, limit, worker) => {
@@ -237,6 +272,9 @@ export const MediaLibrary = () => {
   const [folderTagInput, setFolderTagInput] = useState('');
   const [savingFolderTagsId, setSavingFolderTagsId] = useState(null);
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null);
+  const [folderPendingDelete, setFolderPendingDelete] = useState(null);
+  const [deletingFolderId, setDeletingFolderId] = useState(null);
+  const [deleteStatusMessage, setDeleteStatusMessage] = useState('');
   const [openMediaMenuId, setOpenMediaMenuId] = useState(null);
   const [selectedMediaIds, setSelectedMediaIds] = useState([]);
   const [captionDialogMedia, setCaptionDialogMedia] = useState(null);
@@ -253,7 +291,11 @@ export const MediaLibrary = () => {
   const [carouselDrafts, setCarouselDrafts] = useState([]);
   const [carouselParentName, setCarouselParentName] = useState('');
   const [carouselUploadInputKey, setCarouselUploadInputKey] = useState(0);
+  const [fileUploadDrafts, setFileUploadDrafts] = useState([]);
+  const [fileUploadInputKey, setFileUploadInputKey] = useState(0);
+  const [uploadFolderName, setUploadFolderName] = useState('');
   const [draggingSlide, setDraggingSlide] = useState(null);
+  const fileUploadDraftsRef = useRef([]);
   // Per-set save progress: { [setId]: 'pending' | 'uploading' | 'done' | 'error' }
   const [setProgress, setSetProgress] = useState({});
 
@@ -291,10 +333,40 @@ export const MediaLibrary = () => {
     setCarouselUploadInputKey((current) => current + 1);
   };
 
+  const clearFileUploadDrafts = () => {
+    fileUploadDrafts.forEach((draft) => URL.revokeObjectURL(draft.previewUrl));
+    setFileUploadDrafts([]);
+    setUploadFolderName('');
+    setFileUploadInputKey((current) => current + 1);
+  };
+
+  useEffect(() => {
+    fileUploadDraftsRef.current = fileUploadDrafts;
+  }, [fileUploadDrafts]);
+
+  useEffect(() => () => {
+    fileUploadDraftsRef.current.forEach((draft) => URL.revokeObjectURL(draft.previewUrl));
+  }, []);
+
+  useEffect(() => {
+    if (!openFolderMenuId) return undefined;
+
+    const closeFolderMenuOnOutsideClick = (event) => {
+      if (event.target.closest('[data-folder-menu]')) return;
+      setOpenFolderMenuId(null);
+    };
+
+    document.addEventListener('pointerdown', closeFolderMenuOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', closeFolderMenuOnOutsideClick);
+  }, [openFolderMenuId]);
+
   const uploadMediaFiles = async ({
     files,
     folderId,
     getCaption = () => '',
+    getUploadOrder = () => undefined,
+    uploadBatchId = '',
+    uploadBatchCreatedAt = '',
     progressLabel = 'Uploading',
   }) => {
     const failedFiles = [];
@@ -314,12 +386,15 @@ export const MediaLibrary = () => {
       });
     };
 
-    const uploadViaNode = async (file, caption) => {
+    const uploadViaNode = async (file, caption, uploadOrder) => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('folderId', folderId);
       formData.append('tags', '');
       formData.append('caption', caption);
+      if (uploadBatchId) formData.append('uploadBatchId', uploadBatchId);
+      if (uploadBatchCreatedAt) formData.append('uploadBatchCreatedAt', uploadBatchCreatedAt);
+      if (uploadOrder !== undefined) formData.append('uploadOrder', String(uploadOrder));
       formData.append('socialAccountIds', '');
       formData.append('campaignId', getActiveCampaignId());
 
@@ -337,7 +412,7 @@ export const MediaLibrary = () => {
       return response.json();
     };
 
-    const uploadDirectToR2 = async (file, caption) => {
+    const uploadDirectToR2 = async (file, caption, uploadOrder) => {
       const campaignId = getActiveCampaignId();
       const contentType = file.type || 'application/octet-stream';
       const initResponse = await fetch(`${API_BASE_URL}/api/media/direct-upload/init`, {
@@ -387,6 +462,9 @@ export const MediaLibrary = () => {
           size: file.size,
           storageKey: upload.storageKey,
           caption,
+          ...(uploadBatchId ? { uploadBatchId } : {}),
+          ...(uploadBatchCreatedAt ? { uploadBatchCreatedAt } : {}),
+          ...(uploadOrder !== undefined ? { uploadOrder } : {}),
           tags: '',
           socialAccountIds: '',
         }),
@@ -400,15 +478,16 @@ export const MediaLibrary = () => {
 
     updateProgress('');
 
-    await runWithConcurrency(files, UPLOAD_CONCURRENCY, async (file) => {
+    await runWithConcurrency(files, UPLOAD_CONCURRENCY, async (file, index) => {
       active += 1;
       updateProgress(`${progressLabel}: ${file.webkitRelativePath || file.name}`);
 
       try {
         const caption = getCaption(file);
+        const uploadOrder = getUploadOrder(file, index);
         if (shouldAttemptDirectUpload) {
           try {
-            const uploaded = await uploadDirectToR2(file, caption);
+            const uploaded = await uploadDirectToR2(file, caption, uploadOrder);
             uploadedMedia.push({ file, media: uploaded });
             return;
           } catch (directError) {
@@ -416,7 +495,7 @@ export const MediaLibrary = () => {
             console.warn('Direct R2 upload failed, using Node upload fallback for this batch:', directError.message);
           }
         }
-        const uploaded = await uploadViaNode(file, caption);
+        const uploaded = await uploadViaNode(file, caption, uploadOrder);
         uploadedMedia.push({ file, media: uploaded });
       } catch (error) {
         failed += 1;
@@ -536,96 +615,91 @@ export const MediaLibrary = () => {
     const selectedFiles = Array.from(e.target.files || []);
     if (selectedFiles.length === 0) return;
 
-    setUploading(true);
-    resetUploadProgress();
-
     try {
-      const { failedFiles } = await uploadMediaFiles({
-        files: selectedFiles,
-        folderId: activeFolderId === 'root' ? 'null' : activeFolderId,
-        progressLabel: 'Uploading file',
-      });
-
-      await invalidateMediaCaches();
-      void fetchMedia();
-
-      if (failedFiles.length > 0) {
-        alert(`${failedFiles.length} files could not be uploaded: ${failedFiles.slice(0, 5).join(', ')}`);
+      clearCarouselDrafts();
+      clearFileUploadDrafts();
+      const drafts = await buildFileUploadDrafts(selectedFiles);
+      if (drafts.length === 0) {
+        alert('Select supported image, video, or audio files to upload.');
+        e.target.value = '';
+        return;
       }
-    } catch (error) {
-      console.error('Failed uploading file:', error);
-      alert(`Upload failed: ${error.message || 'Unable to save these files.'}`);
-    } finally {
-      setUploading(false);
-      resetUploadProgress();
-      e.target.value = '';
+      setFileUploadDrafts(drafts);
       setShowUploadModal(false);
+    } catch (error) {
+      console.error('Failed preparing files:', error);
+      alert(`Upload prep failed: ${error.message || 'Unable to read these files.'}`);
+      e.target.value = '';
     }
   };
 
-  const handleFolderUpload = async (e) => {
-    const selectedFiles = Array.from(e.target.files || []);
-    if (selectedFiles.length === 0) return;
-
-    const mediaFiles = selectedFiles.filter(file => (
-      file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')
-    ));
-
-    if (mediaFiles.length === 0) {
-      alert('No supported image, video, or audio files were found in this folder.');
-      e.target.value = '';
+  const handleConfirmFileUpload = async () => {
+    if (fileUploadDrafts.length === 0) return;
+    const needsFolder = activeFolderId === 'root';
+    const nextFolderName = uploadFolderName.trim();
+    if (needsFolder && !nextFolderName) {
+      setErrorMessage('Create a folder name before uploading from Library Root.');
       return;
     }
 
     setUploading(true);
     resetUploadProgress();
+    setErrorMessage('');
 
     try {
-      const captionMap = await buildCaptionFileMap(selectedFiles);
-      const firstRelativePath = mediaFiles[0].webkitRelativePath || mediaFiles[0].name;
-      const folderName = firstRelativePath.split('/')[0] || 'Uploaded Folder';
-      const folderResponse = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          campaignId: getActiveCampaignId(),
-          name: folderName,
-          parentFolderId: activeFolderId === 'root' ? null : activeFolderId,
-        }),
-      });
+      let targetFolderId = activeFolderId === 'root' ? null : activeFolderId;
+      let createdFolder = null;
 
-      if (!folderResponse.ok) {
-        throw new Error(await getErrorMessage(folderResponse, 'Could not create folder in media library.'));
+      if (needsFolder) {
+        const folderResponse = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            campaignId: getActiveCampaignId(),
+            name: nextFolderName,
+            parentFolderId: null,
+          }),
+        });
+
+        if (!folderResponse.ok) {
+          throw new Error(await getErrorMessage(folderResponse, 'Could not create folder in media library.'));
+        }
+
+        createdFolder = await folderResponse.json();
+        targetFolderId = createdFolder._id;
       }
 
-      const createdFolder = await folderResponse.json();
-      const targetFolderId = createdFolder._id;
-
       const { failedFiles } = await uploadMediaFiles({
-        files: mediaFiles,
-        folderId: targetFolderId,
-        getCaption: (file) => getImportedCaption(captionMap, file),
-        progressLabel: 'Uploading folder file',
+        files: fileUploadDrafts.map((draft) => draft.file),
+        folderId: targetFolderId || 'null',
+        getCaption: (file) => fileUploadDrafts.find((draft) => draft.file === file)?.caption || '',
+        getUploadOrder: (file, index) => fileUploadDrafts.find((draft) => draft.file === file)?.uploadIndex ?? index,
+        uploadBatchId: createUploadBatchId(),
+        uploadBatchCreatedAt: new Date().toISOString(),
+        progressLabel: 'Uploading file',
       });
 
       await invalidateMediaCaches();
-      await fetchFolders();
-      setActiveFolderId(targetFolderId);
+      if (createdFolder) {
+        await fetchFolders();
+        setActiveFolderId(targetFolderId);
+      } else {
+        void fetchMedia();
+      }
+      clearFileUploadDrafts();
 
       if (failedFiles.length > 0) {
         alert(`${failedFiles.length} files could not be uploaded: ${failedFiles.slice(0, 5).join(', ')}`);
       }
     } catch (error) {
-      console.error('Failed uploading folder:', error);
-      alert(`Folder upload failed: ${error.message || 'Unable to import this folder.'}`);
+      console.error('Failed uploading files:', error);
+      alert(`Upload failed: ${error.message || 'Unable to save these files.'}`);
     } finally {
       setUploading(false);
       resetUploadProgress();
-      e.target.value = '';
-      setShowUploadModal(false);
     }
   };
 
@@ -1138,11 +1212,26 @@ export const MediaLibrary = () => {
     }
   };
 
-  const handleDeleteFolder = async (folderId, e) => {
+  const openDeleteFolderModal = (folder, e) => {
     e.stopPropagation();
     setOpenFolderMenuId(null);
-    if (!window.confirm('Are you sure you want to delete this campaign folder? Files inside will also be deleted.')) return;
+    setFolderPendingDelete(folder);
+    setErrorMessage('');
+  };
 
+  const closeDeleteFolderModal = () => {
+    if (deletingFolderId) return;
+    setFolderPendingDelete(null);
+  };
+
+  const handleConfirmDeleteFolder = async () => {
+    if (!folderPendingDelete || deletingFolderId) return;
+    const folderId = folderPendingDelete._id;
+    const folderName = folderPendingDelete.name || 'Folder';
+
+    setDeletingFolderId(folderId);
+    setDeleteStatusMessage(`Deleting "${folderName}" and its files...`);
+    setErrorMessage('');
     try {
       const response = await fetch(`${API_BASE_URL}/api/media/folders/${folderId}${withCampaignScope()}`, {
         method: 'DELETE',
@@ -1157,12 +1246,20 @@ export const MediaLibrary = () => {
         await invalidateMediaCaches();
         void fetchFolders();
         void fetchMedia();
+        setDeleteStatusMessage(`Deleted "${folderName}".`);
+        window.setTimeout(() => {
+          setDeleteStatusMessage((current) => (current === `Deleted "${folderName}".` ? '' : current));
+        }, 3500);
+        setFolderPendingDelete(null);
       } else {
         throw new Error(await getErrorMessage(response, 'Failed to delete folder.'));
       }
     } catch (error) {
       console.error('Failed to delete folder:', error);
-      alert(error.message || 'Failed to delete folder.');
+      setErrorMessage(`Could not delete "${folderName}": ${error.message || 'Failed to delete folder.'}`);
+      setDeleteStatusMessage('');
+    } finally {
+      setDeletingFolderId(null);
     }
   };
 
@@ -1273,6 +1370,219 @@ export const MediaLibrary = () => {
     if (selectedMediaIds.length === 0) return;
     navigate('/scheduler', { state: { preselectedMediaIds: selectedMediaIds } });
   };
+
+  const updateFileUploadCaption = (draftId, caption) => {
+    setFileUploadDrafts((current) => current.map((draft) => (
+      draft.id === draftId ? { ...draft, caption } : draft
+    )));
+  };
+
+  if (fileUploadDrafts.length > 0) {
+    const matchedCaptions = fileUploadDrafts.filter((draft) => draft.caption.trim()).length;
+    const uploadTargetName = activeFolderId === 'root'
+      ? (uploadFolderName.trim() || 'New folder required')
+      : (activeFolder?.name || 'Current folder');
+    const uploadDisabled = uploading || (activeFolderId === 'root' && !uploadFolderName.trim());
+
+    return (
+      <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+        <div className="sticky top-0 z-10 border-b border-[#e5e5ea] bg-white px-5 py-3 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={clearFileUploadDrafts}
+                disabled={uploading}
+                className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-[#d1d1d6] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+              >
+                <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+                Back
+              </button>
+              <div className="min-w-0">
+                <h2 className="m-0 text-base font-bold tracking-tight text-black">Review upload</h2>
+                <p className="m-0 mt-0.5 text-[11px] font-medium text-[#6e6e73]">
+                  {fileUploadDrafts.length} files selected &bull; order preserved &bull; {matchedCaptions}/{fileUploadDrafts.length} captions matched
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={clearFileUploadDrafts}
+                disabled={uploading}
+                className="rounded-md border border-[#d1d1d6] bg-white px-3 py-1.5 text-xs font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmFileUpload}
+                disabled={uploadDisabled}
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#0071e3] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#147ce5] disabled:cursor-not-allowed disabled:bg-[#c7c7cc]"
+              >
+                {uploading ? (
+                  <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                ) : (
+                  <Upload className="h-3.5 w-3.5" />
+                )}
+                <span>{uploading ? 'Uploading...' : 'Upload to folder'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {errorMessage && (
+          <div className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-[#ff9500]/30 bg-[#fff7ed] px-3 py-2 text-xs font-medium text-[#9a3412]">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {uploading && (
+          <div className="mx-5 mt-3 overflow-hidden rounded-lg border border-[#bfdbfe] bg-[#eff6ff]">
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div className="h-4 w-4 rounded-full border-2 border-[#0071e3] border-t-transparent animate-spin" />
+              <div className="min-w-0 flex-1">
+                <p className="m-0 text-xs font-semibold text-[#1d4ed8]">{getUploadProgressText()}</p>
+                {uploadProgress?.currentFile && (
+                  <p className="m-0 mt-0.5 truncate text-[11px] text-[#2563eb]">{uploadProgress.currentFile}</p>
+                )}
+              </div>
+              {uploadProgress?.total > 0 && (
+                <span className="text-[11px] font-bold text-[#1d4ed8]">
+                  {uploadProgress.completed}/{uploadProgress.total}
+                </span>
+              )}
+            </div>
+            {uploadProgress?.total > 0 && (
+              <div className="h-1 bg-[#bfdbfe]/60">
+                <div
+                  className="h-full bg-[#0071e3] transition-all duration-300"
+                  style={{ width: `${Math.round(((uploadProgress.completed || 0) / uploadProgress.total) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="grid gap-3 p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="overflow-hidden rounded-lg border border-[#e5e5ea] bg-white shadow-sm">
+            <div className="grid grid-cols-[58px_76px_minmax(160px,1fr)_minmax(220px,1.35fr)_92px] items-center gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-[#6e6e73]">
+              <span>Order</span>
+              <span>Preview</span>
+              <span>File</span>
+              <span>Caption</span>
+              <span>Status</span>
+            </div>
+            <div className="divide-y divide-[#f2f2f7]">
+              {fileUploadDrafts.map((draft, index) => {
+                const hasCaption = Boolean(draft.caption.trim());
+                return (
+                  <div
+                    key={draft.id}
+                    className="grid grid-cols-[58px_76px_minmax(160px,1fr)_minmax(220px,1.35fr)_92px] items-center gap-3 px-3 py-2.5"
+                  >
+                    <span className="font-mono text-xs font-bold text-[#6e6e73]">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md border border-[#e5e5ea] bg-[#f5f5f7]">
+                      {draft.file.type.startsWith('video/') ? (
+                        <video src={draft.previewUrl} muted playsInline className="h-full w-full object-cover" />
+                      ) : draft.file.type.startsWith('audio/') ? (
+                        <Music className="h-5 w-5 text-[#6e6e73]" />
+                      ) : (
+                        <img src={draft.previewUrl} alt="" className="h-full w-full object-cover" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="m-0 truncate text-xs font-semibold text-[#1d1d1f]" title={draft.name}>{draft.name}</p>
+                      <p className="m-0 mt-0.5 text-[10px] font-medium text-[#8e8e93]">
+                        {draft.file.type || 'Media'} {formatFileSize(draft.file.size) ? `· ${formatFileSize(draft.file.size)}` : ''}
+                      </p>
+                    </div>
+                    <textarea
+                      value={draft.caption}
+                      onChange={(e) => updateFileUploadCaption(draft.id, e.target.value)}
+                      disabled={uploading}
+                      placeholder="No caption matched. Add one here..."
+                      className="h-16 w-full resize-none rounded-md border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-2 text-[11px] leading-relaxed text-[#1d1d1f] placeholder:text-[#a1a1aa] focus:border-[#0071e3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/10 disabled:opacity-50"
+                    />
+                    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold ${
+                      hasCaption
+                        ? 'bg-[#ecfdf3] text-[#15803d]'
+                        : 'bg-[#fff7ed] text-[#b45309]'
+                    }`}>
+                      {hasCaption ? <CheckCircle2 className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                      {hasCaption ? 'Matched' : 'Missing'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <aside className="space-y-3">
+            <section className="rounded-lg border border-[#e5e5ea] bg-white p-3 shadow-sm">
+              <div className="mb-3 flex items-center gap-2">
+                <Folder className="h-4 w-4 text-[#6e6e73]" />
+                <h3 className="m-0 text-xs font-bold text-black">Target folder</h3>
+              </div>
+              {activeFolderId === 'root' ? (
+                <div className="space-y-2">
+                  <p className="m-0 text-[11px] font-medium text-[#6e6e73]">
+                    At Library Root: create folder first
+                  </p>
+                  <label className="block">
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#8e8e93]">New folder name</span>
+                    <input
+                      type="text"
+                      value={uploadFolderName}
+                      onChange={(e) => setUploadFolderName(e.target.value)}
+                      disabled={uploading}
+                      placeholder="Folder name"
+                      className="w-full rounded-md border border-[#d1d1d6] bg-white px-2.5 py-2 text-xs font-semibold text-[#1d1d1f] placeholder:text-[#a1a1aa] focus:border-[#0071e3] focus:outline-none focus:ring-2 focus:ring-[#0071e3]/10 disabled:opacity-50"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div className="rounded-md border border-[#dbeafe] bg-[#eff6ff] px-3 py-2">
+                  <p className="m-0 text-[11px] font-bold text-[#1d4ed8]">Inside folder: upload here</p>
+                  <p className="m-0 mt-0.5 truncate text-xs font-semibold text-[#1d1d1f]" title={activeFolder?.name}>
+                    Current folder: {activeFolder?.name || 'Current folder'}
+                  </p>
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-lg border border-[#e5e5ea] bg-white p-3 shadow-sm">
+              <h3 className="m-0 text-xs font-bold text-black">Ready to upload</h3>
+              <p className="m-0 mt-1 text-[11px] font-medium leading-relaxed text-[#6e6e73]">
+                Assets and captions will be saved to <span className="font-bold text-[#1d1d1f]">{uploadTargetName}</span>.
+              </p>
+              <div className="mt-3 grid grid-cols-4 gap-1.5">
+                {fileUploadDrafts.slice(0, 12).map((draft) => (
+                  <div key={draft.id} className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-[#f5f5f7]">
+                    {draft.file.type.startsWith('video/') ? (
+                      <video src={draft.previewUrl} muted playsInline className="h-full w-full object-cover" />
+                    ) : draft.file.type.startsWith('audio/') ? (
+                      <Music className="h-4 w-4 text-[#8e8e93]" />
+                    ) : (
+                      <img src={draft.previewUrl} alt="" className="h-full w-full object-cover" />
+                    )}
+                  </div>
+                ))}
+              </div>
+              {fileUploadDrafts.length > 12 && (
+                <p className="m-0 mt-2 text-[10px] font-semibold text-[#8e8e93]">
+                  +{fileUploadDrafts.length - 12} more files
+                </p>
+              )}
+            </section>
+          </aside>
+        </div>
+      </div>
+    );
+  }
 
   if (carouselDrafts.length > 0) {
     const totalSlides = carouselDrafts.reduce((sum, set) => sum + set.slides.length, 0);
@@ -1582,14 +1892,38 @@ export const MediaLibrary = () => {
         </div>
       )}
 
+      {deleteStatusMessage && (
+        <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${
+          deletingFolderId
+            ? 'border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]'
+            : 'border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]'
+        }`}>
+          {deletingFolderId ? (
+            <span className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 border-[#0071e3] border-t-transparent animate-spin" />
+          ) : (
+            <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          )}
+          <span>{deleteStatusMessage}</span>
+        </div>
+      )}
+
       {/* Folders List Grid */}
       {(!searchQuery || visibleFolders.length > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-          {visibleFolders.map(folder => (
+          {visibleFolders.map(folder => {
+            const isDeletingThisFolder = deletingFolderId === folder._id;
+            return (
             <div
               key={folder._id}
-              onClick={() => setActiveFolderId(folder._id)}
-              className="relative bg-white border border-[#e5e5ea] hover:border-[#c7c7cc] hover:shadow-sm p-3 rounded-lg flex items-center gap-2.5 cursor-pointer group transition-all min-w-0"
+              onClick={() => {
+                if (isDeletingThisFolder) return;
+                setActiveFolderId(folder._id);
+              }}
+              className={`relative bg-white border border-[#e5e5ea] p-3 rounded-lg flex items-center gap-2.5 group transition-all min-w-0 ${
+                isDeletingThisFolder
+                  ? 'cursor-wait opacity-70'
+                  : 'cursor-pointer hover:border-[#c7c7cc] hover:shadow-sm'
+              }`}
             >
               {/* Icon */}
               <span className="flex-shrink-0">
@@ -1633,69 +1967,85 @@ export const MediaLibrary = () => {
               </div>
               {/* Actions kebab — only visible on hover to save space */}
               {(canManageFolders || canDelete) && (
-                <div className="relative flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenFolderMenuId((current) => (current === folder._id ? null : folder._id));
-                    }}
-                    className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[#f5f5f7] text-gray-400 hover:text-black transition-all"
-                    title="Folder actions"
-                    aria-label="Folder actions"
-                  >
+                <div className="relative flex-shrink-0" data-folder-menu>
+	                  <button
+	                    type="button"
+	                    onClick={(e) => {
+	                      e.stopPropagation();
+                      if (isDeletingThisFolder) return;
+	                      setOpenFolderMenuId((current) => (current === folder._id ? null : folder._id));
+	                    }}
+	                    disabled={isDeletingThisFolder}
+	                    className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[#f5f5f7] text-gray-400 hover:text-black transition-all disabled:cursor-wait disabled:opacity-40"
+	                    title="Folder actions"
+	                    aria-label="Folder actions"
+	                  >
                     <MoreVertical className="w-3 h-3" />
                   </button>
                   {openFolderMenuId === folder._id && (
                     <div className="absolute right-0 top-6 z-20 w-36 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenFolderMenuId(null);
-                          navigate('/scheduler', { state: { preselectedFolderId: folder._id } });
-                        }}
-                        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
-                      >
+	                        onClick={(e) => {
+	                          e.stopPropagation();
+                          if (isDeletingThisFolder) return;
+	                          setOpenFolderMenuId(null);
+	                          navigate('/scheduler', { state: { preselectedFolderId: folder._id } });
+	                        }}
+	                        disabled={isDeletingThisFolder}
+	                        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
+	                      >
                         <Clock className="h-3 w-3" />
                         <span>Schedule</span>
                       </button>
                       {canManageFolders && (
                         <>
-                          <button
-                            type="button"
-                            onClick={(e) => openRenameFolderModal(folder, e)}
-                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
-                          >
+	                          <button
+	                            type="button"
+	                            onClick={(e) => openRenameFolderModal(folder, e)}
+	                            disabled={isDeletingThisFolder}
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
+	                          >
                             <Pencil className="h-3 w-3" />
                             <span>Rename</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={(e) => openFolderTagsModal(folder, e)}
-                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
-                          >
+	                          <button
+	                            type="button"
+	                            onClick={(e) => openFolderTagsModal(folder, e)}
+	                            disabled={isDeletingThisFolder}
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
+	                          >
                             <Tags className="h-3 w-3" />
                             <span>Add tags</span>
                           </button>
                         </>
                       )}
                       {canDelete && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteFolder(folder._id, e)}
-                          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50"
-                        >
+	                        <button
+	                          type="button"
+	                          onClick={(e) => openDeleteFolderModal(folder, e)}
+	                          disabled={isDeletingThisFolder}
+	                          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50 disabled:cursor-wait disabled:opacity-50"
+	                        >
                           <Trash2 className="h-3 w-3" />
                           <span>Delete</span>
                         </button>
                       )}
                     </div>
-                  )}
+	                  )}
+	                </div>
+	              )}
+              {isDeletingThisFolder && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/75 backdrop-blur-[1px]">
+                  <div className="inline-flex items-center gap-2 rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-2.5 py-1.5 text-[11px] font-bold text-[#1d4ed8] shadow-sm">
+                    <span className="h-3 w-3 rounded-full border-2 border-[#0071e3] border-t-transparent animate-spin" />
+                    <span>Deleting...</span>
+                  </div>
                 </div>
               )}
-            </div>
-          ))}
+	            </div>
+            );
+          })}
           {loadingFolders && (
             <div className="col-span-full border border-dashed border-[#e5e5ea] py-3 rounded-lg text-center text-[#8e8e93] text-[11px]">
               Loading folders...
@@ -2047,7 +2397,7 @@ export const MediaLibrary = () => {
               <h3 className="text-xs font-bold text-black">Upload Assets</h3>
               {!uploading && (
                 <button
-                  onClick={() => { clearCarouselDrafts(); setShowUploadModal(false); }}
+                  onClick={() => { clearCarouselDrafts(); clearFileUploadDrafts(); setShowUploadModal(false); }}
                   className="text-gray-400 hover:text-black transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2069,25 +2419,13 @@ export const MediaLibrary = () => {
               <div className="p-2 space-y-1.5">
                 {/* Row: Files */}
                 <label className="flex items-center gap-3 p-2.5 rounded-lg border border-[#e5e5ea] hover:border-[#0071e3] hover:bg-[#f0f7ff] cursor-pointer transition-all group relative">
-                  <input type="file" accept="image/*,video/*,audio/*" multiple onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+                  <input key={fileUploadInputKey} type="file" accept="image/*,video/*,audio/*,text/plain,.txt" multiple onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
                   <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#f5f5f7] flex items-center justify-center group-hover:bg-[#dbeafe] transition-colors">
                     <Upload className="w-4 h-4 text-gray-500 group-hover:text-[#0071e3]" />
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Upload files</p>
-                    <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Images, videos, audio · up to 100MB</p>
-                  </div>
-                </label>
-
-                {/* Row: Folder */}
-                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-[#e5e5ea] hover:border-[#0071e3] hover:bg-[#f0f7ff] cursor-pointer transition-all group relative">
-                  <input type="file" accept="image/*,video/*,audio/*" multiple webkitdirectory="true" directory="true" onChange={handleFolderUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#f5f5f7] flex items-center justify-center group-hover:bg-[#dbeafe] transition-colors">
-                    <Folder className="w-4 h-4 text-gray-500 group-hover:text-[#0071e3]" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Upload folder</p>
-                    <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Uploads entire nested folder structure</p>
+                    <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Multiple files · optional .txt captions</p>
                   </div>
                 </label>
 
@@ -2156,6 +2494,54 @@ export const MediaLibrary = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {folderPendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="w-full max-w-sm rounded-2xl border border-[#e5e5ea] bg-white p-5 text-black shadow-xl">
+            <div className="mb-4 flex items-start gap-3 border-b border-[#e5e5ea] pb-3">
+              <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600">
+                <Trash2 className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="m-0 text-sm font-bold text-black">Delete folder</h3>
+                <p className="m-0 mt-1 truncate text-[11px] font-semibold text-[#6e6e73]" title={folderPendingDelete.name}>
+                  {folderPendingDelete.name || 'Folder'}
+                </p>
+              </div>
+            </div>
+            <p className="m-0 text-xs leading-relaxed text-[#374151]">
+              This will delete the folder and every file inside it. Large folders can take a moment while stored media is removed.
+            </p>
+            {deletingFolderId === folderPendingDelete._id && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-xs font-semibold text-[#1d4ed8]">
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-[#0071e3] border-t-transparent animate-spin" />
+                <span>Deleting folder and files...</span>
+              </div>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeDeleteFolderModal}
+                disabled={Boolean(deletingFolderId)}
+                className="rounded-lg border border-[#e5e5ea] bg-white px-4 py-2 text-xs font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteFolder}
+                disabled={Boolean(deletingFolderId)}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:cursor-wait disabled:bg-red-300"
+              >
+                {deletingFolderId === folderPendingDelete._id && (
+                  <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                )}
+                <span>{deletingFolderId === folderPendingDelete._id ? 'Deleting...' : 'Delete folder'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
