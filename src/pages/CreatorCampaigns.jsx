@@ -276,33 +276,13 @@ export const CreatorCampaigns = () => {
     setPostedStatus(null);
     try {
       const postForCheck = post.manualDownloadedAt ? post : await markPostDownloaded(post);
-      const postedAfter = new Date(postForCheck.manualDownloadedAt || Date.now()).getTime() - (2 * 60 * 1000);
       const postAccounts = getPostAccounts(postForCheck);
-      const connectedAccountIds = postAccounts
+      const connectedMetaAccountIds = postAccounts
+        .filter((account) => ['facebook', 'instagram'].includes(account?.platform))
         .filter((account) => account?.isConnected !== false && account?.status !== 'manual_only')
         .map(getAccountId)
         .filter(Boolean);
       const headers = { Authorization: `Bearer ${token}` };
-
-      if (connectedAccountIds.length > 0) {
-        const beforeTrackingData = await fetchTodayTracking(headers, { force: true });
-        const accounts = beforeTrackingData.accounts || {};
-        const matchingLivePost = connectedAccountIds.some((accountId) => (
-          (accounts[accountId]?.posts || []).some((livePost) => {
-            const publishedAt = new Date(livePost.publishedAt).getTime();
-            return Number.isFinite(publishedAt) && publishedAt >= postedAfter;
-          })
-        ));
-
-        if (!matchingLivePost) {
-          setTodayTracking(accounts);
-          setPostedStatus({
-            type: 'pending',
-            message: 'No live post detected yet. Post this video first, then tap Mark Posted again.',
-          });
-          return;
-        }
-      }
 
       const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/manual-posted`, {
         method: 'POST',
@@ -314,6 +294,15 @@ export const CreatorCampaigns = () => {
       });
       const data = await response.json();
       if (!response.ok) {
+        if (response.status === 409) {
+          const trackingData = await fetchTodayTracking(headers, { force: true });
+          setTodayTracking(trackingData.accounts || {});
+          setPostedStatus({
+            type: 'pending',
+            message: data.message || 'No live post detected yet. Post this video first, then tap Mark Posted again.',
+          });
+          return;
+        }
         throw new Error(data.message || 'Could not mark this post as posted.');
       }
       updatePostInList(data);
@@ -321,7 +310,7 @@ export const CreatorCampaigns = () => {
       setTodayTracking(trackingData.accounts || {});
       setPostedStatus({
         type: 'marked',
-        message: connectedAccountIds.length > 0
+        message: connectedMetaAccountIds.length > 0
           ? 'Live post detected. Next video is ready.'
           : 'Manual post time saved. Next video is ready.',
       });
@@ -572,7 +561,7 @@ export const CreatorCampaigns = () => {
               </div>
               {postedStatus && (
                 <div className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
-                  postedStatus.type === 'verified'
+                  ['verified', 'marked'].includes(postedStatus.type)
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                     : 'border-amber-200 bg-amber-50 text-amber-700'
                 }`}>
