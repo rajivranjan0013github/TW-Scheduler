@@ -39,6 +39,16 @@ export const PublishedFeed = () => {
     Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value) || 0)
   );
 
+  const formatPublishedDate = (value) => {
+    if (!value) return { date: 'Unknown', time: '' };
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return { date: 'Unknown', time: '' };
+    return {
+      date: date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
+      time: date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+    };
+  };
+
   const openLivePost = (post) => {
     if (post.permalink) {
       window.open(post.permalink, '_blank', 'noopener,noreferrer');
@@ -200,12 +210,16 @@ export const PublishedFeed = () => {
             <div className="min-h-0 flex-1 overflow-y-auto">
               {publishedPosts.map((post) => {
                 const publishedDate = getPublishedDate(post);
+                const publishedDisplay = formatPublishedDate(publishedDate);
                 return (
                   <div key={post.id} className="border-b border-[#e5e5ea] last:border-b-0">
                     <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] items-center gap-3 px-3 py-2 text-xs transition hover:bg-[#f5f5f7]">
-                      <span className="font-semibold text-[#1d1d1f]">
-                        {publishedDate ? new Date(publishedDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown'}
-                      </span>
+                      <div className="min-w-0">
+                        <p className="m-0 truncate font-semibold text-[#1d1d1f]">{publishedDisplay.date}</p>
+                        {publishedDisplay.time && (
+                          <p className="m-0 mt-0.5 text-[10px] font-semibold text-[#6e6e73]">{publishedDisplay.time}</p>
+                        )}
+                      </div>
                       <span className="font-semibold text-[#515154]">{compactNumber(post.views)}</span>
                       <span className="font-semibold text-[#515154]">{compactNumber(post.likes)}</span>
                       <span className="font-semibold text-[#515154]">{compactNumber(post.comments)}</span>

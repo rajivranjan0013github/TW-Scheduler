@@ -159,6 +159,20 @@ const DailyViewsChart = ({ data = [] }) => {
   );
 };
 
+const formatPostTime = (value) => {
+  if (!value) return 'Unknown';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown';
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
+const formatDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
   const getDayTitle = (day) => {
     const dateLabel = day.dateStr
@@ -180,21 +194,46 @@ const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
   };
 
   if (selectedTimeRange === 'today' || selectedTimeRange === 'yesterday') {
+    const activityDate = selectedTimeRange === 'today'
+      ? new Date()
+      : new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const activityDateStr = formatDateKey(activityDate);
+    const activityDay = (account.last7DaysActivity || []).find((day) => day.dateStr === activityDateStr);
+    const visiblePosts = (activityDay?.posts || [])
+      .slice()
+      .sort((a, b) => new Date(a.publishedAt || 0) - new Date(b.publishedAt || 0));
     const checkedCount = Math.min(Number(account[selectedRange.postsKey] || 0), 3);
+
     return (
       <div className="flex items-center gap-1">
-        {[0, 1, 2].map((slot) => (
+        {[0, 1, 2].map((slot) => {
+          const post = visiblePosts[slot];
+          const hasPost = slot < checkedCount;
+          const timeLabel = post?.publishedAt ? formatPostTime(post.publishedAt) : '';
+          return (
+            <span
+              key={slot}
+              title={post?.publishedAt
+                ? new Date(post.publishedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+                : hasPost ? 'Posted time unavailable' : 'No post'}
+              className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${
+                hasPost
+                  ? 'border-[#3478f6] bg-[#3478f6] text-white'
+                  : 'border-[#d2d2d7] bg-white text-transparent'
+              }`}
+            >
+              {hasPost ? timeLabel || '✓' : '✓'}
+            </span>
+          );
+        })}
+        {Number(account[selectedRange.postsKey] || 0) > 3 && (
           <span
-            key={slot}
-            className={`flex h-4 w-4 items-center justify-center rounded border text-[9px] font-bold ${
-              slot < checkedCount
-                ? 'border-[#3478f6] bg-[#3478f6] text-white'
-                : 'border-[#d2d2d7] bg-white text-transparent'
-            }`}
+            className="text-[9px] font-semibold text-[#6e6e73]"
+            title={`${account[selectedRange.postsKey]} posts in ${selectedRange.label.toLowerCase()}`}
           >
-            ✓
+            +{Number(account[selectedRange.postsKey] || 0) - 3}
           </span>
-        ))}
+        )}
       </div>
     );
   }
