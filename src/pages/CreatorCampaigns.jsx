@@ -50,6 +50,12 @@ export const CreatorCampaigns = () => {
     ['manual', 'hybrid'].includes(post.scheduleMode)
     && !['posted_manual', 'published', 'published_auto', 'failed', 'cancelled'].includes(post.status)
   );
+  const isAwaitingPostedDecision = (post) => (
+    Boolean(post?.manualDownloadedAt) || post?.status === 'downloaded'
+  );
+  const getPostShareReadyStatus = (post) => (
+    post?.scheduleMode === 'manual' ? 'manual_ready' : 'scheduled'
+  );
 
   const getTodayTrackingQuery = () => {
     const start = new Date();
@@ -272,10 +278,15 @@ export const CreatorCampaigns = () => {
   };
 
   const handleMarkManualPosted = async (post) => {
+    if (!isAwaitingPostedDecision(post)) {
+      alert('Share this queued video first. Mark Posted appears after it is downloaded.');
+      return;
+    }
+
     setMarkingPostId(post._id);
     setPostedStatus(null);
     try {
-      const postForCheck = post.manualDownloadedAt ? post : await markPostDownloaded(post);
+      const postForCheck = post;
       const postAccounts = getPostAccounts(postForCheck);
       const connectedMetaAccountIds = postAccounts
         .filter((account) => ['facebook', 'instagram'].includes(account?.platform))
@@ -324,6 +335,35 @@ export const CreatorCampaigns = () => {
     } finally {
       setMarkingPostId(null);
     }
+  };
+
+  const handleNotPosted = (post) => {
+    setPostedStatus(null);
+    const shareReadyPost = {
+      ...post,
+      status: getPostShareReadyStatus(post),
+      manualDownloadedAt: null,
+      manualPostedAt: null,
+      manualPostUrl: '',
+      publishSource: null,
+    };
+    updatePostInList(shareReadyPost);
+
+    fetch(`${API_BASE_URL}/api/scheduler/${post._id}/not-posted`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Could not reset this post.');
+        updatePostInList(data);
+        void queryClient.invalidateQueries({ queryKey: ['creator'] });
+        void queryClient.invalidateQueries({ queryKey: ['scheduler'] });
+      })
+      .catch((err) => {
+        alert(err.message);
+        updatePostInList(shareReadyPost);
+      });
   };
 
   const loadData = useCallback(async () => {
@@ -415,7 +455,9 @@ export const CreatorCampaigns = () => {
     ['manual', 'hybrid'].includes(post.scheduleMode)
     && !['failed', 'cancelled'].includes(post.status)
   ));
-  const actionablePosts = posts.filter(isCreatorActionable);
+  const actionablePosts = posts
+    .filter(isCreatorActionable)
+    .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
   const nextQueuedPost = actionablePosts[0] || null;
   const getIdValue = (value) => (typeof value === 'object' && value !== null ? value._id : value);
   const getCampaignCreatorPosts = (campaignId) => (
@@ -462,10 +504,11 @@ export const CreatorCampaigns = () => {
 
     return Array.from(groups.values())
       .map((group) => {
-        const actionableQueue = group.posts.filter(isCreatorActionable);
+        const sortedPosts = [...group.posts].sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
+        const actionableQueue = sortedPosts.filter(isCreatorActionable);
         return {
           ...group,
-          posts: group.posts.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt)),
+          posts: sortedPosts,
           actionableQueue,
           nextPost: actionableQueue[0] || null,
         };
@@ -478,7 +521,9 @@ export const CreatorCampaigns = () => {
         return aTime - bTime || getAccountLabel(a.account).localeCompare(getAccountLabel(b.account));
       });
   };
-  const nextShareMedia = getPrimaryMedia(nextQueuedPost || {});
+  const nextShareMedia = !isAwaitingPostedDecision(nextQueuedPost)
+    ? getPrimaryMedia(nextQueuedPost || {})
+    : null;
 
   useEffect(() => {
     shareBlobRef.current = null;
@@ -508,7 +553,7 @@ export const CreatorCampaigns = () => {
   }, [nextQueuedPost?._id, nextShareMedia?.url]);
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] px-2 pb-4 pt-2 text-[#1d1d1f] sm:px-3 sm:pt-3 md:px-6 md:py-5">
+    <div className="px-2 pb-4 pt-2 text-[#1d1d1f] sm:px-3 sm:pt-3 md:px-6 md:py-5">
       <div className="mx-auto max-w-4xl space-y-2 sm:space-y-3 md:space-y-4">
        
 
@@ -596,6 +641,7 @@ export const CreatorCampaigns = () => {
                       const queuePosition = queuePost
                         ? Math.max(queue.posts.findIndex((post) => post._id === queuePost._id) + 1, 1)
                         : 0;
+                      const awaitingPostedDecision = isAwaitingPostedDecision(queuePost);
 
                       return (
                         <div key={`${camp._id}-${queue.accountId}`} className="rounded-lg border border-[#e5e5ea] bg-white p-3">
@@ -663,26 +709,36 @@ export const CreatorCampaigns = () => {
                           </div>
 
                           {queuePost ? (
-                            <div className="grid w-full grid-cols-2 gap-2">
+                            awaitingPostedDecision ? (
+                              <div className="grid w-full grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleNotPosted(queuePost)}
+                                  className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-red-800 bg-red-800 px-3 py-1.5 text-xs font-semibold text-red-50 transition-colors hover:bg-red-900"
+                                >
+                                  Not Posted
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkManualPosted(queuePost)}
+                                  disabled={markingPostId === queuePost._id}
+                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg border border-green-800 bg-green-800 px-3 py-1.5 text-xs font-semibold text-green-50 transition-colors hover:bg-green-900 disabled:opacity-60"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  {markingPostId === queuePost._id ? 'Checking' : 'Mark as Posted'}
+                                </button>
+                              </div>
+                            ) : (
                               <button
                                 type="button"
                                 onClick={() => handleSharePost(queuePost)}
                                 disabled={sharingPostId === queuePost._id}
-                                className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg bg-[#1d1d1f] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black disabled:opacity-60"
+                                className="inline-flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-lg bg-[#1d1d1f] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black disabled:opacity-60"
                               >
                                 <Share2 className="h-3.5 w-3.5" />
                                 {sharingPostId === queuePost._id ? 'Opening' : 'Share Video'}
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleMarkManualPosted(queuePost)}
-                                disabled={markingPostId === queuePost._id}
-                                className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
-                              >
-                                <CheckCircle className="h-3.5 w-3.5" />
-                                {markingPostId === queuePost._id ? 'Checking' : 'Mark Posted'}
-                              </button>
-                            </div>
+                            )
                           ) : (
                             <div className="py-2 text-center">
                               <p className="m-0 text-[10px] font-bold uppercase text-[#6e6e73]">Videos</p>

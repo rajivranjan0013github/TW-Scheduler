@@ -28,6 +28,11 @@
   --color-darkBorder: #e5e5ea;
 }
 
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   background-color: #f5f5f7;
@@ -38,7 +43,7 @@ body {
 }
 
 #root {
-  min-height: 100vh;
+  height: 100%;
   width: 100%;
 }
 
@@ -88,5 +93,16 @@ h1, h2, h3, h4, h5, h6 {
 
   to {
     background-position: -120% 0, 0 0;
+  }
+}
+
+/* Mobile Navigation Safe Area Adjustments */
+@media (max-width: 767px) {
+  .mobile-safe-nav {
+    height: calc(3.25rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
+  .mobile-safe-main-padding {
+    padding-bottom: calc(3.25rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
