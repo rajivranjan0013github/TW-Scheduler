@@ -186,7 +186,7 @@ export const PublishedFeed = () => {
           </div>
         ) : publishedPosts.length === 0 ? (
           <div className="bg-white border border-[#e5e5ea] rounded-xl p-16 text-center text-sm text-gray-400 font-medium shadow-sm">
-            No published posts found on this channel.
+            No cached published posts from the last 30 days. Refresh from Meta to sync this channel.
           </div>
         ) : (
           <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[#d2d2d7] bg-white">

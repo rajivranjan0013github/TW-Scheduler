@@ -42,6 +42,8 @@ export const CreatorCampaigns = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sharingPostId, setSharingPostId] = useState(null);
+  const [markingPostId, setMarkingPostId] = useState(null);
+  const [postedStatus, setPostedStatus] = useState(null);
   const shareBlobRef = useRef(null);
 
   const isCreatorActionable = (post) => (
@@ -67,7 +69,7 @@ export const CreatorCampaigns = () => {
     return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
-  const fetchTodayTracking = useCallback((headers) => {
+  const fetchTodayTracking = useCallback((headers, { force = false } = {}) => {
     const query = getTodayTrackingQuery();
     return queryClient.fetchQuery({
       queryKey: ['creator', 'today-tracking', query],
@@ -84,7 +86,7 @@ export const CreatorCampaigns = () => {
           return { accounts: {} };
         }
       },
-      staleTime: 60 * 1000,
+      staleTime: force ? 0 : 60 * 1000,
     });
   }, [queryClient]);
 
@@ -170,10 +172,13 @@ export const CreatorCampaigns = () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (response.ok) {
-      updatePostInList(await response.json());
+      const updatedPost = await response.json();
+      updatePostInList(updatedPost);
       void queryClient.invalidateQueries({ queryKey: ['creator'] });
       void queryClient.invalidateQueries({ queryKey: ['scheduler'] });
+      return updatedPost;
     }
+    return post;
   };
 
   const handleCopyCaption = async (post) => {
@@ -267,7 +272,38 @@ export const CreatorCampaigns = () => {
   };
 
   const handleMarkManualPosted = async (post) => {
+    setMarkingPostId(post._id);
+    setPostedStatus(null);
     try {
+      const postForCheck = post.manualDownloadedAt ? post : await markPostDownloaded(post);
+      const postedAfter = new Date(postForCheck.manualDownloadedAt || Date.now()).getTime() - (2 * 60 * 1000);
+      const postAccounts = getPostAccounts(postForCheck);
+      const connectedAccountIds = postAccounts
+        .filter((account) => account?.isConnected !== false && account?.status !== 'manual_only')
+        .map(getAccountId)
+        .filter(Boolean);
+      const headers = { Authorization: `Bearer ${token}` };
+
+      if (connectedAccountIds.length > 0) {
+        const beforeTrackingData = await fetchTodayTracking(headers, { force: true });
+        const accounts = beforeTrackingData.accounts || {};
+        const matchingLivePost = connectedAccountIds.some((accountId) => (
+          (accounts[accountId]?.posts || []).some((livePost) => {
+            const publishedAt = new Date(livePost.publishedAt).getTime();
+            return Number.isFinite(publishedAt) && publishedAt >= postedAfter;
+          })
+        ));
+
+        if (!matchingLivePost) {
+          setTodayTracking(accounts);
+          setPostedStatus({
+            type: 'pending',
+            message: 'No live post detected yet. Post this video first, then tap Mark Posted again.',
+          });
+          return;
+        }
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/manual-posted`, {
         method: 'POST',
         headers: {
@@ -281,11 +317,23 @@ export const CreatorCampaigns = () => {
         throw new Error(data.message || 'Could not mark this post as posted.');
       }
       updatePostInList(data);
-      await queryClient.invalidateQueries({ queryKey: ['creator'] });
-      await queryClient.invalidateQueries({ queryKey: ['scheduler'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      const trackingData = await fetchTodayTracking(headers, { force: true });
+      setTodayTracking(trackingData.accounts || {});
+      setPostedStatus({
+        type: 'marked',
+        message: connectedAccountIds.length > 0
+          ? 'Live post detected. Next video is ready.'
+          : 'Manual post time saved. Next video is ready.',
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['creator'] }),
+        queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
     } catch (err) {
       alert(err.message);
+    } finally {
+      setMarkingPostId(null);
     }
   };
 
@@ -522,6 +570,15 @@ export const CreatorCampaigns = () => {
               <div className="px-1">
                 <h2 className="m-0 text-sm font-semibold text-black">My Campaigns</h2>
               </div>
+              {postedStatus && (
+                <div className={`rounded-lg border px-3 py-2 text-xs font-semibold ${
+                  postedStatus.type === 'verified'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-amber-200 bg-amber-50 text-amber-700'
+                }`}>
+                  {postedStatus.message}
+                </div>
+              )}
               {assignedCampaigns.length > 0 ? (
                 <div className="grid gap-2 md:gap-3 lg:grid-cols-2">
                   {assignedCampaigns.flatMap((camp) => {
@@ -630,10 +687,11 @@ export const CreatorCampaigns = () => {
                               <button
                                 type="button"
                                 onClick={() => handleMarkManualPosted(queuePost)}
+                                disabled={markingPostId === queuePost._id}
                                 className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
                               >
                                 <CheckCircle className="h-3.5 w-3.5" />
-                                Mark Posted
+                                {markingPostId === queuePost._id ? 'Checking' : 'Mark Posted'}
                               </button>
                             </div>
                           ) : (
