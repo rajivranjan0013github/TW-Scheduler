@@ -47,25 +47,26 @@ function MobileNav({ isCreator }) {
       ];
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#d2d2d7] bg-white/95 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
-      <PwaInstallButton
-        collapsed
-        className="absolute -top-11 right-3"
-        popoverClassName="right-0"
-      />
-      <div className={`mx-auto grid gap-1 ${isCreator ? 'max-w-sm grid-cols-3' : 'max-w-md grid-cols-5'}`}>
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#d2d2d7] bg-white/95 px-1 pt-0.5 shadow-[0_-2px_8px_rgba(0,0,0,0.05)] backdrop-blur md:hidden mobile-safe-nav">
+      <div className="absolute -top-8 right-2">
+        <PwaInstallButton
+          collapsed
+          popoverClassName="right-0"
+        />
+      </div>
+      <div className={`mx-auto grid h-full gap-0.5 ${isCreator ? 'max-w-xs grid-cols-3' : 'max-w-md grid-cols-5'}`}>
         {items.map((item) => (
           <NavLink
             key={item.name}
             to={item.path}
             end
             className={({ isActive }) =>
-              `flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-[10px] font-semibold transition ${
+              `flex h-full flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[9px] font-semibold leading-none transition ${
                 isActive ? 'bg-[#1d1d1f] text-white' : 'text-[#6e6e73] active:bg-[#f5f5f7]'
               }`
             }
           >
-            <item.icon className="h-4 w-4" />
+            <item.icon className="h-3.5 w-3.5" />
             <span>{item.name}</span>
           </NavLink>
         ))}
@@ -100,7 +101,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const hideSidebar = isCreator ? false : (isBulkBuilderPage || (isOnCampaignPage && !hasActiveCampaign));
 
   return (
-    <div className="flex bg-[#f5f5f7] h-screen text-[#1d1d1f] antialiased overflow-x-visible overflow-y-hidden font-sans">
+    <div className="flex bg-[#f5f5f7] h-[100dvh] text-[#1d1d1f] antialiased overflow-x-visible overflow-y-hidden font-sans">
       {!hideSidebar && (
         <Sidebar
           selectedAccounts={selectedAccounts}
@@ -108,7 +109,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
         />
       )}
 
-      <main className={`min-w-0 flex-1 overflow-y-auto ${!hideSidebar ? 'pb-20 md:pb-0' : ''}`}>
+      <main className={`min-w-0 flex-1 overflow-y-auto ${!hideSidebar ? 'mobile-safe-main-padding md:pb-0' : ''}`}>
         <Routes key={campaignVersion}>
           {isCreator ? (
             <>

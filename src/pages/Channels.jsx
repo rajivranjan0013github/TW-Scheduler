@@ -167,7 +167,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
   const loading = channelsQuery.isLoading && channels.length === 0;
 
   return (
-    <div className="p-4 sm:p-8 bg-[#f5f5f7] min-h-screen text-[#1d1d1f] space-y-6 sm:space-y-8">
+    <div className="p-4 sm:p-8 text-[#1d1d1f] space-y-6 sm:space-y-8">
       
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-[#e5e5ea] gap-2">
