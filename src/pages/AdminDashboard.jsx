@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -163,7 +163,16 @@ const formatPostTime = (value) => {
   if (!value) return 'Unknown';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Unknown';
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return date
+    .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    .toLowerCase();
+};
+
+const formatPostDateTime = (value) => {
+  if (!value) return 'Unknown time';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown time';
+  return `${date.toLocaleDateString([], { dateStyle: 'medium' })}, ${formatPostTime(value)}`;
 };
 
 const formatDateKey = (date) => {
@@ -184,9 +193,7 @@ const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
     }
 
     const times = day.posts.map((post, index) => {
-      const timeLabel = post.publishedAt
-        ? new Date(post.publishedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-        : 'Unknown time';
+      const timeLabel = post.publishedAt ? formatPostDateTime(post.publishedAt) : 'Unknown time';
       return `${index + 1}. ${timeLabel}`;
     });
 
@@ -213,9 +220,7 @@ const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
           return (
             <span
               key={slot}
-              title={post?.publishedAt
-                ? new Date(post.publishedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-                : hasPost ? 'Posted time unavailable' : 'No post'}
+              title={post?.publishedAt ? formatPostDateTime(post.publishedAt) : hasPost ? 'Posted time unavailable' : 'No post'}
               className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${
                 hasPost
                   ? 'border-[#3478f6] bg-[#3478f6] text-white'
@@ -371,11 +376,6 @@ export const AdminDashboard = () => {
     return () => window.removeEventListener('campaign-selected', syncSelectedCampaign);
   }, []);
 
-  const selectedCampaign = useMemo(
-    () => campaigns.find((campaign) => campaign._id === selectedCampaignId),
-    [campaigns, selectedCampaignId]
-  );
-
   const activeMetrics = campaignMetricsById[selectedCampaignId] || emptyMetrics;
   const selectedRange = timeRanges[selectedTimeRange];
   const selectedViews = activeMetrics[selectedRange.viewsKey] || 0;
@@ -524,7 +524,7 @@ export const AdminDashboard = () => {
           <DailyViewsChart data={activeMetrics.last30DaysPostedViews || []} />
 
           <div className="mt-3 rounded-xl border border-[#d2d2d7] bg-white">
-            <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr_0.35fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+            <div className="grid grid-cols-[1.15fr_0.9fr_1.2fr_0.4fr_0.65fr_0.7fr_0.65fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
               <span>Channel</span>
               <span>User</span>
               <span>Activity</span>
@@ -532,7 +532,6 @@ export const AdminDashboard = () => {
               <span>{selectedTimeLabel} views</span>
               <span>Channel insight</span>
               <span>Engagement</span>
-              <span>Feed</span>
             </div>
             {(activeMetrics.accountRows || []).length === 0 ? (
               <div className="px-5 py-8 text-center text-sm text-[#6e6e73]">
@@ -544,7 +543,7 @@ export const AdminDashboard = () => {
                   <div
                     key={account._id}
                     onClick={() => openAccountFeed(account)}
-                    className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.35fr_0.6fr_0.65fr_0.6fr_0.35fr] items-center gap-3 border-b border-[#e5e5ea] px-3 py-2 text-xs transition hover:bg-[#f5f5f7] last:border-b-0"
+                    className="grid cursor-pointer grid-cols-[1.15fr_0.9fr_1.2fr_0.4fr_0.65fr_0.7fr_0.65fr] items-center gap-3 border-b border-[#e5e5ea] px-3 py-2 text-xs transition hover:bg-[#f5f5f7] last:border-b-0"
                     role="button"
                     tabIndex={0}
                     onKeyDown={(event) => {
@@ -580,16 +579,6 @@ export const AdminDashboard = () => {
                     <span className="text-[#515154]">
                       {numberFormat.format(account[selectedRange.likesKey] || 0)} / {numberFormat.format(account[selectedRange.commentsKey] || 0)}
                     </span>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openAccountFeed(account);
-                      }}
-                      className="inline-flex items-center justify-center rounded-md border border-[#d2d2d7] bg-white px-2 py-1 text-[10px] font-semibold text-[#0071e3] transition hover:border-[#0071e3] hover:bg-[#f0f7ff]"
-                    >
-                      Feed
-                    </button>
                   </div>
                 ))}
               </div>
