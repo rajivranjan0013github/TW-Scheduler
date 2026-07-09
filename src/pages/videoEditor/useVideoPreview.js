@@ -52,6 +52,19 @@ export const useVideoPreview = ({ stopPreviewAudio, playPreviewAudio, selectedAu
   }, [setVideoDuration]);
 
   const handleVideo1Ended = useCallback(() => {
+    if (!video2Ref.current) {
+      setPreviewCurrentTime(0);
+      if (isPlayingRef.current && selectedAudio) {
+        void playPreviewAudio(0);
+      }
+      setTimeout(() => {
+        if (video1Ref.current && isPlayingRef.current) {
+          video1Ref.current.currentTime = 0;
+          video1Ref.current.play();
+        }
+      }, 50);
+      return;
+    }
     setActiveVideo(2);
     setPreviewCurrentTime(videoDurationsRef.current.input1 || 0);
     setTimeout(() => {
@@ -60,7 +73,7 @@ export const useVideoPreview = ({ stopPreviewAudio, playPreviewAudio, selectedAu
         video2Ref.current.play();
       }
     }, 50);
-  }, []);
+  }, [selectedAudio, playPreviewAudio]);
 
   const handleVideo2Ended = useCallback(() => {
     setActiveVideo(1);

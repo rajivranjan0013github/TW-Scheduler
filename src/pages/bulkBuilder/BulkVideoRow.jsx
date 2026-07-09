@@ -65,6 +65,7 @@ export const BulkVideoRow = ({
   zoomScale = 1,
   onUpdateCanvasPos,
   onHeaderDoubleClick,
+  isDualVideo = true,
 }) => {
   const { video1, video1Url, video2, video2Url, audio, caption, textSettings, status, resultMediaUrl } = row;
   const dragPos = { ...DEFAULT_DRAG_POS, ...(row.dragPos || {}) };
@@ -409,10 +410,10 @@ export const BulkVideoRow = ({
       </div>
 
       {/* Video Cards Grid */}
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className={isDualVideo ? "grid grid-cols-2 gap-2.5" : "flex justify-center"}>
         
         {/* Video 1 Preview Card */}
-        <div className="relative">
+        <div className={`relative ${isDualVideo ? "" : "w-[145px]"}`}>
           {resolvedVideo1Url ? (
             <>
               <div
@@ -594,68 +595,70 @@ export const BulkVideoRow = ({
         </div>
 
         {/* Video 2 Preview Card */}
-        <div className="relative">
-          {resolvedVideo2Url ? (
-            <>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={(event) => handleTogglePreviewPlayback(event, 'video2')}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    handleTogglePreviewPlayback(event, 'video2');
-                  }
-                }}
-                className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] transition-all hover:bg-[#1a1a1e]"
-              >
-                <LoadingVideoPreview
-                  ref={video2PreviewRef}
-                  src={resolvedVideo2Url}
-                  className="absolute inset-0"
-                  videoClassName="h-full w-full object-cover rounded-xl"
-                  muted
-                  playsInline
-                  preload="metadata"
-                  crossOrigin="anonymous"
-                  onPlay={() => setPlayingPreviewSlot('video2')}
-                  onPause={() => handlePreviewStopped('video2')}
-                  onEnded={() => handlePreviewStopped('video2')}
-                />
-              </div>
-              {/* Change Video Button Overlay */}
-              <div className="absolute top-2 left-2 z-20">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onPickVideo2();
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="flex h-6 w-6 items-center justify-center rounded-full bg-black/60 border border-[#2d2d30] text-gray-300 hover:text-white hover:bg-black/85 transition-all shadow-md"
-                  title="Change Video 2"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={onPickVideo2}
-              className="w-full aspect-[9/16] rounded-xl border border-[#2d2d30] bg-[#121214] flex flex-col items-center justify-center gap-1.5 overflow-hidden transition-all hover:bg-[#1a1a1e] group"
-            >
+        {isDualVideo && (
+          <div className="relative">
+            {resolvedVideo2Url ? (
               <>
-                <Video className="h-5 w-5 text-gray-600 group-hover:text-[#ff5500]" />
-                <span className="text-[9px] font-bold text-gray-500 uppercase">Video 2</span>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={(event) => handleTogglePreviewPlayback(event, 'video2')}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      handleTogglePreviewPlayback(event, 'video2');
+                    }
+                  }}
+                  className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] transition-all hover:bg-[#1a1a1e]"
+                >
+                  <LoadingVideoPreview
+                    ref={video2PreviewRef}
+                    src={resolvedVideo2Url}
+                    className="absolute inset-0"
+                    videoClassName="h-full w-full object-cover rounded-xl"
+                    muted
+                    playsInline
+                    preload="metadata"
+                    crossOrigin="anonymous"
+                    onPlay={() => setPlayingPreviewSlot('video2')}
+                    onPause={() => handlePreviewStopped('video2')}
+                    onEnded={() => handlePreviewStopped('video2')}
+                  />
+                </div>
+                {/* Change Video Button Overlay */}
+                <div className="absolute top-2 left-2 z-20">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPickVideo2();
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-black/60 border border-[#2d2d30] text-gray-300 hover:text-white hover:bg-black/85 transition-all shadow-md"
+                    title="Change Video 2"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </>
-            </button>
-          )}
-          {video2 && (
-            <p className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] rounded text-[8px] font-semibold text-gray-300 truncate px-1 py-0.5 text-center" title={video2.name}>
-              {video2.name}
-            </p>
-          )}
-        </div>
+            ) : (
+              <button
+                type="button"
+                onClick={onPickVideo2}
+                className="w-full aspect-[9/16] rounded-xl border border-[#2d2d30] bg-[#121214] flex flex-col items-center justify-center gap-1.5 overflow-hidden transition-all hover:bg-[#1a1a1e] group"
+              >
+                <>
+                  <Video className="h-5 w-5 text-gray-600 group-hover:text-[#ff5500]" />
+                  <span className="text-[9px] font-bold text-gray-500 uppercase">Video 2</span>
+                </>
+              </button>
+            )}
+            {video2 && (
+              <p className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] rounded text-[8px] font-semibold text-gray-300 truncate px-1 py-0.5 text-center" title={video2.name}>
+                {video2.name}
+              </p>
+            )}
+          </div>
+        )}
 
       </div>
 

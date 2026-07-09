@@ -586,6 +586,7 @@ export const BulkVideoBuilder = () => {
                 <BulkVideoRow
                   row={row}
                   rowIndex={idx}
+                  isDualVideo={bulk.isDualVideo}
                   inverseZoomScale={1 / pageZoom}
                   isActiveCaption={activeCaptionRowId === row.id}
                   onPickVideo1={() => handlePickVideo1(row.id)}
@@ -677,6 +678,19 @@ export const BulkVideoBuilder = () => {
 
         {/* Global Toolbar buttons */}
         <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 cursor-pointer bg-[#27272a] border border-[#3f3f46] hover:bg-[#3f3f46] px-2.5 py-1.5 rounded-lg text-white select-none transition-all">
+            <input
+              type="checkbox"
+              checked={bulk.isDualVideo}
+              onChange={(e) => bulk.toggleDualVideo(e.target.checked)}
+              className="hidden"
+            />
+            <div className={`relative w-7 h-4 rounded-full transition-colors ${bulk.isDualVideo ? 'bg-[#ff5500]' : 'bg-zinc-700'}`}>
+              <div className={`absolute top-[2px] left-[2px] w-3 h-3 rounded-full bg-white transition-transform duration-200 ${bulk.isDualVideo ? 'translate-x-3' : 'translate-x-0'}`} />
+            </div>
+            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-300">Dual Mode</span>
+          </label>
+
           <button
             type="button"
             onClick={bulk.addRow}
@@ -767,7 +781,7 @@ export const BulkVideoBuilder = () => {
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {bulk.rows.map((row, idx) => {
               const isSelected = selectedRowId === row.id;
-              const hasVideo = row.video1 && row.video2;
+              const hasVideo = bulk.isDualVideo ? (row.video1 && row.video2) : row.video1;
               return (
                 <div
                   key={row.id}

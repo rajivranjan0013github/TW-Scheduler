@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search } from 'lucide-react';
+import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search, Trash2 } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
@@ -60,6 +60,9 @@ const CalendarView = ({ selectedAccounts }) => {
     return `${year}-${month}-${day}`;
   };
   const [calendarMode, setCalendarMode] = useState('week');
+  const [calendarGroupingMode, setCalendarGroupingMode] = useState(() => {
+    return localStorage.getItem('calendar-grouping-mode') || 'posts';
+  });
   const [calendarRangeStart, setCalendarRangeStart] = useState(() => {
     const start = new Date(today);
     start.setDate(start.getDate() - start.getDay());
@@ -71,6 +74,7 @@ const CalendarView = ({ selectedAccounts }) => {
     return toInputDate(end);
   });
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => toInputDate(today));
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedCalendarAccountIds, setSelectedCalendarAccountIds] = useState([]);
   const [selectedCalendarStatus, setSelectedCalendarStatus] = useState('all');
   const [activeTooltip, setActiveTooltip] = useState(null); // null or { type: 'day'|'post', dayKey, data }
@@ -130,7 +134,7 @@ const CalendarView = ({ selectedAccounts }) => {
         case 'failed':
           return 'bg-rose-50 text-rose-700 border border-rose-200';
         case 'posted_manual':
-          return 'bg-purple-50 text-purple-700 border border-purple-200';
+          return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
         case 'manual_ready':
         case 'downloaded':
           return 'bg-amber-50 text-amber-700 border border-amber-200';
@@ -150,7 +154,7 @@ const CalendarView = ({ selectedAccounts }) => {
         case 'failed':
           return 'bg-rose-500';
         case 'posted_manual':
-          return 'bg-purple-500';
+          return 'bg-emerald-500';
         case 'manual_ready':
         case 'downloaded':
           return 'bg-amber-500';
@@ -281,12 +285,12 @@ const CalendarView = ({ selectedAccounts }) => {
   };
 
   const [showCalendarAccountMenu, setShowCalendarAccountMenu] = useState(false);
+  const [calendarAccountSearchQuery, setCalendarAccountSearchQuery] = useState('');
   const [showQueueEditor, setShowQueueEditor] = useState(false);
   const [queueEditorPosts, setQueueEditorPosts] = useState([]);
   const [loadingQueueEditor, setLoadingQueueEditor] = useState(false);
   const [queueEditDrafts, setQueueEditDrafts] = useState({});
   const [savingQueuePostIds, setSavingQueuePostIds] = useState([]);
-  const [deletingQueuePostIds, setDeletingQueuePostIds] = useState([]);
   const calendarAccountMenuRef = useRef(null);
   const handledPreselectedFolderIdRef = useRef(null);
   const handledPreselectedMediaKeyRef = useRef('');
@@ -296,7 +300,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [caption, setCaption] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
-  const [scheduleMode, setScheduleMode] = useState('auto');
+  const [scheduleMode, setScheduleMode] = useState('manual');
   const [scheduleContentMode, setScheduleContentMode] = useState('assets');
   const [contentSelectionSource, setContentSelectionSource] = useState('library');
   const [postType, setPostType] = useState('reels');
@@ -305,10 +309,11 @@ const CalendarView = ({ selectedAccounts }) => {
   const [youtubeTags, setYoutubeTags] = useState('');
   const [youtubeMadeForKids, setYoutubeMadeForKids] = useState(false);
   const [captionDrafts, setCaptionDrafts] = useState({});
-  const [savingCaptionId, setSavingCaptionId] = useState(null);
+  const [, setSavingCaptionId] = useState(null);
   const [deselectedPlanRows, setDeselectedPlanRows] = useState([]);
   const [submittingSchedule, setSubmittingSchedule] = useState(false);
   const [librarySearchQuery, setLibrarySearchQuery] = useState('');
+  const [accountsSearchQuery, setAccountsSearchQuery] = useState('');
 
   const [bulkInterval, setBulkInterval] = useState('6');
   const [activeFolderId, setActiveFolderId] = useState('root');
@@ -336,6 +341,31 @@ const CalendarView = ({ selectedAccounts }) => {
   const canUseChannelForMode = (channel) => Boolean(channel?._id) && (
     isChannelVerified(channel) || isManualAssignedChannel(channel)
   );
+  const getAccountKeys = (...values) => {
+    const keys = new Set();
+    const addValue = (value) => {
+      if (!value) return;
+      if (Array.isArray(value)) {
+        value.forEach(addValue);
+        return;
+      }
+      if (typeof value === 'object') {
+        [
+          value._id,
+          value.id,
+          value.socialAccountId,
+          value.matchedAccountId,
+          value.campaignChannelId,
+        ].forEach(addValue);
+        return;
+      }
+      const key = String(value);
+      if (key) keys.add(key);
+    };
+
+    values.forEach(addValue);
+    return [...keys];
+  };
   const normalizeSchedulingChannel = (channel) => {
     const activeCampaignId = getActiveCampaignId();
     const socialAccountId = channel.socialAccountId || channel.matchedAccountId || null;
@@ -355,12 +385,26 @@ const CalendarView = ({ selectedAccounts }) => {
     };
   };
   const getMediaAccountIds = (item) => (item?.socialAccountIds || []).map(account => account._id || account);
+  const getChannelAccountKeys = (channel) => getAccountKeys(
+    channel,
+    channel?._id,
+    channel?.socialAccountId,
+    channel?.matchedAccountId,
+    channel?.campaignChannelId
+  );
+  const getPostAccountKeys = (post) => getAccountKeys(
+    post?.socialAccountIds || [],
+    post?.campaignChannelIds || []
+  );
   const getFolderName = (folderId) => {
     if (!folderId) return 'Campaign Library';
     const id = folderId._id || folderId;
     return folders.find(folder => folder._id === id)?.name || 'Unknown folder';
   };
-  const getAccountLabel = (account) => account?.username || account?.handle || account?.name || 'Account';
+  const getAccountLabel = (account) => {
+    const label = account?.username || account?.handle || account?.name || 'Account';
+    return label.startsWith('@') ? label.substring(1) : label;
+  };
   const getAccountAvatarUrl = (account) => (
     account?.avatarUrl
     || account?.profilePictureUrl
@@ -392,11 +436,6 @@ const CalendarView = ({ selectedAccounts }) => {
     item ? (captionDrafts[item._id] ?? item.caption ?? '') : ''
   );
   const getPlannedCaption = (item) => getAssetCaptionDraft(item).trim() || caption.trim();
-  const getCaptionSource = (item) => {
-    if (getAssetCaptionDraft(item).trim()) return 'Saved on asset';
-    if (caption.trim()) return 'Fallback composer';
-    return 'No caption';
-  };
   const formatScheduleDate = (value) => {
     if (!value) return 'Not set';
     const date = new Date(value);
@@ -421,13 +460,6 @@ const CalendarView = ({ selectedAccounts }) => {
       case 'manual': return 'Manual';
       case 'hybrid': return 'Hybrid';
       default: return 'Auto';
-    }
-  };
-  const getScheduleModeSummary = (mode) => {
-    switch (mode) {
-      case 'manual': return 'Creator downloads and posts. No auto publish job is queued.';
-      case 'hybrid': return 'Auto publish is queued, but creator can post first and remove it from queue.';
-      default: return 'Software publishes at the scheduled time.';
     }
   };
   const getPostStatusLabel = (post) => {
@@ -455,24 +487,20 @@ const CalendarView = ({ selectedAccounts }) => {
     && post?.manualPostedAt
     && !Number.isNaN(new Date(post.manualPostedAt).getTime())
   );
-  const isMediaAvailableForChannels = (item, channelIds) => {
+  const isMediaAvailableForChannels = () => {
     return true;
   };
 
-  const availableMediaList = useMemo(() => {
-    return mediaList.filter(item => {
-      // 1. Must match target channel
-      const matchesChannel = isMediaAvailableForChannels(item, selectedChannels);
-      if (!matchesChannel) return false;
-
-      // 2. Must match selected folder
-      if (activeFolderId === 'root') {
-        return !item.folderId;
-      }
-      const itemFolderId = item.folderId?._id || item.folderId;
-      return itemFolderId === activeFolderId;
+  const filteredComposerChannels = useMemo(() => {
+    const query = accountsSearchQuery.trim().toLowerCase();
+    if (!query) return channels;
+    return channels.filter((chan) => {
+      const label = getAccountLabel(chan).toLowerCase();
+      const platform = (chan.platform || '').toLowerCase();
+      return label.includes(query) || platform.includes(query);
     });
-  }, [mediaList, selectedChannels, activeFolderId]);
+  }, [channels, accountsSearchQuery]);
+
   const isCarouselMode = scheduleContentMode === 'carousel';
   const isBulk = !isCarouselMode && selectedMedia.length > 1;
   const activeFolderName = selectedFolderId === 'root'
@@ -616,12 +644,6 @@ const CalendarView = ({ selectedAccounts }) => {
       });
     });
     return [...sourceMap.values()].sort((a, b) => naturalFolderCollator.compare(a.name || '', b.name || ''));
-  };
-  const getQueueSourceLabel = (queuePosts) => {
-    const sourceFolders = getQueueSourceFolders(queuePosts);
-    if (sourceFolders.length === 0) return 'No folder';
-    if (sourceFolders.length === 1) return sourceFolders[0].name;
-    return `${sourceFolders[0].name} +${sourceFolders.length - 1}`;
   };
   const getPostSourceFolders = (post) => getQueueSourceFolders(post ? [post] : []);
   const getPostSourceLabel = (post) => {
@@ -783,6 +805,7 @@ const CalendarView = ({ selectedAccounts }) => {
   useEffect(() => {
     if (!showComposer) {
       setDeselectedPlanRows([]);
+      setAccountsSearchQuery('');
     }
   }, [showComposer]);
   useEffect(() => {
@@ -933,14 +956,13 @@ const CalendarView = ({ selectedAccounts }) => {
       }
       const normalizedAccountIds = accounts
         .map(normalizeSchedulingChannel)
-        .map(account => account._id);
+        .flatMap(getChannelAccountKeys);
       const scopedAccountIds = activeCampaignId || selectedAccounts.length === 0
         ? normalizedAccountIds
         : selectedAccounts;
+      const scopedAccountSet = new Set(scopedAccountIds.map(String));
       const filtered = data.filter(p => {
-        const accId = p.socialAccountIds?.[0]?._id || p.socialAccountIds?.[0];
-        const channelId = p.campaignChannelIds?.[0]?._id || p.campaignChannelIds?.[0];
-        return scopedAccountIds.includes(accId) || scopedAccountIds.includes(channelId);
+        return getPostAccountKeys(p).some((key) => scopedAccountSet.has(String(key)));
       });
       setPosts(filtered);
     } catch (error) {
@@ -996,10 +1018,13 @@ const CalendarView = ({ selectedAccounts }) => {
   };
 
   const handleDeleteAccountQueue = async (accountId, accountLabel) => {
+    const selectedOption = accountFilterOptions.find((option) => String(option.id) === String(accountId));
+    const accountKeys = selectedOption?.keys?.length ? selectedOption.keys : [accountId];
+    const accountKeySet = new Set(accountKeys.map(String));
     const activePostIds = posts
       .filter((post) => (
         isActiveQueuePost(post)
-        && (post.socialAccountIds || []).some((account) => String(account?._id || account) === String(accountId))
+        && getPostAccountKeys(post).some((key) => accountKeySet.has(String(key)))
       ))
       .map((post) => post._id);
     if (activePostIds.length === 0 || deletingAccountQueueIds.includes(accountId)) return;
@@ -1012,7 +1037,8 @@ const CalendarView = ({ selectedAccounts }) => {
     setPosts((current) => current.filter((post) => !activePostIds.includes(post._id)));
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/scheduler/queue/account/${accountId}${withCampaignScope()}`, {
+      const accountPath = accountKeys.map((key) => encodeURIComponent(key)).join(',');
+      const response = await fetch(`${API_BASE_URL}/api/scheduler/queue/account/${accountPath}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
@@ -1272,7 +1298,7 @@ const CalendarView = ({ selectedAccounts }) => {
         setDeselectedPlanRows([]);
         setCaption('');
         setScheduleTime('');
-        setScheduleMode('auto');
+        setScheduleMode('manual');
         setScheduleContentMode('assets');
         setYoutubeTitle('');
         setYoutubePrivacy('private');
@@ -1288,15 +1314,6 @@ const CalendarView = ({ selectedAccounts }) => {
       alert(error.message || 'Scheduling failed.');
     } finally {
       setSubmittingSchedule(false);
-    }
-  };
-
-  const getStatusBadgeColor = (status) => {
-    switch (status) {
-      case 'published': return 'bg-[#f5f5f7] text-gray-800 border border-[#e5e5ea]';
-      case 'publishing': return 'bg-blue-50 text-blue-600 border border-blue-200';
-      case 'failed': return 'bg-red-50 text-red-600 border border-red-200';
-      default: return 'bg-blue-50 text-blue-600 border border-blue-200';
     }
   };
 
@@ -1337,22 +1354,6 @@ const CalendarView = ({ selectedAccounts }) => {
         })
       ));
     }
-  };
-
-  const toggleMedia = (mediaId) => {
-    setSelectedMedia((current) => (
-      current.includes(mediaId)
-        ? current.filter(id => id !== mediaId)
-        : [...current, mediaId]
-    ));
-  };
-
-  const toggleCarouselSet = (setId) => {
-    setSelectedCarouselSets((current) => (
-      current.includes(setId)
-        ? current.filter(id => id !== setId)
-        : [...current, setId]
-    ));
   };
 
   const parseInputDate = (value) => {
@@ -1425,21 +1426,6 @@ const CalendarView = ({ selectedAccounts }) => {
     }
   };
 
-  const getStatusChipClasses = (group) => {
-    switch (group) {
-      case 'manual':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'done':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'failed':
-        return 'bg-red-50 text-red-700 border-red-200';
-      case 'cancelled':
-        return 'bg-slate-100 text-slate-500 border-slate-200';
-      default:
-        return 'bg-blue-50 text-blue-700 border-blue-200';
-    }
-  };
-
   const findChannelForRef = (ref) => {
     const refId = String(ref?._id || ref || '');
     const socialAccountId = String(ref?.socialAccountId?._id || ref?.socialAccountId || '');
@@ -1461,6 +1447,7 @@ const CalendarView = ({ selectedAccounts }) => {
       refs.set(key, {
         id: key,
         channel: channel || fallback || null,
+        keys: getAccountKeys(channel, fallback, key),
       });
     };
 
@@ -1491,11 +1478,42 @@ const CalendarView = ({ selectedAccounts }) => {
     return firstMedia?.name || 'Scheduled media';
   };
 
+  const accountFilterOptions = useMemo(() => {
+    const optionsById = new Map();
+    channels.forEach((channel) => {
+      const id = String(channel._id);
+      if (!id || optionsById.has(id)) return;
+      optionsById.set(id, {
+        id,
+        keys: getChannelAccountKeys(channel),
+        label: getAccountLabel(channel),
+        platform: channel.platform || 'unknown',
+        channel,
+      });
+    });
+    return [...optionsById.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [channels]);
+
+  const filteredCalendarAccountOptions = useMemo(() => {
+    const query = calendarAccountSearchQuery.trim().toLowerCase();
+    if (!query) return accountFilterOptions;
+    return accountFilterOptions.filter((option) => (
+      option.label.toLowerCase().includes(query) ||
+      option.platform.toLowerCase().includes(query)
+    ));
+  }, [accountFilterOptions, calendarAccountSearchQuery]);
+
   const normalizedCalendarPosts = useMemo(() => {
     const rangeStart = parseInputDate(calendarRangeStart);
     const rangeEnd = parseInputDate(calendarRangeEnd);
     if (rangeEnd) rangeEnd.setHours(23, 59, 59, 999);
     const selectedAccountSet = new Set(selectedCalendarAccountIds.map(String));
+    const selectedAccountKeys = new Set(
+      accountFilterOptions
+        .filter((option) => selectedAccountSet.has(String(option.id)))
+        .flatMap((option) => option.keys)
+        .map(String)
+    );
 
     return posts
       .map((post) => {
@@ -1531,25 +1549,13 @@ const CalendarView = ({ selectedAccounts }) => {
         if (rangeStart && item.displayDate < rangeStart) return false;
         if (rangeEnd && item.displayDate > rangeEnd) return false;
         if (selectedCalendarStatus !== 'all' && item.statusGroup !== selectedCalendarStatus) return false;
-        if (selectedAccountSet.size > 0 && !item.accountRefs.some((ref) => selectedAccountSet.has(String(ref.id)))) return false;
+        if (selectedAccountKeys.size > 0 && !item.accountRefs.some((ref) => (
+          (ref.keys || [ref.id]).some((key) => selectedAccountKeys.has(String(key)))
+        ))) return false;
         return true;
       })
       .sort((a, b) => a.displayDate - b.displayDate);
-  }, [calendarRangeEnd, calendarRangeStart, folderById, posts, selectedCalendarAccountIds, selectedCalendarStatus, channels]);
-
-  const calendarStats = useMemo(() => {
-    const stats = {
-      total: normalizedCalendarPosts.length,
-      scheduled: 0,
-      manual: 0,
-      done: 0,
-      failed: 0,
-    };
-    normalizedCalendarPosts.forEach((item) => {
-      if (stats[item.statusGroup] !== undefined) stats[item.statusGroup] += 1;
-    });
-    return stats;
-  }, [normalizedCalendarPosts]);
+  }, [calendarRangeEnd, calendarRangeStart, folderById, posts, selectedCalendarAccountIds, selectedCalendarStatus, channels, accountFilterOptions]);
 
   const calendarPostsByDate = useMemo(() => {
     const map = new Map();
@@ -1590,6 +1596,7 @@ const CalendarView = ({ selectedAccounts }) => {
         if (!groups.has(key)) {
           groups.set(key, {
             id: key,
+            keys: ref.keys || [key],
             channel: ref.channel,
             posts: [],
           });
@@ -1600,24 +1607,16 @@ const CalendarView = ({ selectedAccounts }) => {
     return [...groups.values()].sort((a, b) => getAccountLabel(a.channel).localeCompare(getAccountLabel(b.channel)));
   }, [selectedDayPosts]);
 
-  const accountFilterOptions = useMemo(() => {
-    const optionsById = new Map();
-    channels.forEach((channel) => {
-      const id = String(channel._id);
-      if (!id || optionsById.has(id)) return;
-      optionsById.set(id, {
-        id,
-        label: getAccountLabel(channel),
-        platform: channel.platform || 'unknown',
-        channel,
-      });
-    });
-    return [...optionsById.values()].sort((a, b) => a.label.localeCompare(b.label));
-  }, [channels]);
   const queueEditorAccountId = selectedCalendarAccountIds.length === 1 ? String(selectedCalendarAccountIds[0]) : '';
   const queueEditorAccount = useMemo(() => (
     accountFilterOptions.find((option) => String(option.id) === queueEditorAccountId) || null
   ), [accountFilterOptions, queueEditorAccountId]);
+  const queueEditorAccountKeys = useMemo(() => (
+    queueEditorAccount?.keys?.length ? queueEditorAccount.keys.map(String) : (queueEditorAccountId ? [queueEditorAccountId] : [])
+  ), [queueEditorAccount, queueEditorAccountId]);
+  const queueEditorAccountKeySet = useMemo(() => (
+    new Set(queueEditorAccountKeys)
+  ), [queueEditorAccountKeys]);
   const queueEditorItems = useMemo(() => {
     if (!queueEditorAccountId) return [];
     return queueEditorPosts
@@ -1637,14 +1636,17 @@ const CalendarView = ({ selectedAccounts }) => {
       })
       .filter((item) => {
         if (Number.isNaN(item.scheduledDate.getTime())) return false;
-        return item.accountRefs.some((ref) => String(ref.id) === queueEditorAccountId);
+        return item.accountRefs.some((ref) => (
+          (ref.keys || [ref.id]).some((key) => queueEditorAccountKeySet.has(String(key)))
+        ));
       })
       .sort((a, b) => a.scheduledDate - b.scheduledDate)
       .map((item, index) => ({ ...item, queueIndex: index + 1 }));
-  }, [queueEditorPosts, queueEditorAccountId, channels, folderById]);
+  }, [queueEditorPosts, queueEditorAccountId, queueEditorAccountKeySet, channels, folderById]);
 
   const fetchQueueEditorPosts = useCallback(async (accountId) => {
-    if (!accountId) {
+    const accountKeys = queueEditorAccount?.keys?.length ? queueEditorAccount.keys : [accountId];
+    if (!accountId || accountKeys.length === 0) {
       setQueueEditorPosts([]);
       return;
     }
@@ -1654,7 +1656,7 @@ const CalendarView = ({ selectedAccounts }) => {
     try {
       const params = new URLSearchParams();
       params.set('from', new Date().toISOString());
-      params.set('accountIds', accountId);
+      params.set('accountIds', accountKeys.join(','));
       params.set('statuses', 'scheduled,manual_ready,downloaded,publishing,paused');
       const response = await fetch(`${API_BASE_URL}/api/scheduler${withCampaignScope(params.toString())}`, {
         headers: {
@@ -1674,7 +1676,7 @@ const CalendarView = ({ selectedAccounts }) => {
     } finally {
       setLoadingQueueEditor(false);
     }
-  }, []);
+  }, [queueEditorAccount]);
 
   const openQueueEditor = () => {
     if (!queueEditorAccountId) return;
@@ -1711,16 +1713,6 @@ const CalendarView = ({ selectedAccounts }) => {
       setShowQueueEditor(false);
     }
   }, [selectedCalendarAccountIds.length]);
-
-  const updateQueueDraft = (postId, updates) => {
-    setQueueEditDrafts((current) => ({
-      ...current,
-      [postId]: {
-        ...(current[postId] || {}),
-        ...updates,
-      },
-    }));
-  };
 
   const buildQueueUpdatePayload = (item, overrides = {}) => {
     const postId = item?.post?._id;
@@ -1794,36 +1786,6 @@ const CalendarView = ({ selectedAccounts }) => {
         status: payload.status || 'scheduled',
       },
     }));
-  };
-
-  const handleSaveQueuePost = async (item) => {
-    const postId = item?.post?._id;
-    if (!postId || savingQueuePostIds.includes(postId)) return;
-    const payload = buildQueueUpdatePayload(item);
-    const previousQueueEditorPosts = queueEditorPosts;
-    const previousPosts = posts;
-    const previousDrafts = queueEditDrafts;
-
-    setQueueError('');
-    setSavingQueuePostIds((current) => [...current, postId]);
-    patchQueuePostInState(postId, payload);
-    patchQueueDraft(postId, payload);
-    try {
-      const savedPost = await saveQueuePostUpdate(item, payload);
-      if (savedPost?._id) {
-        patchQueuePostInState(postId, savedPost);
-        patchQueueDraft(postId, savedPost);
-      }
-      invalidateQueueRelatedQueries();
-    } catch (error) {
-      console.error('Failed to update queue post:', error);
-      setQueueEditorPosts(previousQueueEditorPosts);
-      setPosts(previousPosts);
-      setQueueEditDrafts(previousDrafts);
-      setQueueError(error.message || 'Failed to update queue post.');
-    } finally {
-      setSavingQueuePostIds((current) => current.filter((id) => id !== postId));
-    }
   };
 
   const handleBulkUpdateQueuePosts = async (items, updates = {}) => {
@@ -1917,38 +1879,6 @@ const CalendarView = ({ selectedAccounts }) => {
     }
   };
 
-  const handleDeleteQueuePost = async (item) => {
-    const postId = item?.post?._id;
-    if (!postId || deletingQueuePostIds.includes(postId)) return;
-    if (!window.confirm(`Remove "${item.mediaLabel || 'this post'}" from the queue?`)) return;
-
-    const previousPosts = posts;
-    const previousQueueEditorPosts = queueEditorPosts;
-    setQueueError('');
-    setDeletingQueuePostIds((current) => [...current, postId]);
-    setPosts((current) => current.filter((post) => post._id !== postId));
-    setQueueEditorPosts((current) => current.filter((post) => post._id !== postId));
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/scheduler/${postId}${withCampaignScope()}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
-        },
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(data?.message || `Delete failed: ${response.status}`);
-      }
-      invalidateQueueRelatedQueries();
-    } catch (error) {
-      console.error('Failed to delete queue post:', error);
-      setPosts(previousPosts);
-      setQueueEditorPosts(previousQueueEditorPosts);
-      setQueueError(error.message || 'Failed to delete queue post.');
-    } finally {
-      setDeletingQueuePostIds((current) => current.filter((id) => id !== postId));
-    }
-  };
   useEffect(() => {
     if (!showCalendarAccountMenu) return undefined;
 
@@ -1968,6 +1898,12 @@ const CalendarView = ({ selectedAccounts }) => {
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
+  }, [showCalendarAccountMenu]);
+
+  useEffect(() => {
+    if (!showCalendarAccountMenu) {
+      setCalendarAccountSearchQuery('');
+    }
   }, [showCalendarAccountMenu]);
 
   return (
@@ -2054,7 +1990,7 @@ const CalendarView = ({ selectedAccounts }) => {
                     label: '4. Review & Schedule',
                     active: selectedChannels.length > 0 && (selectedMedia.length > 0 || selectedCarouselSets.length > 0) && scheduleTime && schedulePlan.length > 0,
                   },
-                ].map((s, idx) => (
+                ].map((s) => (
                   <div key={s.step} className="flex flex-col items-center z-10 relative">
                     <span
                       className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border shadow-sm ${
@@ -2074,7 +2010,7 @@ const CalendarView = ({ selectedAccounts }) => {
             <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-2.5 p-2.5 overflow-hidden">
               
               <div className="rounded-xl border border-[#e5e7eb] bg-white shadow-sm flex flex-col overflow-hidden h-full">
-                <div className="flex items-center justify-between border-b border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5">
+                <div className="flex items-center justify-between border-b border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 flex-shrink-0">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Accounts</span>
                   <button
                     type="button"
@@ -2084,8 +2020,20 @@ const CalendarView = ({ selectedAccounts }) => {
                     Select all
                   </button>
                 </div>
+                <div className="p-2 border-b border-[#e5e7eb] bg-[#f8fafc]/50 flex-shrink-0">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={accountsSearchQuery}
+                      onChange={(e) => setAccountsSearchQuery(e.target.value)}
+                      placeholder="Search accounts"
+                      className="h-7 w-full rounded-md border border-[#e2e8f0] bg-white pl-7 pr-2 text-[11px] font-semibold text-slate-700 placeholder:text-slate-400 focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]/20"
+                    />
+                  </div>
+                </div>
                 <div className="p-2 space-y-1 flex-1 overflow-y-auto">
-                  {channels.map(chan => {
+                  {filteredComposerChannels.map(chan => {
                     const isSelected = selectedChannels.includes(chan._id);
                     const isVerified = isChannelVerified(chan);
                     const canSelect = canUseChannelForMode(chan);
@@ -2128,6 +2076,11 @@ const CalendarView = ({ selectedAccounts }) => {
                       </button>
                     );
                   })}
+                  {filteredComposerChannels.length === 0 && (
+                    <div className="h-32 flex items-center justify-center text-[10px] text-slate-400 text-center p-4">
+                      {accountsSearchQuery.trim() ? 'No matching accounts' : 'No accounts available'}
+                    </div>
+                  )}
                 </div>
                 <div className="border-t border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 text-[10px] font-semibold text-[#64748b]">
                   {selectedChannels.length} channel{selectedChannels.length === 1 ? '' : 's'} selected
@@ -2570,7 +2523,6 @@ const CalendarView = ({ selectedAccounts }) => {
           drafts={queueEditDrafts}
           loading={loadingQueueEditor}
           savingPostIds={savingQueuePostIds}
-          deletingPostIds={deletingQueuePostIds}
           onBulkSave={handleBulkUpdateQueuePosts}
           onBulkCaptionSave={handleBulkSaveQueueCaptions}
           onClose={() => setShowQueueEditor(false)}
@@ -2628,6 +2580,18 @@ const CalendarView = ({ selectedAccounts }) => {
 	                  </button>
 	                  {showCalendarAccountMenu && (
                     <div className="absolute left-0 top-9 z-[9999] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-[#dadce0] bg-white shadow-lg">
+                      <div className="p-2 border-b border-[#f1f3f4] bg-[#f8fafc]/50">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            value={calendarAccountSearchQuery}
+                            onChange={(e) => setCalendarAccountSearchQuery(e.target.value)}
+                            placeholder="Search accounts..."
+                            className="h-7 w-full rounded-md border border-[#e2e8f0] bg-white pl-7 pr-2 text-[11px] font-semibold text-slate-700 placeholder:text-slate-400 focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]/20"
+                          />
+                        </div>
+                      </div>
 	                      <button
 	                        type="button"
 	                        onClick={() => setSelectedCalendarAccountIds([])}
@@ -2639,7 +2603,7 @@ const CalendarView = ({ selectedAccounts }) => {
 	                        {selectedCalendarAccountIds.length === 0 && <span className="text-[10px]">Selected</span>}
 	                      </button>
 	                      <div className="max-h-64 overflow-y-auto border-t border-[#f1f3f4] py-1">
-	                        {accountFilterOptions.map((option) => {
+	                        {filteredCalendarAccountOptions.map((option) => {
 	                          const selected = selectedCalendarAccountIds.includes(option.id);
 	                          return (
 	                            <button
@@ -2662,9 +2626,9 @@ const CalendarView = ({ selectedAccounts }) => {
 	                            </button>
 	                          );
 	                        })}
-	                        {accountFilterOptions.length === 0 && (
-	                          <div className="px-3 py-3 text-[12px] font-medium text-[#80868b]">
-	                            No campaign accounts
+	                        {filteredCalendarAccountOptions.length === 0 && (
+	                          <div className="px-3 py-3 text-[12px] font-medium text-[#80868b] text-center">
+	                            {calendarAccountSearchQuery.trim() ? 'No matching accounts' : 'No campaign accounts'}
 	                          </div>
 	                        )}
 	                      </div>
@@ -2700,6 +2664,30 @@ const CalendarView = ({ selectedAccounts }) => {
               </div>
 
               <div className="flex flex-shrink-0 items-center gap-2.5">
+                {/* Grouping Mode Toggle */}
+                <div className="flex items-center rounded-lg border border-[#dadce0] overflow-hidden">
+                  {[
+                    { mode: 'posts', label: 'Posts View' },
+                    { mode: 'accounts', label: 'Accounts View' },
+                  ].map((item) => (
+                    <button
+                      key={item.mode}
+                      type="button"
+                      onClick={() => {
+                        setCalendarGroupingMode(item.mode);
+                        localStorage.setItem('calendar-grouping-mode', item.mode);
+                      }}
+                      className={`h-8 px-3 text-[12px] font-semibold transition-colors ${
+                        calendarGroupingMode === item.mode
+                          ? 'bg-[#1a73e8] text-white'
+                          : 'bg-white text-[#3c4043] hover:bg-[#f8f9fa]'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="flex items-center rounded-lg border border-[#dadce0] overflow-hidden">
                   {['month', 'week'].map((mode) => (
                     <button
@@ -2716,15 +2704,6 @@ const CalendarView = ({ selectedAccounts }) => {
                     </button>
                   ))}
                 </div>
-                {!isViewer && (
-                  <button
-                    onClick={() => setShowComposer(true)}
-                    className="flex items-center gap-1.5 bg-[#1a73e8] hover:bg-[#1557b0] text-white px-4 h-8 rounded-lg text-[12px] font-semibold transition-all shadow-sm"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>New Schedule</span>
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -2745,12 +2724,13 @@ const CalendarView = ({ selectedAccounts }) => {
               {/* Calendar Cells */}
               <div className="grid flex-1 min-h-0 grid-cols-7 auto-rows-fr overflow-hidden">
                 {calendarDays.map((day) => {
-                  const visibleDayPosts = day.posts;
-                  const moreCount = Math.max(day.posts.length - visibleDayPosts.length, 0);
+                  const visibleDayPosts = calendarGroupingMode === 'accounts'
+                    ? []
+                    : day.posts;
                   const isTooltipOpen = activeTooltip && activeTooltip.dayKey === day.key;
 
                   const getStatusRowStyle = (group, manualPosted = false) => {
-                    if (manualPosted) return 'bg-[#f5f3ff] text-[#6d28d9] border border-[#ddd6fe]';
+                    if (manualPosted) return 'bg-[#ecfdf5] text-[#047857] border border-[#a7f3d0]';
                     switch (group) {
                       case 'manual': return 'bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa]';
                       case 'done': return 'bg-[#ecfdf5] text-[#047857] border border-[#a7f3d0]';
@@ -2759,6 +2739,27 @@ const CalendarView = ({ selectedAccounts }) => {
                       default: return 'bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]';
                     }
                   };
+
+                  // Group day posts by account for the 'accounts' grouping mode
+                  const dayAccountGroups = (() => {
+                    if (calendarGroupingMode !== 'accounts') return [];
+                    const groupsMap = new Map();
+                    day.posts.forEach((item) => {
+                      item.accountRefs.forEach((ref) => {
+                        const key = String(ref.id);
+                        if (!groupsMap.has(key)) {
+                        groupsMap.set(key, {
+                          id: key,
+                          keys: ref.keys || [key],
+                          channel: ref.channel,
+                          posts: [],
+                        });
+                        }
+                        groupsMap.get(key).posts.push(item);
+                      });
+                    });
+                    return [...groupsMap.values()].sort((a, b) => getAccountLabel(a.channel).localeCompare(getAccountLabel(b.channel)));
+                  })();
 
                   return (
 	                    <div
@@ -2795,35 +2796,8 @@ const CalendarView = ({ selectedAccounts }) => {
                           {day.date.getDate()}
                         </span>
                         <div className="flex items-center gap-1">
-                          {moreCount > 0 ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedCalendarDate(day.key);
-                                const isThisDayTooltipOpen = activeTooltip && activeTooltip.type === 'day' && activeTooltip.dayKey === day.key;
-                                if (isThisDayTooltipOpen) {
-                                  setActiveTooltip(null);
-                                } else {
-                                  showTooltip(e, 'day', day);
-                                }
-                              }}
-                              onMouseEnter={() => {
-                                if (activeTooltip && activeTooltip.type === 'day' && activeTooltip.dayKey === day.key) {
-                                  cancelCloseTimeout();
-                                }
-                              }}
-                              onMouseLeave={() => {
-                                if (activeTooltip && activeTooltip.type === 'day' && activeTooltip.dayKey === day.key) {
-                                  startCloseTimeout();
-                                }
-                              }}
-                              className="rounded-full bg-blue-50 px-1 py-0 text-[9px] font-black text-blue-700 hover:bg-blue-100"
-                            >
-                              +{moreCount} more
-                            </button>
-                          ) : day.posts.length > 0 ? (
-	                            <span className="text-[9px] font-bold text-[#5f6368] bg-[#f1f3f4] rounded-full px-1 py-0">
+                          {day.posts.length > 0 ? (
+                            <span className="text-[9px] font-bold text-[#5f6368] bg-[#f1f3f4] rounded-full px-1 py-0">
                               {day.posts.length}
                             </span>
                           ) : null}
@@ -2832,10 +2806,63 @@ const CalendarView = ({ selectedAccounts }) => {
 
                       {/* Post Entries — compact preview */}
 	                      <div className="scrollbar-none min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-0.5">
-                        {visibleDayPosts.map((item) => {
-                          const primaryChannel = item.accountRefs[0]?.channel;
-                          const isThisPostTooltipOpen = activeTooltip && activeTooltip.type === 'post' && activeTooltip.data?.post?._id === item.post?._id;
-                          return (
+                        {calendarGroupingMode === 'accounts' ? (
+                          dayAccountGroups.map((group) => {
+                            let queuedCount = 0;
+                            let postedCount = 0;
+                            group.posts.forEach((item) => {
+                              if (item.statusGroup === 'done') {
+                                postedCount++;
+                              } else {
+                                queuedCount++;
+                              }
+                            });
+                            const isThisAccountTooltipOpen = activeTooltip && activeTooltip.type === 'day-account' && activeTooltip.data?.dayKey === day.key && activeTooltip.data?.accountId === group.id;
+                            return (
+                              <div
+                                key={group.id}
+                                onMouseEnter={() => {
+                                  if (isThisAccountTooltipOpen) {
+                                    cancelCloseTimeout();
+                                  }
+                                }}
+                                onMouseLeave={() => {
+                                  if (isThisAccountTooltipOpen) {
+                                    startCloseTimeout();
+                                  }
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCalendarDate(day.key);
+                                  if (isThisAccountTooltipOpen) {
+                                    setActiveTooltip(null);
+                                  } else {
+                                    showTooltip(e, 'day-account', { dayKey: day.key, accountId: group.id, group });
+                                  }
+                                }}
+                                title={`${queuedCount} queued, ${postedCount} posted`}
+                                className="flex h-8 min-w-0 items-center justify-between gap-1 rounded-md border border-slate-100 bg-white px-1.5 shadow-sm transition-all hover:scale-[1.02] cursor-pointer hover:bg-slate-50"
+                              >
+                                <div className="flex items-center gap-1 min-w-0">
+                                  <PlatformIcon platform={group.channel?.platform} className="h-4 w-4 flex-shrink-0" showFallback={true} />
+                                  <AccountAvatar account={group.channel} sizeClass="h-4.5 w-4.5" textClass="text-[8px]" />
+                                  <div className="min-w-0 flex flex-col leading-none">
+                                    <span className="truncate text-[10px] font-bold text-slate-800 leading-tight">
+                                      {getAccountLabel(group.channel)}
+                                    </span>
+                                    <span className="text-[8px] font-bold text-slate-500 mt-0.5 leading-none">
+                                      {queuedCount} - {postedCount}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          visibleDayPosts.map((item) => {
+                            const primaryChannel = item.accountRefs[0]?.channel;
+                            const isThisPostTooltipOpen = activeTooltip && activeTooltip.type === 'post' && activeTooltip.data?.post?._id === item.post?._id;
+                            return (
 	                            <div
 	                              key={`${item.post._id}-${item.accountRefs[0]?.id || 'account'}`}
 	                              className={`flex h-7 min-w-0 items-center gap-1 rounded-md px-1 shadow-sm transition-all hover:scale-[1.02] cursor-pointer ${getStatusRowStyle(item.statusGroup, item.manualPosted)}`}
@@ -2862,13 +2889,13 @@ const CalendarView = ({ selectedAccounts }) => {
 	                            >
 	                              <PlatformIcon platform={primaryChannel?.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
 	                              <AccountAvatar account={primaryChannel} sizeClass="h-5 w-5" textClass="text-[8px]" />
-	                              <span className="truncate text-[11px] font-bold">
+	                              <span className={`truncate text-[11px] font-bold ${item.manualPosted ? 'text-purple-700' : ''}`}>
                                    {item.manualPosted ? item.manualPostedTimeLabel : item.timeLabel}
                                 </span>
 	                            </div>
                           );
-	                        })}
-	                      </div>
+	                        }))}
+                      </div>
                       {isTooltipOpen && activeTooltip && (
                         <div
                           onClick={(e) => e.stopPropagation()}
@@ -2886,10 +2913,21 @@ const CalendarView = ({ selectedAccounts }) => {
                               <p className="m-0 truncate text-[12px] font-black text-[#202124]">
                                 {day.date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
                               </p>
-                              <p className="m-0 text-[10px] font-semibold text-[#70757a]">
+                              {activeTooltip.type === 'day-account' && (
+                                <div className="mt-1 flex items-center gap-1.5 min-w-0 bg-slate-50 border border-slate-100 rounded-lg p-1.5">
+                                  <PlatformIcon platform={activeTooltip.data.group.channel?.platform} className="h-4.5 w-4.5 flex-shrink-0" showFallback={true} />
+                                  <AccountAvatar account={activeTooltip.data.group.channel} sizeClass="h-5.5 w-5.5" textClass="text-[8px]" />
+                                  <span className="truncate text-[11px] font-black text-slate-800">
+                                    @{getAccountLabel(activeTooltip.data.group.channel)}
+                                  </span>
+                                </div>
+                              )}
+                              <p className="m-0 mt-1 text-[10px] font-semibold text-[#70757a]">
                                 {activeTooltip.type === 'day'
                                   ? `${activeTooltip.data.posts.length} scheduled item${activeTooltip.data.posts.length === 1 ? '' : 's'}`
-                                  : 'Post Preview'
+                                  : activeTooltip.type === 'day-account'
+                                    ? `${activeTooltip.data.group.posts.length} post${activeTooltip.data.group.posts.length === 1 ? '' : 's'} scheduled`
+                                    : 'Post Preview'
                                 }
                               </p>
                             </div>
@@ -2915,6 +2953,13 @@ const CalendarView = ({ selectedAccounts }) => {
                                   item={item}
                                 />
                               ))
+                            ) : activeTooltip.type === 'day-account' ? (
+                              activeTooltip.data.group.posts.map((item) => (
+                                <PostPreviewRow
+                                  key={`tooltip-${item.post._id}-${item.accountRefs[0]?.id || 'account'}`}
+                                  item={item}
+                                />
+                              ))
                             ) : (
                               <PostPreviewRow item={activeTooltip.data} />
                             )}
@@ -2932,7 +2977,7 @@ const CalendarView = ({ selectedAccounts }) => {
                   ['Scheduled', 'bg-[#1a73e8]'],
                   ['Manual Ready', 'bg-[#f59e0b]'],
                   ['Published', 'bg-[#34a853]'],
-                  ['Manual Posted', 'bg-[#7c3aed]'],
+                  ['Manual Posted', 'bg-[#34a853]'],
                   ['Failed', 'bg-[#ea4335]'],
                   ['Paused / Cancelled', 'bg-[#9aa0a6]'],
                 ].map(([label, dotColor]) => (
@@ -2945,7 +2990,28 @@ const CalendarView = ({ selectedAccounts }) => {
             </div>
 
             {/* Right Sidebar — Selected Date Detail */}
-            <aside className="w-[260px] xl:w-[300px] min-h-0 flex flex-col overflow-hidden bg-white flex-shrink-0">
+            <aside className={`min-h-0 flex flex-col overflow-hidden bg-white flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-10' : 'w-[260px] xl:w-[300px]'}`}>
+              {/* Collapse/Expand Toggle */}
+              {sidebarCollapsed ? (
+                <div className="flex-1 flex flex-col items-center pt-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSidebarCollapsed(false)}
+                    className="h-7 w-7 rounded-full hover:bg-[#f1f3f4] flex items-center justify-center text-[#5f6368] transition-colors"
+                    title="Expand sidebar"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-[10px] font-bold text-[#5f6368] [writing-mode:vertical-lr] rotate-180">
+                    {(() => {
+                      const d = parseInputDate(selectedCalendarDate) || new Date();
+                      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                    })()}
+                  </span>
+                  <span className="rounded-full bg-[#1a73e8] text-white text-[9px] font-bold px-1.5 py-0.5">{selectedDayPosts.length}</span>
+                </div>
+              ) : (
+                <>
               {/* Sidebar Header */}
               <div className="border-b border-[#e8eaed] px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0">
                 <div className="min-w-0 flex items-center gap-2">
@@ -2959,18 +3025,19 @@ const CalendarView = ({ selectedAccounts }) => {
                     {selectedDayPosts.length}
                   </span>
                 </div>
+
                 <button
                   type="button"
-                  onClick={() => setSelectedCalendarDate('')}
+                  onClick={() => setSidebarCollapsed(true)}
                   className="h-6 w-6 rounded-full hover:bg-[#f1f3f4] flex items-center justify-center text-[#5f6368] transition-colors flex-shrink-0"
-                  title="Close"
+                  title="Collapse sidebar"
                 >
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12"/></svg>
+                  <ChevronLeft className="h-3.5 w-3.5 rotate-180" />
                 </button>
               </div>
 
               {/* Sidebar Content */}
-              <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
                 {selectedDayGroups.length === 0 && (
 	                  <div className="h-32 flex flex-col items-center justify-center gap-1.5 text-center px-3">
 	                    <Clock className="h-6 w-6 text-[#dadce0]" />
@@ -2979,44 +3046,45 @@ const CalendarView = ({ selectedAccounts }) => {
                 )}
 
                 {selectedDayGroups.map((group) => {
+                  const groupKeySet = new Set((group.keys || [group.id]).map(String));
                   const activePostIds = group.posts
                     .filter((item) => (
                       isActiveQueuePost(item.post)
-                      && (item.post.socialAccountIds || []).some((account) => String(account?._id || account) === String(group.id))
+                      && getPostAccountKeys(item.post).some((key) => groupKeySet.has(String(key)))
                     ))
                     .map((item) => item.post._id);
                   const deletingAccountQueue = deletingAccountQueueIds.includes(group.id);
 
                   return (
-                    <div key={group.id} className="border-b border-[#e8eaed]">
+                    <div key={group.id} className="rounded-lg border border-[#dadce0] overflow-hidden">
                       {/* Account Header */}
-	                      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[#f8f9fa]">
+	                      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[#e8eaed]">
 	                        <div className="min-w-0 flex items-center gap-2">
 	                          <PlatformIcon platform={group.channel?.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
 	                          <AccountAvatar account={group.channel} sizeClass="h-8 w-8" textClass="text-[10px]" />
-	                          <span className="text-[12px] font-semibold text-[#3c4043] truncate">@{getAccountLabel(group.channel)}</span>
+	                          <span className="text-[12px] font-bold text-[#202124] truncate">{getAccountLabel(group.channel)}</span>
 	                        </div>
 	                        <div className="flex items-center gap-1.5">
-	                          <span className="text-[10px] font-semibold text-[#5f6368] bg-white border border-[#dadce0] rounded-full px-1.5 py-0.5">{group.posts.length}</span>
+	                          <span className="text-[10px] font-bold text-white bg-[#1a73e8] rounded-full px-1.5 py-0.5">{group.posts.length}</span>
                           {activePostIds.length > 0 && (
                             <button
                               type="button"
                               onClick={() => handleDeleteAccountQueue(group.id, getAccountLabel(group.channel))}
                               disabled={deletingAccountQueue}
                               className="text-[#5f6368] hover:text-[#ea4335] transition-colors"
-                              title="Expand"
+                              title="Delete queue"
                             >
-                              <ChevronLeft className="h-3.5 w-3.5 -rotate-90" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           )}
                         </div>
                       </div>
 
                       {/* Posts List */}
-                      <div className="divide-y divide-[#f1f3f4]">
+                      <div className="flex flex-wrap gap-1 p-2 bg-white">
                         {group.posts.map((item) => {
                           const getStatusDotBg = (statusGroup, manualPosted = false) => {
-                            if (manualPosted) return 'bg-[#7c3aed]';
+                            if (manualPosted) return 'bg-[#34a853]';
                             switch (statusGroup) {
                               case 'manual': return 'bg-[#f59e0b]';
                               case 'done': return 'bg-[#34a853]';
@@ -3026,48 +3094,17 @@ const CalendarView = ({ selectedAccounts }) => {
                             }
                           };
 
-                          const getStatusPillStyle = (statusGroup, manualPosted = false) => {
-                            if (manualPosted) return 'bg-[#f5f3ff] text-[#6d28d9] border-[#ddd6fe]';
-                            switch (statusGroup) {
-                              case 'manual': return 'bg-[#fff7ed] text-[#c2410c] border-[#fed7aa]';
-                              case 'done': return 'bg-[#ecfdf5] text-[#047857] border-[#a7f3d0]';
-                              case 'failed': return 'bg-[#fef2f2] text-[#b91c1c] border-[#fecaca]';
-                              case 'cancelled': return 'bg-[#f9fafb] text-[#6b7280] border-[#e5e7eb]';
-                              default: return 'bg-[#eff6ff] text-[#1d4ed8] border-[#bfdbfe]';
-                            }
-                          };
-
                           return (
-	                            <div key={`${group.id}-${item.post._id}`} className="flex items-center gap-2 px-3 py-2">
+	                            <div key={`${group.id}-${item.post._id}`} className="flex flex-col items-center gap-0.5 py-1.5" title={item.mediaLabel}>
 	                              {/* Media Thumbnail */}
-	                              <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-[#f1f3f4] relative">
+	                              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-[#f1f3f4] relative">
 	                                <MediaPreview item={item.mediaItem} />
 	                              </div>
-		                              {/* Post Info */}
-	                              <div className="min-w-0 flex-1">
-	                                <p className="m-0 text-[11px] font-semibold text-[#1a1a2e] truncate leading-tight">{item.mediaLabel}</p>
-	                                <div className="mt-0.5 flex min-w-0 items-start gap-1.5">
-	                                  <div className="min-w-0 flex-1">
-	                                    <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[9px] font-semibold leading-tight text-[#8b9098]">
-	                                      <Folder className="h-2.5 w-2.5 flex-shrink-0 text-[#9aa0a6]" />
-	                                      <span className="truncate">{item.folderLabel}</span>
-	                                    </span>
-	                                  </div>
-	                                  <div className="flex flex-shrink-0 items-center gap-1">
-	                                    <span className="text-[10px] font-semibold text-[#5f6368]">
-                                        {item.manualPosted ? item.manualPostedTimeLabel : item.timeLabel}
-                                      </span>
-	                                    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border truncate ${getStatusPillStyle(item.statusGroup, item.manualPosted)}`}>
-	                                      <span className={`w-1 h-1 rounded-full flex-shrink-0 ${getStatusDotBg(item.statusGroup, item.manualPosted)}`} />
-	                                      {getPostStatusLabel(item.post)}
-	                                    </span>
-	                                  </div>
-	                                </div>
-                                  {item.manualPosted && (
-                                    <p className="m-0 mt-0.5 text-[9px] font-semibold text-[#8b9098]">
-                                      Scheduled {item.scheduledTimeLabel}
-                                    </p>
-                                  )}
+	                              <div className="flex items-center gap-1">
+	                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusDotBg(item.statusGroup, item.manualPosted)}`} title={getPostStatusLabel(item.post)} />
+	                                <span className={`text-[9px] font-semibold ${item.manualPosted ? 'text-purple-700' : 'text-[#5f6368]'}`}>
+                                    {item.manualPosted ? item.manualPostedTimeLabel : item.timeLabel}
+                                  </span>
 	                              </div>
 	                            </div>
                           );
@@ -3085,6 +3122,8 @@ const CalendarView = ({ selectedAccounts }) => {
 	                    {selectedDayPosts.length} item{selectedDayPosts.length === 1 ? '' : 's'}
 	                  </div>
 	                </div>
+              )}
+                </>
               )}
             </aside>
           </div>

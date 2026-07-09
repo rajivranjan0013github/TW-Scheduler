@@ -3,11 +3,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { AlertCircle, Calendar, CheckCircle, Share2 } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle, Share2, RefreshCw } from 'lucide-react';
 import { getMediaUrl } from '../utils/mediaUrls';
 import PlatformIcon from '../components/PlatformIcon';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
+const POST_COOLDOWN_MS = 4 * 60 * 60 * 1000;
 
 const copyToClipboard = (text) => {
   if (navigator.clipboard && window.isSecureContext) {
@@ -44,7 +45,15 @@ export const CreatorCampaigns = () => {
   const [sharingPostId, setSharingPostId] = useState(null);
   const [markingPostId, setMarkingPostId] = useState(null);
   const [postedStatus, setPostedStatus] = useState(null);
+  const [nowMs, setNowMs] = useState(0);
   const shareBlobRef = useRef(null);
+
+  // Pull-to-refresh state & refs
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const startYRef = useRef(null);
+  const isReadyToPullRef = useRef(false);
 
   const isCreatorActionable = (post) => (
     ['manual', 'hybrid'].includes(post.scheduleMode)
@@ -68,11 +77,50 @@ export const CreatorCampaigns = () => {
     }).toString();
   };
 
+  const parseDateValue = (value) => {
+    if (!value) return null;
+    const normalizedValue = typeof value === 'object' && value !== null
+      ? value.iso || value.local || value.timestamp
+      : value;
+    const date = new Date(normalizedValue);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
   const formatPostTime = (value) => {
-    if (!value) return '--:--';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '--:--';
+    const date = parseDateValue(value);
+    if (!date) return '--:--';
     return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  const formatCooldownRemaining = (remainingMs) => {
+    const totalMinutes = Math.max(1, Math.ceil(remainingMs / (60 * 1000)));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h`;
+    return `${minutes}m`;
+  };
+
+  const getPostingCooldown = (tracking = {}) => {
+    const latestPublishedAt = parseDateValue(
+      tracking.lastPublishedAt || tracking.posts?.[0]?.publishedAt
+    );
+    if (!latestPublishedAt) {
+      return { isLocked: false, remainingMs: 0, label: '' };
+    }
+    if (!nowMs) {
+      return { isLocked: true, remainingMs: 0, label: 'Checking availability' };
+    }
+    const unlocksAt = latestPublishedAt.getTime() + POST_COOLDOWN_MS;
+    const remainingMs = unlocksAt - nowMs;
+    if (remainingMs <= 0) {
+      return { isLocked: false, remainingMs: 0, label: '' };
+    }
+    return {
+      isLocked: true,
+      remainingMs,
+      label: `Available in ${formatCooldownRemaining(remainingMs)}`,
+    };
   };
 
   const fetchTodayTracking = useCallback((headers, { force = false } = {}) => {
@@ -113,7 +161,7 @@ export const CreatorCampaigns = () => {
     const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
     const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
-    window.location.href = oauthUrl;
+    window.location.assign(oauthUrl);
   };
 
   const connectInstagramOAuth = (campaignId) => {
@@ -130,7 +178,7 @@ export const CreatorCampaigns = () => {
     const redirectUri = encodeURIComponent(rawRedirectUri);
     const scope = encodeURIComponent('instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights');
     const oauthUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
-    window.location.href = oauthUrl;
+    window.location.assign(oauthUrl);
   };
 
   const connectYoutubeOAuth = async (campaignId) => {
@@ -146,7 +194,7 @@ export const CreatorCampaigns = () => {
         return;
       }
 
-      window.location.href = data.url;
+      window.location.assign(data.url);
     } catch (error) {
       console.error('Failed to start YouTube OAuth:', error);
       alert('Failed to connect to the backend for YouTube OAuth.');
@@ -184,7 +232,8 @@ export const CreatorCampaigns = () => {
       void queryClient.invalidateQueries({ queryKey: ['scheduler'] });
       return updatedPost;
     }
-    return post;
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || 'Could not prepare this post for sharing.');
   };
 
   const handleCopyCaption = async (post) => {
@@ -209,7 +258,12 @@ export const CreatorCampaigns = () => {
     return rawName.includes('.') ? rawName : `${rawName}.mp4`;
   };
 
-  const handleSharePost = async (post) => {
+  const handleSharePost = async (post, cooldown = {}) => {
+    if (cooldown.isLocked) {
+      alert(`You can share the next video after ${formatCooldownRemaining(cooldown.remainingMs)}.`);
+      return;
+    }
+
     const media = post.mediaIds?.[0];
     if (!media?.url) {
       alert('No video is attached to this post.');
@@ -222,16 +276,13 @@ export const CreatorCampaigns = () => {
     setSharingPostId(post._id);
 
     try {
-      void markPostDownloaded(post).catch((err) => {
-        console.error('Failed to mark post downloaded:', err);
-      });
-
       if (typeof navigator.share !== 'function') {
         alert('Native sharing is not available in this browser.');
         return;
       }
 
       const fileName = getMediaFileName(media);
+      await markPostDownloaded(post);
 
       if (window.isSecureContext) {
         try {
@@ -270,7 +321,7 @@ export const CreatorCampaigns = () => {
     } catch (err) {
       if (err.name !== 'AbortError') {
         console.error('Share failed:', err);
-        alert('Could not open the share sheet for this video.');
+        alert(err.message || 'Could not open the share sheet for this video.');
       }
     } finally {
       setSharingPostId(null);
@@ -366,8 +417,10 @@ export const CreatorCampaigns = () => {
       });
   };
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (opts = {}) => {
+    if (!opts.silent) {
+      setLoading(true);
+    }
     setError('');
     try {
       const headers = { Authorization: `Bearer ${token}` };
@@ -376,18 +429,23 @@ export const CreatorCampaigns = () => {
         if (!response.ok) throw new Error(`Request failed: ${response.status}`);
         return response.json();
       };
+
+      if (opts.force) {
+        await queryClient.invalidateQueries({ queryKey: ['creator'] });
+      }
+
       const [campData, postData, trackingData] = await Promise.all([
         queryClient.fetchQuery({
           queryKey: ['creator', 'campaigns'],
           queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
-          staleTime: 2 * 60 * 1000,
+          staleTime: opts.force ? 0 : 2 * 60 * 1000,
         }),
         queryClient.fetchQuery({
           queryKey: ['creator', 'posts'],
           queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler/creator/posts`),
-          staleTime: 20 * 1000,
+          staleTime: opts.force ? 0 : 20 * 1000,
         }),
-        fetchTodayTracking(headers),
+        fetchTodayTracking(headers, { force: opts.force }),
       ]);
 
       setCampaigns(campData);
@@ -396,9 +454,56 @@ export const CreatorCampaigns = () => {
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!opts.silent) {
+        setLoading(false);
+      }
     }
   }, [fetchTodayTracking, queryClient, token]);
+
+  const handleTouchStart = (e) => {
+    if (isRefreshing) return;
+    const mainElement = e.currentTarget.closest('main');
+    const isAtTop = !mainElement || mainElement.scrollTop <= 0;
+    if (isAtTop) {
+      startYRef.current = e.touches[0].clientY;
+      isReadyToPullRef.current = true;
+      setIsDragging(true);
+    } else {
+      isReadyToPullRef.current = false;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isReadyToPullRef.current || isRefreshing) return;
+    const currentY = e.touches[0].clientY;
+    const diffY = currentY - startYRef.current;
+    if (diffY > 0) {
+      const distance = Math.min(diffY * 0.4, 80);
+      setPullDistance(distance);
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (!isReadyToPullRef.current) return;
+    setIsDragging(false);
+    isReadyToPullRef.current = false;
+    startYRef.current = null;
+
+    if (pullDistance >= 60) {
+      setIsRefreshing(true);
+      setPullDistance(50);
+      try {
+        await loadData({ silent: true, force: true });
+      } catch (err) {
+        console.error('Pull to refresh failed:', err);
+      } finally {
+        setIsRefreshing(false);
+        setPullDistance(0);
+      }
+    } else {
+      setPullDistance(0);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -444,6 +549,19 @@ export const CreatorCampaigns = () => {
       active = false;
     };
   }, [fetchTodayTracking, queryClient, token]);
+
+  useEffect(() => {
+    const updateNow = () => {
+      setNowMs(Date.now());
+    };
+    const initialTimer = window.setTimeout(updateNow, 0);
+    const timer = window.setInterval(updateNow, 60 * 1000);
+
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const pendingVerifications = campaigns.flatMap((camp) => (
     (camp.channels || [])
@@ -553,7 +671,37 @@ export const CreatorCampaigns = () => {
   }, [nextQueuedPost?._id, nextShareMedia?.url]);
 
   return (
-    <div className="px-2 pb-4 pt-2 text-[#1d1d1f] sm:px-3 sm:pt-3 md:px-6 md:py-5">
+    <div 
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      className="px-4 pb-4 pt-2 text-[#1d1d1f] sm:px-6 sm:pt-3 md:px-8 md:py-5 min-h-screen"
+    >
+      {/* Pull-to-refresh elegant indicator */}
+      <div 
+        style={{ height: `${pullDistance}px` }}
+        className={`flex items-center justify-center overflow-hidden w-full bg-transparent ${
+          isDragging ? '' : 'transition-all duration-300 ease-out'
+        }`}
+      >
+        <div className="flex flex-col items-center justify-center gap-1 py-1.5 text-[#8e8e93]">
+          <RefreshCw 
+            className={`w-5 h-5 text-[#3478f6] ${
+              isRefreshing ? 'animate-spin' : ''
+            }`}
+            style={!isRefreshing ? { transform: `rotate(${pullDistance * 6}deg)` } : undefined}
+          />
+          <span className="text-[10px] font-bold tracking-wide uppercase">
+            {isRefreshing 
+              ? 'Syncing campaigns...' 
+              : pullDistance >= 60 
+                ? 'Release to refresh' 
+                : 'Pull to refresh'}
+          </span>
+        </div>
+      </div>
+
       <div className="mx-auto max-w-4xl space-y-2 sm:space-y-3 md:space-y-4">
        
 
@@ -579,7 +727,21 @@ export const CreatorCampaigns = () => {
                   {pendingVerifications.map((ch) => (
                     <div key={`${ch.campaignId}-${ch.platform}-${ch.handle}`} className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 md:p-3">
                       <div className="flex min-w-0 items-center gap-3">
-                        <PlatformIcon platform={ch.platform} className="h-7 w-7 md:h-8 md:w-8" />
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <PlatformIcon platform={ch.platform} className="h-7 w-7 md:h-8 md:w-8" />
+                          {ch.avatarUrl ? (
+                            <img 
+                              src={ch.avatarUrl} 
+                              crossOrigin="anonymous" 
+                              className="h-7 w-7 md:h-8 md:w-8 rounded-full object-cover border border-amber-200/50 shadow-sm" 
+                              alt="" 
+                            />
+                          ) : (
+                            <div className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-amber-100 border border-amber-200/50 flex items-center justify-center text-xs font-bold text-amber-700">
+                              {(ch.handle?.charAt(0) || '@').toUpperCase()}
+                            </div>
+                          )}
+                        </div>
                         <div className="min-w-0">
                           <p className="m-0 truncate text-sm font-semibold text-[#1d1d1f]">
                             {ch.handle.startsWith('@') ? ch.handle : `@${ch.handle}`}
@@ -614,18 +776,20 @@ export const CreatorCampaigns = () => {
                 </div>
               )}
               {assignedCampaigns.length > 0 ? (
-                <div className="grid gap-2 md:gap-3 lg:grid-cols-2">
+                <div className="grid gap-x-4 gap-y-3 md:gap-x-6 md:gap-y-4 lg:grid-cols-2">
                   {assignedCampaigns.flatMap((camp) => {
                     const accountQueues = getAccountQueueGroups(camp);
                     if (accountQueues.length === 0) {
                       return (
-                        <div key={`${camp._id}-empty`} className="rounded-lg border border-[#e5e5ea] bg-white p-3">
+                        <div key={`${camp._id}-empty`} className="rounded-lg border border-[#e5e5ea] bg-white px-4 py-3">
+                          {/* 
                           <div className="mb-2 flex items-center justify-between gap-3">
-                            <span className="truncate text-sm font-semibold text-black">{camp.name}</span>
-                            <span className="shrink-0 rounded-full border border-[#e5e5ea] bg-white px-2 py-0.5 text-[10px] font-bold capitalize text-[#6e6e73]">
+                            <span className="truncate text-xs font-semibold text-[#6e6e73]">{camp.name}</span>
+                            <span className="shrink-0 rounded-full border border-[#e5e5ea] bg-white px-1.5 py-0.5 text-[9px] font-bold capitalize text-[#8e8e93]">
                               {camp.status || 'active'}
                             </span>
                           </div>
+                          */}
                           <div className="py-2 text-center">
                             <p className="m-0 text-[10px] font-bold uppercase text-[#6e6e73]">Videos</p>
                             <p className="m-0 mt-0.5 text-xs font-semibold text-[#1d1d1f]">No videos yet</p>
@@ -638,32 +802,48 @@ export const CreatorCampaigns = () => {
                       const queuePost = queue.nextPost;
                       const tracking = todayTracking[queue.accountId] || { count: 0, posts: [] };
                       const postedToday = tracking.posts || [];
-                      const queuePosition = queuePost
-                        ? Math.max(queue.posts.findIndex((post) => post._id === queuePost._id) + 1, 1)
-                        : 0;
                       const awaitingPostedDecision = isAwaitingPostedDecision(queuePost);
+                      const postingCooldown = getPostingCooldown(tracking);
 
                       return (
-                        <div key={`${camp._id}-${queue.accountId}`} className="rounded-lg border border-[#e5e5ea] bg-white p-3">
+                        <div key={`${camp._id}-${queue.accountId}`} className="rounded-lg border border-[#e5e5ea] bg-white px-4 py-3">
+                          {/* 
                           <div className="mb-2 flex items-center justify-between gap-3 border-b border-[#e5e5ea] pb-2">
-                            <span className="truncate text-sm font-semibold text-black">{camp.name}</span>
-                            <span className="shrink-0 rounded-full border border-[#e5e5ea] bg-white px-2 py-0.5 text-[10px] font-bold capitalize text-[#6e6e73]">
+                            <span className="truncate text-xs font-semibold text-[#6e6e73]">{camp.name}</span>
+                            <span className="shrink-0 rounded-full border border-[#e5e5ea] bg-white px-1.5 py-0.5 text-[9px] font-bold capitalize text-[#8e8e93]">
                               {camp.status || 'active'}
                             </span>
                           </div>
+                          */}
 
                           <div className="mb-2 flex items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <PlatformIcon platform={queue.account?.platform} className="h-6 w-6" />
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex items-center gap-2 shrink-0">
+                                <PlatformIcon platform={queue.account?.platform} className="h-8 w-8" />
+                                {queue.account?.avatarUrl ? (
+                                  <img 
+                                    src={queue.account.avatarUrl} 
+                                    crossOrigin="anonymous" 
+                                    className="h-8 w-8 rounded-full object-cover border border-[#e5e5ea]" 
+                                    alt="" 
+                                  />
+                                ) : (
+                                  <div className="h-8 w-8 rounded-full bg-[#f5f5f7] border border-[#e5e5ea] flex items-center justify-center text-xs font-bold text-[#8e8e93]">
+                                    {(getAccountLabel(queue.account)?.charAt(0) || '@').toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
                               <div className="min-w-0">
-                                <p className="m-0 truncate text-xs font-semibold text-[#1d1d1f]">
+                                <p className="m-0 truncate text-sm font-bold text-[#1d1d1f]">
                                   {getAccountLabel(queue.account).startsWith('@')
                                     ? getAccountLabel(queue.account)
                                     : `@${getAccountLabel(queue.account)}`}
                                 </p>
+                                {/* 
                                 <p className="m-0 text-[10px] font-semibold text-[#8e8e93]">
                                   {queue.nextPost ? `Post ${queuePosition}/${queue.actionableQueue.length}` : 'No videos yet'}
                                 </p>
+                                */}
                               </div>
                             </div>
                             {queue.nextPost && (
@@ -729,15 +909,26 @@ export const CreatorCampaigns = () => {
                                 </button>
                               </div>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleSharePost(queuePost)}
-                                disabled={sharingPostId === queuePost._id}
-                                className="inline-flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-lg bg-[#1d1d1f] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black disabled:opacity-60"
-                              >
-                                <Share2 className="h-3.5 w-3.5" />
-                                {sharingPostId === queuePost._id ? 'Opening' : 'Share Video'}
-                              </button>
+                              <div className="space-y-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSharePost(queuePost, postingCooldown)}
+                                  disabled={sharingPostId === queuePost._id || postingCooldown.isLocked}
+                                  className="inline-flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-lg bg-[#1d1d1f] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  <Share2 className="h-3.5 w-3.5" />
+                                  {sharingPostId === queuePost._id
+                                    ? 'Opening'
+                                    : postingCooldown.isLocked
+                                      ? postingCooldown.label
+                                      : 'Share Video'}
+                                </button>
+                                {postingCooldown.isLocked && (
+                                  <p className="m-0 text-center text-[10px] font-semibold text-[#8e8e93]">
+                                    Wait 4h between verified posts.
+                                  </p>
+                                )}
+                              </div>
                             )
                           ) : (
                             <div className="py-2 text-center">

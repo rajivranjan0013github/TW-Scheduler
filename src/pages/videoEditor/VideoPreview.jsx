@@ -141,16 +141,19 @@ export const VideoPreview = ({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  isDualVideo = true,
 }) => {
   const [showIgOverlay, setShowIgOverlay] = useState(false);
 
-  if (!video1Url || !video2Url) {
+  if (!video1Url || (isDualVideo && !video2Url)) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
         <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Placement Preview</h4>
         <div className="aspect-[9/16] h-[480px] max-w-[270px] mx-auto rounded-xl bg-gray-150 border border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 gap-2">
           <Video className="w-7 h-7" />
-          <span className="text-[11px]">Import Video 1 &amp; Video 2</span>
+          <span className="text-[11px]">
+            {isDualVideo ? 'Import Video 1 & Video 2' : 'Import Video'}
+          </span>
         </div>
       </div>
     );
@@ -197,19 +200,21 @@ export const VideoPreview = ({
             className={`absolute inset-0 w-full h-full object-contain ${activeVideo === 1 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           />
           {/* Video 2 */}
-          <video
-            key={video2Url}
-            ref={video2Ref}
-            src={video2Url}
-            crossOrigin="anonymous"
-            preload="auto"
-            onEnded={onVideo2Ended}
-            onLoadedMetadata={(e) => onLoadedMetadata('input2', e)}
-            onDurationChange={(e) => onDurationChange('input2', e)}
-            onTimeUpdate={() => onTimeUpdate('input2')}
-            muted={Boolean(selectedAudio)}
-            className={`absolute inset-0 w-full h-full object-contain ${activeVideo === 2 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-          />
+          {isDualVideo && video2Url && (
+            <video
+              key={video2Url}
+              ref={video2Ref}
+              src={video2Url}
+              crossOrigin="anonymous"
+              preload="auto"
+              onEnded={onVideo2Ended}
+              onLoadedMetadata={(e) => onLoadedMetadata('input2', e)}
+              onDurationChange={(e) => onDurationChange('input2', e)}
+              onTimeUpdate={() => onTimeUpdate('input2')}
+              muted={Boolean(selectedAudio)}
+              className={`absolute inset-0 w-full h-full object-contain ${activeVideo === 2 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            />
+          )}
 
           {/* Instagram Reels UI Overlay */}
           {showIgOverlay && <InstagramReelsOverlay />}

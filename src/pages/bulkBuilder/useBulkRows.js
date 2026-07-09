@@ -17,11 +17,21 @@ export const DEFAULT_DRAG_POS = { x: 20, y: 220 };
 
 const isBlobUrl = (url) => typeof url === 'string' && url.startsWith('blob:');
 
+const getIsDualVideoFromStorage = () => {
+  try {
+    const saved = localStorage.getItem('tw_bulk_builder_dual_video');
+    return saved !== 'false';
+  } catch {
+    return true;
+  }
+};
+
 const deriveRowStatus = (row) => {
   if (row.status === 'processing' || row.status === 'saving') return row.status;
   if (row.status === 'done' && (row.resultMediaId || row.resultMediaUrl)) return 'done';
   if (row.status === 'error') return 'error';
-  return row.video1 && row.video2 ? 'ready' : 'draft';
+  const isDual = getIsDualVideoFromStorage();
+  return row.video1 && (!isDual || row.video2) ? 'ready' : 'draft';
 };
 
 export const sanitizeBulkRowForStorage = (row) => {
@@ -39,20 +49,21 @@ export const sanitizeBulkRowForStorage = (row) => {
   };
 };
 
-export const normalizeBulkRowsFromStorage = (rows) => (
-  Array.isArray(rows)
+export const normalizeBulkRowsFromStorage = (rows) => {
+  const isDual = getIsDualVideoFromStorage();
+  return Array.isArray(rows)
     ? rows.map((row) => {
         const sanitized = sanitizeBulkRowForStorage(row);
         if (sanitized.status === 'processing' || sanitized.status === 'saving') {
           return {
             ...sanitized,
-            status: sanitized.video1 && sanitized.video2 ? 'ready' : 'draft',
+            status: sanitized.video1 && (!isDual || sanitized.video2) ? 'ready' : 'draft',
           };
         }
         return sanitized;
       })
-    : []
-);
+    : [];
+};
 
 const createEmptyRow = (index = 0) => ({
   id: `row-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -79,6 +90,8 @@ const createEmptyRow = (index = 0) => ({
  * Custom hook managing bulk builder rows with localStorage persistence.
  */
 export const useBulkRows = () => {
+  const [isDualVideo, setIsDualVideo] = useState(getIsDualVideoFromStorage);
+
   const [rows, setRows] = useState(() => {
     try {
       const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
@@ -86,6 +99,15 @@ export const useBulkRows = () => {
     } catch { /* ignore parse errors */ }
     return [createEmptyRow(0)];
   });
+
+  const toggleDualVideo = useCallback((val) => {
+    setIsDualVideo(val);
+    try {
+      localStorage.setItem('tw_bulk_builder_dual_video', String(val));
+    } catch { /* ignore */ }
+    // Force recalculate row statuses for all rows
+    setRows((prev) => prev.map((r) => sanitizeBulkRowForStorage(r)));
+  }, []);
 
   // Auto-save to localStorage on every change
   useEffect(() => {
@@ -111,9 +133,10 @@ export const useBulkRows = () => {
         if (Object.prototype.hasOwnProperty.call(partialData, 'status') || Object.prototype.hasOwnProperty.call(partialData, 'canvasPos')) {
           return sanitizeBulkRowForStorage(updated);
         }
+        const isDual = getIsDualVideoFromStorage();
         return {
           ...sanitizeBulkRowForStorage(updated),
-          status: updated.video1 && updated.video2 ? 'ready' : 'draft',
+          status: updated.video1 && (!isDual || updated.video2) ? 'ready' : 'draft',
           resultMediaId: '',
           resultMediaUrl: '',
           resultMediaName: '',
@@ -125,42 +148,43 @@ export const useBulkRows = () => {
 
   const updateRowTextSettings = useCallback((rowId, partialSettings) => {
     setRows((prev) =>
-      prev.map((r) =>
-        r.id === rowId
-          ? {
-              ...r,
-              textSettings: { ...r.textSettings, ...partialSettings },
-              status: r.video1 && r.video2 ? 'ready' : 'draft',
-              resultMediaId: '',
-              resultMediaUrl: '',
-              resultMediaName: '',
-              resultVideoUrl: '',
-            }
-          : r
-      )
+      prev.map((r) => {
+        if (r.id !== rowId) return r;
+        const isDual = getIsDualVideoFromStorage();
+        return {
+          ...r,
+          textSettings: { ...r.textSettings, ...partialSettings },
+          status: r.video1 && (!isDual || r.video2) ? 'ready' : 'draft',
+          resultMediaId: '',
+          resultMediaUrl: '',
+          resultMediaName: '',
+          resultVideoUrl: '',
+        };
+      })
     );
   }, []);
 
   const updateRowDragPos = useCallback((rowId, dragPos) => {
     setRows((prev) =>
-      prev.map((r) =>
-        r.id === rowId
-          ? {
-              ...r,
-              dragPos: { ...DEFAULT_DRAG_POS, ...dragPos },
-              status: r.video1 && r.video2 ? 'ready' : 'draft',
-              resultMediaId: '',
-              resultMediaUrl: '',
-              resultMediaName: '',
-              resultVideoUrl: '',
-            }
-          : r
-      )
+      prev.map((r) => {
+        if (r.id !== rowId) return r;
+        const isDual = getIsDualVideoFromStorage();
+        return {
+          ...r,
+          dragPos: { ...DEFAULT_DRAG_POS, ...dragPos },
+          status: r.video1 && (!isDual || r.video2) ? 'ready' : 'draft',
+          resultMediaId: '',
+          resultMediaUrl: '',
+          resultMediaName: '',
+          resultVideoUrl: '',
+        };
+      })
     );
   }, []);
 
   const getReadyRows = useCallback(() => {
-    return rows.filter((r) => r.video1 && r.video2 && r.status !== 'done');
+    const isDual = getIsDualVideoFromStorage();
+    return rows.filter((r) => r.video1 && (!isDual || r.video2) && r.status !== 'done');
   }, [rows]);
 
   const markRowStatus = useCallback((rowId, status) => {
@@ -222,5 +246,7 @@ export const useBulkRows = () => {
     clearAllRows,
     addRowsWithFirstVideos,
     DEFAULT_TEXT_SETTINGS,
+    isDualVideo,
+    toggleDualVideo,
   };
 };

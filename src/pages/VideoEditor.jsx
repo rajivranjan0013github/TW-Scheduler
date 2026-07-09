@@ -78,6 +78,21 @@ export const VideoEditor = () => {
   const [video1Url, setVideo1Url] = useState('');
   const [video2Url, setVideo2Url] = useState('');
   const [videoPickerSlot, setVideoPickerSlot] = useState(null);
+  const [isDualVideo, setIsDualVideo] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tw_bulk_builder_dual_video');
+      return saved !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleDualVideo = useCallback((val) => {
+    setIsDualVideo(val);
+    try {
+      localStorage.setItem('tw_bulk_builder_dual_video', String(val));
+    } catch { /* ignore */ }
+  }, []);
 
   // Processing state
   const [processing, setProcessing] = useState(false);
@@ -228,8 +243,8 @@ export const VideoEditor = () => {
 
   // --- Process video (coordinates across hooks) ---
   const processVideo = useCallback(async () => {
-    if (!video1 || !video2) {
-      setStatusMessage({ type: 'error', text: 'Please select both video files before merging.' });
+    if (!video1 || (isDualVideo && !video2)) {
+      setStatusMessage({ type: 'error', text: isDualVideo ? 'Please select both video files before merging.' : 'Please select a video file before exporting.' });
       return;
     }
     if (!ffmpegLoaded) {
@@ -258,13 +273,16 @@ export const VideoEditor = () => {
       ]);
 
       setProgressMsg('Reading video files...');
-      const [v1Data, v2Data] = await Promise.all([
-        fetchFile(video1.file || video1.url || video1),
-        fetchFile(video2.file || video2.url || video2),
-      ]);
+      const readPromises = [fetchFile(video1.file || video1.url || video1)];
+      if (isDualVideo && video2) {
+        readPromises.push(fetchFile(video2.file || video2.url || video2));
+      }
+      const [v1Data, v2Data] = await Promise.all(readPromises);
 
       await ffmpeg.writeFile('input1.mp4', v1Data);
-      await ffmpeg.writeFile('input2.mp4', v2Data);
+      if (isDualVideo && video2) {
+        await ffmpeg.writeFile('input2.mp4', v2Data);
+      }
 
       const selectedAudioUrl = selectedAudio?.sourceType === 'library' ? selectedAudio.url : '';
       if ((selectedAudio?.sourceType === 'upload' && selectedAudio.file) || selectedAudioUrl) {
@@ -273,10 +291,13 @@ export const VideoEditor = () => {
       }
 
       setProgressMsg('Checking audio streams...');
-      const [video1HasAudio, video2HasAudio] = await Promise.all([
-        hasAudioStream('input1.mp4'),
-        hasAudioStream('input2.mp4'),
-      ]);
+      const checkAudioPromises = [hasAudioStream('input1.mp4')];
+      if (isDualVideo && video2) {
+        checkAudioPromises.push(hasAudioStream('input2.mp4'));
+      } else {
+        checkAudioPromises.push(Promise.resolve(false));
+      }
+      const [video1HasAudio, video2HasAudio] = await Promise.all(checkAudioPromises);
 
       setProgressMsg('Calculating text position...');
       const containerRect = overlay.containerRef.current?.getBoundingClientRect();
@@ -287,7 +308,7 @@ export const VideoEditor = () => {
       setProgressMsg('Rendering text overlay...');
       await ffmpeg.writeFile('text_overlay.png', await overlay.createTextOverlayPng(containerRect));
 
-      setProgressMsg('Merging videos and rendering text (this may take a minute)...');
+      setProgressMsg('Processing video and rendering text (this may take a minute)...');
       ffmpegLogLinesRef.current = [];
 
       if (ffmpegLogHandlerRef.current) {
@@ -306,9 +327,11 @@ export const VideoEditor = () => {
       const input1Duration = Number.isFinite(videoDurations.input1) && videoDurations.input1 > 0
         ? videoDurations.input1
         : preview.video1Ref.current?.duration || 0;
-      const input2Duration = Number.isFinite(videoDurations.input2) && videoDurations.input2 > 0
-        ? videoDurations.input2
-        : preview.video2Ref.current?.duration || 0;
+      const input2Duration = isDualVideo && video2
+        ? (Number.isFinite(videoDurations.input2) && videoDurations.input2 > 0
+          ? videoDurations.input2
+          : preview.video2Ref.current?.duration || 0)
+        : 0;
       const audio0Filter = video1HasAudio
         ? '[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,asetpts=PTS-STARTPTS[a0];'
         : `anullsrc=channel_layout=stereo:sample_rate=44100:d=${Math.max(input1Duration, 0.1)},asetpts=PTS-STARTPTS[a0];`;
@@ -317,14 +340,39 @@ export const VideoEditor = () => {
         : `anullsrc=channel_layout=stereo:sample_rate=44100:d=${Math.max(input2Duration, 0.1)},asetpts=PTS-STARTPTS[a1];`;
       const totalVideoDuration = input1Duration + input2Duration;
       if (!Number.isFinite(totalVideoDuration) || totalVideoDuration <= 0.25) {
-        throw new Error('Video durations are not ready yet. Please wait for both videos to load, then export again.');
+        throw new Error('Video durations are not ready yet. Please wait for the video to load, then export again.');
       }
       const hasFileAudio = selectedAudio?.sourceType === 'upload' && selectedAudio.file;
       const hasLibraryAudio = selectedAudio?.sourceType === 'library' && selectedAudio.url;
       const hasGeneratedAudio = selectedAudio?.sourceType === 'generated';
       const hasSelectedAudioInput = Boolean(hasFileAudio || hasLibraryAudio);
       const selectedAudioInputArgs = hasSelectedAudioInput ? ['-stream_loop', '-1', '-i', 'selected_audio'] : [];
-      const selectedAudioInputIndex = 3;
+
+      let textOverlayIndex;
+      let selectedAudioInputIndex;
+      let ffmpegExecArgs;
+
+      if (isDualVideo && video2) {
+        textOverlayIndex = 2;
+        selectedAudioInputIndex = 3;
+        ffmpegExecArgs = [
+          '-y',
+          '-i', 'input1.mp4',
+          '-i', 'input2.mp4',
+          '-i', 'text_overlay.png',
+          ...selectedAudioInputArgs,
+        ];
+      } else {
+        textOverlayIndex = 1;
+        selectedAudioInputIndex = 2;
+        ffmpegExecArgs = [
+          '-y',
+          '-i', 'input1.mp4',
+          '-i', 'text_overlay.png',
+          ...selectedAudioInputArgs,
+        ];
+      }
+
       const selectedAudioFilter = hasGeneratedAudio
         ? `sine=frequency=${selectedAudio.frequency || 180}:duration=${totalVideoDuration},volume=0.16,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,aresample=async=1:first_pts=0,asetpts=PTS-STARTPTS[outa]`
         : hasSelectedAudioInput
@@ -332,25 +380,37 @@ export const VideoEditor = () => {
           : '';
       const hasReplacementAudio = Boolean(selectedAudioFilter);
       const outputAudioMap = hasReplacementAudio ? '[outa]' : '[a]';
-      const baseVideoFilters =
-        `[0:v]setpts=PTS-STARTPTS,scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${OUTPUT_FPS}[v0];` +
-        `[1:v]setpts=PTS-STARTPTS,scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${OUTPUT_FPS}[v1];` +
-        `[v0][2:v]overlay=0:0:format=auto[v0text];`;
-      const filterComplex = hasReplacementAudio
-        ? baseVideoFilters +
-          `[v0text][v1]concat=n=2:v=1:a=0[outv];` +
-          selectedAudioFilter
-        : baseVideoFilters +
-          audio0Filter +
-          audio1Filter +
-          `[v0text][a0][v1][a1]concat=n=2:v=1:a=1[outv][a]`;
+
+      let filterComplex = '';
+      if (isDualVideo && video2) {
+        const baseVideoFilters =
+          `[0:v]setpts=PTS-STARTPTS,scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${OUTPUT_FPS}[v0];` +
+          `[1:v]setpts=PTS-STARTPTS,scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${OUTPUT_FPS}[v1];` +
+          `[v0][${textOverlayIndex}:v]overlay=0:0:format=auto[v0text];`;
+
+        filterComplex = hasReplacementAudio
+          ? baseVideoFilters +
+            `[v0text][v1]concat=n=2:v=1:a=0[outv];` +
+            selectedAudioFilter
+          : baseVideoFilters +
+            audio0Filter +
+            audio1Filter +
+            `[v0text][a0][v1][a1]concat=n=2:v=1:a=1[outv][a]`;
+      } else {
+        const baseVideoFilters =
+          `[0:v]setpts=PTS-STARTPTS,scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${OUTPUT_FPS}[v0];` +
+          `[v0][${textOverlayIndex}:v]overlay=0:0:format=auto[outv];`;
+
+        filterComplex = hasReplacementAudio
+          ? baseVideoFilters + selectedAudioFilter
+          : baseVideoFilters +
+            (video1HasAudio
+              ? `[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,asetpts=PTS-STARTPTS[a];`
+              : `anullsrc=channel_layout=stereo:sample_rate=44100:d=${Math.max(input1Duration, 0.1)},asetpts=PTS-STARTPTS[a];`);
+      }
 
       const exitCode = await ffmpeg.exec([
-        '-y',
-        '-i', 'input1.mp4',
-        '-i', 'input2.mp4',
-        '-i', 'text_overlay.png',
-        ...selectedAudioInputArgs,
+        ...ffmpegExecArgs,
         '-filter_complex',
         filterComplex,
         '-map', '[outv]',
@@ -410,7 +470,7 @@ export const VideoEditor = () => {
       }
       setProcessing(false);
     }
-  }, [video1, video2, ffmpegLoaded, ffmpegRef, audio.selectedAudio, hasAudioStream, removeIfExists, overlay, preview.videoDurationsRef, ffmpegLogHandlerRef, ffmpegLogLinesRef, isBulkMode]);
+  }, [video1, video2, ffmpegLoaded, ffmpegRef, audio.selectedAudio, hasAudioStream, removeIfExists, overlay, preview.videoDurationsRef, ffmpegLogHandlerRef, ffmpegLogLinesRef, isBulkMode, isDualVideo]);
 
   const handleGenerateSingleCaption = useCallback(async () => {
     if (!resultVideoUrl) return;
@@ -694,21 +754,22 @@ export const VideoEditor = () => {
 
   const startBulkQueue = useCallback(() => {
     activeBulkRunRef.current = null;
+    const hasVideo = (r) => r.video1 && (!isDualVideo || r.video2);
     const queueRows = bulkRows.map((row) => (
-      row.video1 && row.video2 && ['processing', 'saving', 'error'].includes(row.status)
+      hasVideo(row) && ['processing', 'saving', 'error'].includes(row.status)
         ? { ...row, status: 'ready' }
         : row
     ));
-    const firstPendingIdx = queueRows.findIndex((row) => row.video1 && row.video2 && row.status !== 'done');
+    const firstPendingIdx = queueRows.findIndex((row) => hasVideo(row) && row.status !== 'done');
     if (firstPendingIdx < 0) {
-      const firstReadyIdx = queueRows.findIndex((row) => row.video1 && row.video2);
+      const firstReadyIdx = queueRows.findIndex((row) => hasVideo(row));
       if (firstReadyIdx < 0) {
-        setStatusMessage({ type: 'error', text: 'No ready bulk rows found. Add Video 1 and Video 2 before exporting.' });
+        setStatusMessage({ type: 'error', text: 'No ready bulk rows found. Add required video assets before exporting.' });
         return;
       }
 
       const resetRows = queueRows.map((row) => (
-        row.video1 && row.video2
+        hasVideo(row)
           ? {
               ...row,
               status: 'ready',
@@ -739,9 +800,9 @@ export const VideoEditor = () => {
     }
     setResultVideoUrl('');
     setCurrentQueueIndex(firstPendingIdx);
-      setIsQueueRunning(true);
-      setStatusMessage(null);
-    }, [bulkRows]);
+    setIsQueueRunning(true);
+    setStatusMessage(null);
+  }, [bulkRows, isDualVideo]);
 
   const resetSingleBulkRow = useCallback((rowId) => {
     setBulkRows((prev) => {
@@ -823,8 +884,8 @@ export const VideoEditor = () => {
     if (isBulkMode) {
       try {
         const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
-        // Load all rows that have both video1 and video2
-        const readyRows = saved.filter((r) => r.video1 && r.video2);
+        // Load all ready rows
+        const readyRows = saved.filter((r) => r.video1 && (!isDualVideo || r.video2));
         setBulkRows(readyRows);
         if (readyRows.length > 0) {
           // Set active to first non-done row, or default to index 0
@@ -929,7 +990,7 @@ export const VideoEditor = () => {
         textSettings: nextTextSettings,
         dragPos: nextDragPos,
         audio: audio.selectedAudio,
-        status: row.video1 && row.video2 ? 'ready' : 'draft',
+        status: row.video1 && (!isDualVideo || row.video2) ? 'ready' : 'draft',
         resultMediaId: '',
         resultMediaUrl: '',
         resultMediaName: '',
@@ -985,12 +1046,12 @@ export const VideoEditor = () => {
     // Wait for current row's video durations to be resolved (> 0)
     const videoDurations = preview.videoDurationsRef.current;
     const input1Duration = videoDurations.input1 || preview.video1Ref.current?.duration || 0;
-    const input2Duration = videoDurations.input2 || preview.video2Ref.current?.duration || 0;
-    if (input1Duration > 0 && input2Duration > 0) {
+    const input2Duration = isDualVideo && row.video2Url ? (videoDurations.input2 || preview.video2Ref.current?.duration || 0) : 0;
+    if (input1Duration > 0 && (!isDualVideo || !row.video2Url || input2Duration > 0)) {
       if (videoDurations.input1 !== input1Duration) {
         preview.setVideoDuration('input1', input1Duration);
       }
-      if (videoDurations.input2 !== input2Duration) {
+      if (isDualVideo && row.video2Url && videoDurations.input2 !== input2Duration) {
         preview.setVideoDuration('input2', input2Duration);
       }
     } else {
@@ -1114,12 +1175,12 @@ export const VideoEditor = () => {
     // Wait for current row's video durations to be resolved (> 0)
     const videoDurations = preview.videoDurationsRef.current;
     const input1Duration = videoDurations.input1 || preview.video1Ref.current?.duration || 0;
-    const input2Duration = videoDurations.input2 || preview.video2Ref.current?.duration || 0;
-    if (input1Duration > 0 && input2Duration > 0) {
+    const input2Duration = isDualVideo && row.video2Url ? (videoDurations.input2 || preview.video2Ref.current?.duration || 0) : 0;
+    if (input1Duration > 0 && (!isDualVideo || !row.video2Url || input2Duration > 0)) {
       if (videoDurations.input1 !== input1Duration) {
         preview.setVideoDuration('input1', input1Duration);
       }
-      if (videoDurations.input2 !== input2Duration) {
+      if (isDualVideo && row.video2Url && videoDurations.input2 !== input2Duration) {
         preview.setVideoDuration('input2', input2Duration);
       }
     } else {
@@ -1246,8 +1307,8 @@ export const VideoEditor = () => {
   const overlayTextWidth = overlay.computeOverlayTextWidth();
   const overlayTextHeight = overlay.computeOverlayTextHeight();
   const previewFontFamily = overlay.getPreviewFontFamily();
-  const pendingBulkCount = bulkRows.filter((row) => row.video1 && row.video2 && row.status !== 'done').length;
-  const readyBulkCount = bulkRows.filter((row) => row.video1 && row.video2).length;
+  const pendingBulkCount = bulkRows.filter((row) => row.video1 && (!isDualVideo || row.video2) && row.status !== 'done').length;
+  const readyBulkCount = bulkRows.filter((row) => row.video1 && (!isDualVideo || row.video2)).length;
   const doneBulkRows = bulkRows.filter((row) => row.status === 'done' && (row.resultMediaUrl || row.resultVideoUrl));
   const activeBulkRow = currentQueueIndex >= 0 && currentQueueIndex < bulkRows.length
     ? bulkRows[currentQueueIndex]
@@ -1289,7 +1350,7 @@ export const VideoEditor = () => {
               isQueueRunning ||
               !ffmpegLoaded ||
               Boolean(engineError) ||
-              (isBulkMode ? readyBulkCount === 0 : (!video1 || !video2))
+              (isBulkMode ? readyBulkCount === 0 : !video1)
             }
             onClick={isBulkMode ? startBulkQueue : processVideo}
             className="rounded-lg bg-[#0071e3] px-3.5 py-1.5 text-xs font-semibold text-white transition-all hover:bg-blue-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1331,7 +1392,7 @@ export const VideoEditor = () => {
                       setBulkRows((prev) =>
                         prev.map((row) => (
                           ['processing', 'saving'].includes(row.status)
-                            ? { ...row, status: row.video1 && row.video2 ? 'ready' : 'draft' }
+                            ? { ...row, status: row.video1 && (!isDualVideo || row.video2) ? 'ready' : 'draft' }
                             : row
                         ))
                       );
@@ -1458,6 +1519,8 @@ export const VideoEditor = () => {
             ffmpegLoading={ffmpegLoading}
             engineError={engineError}
             onOpenTextGenerator={() => setShowTextGenerator(true)}
+            isDualVideo={isDualVideo}
+            onToggleDualVideo={toggleDualVideo}
           />
         )}
 
@@ -1502,6 +1565,7 @@ export const VideoEditor = () => {
             onPointerDown={overlay.handlePointerDown}
             onPointerMove={overlay.handlePointerMove}
             onPointerUp={overlay.handlePointerUp}
+            isDualVideo={isDualVideo}
           />
 
           {!isBulkMode && (

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Eye, Megaphone, RefreshCw, Rows3 } from 'lucide-react';
+import { Eye, Megaphone, RefreshCw, Rows3, Loader2 } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getActiveCampaignId } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
@@ -281,6 +281,11 @@ export const AdminDashboard = () => {
   const [campaignMetricsById, setCampaignMetricsById] = useState({});
   const [error, setError] = useState('');
 
+  // Local table filtering states
+  const [searchChannel, setSearchChannel] = useState('');
+  const [filterPlatform, setFilterPlatform] = useState('all');
+  const [searchUser, setSearchUser] = useState('');
+
   const fetchCampaigns = async ({ force = false } = {}) => {
     if (campaigns.length === 0) setLoading(true);
     setError('');
@@ -362,6 +367,10 @@ export const AdminDashboard = () => {
   useEffect(() => {
     if (selectedCampaignId) {
       fetchCampaignMetrics(selectedCampaignId);
+      // Reset filter states when campaign changes
+      setSearchChannel('');
+      setFilterPlatform('all');
+      setSearchUser('');
     }
   }, [selectedCampaignId]);
 
@@ -383,6 +392,27 @@ export const AdminDashboard = () => {
   const selectedPosts = activeMetrics[selectedRange.postsKey] || 0;
   const selectedLikes = activeMetrics[selectedRange.likesKey] || 0;
   const selectedComments = activeMetrics[selectedRange.commentsKey] || 0;
+
+  // Filter channels based on text inputs and platform selection
+  const filteredAccountRows = (activeMetrics.accountRows || []).filter((account) => {
+    const channelName = (account.name || '').toLowerCase();
+    const channelUsername = (account.username || '').toLowerCase();
+    const userName = (account.user?.name || '').toLowerCase();
+    const userEmail = (account.user?.email || '').toLowerCase();
+    const platform = (account.platform || '').toLowerCase();
+
+    const matchesChannel = !searchChannel || 
+      channelName.includes(searchChannel.toLowerCase()) || 
+      channelUsername.includes(searchChannel.toLowerCase());
+
+    const matchesPlatform = filterPlatform === 'all' || platform === filterPlatform;
+
+    const matchesUser = !searchUser || 
+      userName.includes(searchUser.toLowerCase()) || 
+      userEmail.includes(searchUser.toLowerCase());
+
+    return matchesChannel && matchesPlatform && matchesUser;
+  });
   const selectedTimeLabel = selectedRange.label;
   const openAccountFeed = (account) => {
     sessionStorage.removeItem('admin_view_context');
@@ -463,9 +493,10 @@ export const AdminDashboard = () => {
                 fetchCampaignMetrics(selectedCampaignId, { force: true });
               }
             }}
-            className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-[#d2d2d7] bg-white px-2.5 text-[11px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+            disabled={loading || metricsLoading}
+            className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-[#d2d2d7] bg-white px-2.5 text-[11px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7] disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <RefreshCw className="h-3 w-3" />
+            <RefreshCw className={`h-3 w-3 ${loading || metricsLoading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
@@ -478,8 +509,9 @@ export const AdminDashboard = () => {
       )}
 
       {loading ? (
-        <div className="rounded-xl border border-[#d2d2d7] bg-white p-8 text-center text-sm text-[#6e6e73]">
-          Loading campaign dashboard...
+        <div className="rounded-xl border border-[#d2d2d7] bg-white p-12 text-center text-sm text-[#6e6e73] flex flex-col items-center justify-center gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-[#3478f6]" />
+          <span className="font-medium">Loading campaign dashboard...</span>
         </div>
       ) : campaigns.length === 0 ? (
         <div className="rounded-xl border border-[#d2d2d7] bg-white p-8 text-center">
@@ -490,8 +522,9 @@ export const AdminDashboard = () => {
       ) : (
         <div className="flex flex-col">
           {metricsLoading && (
-            <div className="mb-2 rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs font-semibold text-[#6e6e73]">
-              Loading selected campaign metrics...
+            <div className="mb-2 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 text-xs font-semibold text-[#6e6e73] flex items-center gap-2 shadow-sm">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#3478f6]" />
+              <span>Updating campaign metrics...</span>
             </div>
           )}
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -523,6 +556,55 @@ export const AdminDashboard = () => {
 
           <DailyViewsChart data={activeMetrics.last30DaysPostedViews || []} />
 
+          {/* Table Filters Bar */}
+          <div className="mt-3 grid gap-2.5 rounded-xl border border-[#d2d2d7] bg-white p-3 sm:grid-cols-3">
+            <div className="flex flex-col gap-0.5">
+              <label htmlFor="search-channel" className="text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+                Search Channel
+              </label>
+              <input
+                id="search-channel"
+                type="text"
+                value={searchChannel}
+                onChange={(e) => setSearchChannel(e.target.value)}
+                placeholder="Search channel or username..."
+                className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
+              />
+            </div>
+
+            <div className="flex flex-col gap-0.5">
+              <label htmlFor="filter-platform" className="text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+                Filter Channel / Platform
+              </label>
+              <select
+                id="filter-platform"
+                value={filterPlatform}
+                onChange={(e) => setFilterPlatform(e.target.value)}
+                className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
+              >
+                <option value="all">All Platforms</option>
+                <option value="youtube">YouTube</option>
+                <option value="instagram">Instagram</option>
+                <option value="tiktok">TikTok</option>
+                <option value="facebook">Facebook</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-0.5">
+              <label htmlFor="search-user" className="text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+                Search User (Name/Email)
+              </label>
+              <input
+                id="search-user"
+                type="text"
+                value={searchUser}
+                onChange={(e) => setSearchUser(e.target.value)}
+                placeholder="Search by user name or email..."
+                className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
+              />
+            </div>
+          </div>
+
           <div className="mt-3 rounded-xl border border-[#d2d2d7] bg-white">
             <div className="grid grid-cols-[1.15fr_0.9fr_1.2fr_0.4fr_0.65fr_0.7fr_0.65fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
               <span>Channel</span>
@@ -537,9 +619,13 @@ export const AdminDashboard = () => {
               <div className="px-5 py-8 text-center text-sm text-[#6e6e73]">
                 No publishing channels are associated with this campaign.
               </div>
+            ) : filteredAccountRows.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-[#6e6e73]">
+                No publishing channels match the filter criteria.
+              </div>
             ) : (
               <div>
-                {activeMetrics.accountRows.map((account) => (
+                {filteredAccountRows.map((account) => (
                   <div
                     key={account._id}
                     onClick={() => openAccountFeed(account)}
