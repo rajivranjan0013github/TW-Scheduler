@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Eye, Megaphone, RefreshCw, Rows3, Loader2 } from 'lucide-react';
+import { CalendarClock, Eye, Megaphone, RefreshCw, Rows3, Loader2 } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getActiveCampaignId } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
 
 const numberFormat = new Intl.NumberFormat();
+const upcomingStatuses = 'scheduled,manual_ready,downloaded,publishing,paused';
 
 const emptyMetrics = {
   accounts: 0,
@@ -36,6 +37,7 @@ const emptyMetrics = {
   last7DaysComments: 0,
   thisMonthLikes: 0,
   thisMonthComments: 0,
+  upcomingPosts: 0,
   last30DaysPostedViews: [],
   accountRows: [],
 };
@@ -44,7 +46,6 @@ const timeRanges = {
   today: {
     label: 'Today',
     viewsKey: 'todayViews',
-    accountInsightKey: 'todayAccountInsight',
     postsKey: 'todayPosts',
     likesKey: 'todayLikes',
     commentsKey: 'todayComments',
@@ -52,7 +53,6 @@ const timeRanges = {
   yesterday: {
     label: 'Yesterday',
     viewsKey: 'yesterdayViews',
-    accountInsightKey: 'yesterdayAccountInsight',
     postsKey: 'yesterdayPosts',
     likesKey: 'yesterdayLikes',
     commentsKey: 'yesterdayComments',
@@ -60,7 +60,6 @@ const timeRanges = {
   last7Days: {
     label: 'Last 7 days',
     viewsKey: 'last7DaysViews',
-    accountInsightKey: 'last7DaysAccountInsight',
     postsKey: 'last7DaysPosts',
     likesKey: 'last7DaysLikes',
     commentsKey: 'last7DaysComments',
@@ -68,7 +67,6 @@ const timeRanges = {
   thisMonth: {
     label: 'This month',
     viewsKey: 'thisMonthViews',
-    accountInsightKey: 'thisMonthAccountInsight',
     postsKey: 'thisMonthPosts',
     likesKey: 'thisMonthLikes',
     commentsKey: 'thisMonthComments',
@@ -76,7 +74,6 @@ const timeRanges = {
   lifetime: {
     label: 'Lifetime',
     viewsKey: 'lifetimeViews',
-    accountInsightKey: 'lifetimeAccountInsight',
     postsKey: 'posts',
     likesKey: 'latestLikes',
     commentsKey: 'latestComments',
@@ -137,7 +134,7 @@ const DailyViewsChart = ({ data = [] }) => {
             />
             <Tooltip
               cursor={{ fill: 'rgba(52, 120, 246, 0.08)' }}
-              formatter={(value, name, props) => [
+              formatter={(value, name) => [
                 name === 'views' ? numberFormat.format(value) : value,
                 name === 'views' ? 'Views' : 'Posts',
               ]}
@@ -182,6 +179,71 @@ const formatDateKey = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+const normalizeHandle = (value = '') => String(value).replace(/^@/, '').trim().toLowerCase();
+
+const getItemId = (item) => String(item?._id || item || '');
+
+const getUpcomingCountsByAccount = (accountRows = [], queuePosts = []) => {
+  const accountIds = new Set(accountRows.map((account) => getItemId(account)).filter(Boolean));
+  const accountHandleMap = new Map();
+
+  accountRows.forEach((account) => {
+    [account.username, account.name].forEach((value) => {
+      const handle = normalizeHandle(value);
+      if (handle) {
+        accountHandleMap.set(`${account.platform}:${handle}`, getItemId(account));
+      }
+    });
+  });
+
+  return queuePosts.reduce((counts, post) => {
+    const targetAccountIds = new Set();
+
+    (post.socialAccountIds || []).forEach((account) => {
+      const accountId = getItemId(account);
+      if (accountIds.has(accountId)) {
+        targetAccountIds.add(accountId);
+      }
+    });
+
+    (post.campaignChannelIds || []).forEach((channel) => {
+      const linkedAccountId = getItemId(channel?.socialAccountId);
+      if (accountIds.has(linkedAccountId)) {
+        targetAccountIds.add(linkedAccountId);
+        return;
+      }
+
+      [channel?.normalizedHandle, channel?.requestedHandle, channel?.displayName].forEach((value) => {
+        const handle = normalizeHandle(value);
+        const accountId = accountHandleMap.get(`${channel?.platform}:${handle}`);
+        if (accountId) {
+          targetAccountIds.add(accountId);
+        }
+      });
+    });
+
+    targetAccountIds.forEach((accountId) => {
+      counts[accountId] = (counts[accountId] || 0) + 1;
+    });
+
+    return counts;
+  }, {});
+};
+
+const applyUpcomingCounts = (metrics = emptyMetrics, queuePosts = []) => {
+  const accountRows = metrics.accountRows || [];
+  const upcomingCountsByAccount = getUpcomingCountsByAccount(accountRows, queuePosts);
+
+  return {
+    ...metrics,
+    upcomingPosts: queuePosts.length,
+    accountRows: accountRows.map((account) => ({
+      ...account,
+      upcomingPosts: upcomingCountsByAccount[getItemId(account)] || 0,
+    })),
+  };
+};
+
 const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
   const getDayTitle = (day) => {
     const dateLabel = day.dateStr
@@ -221,11 +283,10 @@ const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
             <span
               key={slot}
               title={post?.publishedAt ? formatPostDateTime(post.publishedAt) : hasPost ? 'Posted time unavailable' : 'No post'}
-              className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${
-                hasPost
+              className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${hasPost
                   ? 'border-[#3478f6] bg-[#3478f6] text-white'
                   : 'border-[#d2d2d7] bg-white text-transparent'
-              }`}
+                }`}
             >
               {hasPost ? timeLabel || '✓' : '✓'}
             </span>
@@ -250,11 +311,10 @@ const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
           <span
             key={day.dateStr}
             title={getDayTitle(day)}
-            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[9px] font-semibold ${
-              Number(day.count || 0) >= 3
+            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[9px] font-semibold ${Number(day.count || 0) >= 3
                 ? 'border-[#34c759] bg-[#34c759] text-white'
                 : 'border-[#d2d2d7] bg-[#f5f5f7] text-[#6e6e73]'
-            }`}
+              }`}
           >
             {day.count || 0}
           </span>
@@ -349,9 +409,22 @@ export const AdminDashboard = () => {
         },
         staleTime: 60 * 1000,
       });
+      const metrics = data.metrics || emptyMetrics;
+      const schedulerParams = new URLSearchParams();
+      schedulerParams.set('campaignId', campaignId);
+      schedulerParams.set('statuses', upcomingStatuses);
+      const schedulerResponse = await fetch(`${API_BASE_URL}/api/scheduler?${schedulerParams.toString()}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
+        cache: 'no-store',
+      });
+      const schedulerPayload = await schedulerResponse.json().catch(() => null);
+      const metricsWithUpcoming = schedulerResponse.ok && Array.isArray(schedulerPayload)
+        ? applyUpcomingCounts(metrics, schedulerPayload)
+        : metrics;
+
       setCampaignMetricsById((current) => ({
         ...current,
-        [campaignId]: data.metrics || emptyMetrics,
+        [campaignId]: metricsWithUpcoming,
       }));
     } catch (err) {
       setError(err.message);
@@ -388,10 +461,10 @@ export const AdminDashboard = () => {
   const activeMetrics = campaignMetricsById[selectedCampaignId] || emptyMetrics;
   const selectedRange = timeRanges[selectedTimeRange];
   const selectedViews = activeMetrics[selectedRange.viewsKey] || 0;
-  const selectedAccountInsight = activeMetrics[selectedRange.accountInsightKey] || 0;
   const selectedPosts = activeMetrics[selectedRange.postsKey] || 0;
   const selectedLikes = activeMetrics[selectedRange.likesKey] || 0;
   const selectedComments = activeMetrics[selectedRange.commentsKey] || 0;
+  const upcomingPosts = activeMetrics.upcomingPosts || 0;
 
   // Filter channels based on text inputs and platform selection
   const filteredAccountRows = (activeMetrics.accountRows || []).filter((account) => {
@@ -401,14 +474,14 @@ export const AdminDashboard = () => {
     const userEmail = (account.user?.email || '').toLowerCase();
     const platform = (account.platform || '').toLowerCase();
 
-    const matchesChannel = !searchChannel || 
-      channelName.includes(searchChannel.toLowerCase()) || 
+    const matchesChannel = !searchChannel ||
+      channelName.includes(searchChannel.toLowerCase()) ||
       channelUsername.includes(searchChannel.toLowerCase());
 
     const matchesPlatform = filterPlatform === 'all' || platform === filterPlatform;
 
-    const matchesUser = !searchUser || 
-      userName.includes(searchUser.toLowerCase()) || 
+    const matchesUser = !searchUser ||
+      userName.includes(searchUser.toLowerCase()) ||
       userEmail.includes(searchUser.toLowerCase());
 
     return matchesChannel && matchesPlatform && matchesUser;
@@ -535,10 +608,10 @@ export const AdminDashboard = () => {
               note={selectedTimeRange === 'lifetime' ? 'Current total on cached posts' : 'Posts published in selected range'}
             />
             <MetricCard
-              icon={Eye}
-              label={`${selectedTimeLabel} channel insight`}
-              value={numberFormat.format(selectedAccountInsight)}
-              note="Publishing-channel cached insight total"
+              icon={CalendarClock}
+              label="Upcoming posts"
+              value={numberFormat.format(upcomingPosts)}
+              note="Queued scheduled posts"
             />
             <MetricCard
               icon={Megaphone}
@@ -606,13 +679,13 @@ export const AdminDashboard = () => {
           </div>
 
           <div className="mt-3 rounded-xl border border-[#d2d2d7] bg-white">
-            <div className="grid grid-cols-[1.15fr_0.9fr_1.2fr_0.4fr_0.65fr_0.7fr_0.65fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+            <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
               <span>Channel</span>
               <span>User</span>
               <span>Activity</span>
               <span>Posts</span>
               <span>{selectedTimeLabel} views</span>
-              <span>Channel insight</span>
+              <span>Upcoming</span>
               <span>Engagement</span>
             </div>
             {(activeMetrics.accountRows || []).length === 0 ? (
@@ -629,7 +702,7 @@ export const AdminDashboard = () => {
                   <div
                     key={account._id}
                     onClick={() => openAccountFeed(account)}
-                    className="grid cursor-pointer grid-cols-[1.15fr_0.9fr_1.2fr_0.4fr_0.65fr_0.7fr_0.65fr] items-center gap-3 border-b border-[#e5e5ea] px-3 py-2 text-xs transition hover:bg-[#f5f5f7] last:border-b-0"
+                    className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] items-center gap-3 border-b border-[#e5e5ea] px-3 py-2 text-xs transition hover:bg-[#f5f5f7] last:border-b-0"
                     role="button"
                     tabIndex={0}
                     onKeyDown={(event) => {
@@ -661,7 +734,9 @@ export const AdminDashboard = () => {
                     <ActivityCell account={account} selectedTimeRange={selectedTimeRange} selectedRange={selectedRange} />
                     <span className="text-[#515154]">{account[selectedRange.postsKey] || 0}</span>
                     <span className="text-[#515154]">{numberFormat.format(account[selectedRange.viewsKey] || 0)}</span>
-                    <span className="text-[#515154]">{numberFormat.format(account[selectedRange.accountInsightKey] || 0)}</span>
+                    <span className={(account.upcomingPosts || 0) < 3 ? 'text-[#ff3b30] font-medium' : 'text-[#515154]'}>
+                      {numberFormat.format(account.upcomingPosts || 0)}
+                    </span>
                     <span className="text-[#515154]">
                       {numberFormat.format(account[selectedRange.likesKey] || 0)} / {numberFormat.format(account[selectedRange.commentsKey] || 0)}
                     </span>

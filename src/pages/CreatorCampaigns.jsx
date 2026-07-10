@@ -89,8 +89,22 @@ export const CreatorCampaigns = () => {
   const formatPostTime = (value) => {
     const date = parseDateValue(value);
     if (!date) return '--:--';
-    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    return minutes === 0
+      ? `${hour12}${period}`
+      : `${hour12}:${String(minutes).padStart(2, '0')}${period}`;
   };
+
+  const sortPostsByPublishedAt = (items = []) => (
+    [...items].sort((a, b) => {
+      const aTime = parseDateValue(a.publishedAt)?.getTime() || 0;
+      const bTime = parseDateValue(b.publishedAt)?.getTime() || 0;
+      return aTime - bTime;
+    })
+  );
 
   const formatCooldownRemaining = (remainingMs) => {
     const totalMinutes = Math.max(1, Math.ceil(remainingMs / (60 * 1000)));
@@ -801,7 +815,7 @@ export const CreatorCampaigns = () => {
                     return accountQueues.map((queue) => {
                       const queuePost = queue.nextPost;
                       const tracking = todayTracking[queue.accountId] || { count: 0, posts: [] };
-                      const postedToday = tracking.posts || [];
+                      const postedToday = sortPostsByPublishedAt(tracking.posts || []);
                       const awaitingPostedDecision = isAwaitingPostedDecision(queuePost);
                       const postingCooldown = getPostingCooldown(tracking);
 

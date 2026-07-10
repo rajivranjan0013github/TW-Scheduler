@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowLeft, Check, Clock, Loader2, MessageSquareText, PauseCircle, PlayCircle, Save, X } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { getMediaUrl } from '../utils/mediaUrls';
@@ -70,6 +70,39 @@ const formatQueueScheduleParts = (value) => {
   };
 };
 
+const toDateTimeLocalValue = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+};
+
+const getDetectedIntervalHours = (items = []) => {
+  const scheduledTimes = items
+    .map((item) => new Date(item?.post?.scheduledAt).getTime())
+    .filter((time) => Number.isFinite(time))
+    .sort((a, b) => a - b);
+
+  if (scheduledTimes.length < 2) return '';
+
+  for (let index = 1; index < scheduledTimes.length; index += 1) {
+    const diffHours = (scheduledTimes[index] - scheduledTimes[index - 1]) / (60 * 60 * 1000);
+    if (diffHours > 0) {
+      return String(Math.round(diffHours * 100) / 100);
+    }
+  }
+
+  return '';
+};
+
+const formatPreviewDateTime = (value) => {
+  if (!value) return 'Not set';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not set';
+  return `${date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+};
+
 const AccountQueueEditor = ({
   account,
   items = [],
@@ -83,7 +116,10 @@ const AccountQueueEditor = ({
 }) => {
   const [selectedPostIds, setSelectedPostIds] = useState([]);
   const [showCaptionEditor, setShowCaptionEditor] = useState(false);
+  const [showTimeEditor, setShowTimeEditor] = useState(false);
   const [captionDrafts, setCaptionDrafts] = useState({});
+  const [rescheduleStart, setRescheduleStart] = useState('');
+  const [rescheduleIntervalHours, setRescheduleIntervalHours] = useState('10');
   const selectedItems = useMemo(() => (
     items.filter((item) => selectedPostIds.includes(item.post._id))
   ), [items, selectedPostIds]);
@@ -91,41 +127,81 @@ const AccountQueueEditor = ({
   const selectedSaving = selectedItems.some((item) => savingPostIds.includes(item.post._id));
   const selectedDeleting = selectedItems.some((item) => deletingPostIds.includes(item.post._id));
   const bulkBusy = selectedSaving || selectedDeleting;
+  const allVisibleSelected = items.length > 0 && selectedCount === items.length;
   const hasUnpausedSelection = selectedItems.some((item) => item.post.status !== 'paused');
   const allSelectedPaused = selectedCount > 0 && selectedItems.every((item) => item.post.status === 'paused');
   const hasCaptionChanges = selectedItems.some((item) => (
     (captionDrafts[item.post._id] ?? item.post.caption ?? '') !== (item.post.caption ?? '')
   ));
+  const lastPostPreviewDate = useMemo(() => {
+    if (selectedCount === 0) return null;
+    const startTime = new Date(rescheduleStart).getTime();
+    const intervalHours = Number(rescheduleIntervalHours);
+    if (!Number.isFinite(startTime) || !Number.isFinite(intervalHours) || intervalHours <= 0) return null;
+    return new Date(startTime + ((selectedCount - 1) * intervalHours * 60 * 60 * 1000));
+  }, [rescheduleIntervalHours, rescheduleStart, selectedCount]);
 
-  useEffect(() => {
-    if (selectedCount === 0) {
-      setShowCaptionEditor(false);
-    }
-  }, [selectedCount]);
-
-  useEffect(() => {
-    if (!showCaptionEditor) return;
+  const initializeCaptionDrafts = (itemsToDraft = selectedItems) => {
     setCaptionDrafts((current) => {
-      const next = {};
-      selectedItems.forEach((item) => {
+      const next = { ...current };
+      itemsToDraft.forEach((item) => {
         const postId = item.post._id;
         next[postId] = current[postId] ?? item.post.caption ?? '';
       });
       return next;
     });
-  }, [selectedItems, showCaptionEditor]);
+  };
 
   const toggleSelectedPost = (postId) => {
-    setSelectedPostIds((current) => (
-      current.includes(postId)
-        ? current.filter((id) => id !== postId)
-        : [...current, postId]
-    ));
+    const isSelected = selectedPostIds.includes(postId);
+    const nextSelectedPostIds = isSelected
+      ? selectedPostIds.filter((id) => id !== postId)
+      : [...selectedPostIds, postId];
+    setSelectedPostIds(nextSelectedPostIds);
+
+    if (nextSelectedPostIds.length === 0) {
+      setRescheduleStart('');
+      setShowCaptionEditor(false);
+      setShowTimeEditor(false);
+      return;
+    }
+    if (!isSelected && selectedPostIds.length === 0) {
+      const selectedItem = items.find((item) => item.post._id === postId);
+      setRescheduleStart(toDateTimeLocalValue(selectedItem?.post?.scheduledAt));
+    }
+    if (!isSelected && showCaptionEditor) {
+      const selectedItem = items.find((item) => item.post._id === postId);
+      if (selectedItem) initializeCaptionDrafts([selectedItem]);
+    }
+  };
+
+  const selectAllPosts = () => {
+    if (items.length === 0) return;
+    setSelectedPostIds(items.map((item) => item.post._id));
+    setRescheduleStart(toDateTimeLocalValue(items[0]?.post?.scheduledAt));
+    setRescheduleIntervalHours(getDetectedIntervalHours(items) || rescheduleIntervalHours);
+  };
+
+  const clearSelection = () => {
+    setSelectedPostIds([]);
+    setRescheduleStart('');
+    setShowCaptionEditor(false);
+    setShowTimeEditor(false);
   };
 
   const saveBulkChanges = async (updates) => {
     if (!selectedCount || !onBulkSave) return;
     await onBulkSave(selectedItems, updates);
+  };
+
+  const openTimeEditor = () => {
+    if (selectedCount === 0) return;
+    setRescheduleStart((current) => current || toDateTimeLocalValue(selectedItems[0]?.post?.scheduledAt));
+    const detectedInterval = getDetectedIntervalHours(selectedItems);
+    if (detectedInterval) {
+      setRescheduleIntervalHours(detectedInterval);
+    }
+    setShowTimeEditor(true);
   };
 
   const saveCaptionChanges = async () => {
@@ -139,6 +215,28 @@ const AccountQueueEditor = ({
       }
     });
     await onBulkCaptionSave(selectedItems, changesByPostId);
+  };
+
+  const saveIntervalChanges = async () => {
+    if (!selectedCount || !onBulkSave) return;
+    const startDate = new Date(rescheduleStart);
+    const intervalHours = Number(rescheduleIntervalHours);
+    if (!rescheduleStart || Number.isNaN(startDate.getTime())) {
+      window.alert('Choose a valid start date and time.');
+      return;
+    }
+    if (!Number.isFinite(intervalHours) || intervalHours <= 0) {
+      window.alert('Enter an interval greater than 0 hours.');
+      return;
+    }
+
+    await onBulkSave(selectedItems, {
+      reschedule: {
+        startAt: startDate.toISOString(),
+        intervalHours,
+      },
+    });
+    setShowTimeEditor(false);
   };
 
   return (
@@ -163,7 +261,18 @@ const AccountQueueEditor = ({
             </span>
           </div>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-2">
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={allVisibleSelected ? clearSelection : selectAllPosts}
+              disabled={bulkBusy}
+              className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#d2d2d7] bg-white px-2.5 text-[11px] font-semibold text-[#3c4043] transition hover:bg-[#f8f9fa] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Check className="h-3.5 w-3.5" />
+              {allVisibleSelected ? 'Clear' : 'Select all'}
+            </button>
+          )}
           {selectedCount > 0 && (
             <div className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#eff6ff] px-2.5 text-[11px] font-bold text-[#1a73e8]">
               <Check className="h-3.5 w-3.5" />
@@ -195,7 +304,21 @@ const AccountQueueEditor = ({
           {selectedCount > 0 && (
             <button
               type="button"
-              onClick={() => setShowCaptionEditor(true)}
+              onClick={openTimeEditor}
+              disabled={bulkBusy}
+              className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2.5 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#dbeafe] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Clock className="h-3.5 w-3.5 flex-shrink-0 text-[#5f6368]" />
+              Edit time
+            </button>
+          )}
+          {selectedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                initializeCaptionDrafts();
+                setShowCaptionEditor(true);
+              }}
               className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2.5 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#dbeafe]"
             >
               <MessageSquareText className="h-3.5 w-3.5" />
@@ -206,7 +329,83 @@ const AccountQueueEditor = ({
             {loading ? 'Loading' : `${items.length} queued`}
           </div>
         </div>
-      </div>
+	      </div>
+      {showTimeEditor && selectedCount > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-md rounded-xl border border-[#d2d2d7] bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-[#e5e5ea] px-4 py-3">
+              <div className="min-w-0">
+                <h4 className="m-0 text-sm font-bold text-[#1c1c1e]">Bulk edit post time</h4>
+                <p className="m-0 mt-0.5 text-[11px] font-semibold text-[#6b7280]">
+                  {selectedCount} selected post{selectedCount === 1 ? '' : 's'} will be rescheduled in queue order.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTimeEditor(false)}
+                className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-[#6b7280] transition hover:bg-[#f2f2f7] hover:text-[#1c1c1e]"
+                title="Close time editor"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-4 px-4 py-4">
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-[#6b7280]">Start date and time</span>
+                <input
+                  type="datetime-local"
+                  value={rescheduleStart}
+                  onChange={(event) => setRescheduleStart(event.target.value)}
+                  disabled={bulkBusy}
+                  className="h-10 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 text-sm font-semibold text-[#1c1c1e] outline-none transition focus:border-[#1a73e8] focus:ring-[3px] focus:ring-[#1a73e8]/10 disabled:opacity-60"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-[#6b7280]">Interval between posts</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0.25"
+                    step="0.25"
+                    value={rescheduleIntervalHours}
+                    onChange={(event) => setRescheduleIntervalHours(event.target.value)}
+                    disabled={bulkBusy}
+                    className="h-10 w-28 rounded-lg border border-[#d2d2d7] bg-white px-3 text-sm font-bold text-[#1c1c1e] outline-none transition focus:border-[#1a73e8] focus:ring-[3px] focus:ring-[#1a73e8]/10 disabled:opacity-60"
+                  />
+                  <span className="text-sm font-semibold text-[#6b7280]">hours</span>
+                </div>
+              </label>
+              <div className="rounded-lg border border-[#dbeafe] bg-[#eff6ff] px-3 py-2">
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-[#1a73e8]">Preview only</span>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-[#3c4043]">Last post date</span>
+                  <span className="text-right text-xs font-bold text-[#1c1c1e]">
+                    {formatPreviewDateTime(lastPostPreviewDate)}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-[#e5e5ea] px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setShowTimeEditor(false)}
+                className="h-9 rounded-md px-3 text-xs font-semibold text-[#6b7280] transition hover:bg-[#f2f2f7] hover:text-[#1c1c1e]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveIntervalChanges}
+                disabled={bulkBusy}
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#1a73e8] px-3 text-xs font-semibold text-white transition hover:bg-[#1558b0] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Save className="h-3.5 w-3.5" />
+                {bulkBusy ? 'Saving' : 'Apply time'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-hidden">
         <div className="flex h-full min-h-0">
@@ -223,7 +422,7 @@ const AccountQueueEditor = ({
                   <p className="m-0 text-sm font-semibold text-[#3c4043]">No upcoming queued media for this account.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,200px))] justify-center gap-4">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,160px))] justify-center gap-3">
                   {items.map((item, index) => {
                 const postId = item.post._id;
                 const isSelected = selectedPostIds.includes(postId);
@@ -236,9 +435,9 @@ const AccountQueueEditor = ({
                   } ${
                     isSelected ? 'border-[#1a73e8] ring-2 ring-[#1a73e8]/20' : 'border-[#e5e5ea] hover:border-[#ccd0d9]'
                   }`}>
-                    <div className={`flex items-center justify-between gap-2 border-b px-2.5 py-2 ${
-                      isPaused ? 'border-[#d8dde3] bg-[#e5e7eb]' : 'border-[#f4f4f6] bg-gray-50/40'
-                    }`}>
+	                    <div className={`flex items-center justify-between gap-1.5 border-b px-2 py-1.5 ${
+	                      isPaused ? 'border-[#d8dde3] bg-[#e5e7eb]' : 'border-[#f4f4f6] bg-gray-50/40'
+	                    }`}>
                           <div className="flex min-w-0 items-center gap-1.5">
                             <button
                               type="button"
@@ -259,25 +458,25 @@ const AccountQueueEditor = ({
                           </span>
                         </div>
 
-                        <div className="p-2.5">
-                      <div className={`aspect-[9/16] overflow-hidden rounded-lg border shadow-inner relative ${
-                        isPaused ? 'border-[#d1d5db] bg-[#e5e7eb] grayscale opacity-70' : 'border-[#e5e5ea] bg-[#f2f2f7]'
-                      }`}>
-                        <QueueMediaPreview item={item.mediaItem} />
-                      </div>
-                      <div className={`mt-2 rounded-md border px-2 py-1.5 ${
-                        isPaused ? 'border-[#d1d5db] bg-[#e5e7eb]' : 'border-[#e7e9ee] bg-[#f8fafc]'
-                      }`}>
-                        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
-                          <span className={`text-[11px] font-bold leading-4 ${isPaused ? 'text-[#6b7280]' : 'text-[#374151]'}`}>{scheduleParts.date}</span>
-                          <span className={`text-[11px] font-black leading-4 ${isPaused ? 'text-[#4b5563]' : 'text-[#111827]'}`}>{scheduleParts.time}</span>
-                        </div>
-                      </div>
-                      <div className="mt-2 min-w-0">
-                        <p className={`m-0 truncate text-xs font-bold ${isPaused ? 'text-[#4b5563]' : 'text-[#1c1c1e]'}`}>{item.mediaLabel}</p>
-                        <p className={`m-0 mt-1 line-clamp-2 text-[10px] font-normal leading-4 ${isPaused ? 'text-[#6b7280]' : 'text-[#8e8e93]'}`}>
-                          {item.post.caption || 'No caption'}
-                        </p>
+	                        <div className="p-2">
+	                      <div className={`aspect-[9/16] overflow-hidden rounded-lg border shadow-inner relative ${
+	                        isPaused ? 'border-[#d1d5db] bg-[#e5e7eb] grayscale opacity-70' : 'border-[#e5e5ea] bg-[#f2f2f7]'
+	                      }`}>
+	                        <QueueMediaPreview item={item.mediaItem} />
+	                      </div>
+	                      <div className={`mt-1.5 rounded-md border px-1.5 py-1 ${
+	                        isPaused ? 'border-[#d1d5db] bg-[#e5e7eb]' : 'border-[#e7e9ee] bg-[#f8fafc]'
+	                      }`}>
+	                        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+	                          <span className={`text-[10px] font-bold leading-4 ${isPaused ? 'text-[#6b7280]' : 'text-[#374151]'}`}>{scheduleParts.date}</span>
+	                          <span className={`text-[10px] font-black leading-4 ${isPaused ? 'text-[#4b5563]' : 'text-[#111827]'}`}>{scheduleParts.time}</span>
+	                        </div>
+	                      </div>
+	                      <div className="mt-1.5 min-w-0">
+	                        <p className={`m-0 truncate text-[11px] font-bold ${isPaused ? 'text-[#4b5563]' : 'text-[#1c1c1e]'}`}>{item.mediaLabel}</p>
+	                        <p className={`m-0 mt-0.5 line-clamp-2 text-[9px] font-normal leading-3 ${isPaused ? 'text-[#6b7280]' : 'text-[#8e8e93]'}`}>
+	                          {item.post.caption || 'No caption'}
+	                        </p>
                           </div>
                         </div>
                       </article>

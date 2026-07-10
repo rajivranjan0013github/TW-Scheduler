@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, BarChart3, ExternalLink, RefreshCw, MoreVertical } from 'lucide-react';
 import { withCampaignScope } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
@@ -81,17 +81,106 @@ export const PublishedFeed = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
 
-  const [channel, setChannel] = useState(null);
-  const [publishedPosts, setPublishedPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingPosts, setLoadingPosts] = useState(false);
-  const [errorPosts, setErrorPosts] = useState(null);
-
   const [activeTab, setActiveTab] = useState('published'); // 'published' | 'queued'
-  const [queuedPosts, setQueuedPosts] = useState([]);
-  const [loadingQueue, setLoadingQueue] = useState(false);
-  const [errorQueue, setErrorQueue] = useState(null);
   const [activeMenuPostId, setActiveMenuPostId] = useState(null);
+  const forceRefreshRef = useRef(false);
+
+  // 1. Channel Details Query
+  const channelQuery = useQuery({
+    queryKey: ['channel', id],
+    queryFn: async () => {
+      const token = localStorage.getItem('tw_token');
+      const headers = { 'Authorization': `Bearer ${token}` };
+      const chanRes = await fetch(`${API_BASE_URL}/api/accounts${withCampaignScope()}`, { headers });
+      let channels = chanRes.ok ? await chanRes.json() : [];
+      let targetChan = channels.find(c => c._id === id);
+
+      if (!targetChan) {
+        const adminRes = await fetch(`${API_BASE_URL}/api/admin/social-accounts`, { headers });
+        channels = adminRes.ok ? await adminRes.json() : [];
+        targetChan = channels.find(c => c._id === id);
+      }
+
+      if (!targetChan) {
+        throw new Error('Channel not found');
+      }
+      return targetChan;
+    },
+    initialData: () => {
+      if (location.state?.channel?._id === id) {
+        return location.state.channel;
+      }
+      return undefined;
+    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // 2. Published Posts Query
+  const publishedPostsQuery = useQuery({
+    queryKey: ['publishedPosts', id],
+    queryFn: async () => {
+      const token = localStorage.getItem('tw_token');
+      const refreshParam = forceRefreshRef.current ? '?refresh=true' : '';
+      const response = await fetch(`${API_BASE_URL}/api/accounts/${id}/posts${refreshParam}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData?.message || 'Failed to retrieve published posts.');
+      }
+      return response.json();
+    },
+    enabled: !!id,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // 3. Queued Scheduler Posts Query
+  const queuedPostsQuery = useQuery({
+    queryKey: ['queuedPosts', id],
+    queryFn: async () => {
+      const token = localStorage.getItem('tw_token');
+      const params = new URLSearchParams();
+      params.set('accountIds', id);
+      params.set('statuses', 'scheduled,manual_ready,downloaded,publishing,paused,posted_manual,published,published_auto');
+      const url = `${API_BASE_URL}/api/scheduler${withCampaignScope(params.toString())}`;
+
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData?.message || 'Failed to retrieve queued posts.');
+      }
+      const data = await response.json();
+      const posts = Array.isArray(data) ? data : [];
+      
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startDate = new Date(todayStart);
+      startDate.setDate(startDate.getDate() - 2);
+      const endDate = new Date(todayStart);
+      endDate.setDate(endDate.getDate() + 4);
+      endDate.setHours(23, 59, 59, 999);
+      
+      return posts.filter((post) => {
+        const displayDate = getPostDisplayDate(post);
+        return displayDate >= startDate && displayDate <= endDate;
+      });
+    },
+    enabled: !!id,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const channel = channelQuery.data;
+  const publishedPosts = publishedPostsQuery.data || [];
+  const queuedPosts = queuedPostsQuery.data || [];
+
+  const loading = channelQuery.isLoading || (publishedPostsQuery.isLoading && publishedPosts.length === 0);
+  const loadingPosts = publishedPostsQuery.isFetching;
+  const loadingQueue = queuedPostsQuery.isFetching;
+  const errorPosts = publishedPostsQuery.error?.message || null;
+  const errorQueue = queuedPostsQuery.error?.message || null;
 
   const handleDeletePost = async (postId) => {
     if (!window.confirm('Are you sure you want to delete this scheduled post?')) return;
@@ -103,7 +192,7 @@ export const PublishedFeed = () => {
         },
       });
       if (response.ok) {
-        setQueuedPosts((current) => current.filter((post) => post._id !== postId));
+        await queuedPostsQuery.refetch();
         await queryClient.invalidateQueries({ queryKey: ['admin'] });
       } else {
         const data = await response.json().catch(() => null);
@@ -115,10 +204,20 @@ export const PublishedFeed = () => {
     }
   };
 
-  useEffect(() => {
-    fetchChannelAndPosts();
-    fetchQueuedPosts();
-  }, [id]);
+  const handleRefresh = async () => {
+    forceRefreshRef.current = true;
+    try {
+      await Promise.all([
+        publishedPostsQuery.refetch(),
+        queuedPostsQuery.refetch(),
+      ]);
+      await queryClient.invalidateQueries({ queryKey: ['admin'] });
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      forceRefreshRef.current = false;
+    }
+  };
 
   const getTimeSince = (dateStr) => {
     const now = Date.now();
@@ -170,121 +269,19 @@ export const PublishedFeed = () => {
   };
 
   const getPublishedDate = (post) => post.publishedAt || post.createdAt || post.timestamp || null;
-  const getFeedSyncedAt = () => {
+
+  const feedSyncedAt = useMemo(() => {
     const syncTimes = publishedPosts
       .map((post) => (post.lastSyncedAt ? new Date(post.lastSyncedAt).getTime() : null))
       .filter((time) => Number.isFinite(time));
 
     if (syncTimes.length === 0) return null;
     return new Date(Math.min(...syncTimes)).toISOString();
-  };
+  }, [publishedPosts]);
 
-  const fetchChannelAndPosts = async (forceRefresh = false) => {
-    if (forceRefresh) {
-      setLoadingPosts(true);
-    } else {
-      setLoading(true);
-    }
-    setErrorPosts(null);
+  const getFeedSyncedAt = () => feedSyncedAt;
 
-    try {
-      const token = localStorage.getItem('tw_token');
-
-      // 1. Fetch channel metadata if not already loaded
-      if (!channel) {
-        if (location.state?.channel?._id === id) {
-          setChannel(location.state.channel);
-        } else {
-          const headers = { 'Authorization': `Bearer ${token}` };
-          const chanRes = await fetch(`${API_BASE_URL}/api/accounts${withCampaignScope()}`, { headers });
-          let channels = chanRes.ok ? await chanRes.json() : [];
-          let targetChan = channels.find(c => c._id === id);
-
-          if (!targetChan) {
-            const adminRes = await fetch(`${API_BASE_URL}/api/admin/social-accounts`, { headers });
-            channels = adminRes.ok ? await adminRes.json() : [];
-            targetChan = channels.find(c => c._id === id);
-          }
-
-          if (targetChan) {
-            setChannel(targetChan);
-          } else {
-            setErrorPosts('Channel not found');
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
-      // 2. Fetch posts
-      const refreshParam = forceRefresh ? '?refresh=true' : '';
-      const response = await fetch(`${API_BASE_URL}/api/accounts/${id}/posts${refreshParam}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPublishedPosts(data);
-        if (forceRefresh) {
-          await queryClient.invalidateQueries({ queryKey: ['admin'] });
-        }
-      } else {
-        const errData = await response.json();
-        setErrorPosts(errData.message || 'Failed to retrieve published posts.');
-      }
-    } catch (error) {
-      console.error('Failed to load page data:', error);
-      setErrorPosts('Network error: Failed to connect to server.');
-    } finally {
-      setLoading(false);
-      setLoadingPosts(false);
-    }
-  };
-
-  const fetchQueuedPosts = async () => {
-    setLoadingQueue(true);
-    setErrorQueue(null);
-    try {
-      const token = localStorage.getItem('tw_token');
-      const params = new URLSearchParams();
-      params.set('accountIds', id);
-      params.set('statuses', 'scheduled,manual_ready,downloaded,publishing,paused,posted_manual,published,published_auto');
-      const url = `${API_BASE_URL}/api/scheduler${withCampaignScope(params.toString())}`;
-
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const posts = Array.isArray(data) ? data : [];
-        
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const startDate = new Date(todayStart);
-        startDate.setDate(startDate.getDate() - 2);
-        const endDate = new Date(todayStart);
-        endDate.setDate(endDate.getDate() + 4);
-        endDate.setHours(23, 59, 59, 999);
-        
-        const filtered = posts.filter((post) => {
-          const displayDate = getPostDisplayDate(post);
-          return displayDate >= startDate && displayDate <= endDate;
-        });
-
-        setQueuedPosts(filtered);
-      } else {
-        const errData = await response.json().catch(() => null);
-        setErrorQueue(errData?.message || 'Failed to retrieve queued posts.');
-      }
-    } catch (error) {
-      console.error('Failed to load queued posts:', error);
-      setErrorQueue('Network error: Failed to connect to server.');
-    } finally {
-      setLoadingQueue(false);
-    }
-  };
-
-  const calculateViewsByRange = () => {
+  const viewsStats = useMemo(() => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
@@ -325,7 +322,16 @@ export const PublishedFeed = () => {
     });
 
     return { today, yesterday, last7Days, thisMonth, allTime };
-  };
+  }, [publishedPosts]);
+
+  const upcomingQueuedCount = useMemo(() => {
+    return queuedPosts.filter((post) => {
+      const isManualPosted = post.status === 'posted_manual' || Boolean(post.manualPostedAt);
+      const isAutoPublished = ['published', 'published_auto'].includes(post.status);
+      const isPosted = isManualPosted || isAutoPublished;
+      return !isPosted;
+    }).length;
+  }, [queuedPosts]);
 
   const getSevenDaysRange = () => {
     const range = [];
@@ -405,10 +411,7 @@ export const PublishedFeed = () => {
                 }
               </span>
               <button
-                onClick={() => {
-                  fetchChannelAndPosts(true);
-                  fetchQueuedPosts();
-                }}
+                onClick={handleRefresh}
                 disabled={loadingPosts || loadingQueue}
                 className="flex items-center gap-1.5 text-xs text-[#0071e3] hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 px-3.5 py-1.5 rounded-lg border border-blue-100 transition-all font-semibold disabled:opacity-50 active:scale-95"
               >
@@ -424,7 +427,7 @@ export const PublishedFeed = () => {
       {!loading && channel && publishedPosts.length > 0 && (
         <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
           {(() => {
-            const stats = calculateViewsByRange();
+            const stats = viewsStats;
             const format = (num) => Intl.NumberFormat().format(num);
             return [
               { label: 'Today', value: stats.today },
@@ -463,7 +466,7 @@ export const PublishedFeed = () => {
                 : 'border-transparent text-gray-500 hover:text-black'
             }`}
           >
-            Scheduled Queue ({queuedPosts.length})
+            Scheduled Queue ({upcomingQueuedCount})
           </button>
         </div>
       )}
@@ -609,6 +612,17 @@ export const PublishedFeed = () => {
                                 default: return 'bg-blue-500';
                               }
                             };
+                            const getStatusLabel = (status) => {
+                              if (isPosted) return 'Posted';
+                              switch (status) {
+                                case 'manual_ready': return 'Manual Ready';
+                                case 'downloaded': return 'Downloaded';
+                                case 'paused': return 'Paused';
+                                case 'scheduled': return 'Scheduled';
+                                case 'publishing': return 'Publishing';
+                                default: return status || 'Scheduled';
+                              }
+                            };
                             return (
                               <div key={post._id} className={`group flex flex-col items-center shrink-0 relative rounded-lg border p-1 shadow-sm hover:shadow-md transition-all w-full ${
                                 isPosted ? postedCardClass : 'border-[#e5e5ea] bg-white'
@@ -674,8 +688,11 @@ export const PublishedFeed = () => {
                                 </div>
 
                                 {/* Content details below */}
-                                <div className="mt-1 flex items-center justify-center gap-0.5 w-full text-center px-1 py-0.5">
-                                  <span className={`w-1 h-1 rounded-full flex-shrink-0 ${getStatusDotBg(post.status)}`} />
+                                <div 
+                                  className="mt-1 flex items-center justify-center gap-1 w-full text-center px-1 py-0.5"
+                                  title={`Status: ${getStatusLabel(post.status)}`}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusDotBg(post.status)}`} />
                                   <span className={`text-[9px] font-bold truncate ${isPosted ? 'text-green-800' : 'text-gray-700'}`}>{pubDisplay.time}</span>
                                 </div>
                               </div>
