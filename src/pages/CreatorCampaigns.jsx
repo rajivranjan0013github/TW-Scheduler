@@ -98,13 +98,24 @@ export const CreatorCampaigns = () => {
       : `${hour12}:${String(minutes).padStart(2, '0')}${period}`;
   };
 
+  const getPostDisplayPublishedAt = (post) => post?.publishedAt || post?.manualPostedAt;
+
   const sortPostsByPublishedAt = (items = []) => (
     [...items].sort((a, b) => {
-      const aTime = parseDateValue(a.publishedAt)?.getTime() || 0;
-      const bTime = parseDateValue(b.publishedAt)?.getTime() || 0;
+      const aTime = parseDateValue(getPostDisplayPublishedAt(a))?.getTime() || 0;
+      const bTime = parseDateValue(getPostDisplayPublishedAt(b))?.getTime() || 0;
       return aTime - bTime;
     })
   );
+
+  const isTodayDate = (value) => {
+    const date = parseDateValue(value);
+    if (!date) return false;
+    const today = new Date();
+    return date.getFullYear() === today.getFullYear()
+      && date.getMonth() === today.getMonth()
+      && date.getDate() === today.getDate();
+  };
 
   const formatCooldownRemaining = (remainingMs) => {
     const totalMinutes = Math.max(1, Math.ceil(remainingMs / (60 * 1000)));
@@ -604,6 +615,22 @@ export const CreatorCampaigns = () => {
   );
   const getAccountId = (account) => String(getIdValue(account) || '');
   const getAccountLabel = (account) => account?.username || account?.name || account?.handle || account?.requestedHandle || 'Account';
+  const shouldShowManualPostedTimes = (account) => (
+    ['manual_only', 'pending_verification', 'disconnected'].includes(account?.status)
+    || account?.isVerified === false
+    || account?.isConnected === false
+  );
+  const getManualPostedToday = (items = []) => (
+    items
+      .filter((post) => post.status === 'posted_manual' && isTodayDate(post.manualPostedAt))
+      .map((post) => ({
+        id: `manual-${post._id}`,
+        platform: getPostAccounts(post)?.[0]?.platform || '',
+        publishedAt: post.manualPostedAt,
+        manualPostedAt: post.manualPostedAt,
+        source: 'manual',
+      }))
+  );
   const getAccountQueueGroups = (camp) => {
     const campaignPosts = getCampaignCreatorPosts(camp._id);
     const groups = new Map();
@@ -645,17 +672,15 @@ export const CreatorCampaigns = () => {
           nextPost: actionableQueue[0] || null,
         };
       })
-      .sort((a, b) => {
-        if (a.nextPost && !b.nextPost) return -1;
-        if (!a.nextPost && b.nextPost) return 1;
-        const aTime = a.nextPost ? new Date(a.nextPost.scheduledAt).getTime() : 0;
-        const bTime = b.nextPost ? new Date(b.nextPost.scheduledAt).getTime() : 0;
-        return aTime - bTime || getAccountLabel(a.account).localeCompare(getAccountLabel(b.account));
-      });
+      .filter(Boolean);
   };
   const nextShareMedia = !isAwaitingPostedDecision(nextQueuedPost)
     ? getPrimaryMedia(nextQueuedPost || {})
     : null;
+  const campaignQueueViews = assignedCampaigns.map((camp) => ({
+    camp,
+    accountQueues: getAccountQueueGroups(camp),
+  }));
 
   useEffect(() => {
     shareBlobRef.current = null;
@@ -791,8 +816,7 @@ export const CreatorCampaigns = () => {
               )}
               {assignedCampaigns.length > 0 ? (
                 <div className="grid gap-x-4 gap-y-3 md:gap-x-6 md:gap-y-4 lg:grid-cols-2">
-                  {assignedCampaigns.flatMap((camp) => {
-                    const accountQueues = getAccountQueueGroups(camp);
+                  {campaignQueueViews.flatMap(({ camp, accountQueues }) => {
                     if (accountQueues.length === 0) {
                       return (
                         <div key={`${camp._id}-empty`} className="rounded-lg border border-[#e5e5ea] bg-white px-4 py-3">
@@ -815,7 +839,13 @@ export const CreatorCampaigns = () => {
                     return accountQueues.map((queue) => {
                       const queuePost = queue.nextPost;
                       const tracking = todayTracking[queue.accountId] || { count: 0, posts: [] };
-                      const postedToday = sortPostsByPublishedAt(tracking.posts || []);
+                      const manualPostedToday = shouldShowManualPostedTimes(queue.account)
+                        ? getManualPostedToday(queue.posts)
+                        : [];
+                      const postedToday = sortPostsByPublishedAt([
+                        ...(tracking.posts || []),
+                        ...manualPostedToday,
+                      ]);
                       const awaitingPostedDecision = isAwaitingPostedDecision(queuePost);
                       const postingCooldown = getPostingCooldown(tracking);
 
@@ -871,7 +901,7 @@ export const CreatorCampaigns = () => {
                             <div className="mb-1.5 flex items-center justify-between gap-2">
                               <span className="text-[10px] font-bold uppercase text-[#6e6e73]">Posted today</span>
                               <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-[#1d1d1f]">
-                                {tracking.count || 0}
+                                {postedToday.length}
                               </span>
                             </div>
                             {postedToday.length > 0 ? (
@@ -885,10 +915,10 @@ export const CreatorCampaigns = () => {
                                       type="checkbox"
                                       checked
                                       readOnly
-                                      aria-label={`Posted at ${formatPostTime(post.publishedAt)}`}
+                                      aria-label={`Posted at ${formatPostTime(getPostDisplayPublishedAt(post))}`}
                                       className="h-3 w-3 accent-emerald-600"
                                     />
-                                    {formatPostTime(post.publishedAt)}
+                                    {formatPostTime(getPostDisplayPublishedAt(post))}
                                   </span>
                                 ))}
                                 {postedToday.length > 6 && (
