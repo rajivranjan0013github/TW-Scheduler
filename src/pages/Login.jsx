@@ -44,7 +44,7 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fbfbfd] text-[#1d1d1f] font-sans">
+    <div className="h-screen overflow-y-auto bg-[#fbfbfd] text-[#1d1d1f] font-sans">
       <header className="border-b border-[#d2d2d7] bg-white px-5 py-4">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#3478f6]">

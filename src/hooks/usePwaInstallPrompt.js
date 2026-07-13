@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+let sharedInstallPrompt = null;
+let sharedIsInstalled = false;
+let browserListenersRegistered = false;
+const promptListeners = new Set();
+
 const isStandaloneDisplay = () => (
   window.matchMedia?.('(display-mode: standalone)').matches ||
   window.navigator.standalone === true
@@ -12,56 +17,75 @@ const detectIOS = () => {
     (platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
 };
 
+const notifyPromptListeners = () => {
+  promptListeners.forEach((listener) => listener({
+    installPrompt: sharedInstallPrompt,
+    isInstalled: sharedIsInstalled,
+  }));
+};
+
+const ensureBrowserListeners = () => {
+  if (browserListenersRegistered || typeof window === 'undefined') return;
+  browserListenersRegistered = true;
+  sharedIsInstalled = isStandaloneDisplay();
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    sharedInstallPrompt = event;
+    notifyPromptListeners();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    sharedInstallPrompt = null;
+    sharedIsInstalled = true;
+    notifyPromptListeners();
+  });
+};
+
 export const usePwaInstallPrompt = () => {
-  const [installPrompt, setInstallPrompt] = useState(null);
-  const [isInstalled, setIsInstalled] = useState(() => (
-    typeof window !== 'undefined' ? isStandaloneDisplay() : false
-  ));
+  const [promptState, setPromptState] = useState(() => ({
+    installPrompt: sharedInstallPrompt,
+    isInstalled: typeof window !== 'undefined' ? sharedIsInstalled || isStandaloneDisplay() : sharedIsInstalled,
+  }));
 
   const isIOS = useMemo(() => (
     typeof window !== 'undefined' ? detectIOS() : false
   ), []);
 
   useEffect(() => {
-    const handleBeforeInstallPrompt = (event) => {
-      event.preventDefault();
-      setInstallPrompt(event);
-    };
+    ensureBrowserListeners();
+    const listener = (nextState) => setPromptState(nextState);
+    promptListeners.add(listener);
+    listener({
+      installPrompt: sharedInstallPrompt,
+      isInstalled: typeof window !== 'undefined' ? sharedIsInstalled || isStandaloneDisplay() : sharedIsInstalled,
+    });
 
-    const handleInstalled = () => {
-      setInstallPrompt(null);
-      setIsInstalled(true);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleInstalled);
-    };
+    return () => promptListeners.delete(listener);
   }, []);
 
   const install = useCallback(async () => {
-    if (!installPrompt) return false;
+    if (!promptState.installPrompt) return false;
 
-    installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
-    setInstallPrompt(null);
+    promptState.installPrompt.prompt();
+    const choice = await promptState.installPrompt.userChoice;
+    sharedInstallPrompt = null;
 
     if (choice?.outcome === 'accepted') {
-      setIsInstalled(true);
+      sharedIsInstalled = true;
+      notifyPromptListeners();
       return true;
     }
 
+    notifyPromptListeners();
     return false;
-  }, [installPrompt]);
+  }, [promptState.installPrompt]);
 
   return {
-    canInstall: Boolean(installPrompt),
+    canInstall: Boolean(promptState.installPrompt),
     install,
     isIOS,
-    isInstalled,
-    shouldShowInstall: !isInstalled,
+    isInstalled: promptState.isInstalled,
+    shouldShowInstall: !promptState.isInstalled,
   };
 };

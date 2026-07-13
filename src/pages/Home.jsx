@@ -42,7 +42,7 @@ const features = [
 ];
 
 export const Home = () => (
-  <div className="min-h-screen bg-white text-[#1d1d1f] font-sans">
+  <div className="h-screen overflow-y-auto bg-white text-[#1d1d1f] font-sans">
     <header className="sticky top-0 z-20 border-b border-black/5 bg-white/90 backdrop-blur px-5 py-4">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
         <div className="flex items-center gap-3">

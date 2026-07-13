@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Share2, Trash2, ShieldCheck, Link2, Eye, Trash } from 'lucide-react';
+import { Trash2, ShieldCheck, Link2, Eye } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
 
-export const Channels = ({ selectedAccounts = [] }) => {
+export const Channels = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,7 +29,7 @@ export const Channels = ({ selectedAccounts = [] }) => {
     }
   })();
   const adminViewUserId = adminViewContext?.userId || '';
-  const [channels, setChannels] = useState([]);
+  const [disconnectedChannelIds, setDisconnectedChannelIds] = useState([]);
   const isCreator = user?.userType === 'account_handler';
   const activeConnectCampaignId = isCreator
     ? (location.state?.campaignId || sessionStorage.getItem('connect_campaign_id') || null)
@@ -69,12 +69,26 @@ export const Channels = ({ selectedAccounts = [] }) => {
     staleTime: 2 * 60 * 1000,
     enabled: Boolean(user),
   });
+  const creatorCampaignsQuery = useQuery({
+    queryKey: ['creator', 'campaigns', 'channels-verification'],
+    queryFn: async () => {
+      const token = localStorage.getItem('tw_token');
+      const response = await fetch(`${API_BASE_URL}/api/accounts/creator/campaigns`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch campaign channels: ${response.status}`);
+      }
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000,
+    enabled: Boolean(user) && isCreator,
+  });
 
-  useEffect(() => {
-    if (channelsQuery.data) {
-      setChannels(normalizeChannels(channelsQuery.data));
-    }
-  }, [channelsQuery.data]);
+  const normalizedChannels = useMemo(
+    () => normalizeChannels(channelsQuery.data),
+    [channelsQuery.data]
+  );
 
   useEffect(() => {
     if (channelsQuery.error) {
@@ -94,7 +108,9 @@ export const Channels = ({ selectedAccounts = [] }) => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
-        setChannels(channels.filter(chan => chan.socialAccountId !== id && chan._id !== id));
+        setDisconnectedChannelIds((current) => (
+          current.includes(id) ? current : [...current, id]
+        ));
         await queryClient.invalidateQueries({ queryKey: ['channels'] });
         await queryClient.invalidateQueries({ queryKey: ['scheduler'] });
         await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -106,34 +122,40 @@ export const Channels = ({ selectedAccounts = [] }) => {
     }
   };
 
-  const connectMetaOAuth = () => {
-    if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
+  const setConnectCampaignContext = (campaignId = activeConnectCampaignId) => {
+    if (campaignId) {
+      sessionStorage.setItem('connect_campaign_id', campaignId);
+    }
+  };
+
+  const connectMetaOAuth = (campaignId = activeConnectCampaignId) => {
+    setConnectCampaignContext(campaignId);
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
     const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
     const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
     const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
-    window.location.href = oauthUrl;
+    window.location.assign(oauthUrl);
   };
 
-  const connectInstagramOAuth = () => {
+  const connectInstagramOAuth = (campaignId = activeConnectCampaignId) => {
     const appId = import.meta.env.VITE_INSTAGRAM_APP_ID;
     const facebookAppId = import.meta.env.VITE_META_APP_ID;
     if (!appId || appId === facebookAppId) {
       alert('Set VITE_INSTAGRAM_APP_ID to the Instagram App ID from Meta Dashboard > Instagram > API setup with Instagram login. It cannot be the Facebook App ID.');
       return;
     }
-    if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
+    setConnectCampaignContext(campaignId);
     const rawRedirectUri = import.meta.env.VITE_INSTAGRAM_REDIRECT_URI || `${window.location.origin}/auth/instagram/callback`;
     sessionStorage.setItem('instagram_oauth_redirect_uri', rawRedirectUri);
     const redirectUri = encodeURIComponent(rawRedirectUri);
     const scope = encodeURIComponent('instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights');
     const oauthUrl = `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
-    window.location.href = oauthUrl;
+    window.location.assign(oauthUrl);
   };
 
-  const connectYoutubeOAuth = async () => {
+  const connectYoutubeOAuth = async (campaignId = activeConnectCampaignId) => {
     try {
-      if (activeConnectCampaignId) sessionStorage.setItem('connect_campaign_id', activeConnectCampaignId);
+      setConnectCampaignContext(campaignId);
       const token = localStorage.getItem('tw_token');
       const response = await fetch(`${API_BASE_URL}/api/accounts/youtube/auth-url`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -145,10 +167,27 @@ export const Channels = ({ selectedAccounts = [] }) => {
         return;
       }
 
-      window.location.href = data.url;
+      window.location.assign(data.url);
     } catch (error) {
       console.error('Failed to start YouTube OAuth:', error);
       alert('Failed to connect to the backend for YouTube OAuth.');
+    }
+  };
+
+  const handleVerifyChannel = (channel) => {
+    if (channel.platform === 'instagram') {
+      connectInstagramOAuth(channel.campaignId);
+      return;
+    }
+
+    if (channel.platform === 'youtube') {
+      void connectYoutubeOAuth(channel.campaignId);
+      return;
+    }
+
+    if (channel.platform === 'facebook') {
+      connectMetaOAuth(channel.campaignId);
+      return;
     }
   };
 
@@ -163,8 +202,22 @@ export const Channels = ({ selectedAccounts = [] }) => {
     return 'Pending verification';
   };
   const getChannelAccountId = (channel) => channel.socialAccountId || (channel.accountId ? channel._id : null);
-  const visibleChannels = channels;
-  const loading = channelsQuery.isLoading && channels.length === 0;
+  const pendingVerificationChannels = isCreator
+    ? (creatorCampaignsQuery.data || []).flatMap((campaign) => (
+      (campaign.channels || [])
+        .filter((channel) => !channel.isVerified)
+        .map((channel) => ({
+          ...channel,
+          campaignId: campaign._id,
+          campaignName: campaign.name,
+        }))
+    ))
+    : [];
+  const visibleChannels = normalizedChannels.filter((channel) => {
+    const accountId = getChannelAccountId(channel);
+    return !disconnectedChannelIds.includes(accountId) && !disconnectedChannelIds.includes(channel._id);
+  });
+  const loading = channelsQuery.isLoading && normalizedChannels.length === 0;
 
   return (
     <div className="p-4 sm:p-8 text-[#1d1d1f] space-y-6 sm:space-y-8">
@@ -185,6 +238,54 @@ export const Channels = ({ selectedAccounts = [] }) => {
         
         {/* Info card */}
        
+        {pendingVerificationChannels.length > 0 && (
+          <section className="bg-white border border-[#e5e5ea] rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 sm:px-6 py-4 border-b border-[#e5e5ea]">
+              <h3 className="m-0 text-sm font-semibold text-black">Channels To Verify</h3>
+            </div>
+            <div className="grid gap-2 p-3 md:gap-3 md:p-4 lg:grid-cols-2">
+              {pendingVerificationChannels.map((channel) => (
+                <div
+                  key={`${channel.campaignId}-${channel.platform}-${channel.handle || channel.requestedHandle}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 md:p-3"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <PlatformIcon platform={channel.platform} className="h-7 w-7 md:h-8 md:w-8" />
+                      {channel.avatarUrl ? (
+                        <img
+                          src={channel.avatarUrl}
+                          crossOrigin="anonymous"
+                          className="h-7 w-7 rounded-full border border-amber-200/50 object-cover shadow-sm md:h-8 md:w-8"
+                          alt=""
+                        />
+                      ) : (
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full border border-amber-200/50 bg-amber-100 text-xs font-bold text-amber-700 md:h-8 md:w-8">
+                          {((channel.handle || channel.requestedHandle || '@').charAt(0) || '@').toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="m-0 truncate text-sm font-semibold text-[#1d1d1f]">
+                        {(channel.handle || channel.requestedHandle || '').startsWith('@')
+                          ? (channel.handle || channel.requestedHandle)
+                          : `@${channel.handle || channel.requestedHandle || 'channel'}`}
+                      </p>
+                      <p className="m-0 truncate text-xs text-[#8a6b1f]">{channel.campaignName}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleVerifyChannel(channel)}
+                    className="shrink-0 rounded-lg bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white transition hover:bg-black"
+                  >
+                    Verify
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Channels Listing */}
         <div className="bg-white border border-[#e5e5ea] rounded-xl shadow-sm overflow-hidden">
@@ -194,21 +295,21 @@ export const Channels = ({ selectedAccounts = [] }) => {
             </span>
             <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 w-full lg:w-auto">
               <button
-                onClick={connectInstagramOAuth}
+                onClick={() => connectInstagramOAuth()}
                 className="flex items-center justify-center gap-1.5 bg-black hover:bg-gray-800 text-white px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm w-full sm:w-auto"
               >
                 <Link2 className="w-3.5 h-3.5" />
                 <span>Connect Instagram</span>
               </button>
               <button
-                onClick={connectYoutubeOAuth}
+                onClick={() => connectYoutubeOAuth()}
                 className="flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm w-full sm:w-auto"
               >
                 <Link2 className="w-3.5 h-3.5" />
                 <span>Connect YouTube</span>
               </button>
               <button
-                onClick={connectMetaOAuth}
+                onClick={() => connectMetaOAuth()}
                 className="flex items-center justify-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all shadow-sm w-full sm:w-auto"
               >
                 <Link2 className="w-3.5 h-3.5" />

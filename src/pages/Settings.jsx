@@ -165,6 +165,25 @@ export const Settings = () => {
             </div>
           </form>
 
+          {/* Session Card */}
+          <div className="bg-white border border-[#e5e5ea] rounded-xl p-6 shadow-sm space-y-4">
+            <h3 className="text-sm font-semibold text-black m-0 border-b border-[#f5f5f7] pb-3">Session</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold text-[#1d1d1f] m-0">Sign Out of EasyPost</p>
+                <p className="text-[10px] text-gray-500 m-0 mt-0.5">Disconnect and close your current session on this device.</p>
+              </div>
+              <button
+                type="button"
+                onClick={logout}
+                className="flex items-center justify-center gap-2 bg-white hover:bg-[#f5f5f7] text-rose-600 border border-[#d2d2d7] rounded-lg px-4 py-2 text-xs font-semibold shadow-sm transition-all outline-none self-start sm:self-center w-full sm:w-auto"
+              >
+                <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                <span>Log Out</span>
+              </button>
+            </div>
+          </div>
+
           {/* Danger Zone Card */}
           <div className="bg-white border border-rose-200 rounded-xl p-6 shadow-sm space-y-4">
             <h3 className="text-sm font-semibold text-rose-600 m-0 border-b border-rose-50 pb-3">Danger Zone</h3>
