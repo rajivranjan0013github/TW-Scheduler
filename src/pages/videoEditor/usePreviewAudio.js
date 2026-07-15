@@ -28,6 +28,7 @@ const mediaItemToAudioTrack = (item) => {
     sourceType: 'library',
     url: getMediaUrl(item.url, { apiBaseUrl: API_BASE_URL }),
     originalUrl: item.url,
+    tags: Array.isArray(item.tags) ? item.tags : [],
     savedAt: item.createdAt || '',
   };
 };
@@ -236,6 +237,7 @@ export const usePreviewAudio = () => {
       sourceType: 'upload',
       file,
       url: audioUrl,
+      tags: [],
       savedAt: file.lastModified ? new Date(file.lastModified).toISOString() : '',
     };
 

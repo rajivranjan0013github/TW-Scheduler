@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, FileText, Folder, GripVertical, Images, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles, Tags, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Folder, Images, Info, MessageSquareCheck, MessageSquareWarning, MoreVertical, Music, Pencil, Search, Upload, Plus, Trash2, ChevronRight, Clock, Save, Sparkles, Tags, X } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
@@ -20,6 +20,7 @@ const getErrorMessage = async (response, fallback) => {
 };
 
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
+const normalizeScope = (scope) => (scope === 'global' ? 'global' : 'campaign');
 
 const normalizeTagList = (tags) => {
   const rawTags = Array.isArray(tags) ? tags : String(tags || '').split(',');
@@ -261,6 +262,7 @@ export const MediaLibrary = () => {
   const [uploadProgress, setUploadProgress] = useState(null);
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderScope, setNewFolderScope] = useState('campaign');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [captionDrafts, setCaptionDrafts] = useState({});
   const [savingCaptionId, setSavingCaptionId] = useState(null);
@@ -278,6 +280,10 @@ export const MediaLibrary = () => {
   const [openMediaMenuId, setOpenMediaMenuId] = useState(null);
   const [selectedMediaIds, setSelectedMediaIds] = useState([]);
   const [captionDialogMedia, setCaptionDialogMedia] = useState(null);
+  const [taggingMedia, setTaggingMedia] = useState(null);
+  const [mediaTagDrafts, setMediaTagDrafts] = useState([]);
+  const [mediaTagInput, setMediaTagInput] = useState('');
+  const [savingMediaTagsId, setSavingMediaTagsId] = useState(null);
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [generatingCaption, setGeneratingCaption] = useState(false);
@@ -294,6 +300,7 @@ export const MediaLibrary = () => {
   const [fileUploadDrafts, setFileUploadDrafts] = useState([]);
   const [fileUploadInputKey, setFileUploadInputKey] = useState(0);
   const [uploadFolderName, setUploadFolderName] = useState('');
+  const [uploadFolderScope, setUploadFolderScope] = useState('campaign');
   const [draggingSlide, setDraggingSlide] = useState(null);
   const fileUploadDraftsRef = useRef([]);
   // Per-set save progress: { [setId]: 'pending' | 'uploading' | 'done' | 'error' }
@@ -302,6 +309,7 @@ export const MediaLibrary = () => {
   const authToken = token || localStorage.getItem('tw_token');
   const canUpload = ['owner', 'admin', 'editor'].includes(user?.role);
   const canDelete = ['owner', 'admin'].includes(user?.role);
+  const canManageGlobalMedia = ['owner', 'admin'].includes(user?.role);
   const canManageFolders = canUpload;
   const canSchedule = canUpload;
   const resetUploadProgress = () => setUploadProgress(null);
@@ -337,6 +345,7 @@ export const MediaLibrary = () => {
     fileUploadDrafts.forEach((draft) => URL.revokeObjectURL(draft.previewUrl));
     setFileUploadDrafts([]);
     setUploadFolderName('');
+    setUploadFolderScope('campaign');
     setFileUploadInputKey((current) => current + 1);
   };
 
@@ -367,6 +376,7 @@ export const MediaLibrary = () => {
     getUploadOrder = () => undefined,
     uploadBatchId = '',
     uploadBatchCreatedAt = '',
+    scope = 'campaign',
     progressLabel = 'Uploading',
   }) => {
     const failedFiles = [];
@@ -397,6 +407,7 @@ export const MediaLibrary = () => {
       if (uploadOrder !== undefined) formData.append('uploadOrder', String(uploadOrder));
       formData.append('socialAccountIds', '');
       formData.append('campaignId', getActiveCampaignId());
+      formData.append('scope', normalizeScope(scope));
 
       const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
         method: 'POST',
@@ -423,6 +434,7 @@ export const MediaLibrary = () => {
         },
         body: JSON.stringify({
           campaignId,
+          scope: normalizeScope(scope),
           folderId,
           name: file.name,
           contentType,
@@ -455,6 +467,7 @@ export const MediaLibrary = () => {
         },
         body: JSON.stringify({
           campaignId,
+          scope: normalizeScope(scope),
           folderId,
           mediaId: upload.mediaId,
           name: file.name,
@@ -648,6 +661,7 @@ export const MediaLibrary = () => {
 
     try {
       let targetFolderId = activeFolderId === 'root' ? null : activeFolderId;
+      const targetScope = activeFolderId === 'root' ? uploadFolderScope : activeFolderScope;
       let createdFolder = null;
 
       if (needsFolder) {
@@ -659,6 +673,7 @@ export const MediaLibrary = () => {
           },
           body: JSON.stringify({
             campaignId: getActiveCampaignId(),
+            scope: targetScope,
             name: nextFolderName,
             parentFolderId: null,
           }),
@@ -679,6 +694,7 @@ export const MediaLibrary = () => {
         getUploadOrder: (file, index) => fileUploadDrafts.find((draft) => draft.file === file)?.uploadIndex ?? index,
         uploadBatchId: createUploadBatchId(),
         uploadBatchCreatedAt: new Date().toISOString(),
+        scope: targetScope,
         progressLabel: 'Uploading file',
       });
 
@@ -818,6 +834,7 @@ export const MediaLibrary = () => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({
           campaignId: getActiveCampaignId(),
+          scope: activeFolderId === 'root' ? 'campaign' : activeFolderScope,
           name: carouselParentName || 'Carousel Sets',
           parentFolderId: activeFolderId === 'root' ? null : activeFolderId,
         }),
@@ -835,6 +852,7 @@ export const MediaLibrary = () => {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
             body: JSON.stringify({
               campaignId: getActiveCampaignId(),
+              scope: activeFolderId === 'root' ? 'campaign' : activeFolderScope,
               name: set.name,
               parentFolderId: parentFolder._id,
               kind: 'carousel_set',
@@ -858,6 +876,7 @@ export const MediaLibrary = () => {
             files: set.slides.map((slide) => slide.file),
             folderId: setFolder._id,
             getCaption: (file) => set.getCaption(file),
+            scope: normalizeScope(parentFolder.scope || (activeFolderId === 'root' ? 'campaign' : activeFolderScope)),
             progressLabel: `Uploading ${set.name}`,
           });
 
@@ -1071,6 +1090,7 @@ export const MediaLibrary = () => {
         },
         body: JSON.stringify({
           campaignId: getActiveCampaignId(),
+          scope: activeFolderId === 'root' ? newFolderScope : activeFolderScope,
           name: newFolderName.trim(),
           parentFolderId: activeFolderId === 'root' ? null : activeFolderId,
         }),
@@ -1078,6 +1098,7 @@ export const MediaLibrary = () => {
 
       if (response.ok) {
         setNewFolderName('');
+        setNewFolderScope('campaign');
         setShowNewFolderModal(false);
         await invalidateMediaCaches();
         void fetchFolders();
@@ -1212,6 +1233,125 @@ export const MediaLibrary = () => {
     }
   };
 
+  const handleChangeFolderScope = async (folder, nextScope, e) => {
+    e.stopPropagation();
+    setOpenFolderMenuId(null);
+
+    const folderName = folder.name || 'this folder';
+    const isGlobal = nextScope === 'global';
+    const confirmed = window.confirm(isGlobal
+      ? `Make "${folderName}" global? This will make the folder, nested folders, and media inside it available across campaigns.`
+      : `Make "${folderName}" campaign only? This will move the folder, nested folders, and media inside it into the current campaign only.`
+    );
+    if (!confirmed) return;
+
+    setSavingFolderId(folder._id);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/media/folders/${folder._id}${withCampaignScope()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          campaignId: getActiveCampaignId(),
+          scope: nextScope,
+        }),
+      });
+
+      if (response.ok) {
+        const updatedFolder = await response.json();
+        setFolders((current) => current.map((item) => (
+          item._id === updatedFolder._id ? updatedFolder : item
+        )));
+        await invalidateMediaCaches();
+        await fetchFolders();
+        void fetchMedia();
+        alert(isGlobal ? `"${folderName}" is now global.` : `"${folderName}" is now campaign only.`);
+      } else {
+        throw new Error(await getErrorMessage(response, isGlobal ? 'Failed to make folder global.' : 'Failed to make folder campaign only.'));
+      }
+    } catch (error) {
+      console.error('Failed to change folder scope:', error);
+      alert(error.message || 'Failed to change folder scope.');
+    } finally {
+      setSavingFolderId(null);
+    }
+  };
+
+  const openMediaTagsModal = (item, e) => {
+    e.stopPropagation();
+    setOpenMediaMenuId(null);
+    setTaggingMedia(item);
+    setMediaTagDrafts(normalizeTagList(item.tags || []));
+    setMediaTagInput('');
+  };
+
+  const closeMediaTagsModal = () => {
+    setTaggingMedia(null);
+    setMediaTagDrafts([]);
+    setMediaTagInput('');
+  };
+
+  const addMediaTagDraft = (rawValue = mediaTagInput) => {
+    const nextTags = normalizeTagList(rawValue);
+    if (nextTags.length === 0) return;
+    setMediaTagDrafts((current) => normalizeTagList([...current, ...nextTags]));
+    setMediaTagInput('');
+  };
+
+  const removeMediaTagDraft = (tagToRemove) => {
+    setMediaTagDrafts((current) => current.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleMediaTagInputKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addMediaTagDraft();
+    }
+    if (e.key === 'Backspace' && !mediaTagInput && mediaTagDrafts.length > 0) {
+      removeMediaTagDraft(mediaTagDrafts[mediaTagDrafts.length - 1]);
+    }
+  };
+
+  const handleSaveMediaTags = async (e) => {
+    e.preventDefault();
+    if (!taggingMedia) return;
+
+    const nextTags = normalizeTagList([...mediaTagDrafts, mediaTagInput]);
+    setSavingMediaTagsId(taggingMedia._id);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/media/${taggingMedia._id}${withCampaignScope()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          tags: nextTags,
+        }),
+      });
+
+      if (response.ok) {
+        const updatedMedia = await response.json();
+        setMedia((current) => current.map((item) => (
+          item._id === updatedMedia._id ? updatedMedia : item
+        )));
+        await invalidateMediaCaches();
+        closeMediaTagsModal();
+      } else {
+        throw new Error(await getErrorMessage(response, 'Failed to save media tags.'));
+      }
+    } catch (error) {
+      console.error('Failed to save media tags:', error);
+      alert(error.message || 'Failed to save media tags.');
+    } finally {
+      setSavingMediaTagsId(null);
+    }
+  };
+
   const openDeleteFolderModal = (folder, e) => {
     e.stopPropagation();
     setOpenFolderMenuId(null);
@@ -1301,6 +1441,8 @@ export const MediaLibrary = () => {
     })
     .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
   const activeFolder = folders.find((folder) => folder._id === activeFolderId);
+  const activeFolderScope = normalizeScope(activeFolder?.scope);
+  const canManageActiveLocation = activeFolderId === 'root' || activeFolderScope !== 'global' || canManageGlobalMedia;
   const breadcrumbFolders = [];
   let breadcrumbFolder = activeFolder;
   while (breadcrumbFolder) {
@@ -1382,6 +1524,7 @@ export const MediaLibrary = () => {
     const uploadTargetName = activeFolderId === 'root'
       ? (uploadFolderName.trim() || 'New folder required')
       : (activeFolder?.name || 'Current folder');
+    const uploadTargetScope = activeFolderId === 'root' ? uploadFolderScope : activeFolderScope;
     const uploadDisabled = uploading || (activeFolderId === 'root' && !uploadFolderName.trim());
 
     return (
@@ -1543,6 +1686,18 @@ export const MediaLibrary = () => {
                       className="w-full rounded-md border border-[#d1d1d6] bg-white px-2.5 py-2 text-xs font-semibold text-[#1d1d1f] placeholder:text-[#a1a1aa] focus:border-[#0071e3] focus:outline-none focus:ring-2 focus:ring-[#0071e3]/10 disabled:opacity-50"
                     />
                   </label>
+                  {canManageGlobalMedia && (
+                    <label className="flex items-center justify-between gap-3 rounded-md border border-[#e5e5ea] bg-white px-3 py-2">
+                      <span className="text-[11px] font-semibold text-[#1d1d1f]">Global folder</span>
+                      <input
+                        type="checkbox"
+                        checked={uploadFolderScope === 'global'}
+                        onChange={(e) => setUploadFolderScope(e.target.checked ? 'global' : 'campaign')}
+                        disabled={uploading}
+                        className="h-3.5 w-3.5 accent-[#0071e3]"
+                      />
+                    </label>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-md border border-[#dbeafe] bg-[#eff6ff] px-3 py-2">
@@ -1550,6 +1705,9 @@ export const MediaLibrary = () => {
                   <p className="m-0 mt-0.5 truncate text-xs font-semibold text-[#1d1d1f]" title={activeFolder?.name}>
                     Current folder: {activeFolder?.name || 'Current folder'}
                   </p>
+                  {activeFolderScope === 'global' && (
+                    <p className="m-0 mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#4f46e5]">Global</p>
+                  )}
                 </div>
               )}
             </section>
@@ -1558,6 +1716,7 @@ export const MediaLibrary = () => {
               <h3 className="m-0 text-xs font-bold text-black">Ready to upload</h3>
               <p className="m-0 mt-1 text-[11px] font-medium leading-relaxed text-[#6e6e73]">
                 Assets and captions will be saved to <span className="font-bold text-[#1d1d1f]">{uploadTargetName}</span>.
+                {uploadTargetScope === 'global' ? ' This folder is global.' : ''}
               </p>
               <div className="mt-3 grid grid-cols-4 gap-1.5">
                 {fileUploadDrafts.slice(0, 12).map((draft) => (
@@ -1864,7 +2023,7 @@ export const MediaLibrary = () => {
               className="bg-white border border-[#e5e5ea] pl-6 pr-2.5 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-[#0071e3] text-[11px] text-black placeholder:text-gray-400 w-36"
             />
           </div>
-          {canManageFolders && (
+          {canManageFolders && canManageActiveLocation && (
             <>
               <button
                 onClick={() => setShowUploadModal(true)}
@@ -1912,6 +2071,7 @@ export const MediaLibrary = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
           {visibleFolders.map(folder => {
             const isDeletingThisFolder = deletingFolderId === folder._id;
+            const canManageThisFolder = normalizeScope(folder.scope) !== 'global' || canManageGlobalMedia;
             return (
             <div
               key={folder._id}
@@ -1946,6 +2106,11 @@ export const MediaLibrary = () => {
                     {(folder.carouselOrder || []).length || '—'} slides
                   </span>
                 )}
+                {normalizeScope(folder.scope) === 'global' && (
+                  <span className="mt-1 inline-flex rounded bg-[#eef2ff] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#4f46e5]">
+                    Global
+                  </span>
+                )}
                 {(folder.tags || []).length > 0 && (
                   <div className="mt-1 flex items-center gap-1 overflow-hidden">
                     {(folder.tags || []).slice(0, 2).map((tag) => (
@@ -1966,7 +2131,7 @@ export const MediaLibrary = () => {
                 )}
               </div>
               {/* Actions kebab — only visible on hover to save space */}
-              {(canManageFolders || canDelete) && (
+              {((canManageFolders && canManageThisFolder) || (canDelete && canManageThisFolder)) && (
                 <div className="relative flex-shrink-0" data-folder-menu>
 	                  <button
 	                    type="button"
@@ -1998,7 +2163,7 @@ export const MediaLibrary = () => {
                         <Clock className="h-3 w-3" />
                         <span>Schedule</span>
                       </button>
-                      {canManageFolders && (
+                      {canManageFolders && canManageThisFolder && (
                         <>
 	                          <button
 	                            type="button"
@@ -2018,9 +2183,31 @@ export const MediaLibrary = () => {
                             <Tags className="h-3 w-3" />
                             <span>Add tags</span>
                           </button>
+                          {canManageGlobalMedia && normalizeScope(folder.scope) !== 'global' && (
+	                          <button
+	                            type="button"
+	                            onClick={(e) => handleChangeFolderScope(folder, 'global', e)}
+	                            disabled={isDeletingThisFolder || savingFolderId === folder._id}
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#4f46e5] hover:bg-[#eef2ff] disabled:cursor-wait disabled:opacity-50"
+	                          >
+                              <Folder className="h-3 w-3" />
+                              <span>{savingFolderId === folder._id ? 'Saving...' : 'Make global'}</span>
+                            </button>
+                          )}
+                          {canManageGlobalMedia && normalizeScope(folder.scope) === 'global' && (
+	                          <button
+	                            type="button"
+	                            onClick={(e) => handleChangeFolderScope(folder, 'campaign', e)}
+	                            disabled={isDeletingThisFolder || savingFolderId === folder._id}
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d4ed8] hover:bg-[#eff6ff] disabled:cursor-wait disabled:opacity-50"
+	                          >
+                              <Folder className="h-3 w-3" />
+                              <span>{savingFolderId === folder._id ? 'Saving...' : 'Make campaign only'}</span>
+                            </button>
+                          )}
                         </>
                       )}
-                      {canDelete && (
+                      {canDelete && canManageThisFolder && (
 	                        <button
 	                          type="button"
 	                          onClick={(e) => openDeleteFolderModal(folder, e)}
@@ -2115,6 +2302,7 @@ export const MediaLibrary = () => {
             {!loadingMedia && filteredMedia.map(item => {
               const isSelected = selectedMediaIds.includes(item._id);
               const selectionLocked = Boolean(selectedMediaType && item.type !== selectedMediaType);
+              const canManageThisMedia = normalizeScope(item.scope) !== 'global' || canManageGlobalMedia;
               return (
               <div
                 key={item._id}
@@ -2246,6 +2434,11 @@ export const MediaLibrary = () => {
                         <div className={`${canSchedule ? 'left-10' : 'left-2'} absolute top-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm`}>
                           {item.type}
                         </div>
+                        {normalizeScope(item.scope) === 'global' && (
+                          <div className="absolute right-10 top-2 rounded bg-[#eef2ff] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#4f46e5] shadow-sm">
+                            Global
+                          </div>
+                        )}
                         <div
                           className={`absolute left-2 ${canSchedule ? 'top-11' : 'top-9'} inline-flex h-7 w-7 items-center justify-center rounded-lg border shadow-sm ${
                             item.caption?.trim()
@@ -2263,6 +2456,24 @@ export const MediaLibrary = () => {
                         <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">
                           <p className="m-0 truncate" title={item.name}>{item.name || 'Untitled media'}</p>
                         </div>
+                        {(item.tags || []).length > 0 && (
+                          <div className="absolute bottom-7 left-2 right-2 flex flex-wrap gap-1">
+                            {(item.tags || []).slice(0, 2).map((tag) => (
+                              <span
+                                key={tag}
+                                className="max-w-[82px] truncate rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-bold text-[#1d1d1f] shadow-sm"
+                                title={tag}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            {(item.tags || []).length > 2 && (
+                              <span className="rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm">
+                                +{item.tags.length - 2}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Media Actions */}
@@ -2294,6 +2505,7 @@ export const MediaLibrary = () => {
                               <button
                                 type="button"
                                 onClick={(e) => openRenameMediaModal(item, e)}
+                                disabled={!canManageThisMedia}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
@@ -2302,11 +2514,22 @@ export const MediaLibrary = () => {
                               <button
                                 type="button"
                                 onClick={(e) => openCaptionDialog(item, e)}
+                                disabled={!canManageThisMedia}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
                               >
                                 <MessageSquareCheck className="h-3.5 w-3.5" />
                                 <span>Edit caption</span>
                               </button>
+                              {canUpload && canManageThisMedia && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => openMediaTagsModal(item, e)}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                                >
+                                  <Tags className="h-3.5 w-3.5" />
+                                  <span>Add tags</span>
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -2319,7 +2542,7 @@ export const MediaLibrary = () => {
                                 <Clock className="h-3.5 w-3.5" />
                                 <span>Schedule</span>
                               </button>
-                              {canDelete && (
+                              {canDelete && canManageThisMedia && (
                                 <button
                                   type="button"
                                   onClick={(e) => handleDeleteMedia(item._id, e)}
@@ -2384,10 +2607,26 @@ export const MediaLibrary = () => {
                 className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black"
                 autoFocus
               />
+              {activeFolderId === 'root' && canManageGlobalMedia && (
+                <label className="flex items-center justify-between gap-3 rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] px-3.5 py-2">
+                  <span className="text-xs font-semibold text-[#1d1d1f]">Global folder</span>
+                  <input
+                    type="checkbox"
+                    checked={newFolderScope === 'global'}
+                    onChange={(e) => setNewFolderScope(e.target.checked ? 'global' : 'campaign')}
+                    className="h-3.5 w-3.5 accent-[#0071e3]"
+                  />
+                </label>
+              )}
+              {activeFolderId !== 'root' && activeFolderScope === 'global' && (
+                <div className="rounded-lg border border-[#c7d2fe] bg-[#eef2ff] px-3.5 py-2 text-[11px] font-semibold text-[#4338ca]">
+                  This nested folder will be global.
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => { setShowNewFolderModal(false); setNewFolderName(''); }}
+                  onClick={() => { setShowNewFolderModal(false); setNewFolderName(''); setNewFolderScope('campaign'); }}
                   className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
                 >
                   Cancel
@@ -2638,6 +2877,90 @@ export const MediaLibrary = () => {
                   >
                     <Save className="h-3.5 w-3.5" />
                     <span>{savingFolderTagsId === taggingFolder._id ? 'Saving...' : 'Save tags'}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {taggingMedia && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
+          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-md text-black shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3 border-b border-[#e5e5ea] pb-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-black">Manage Media Tags</h3>
+                <p className="mt-1 truncate text-[11px] text-[#8e8e93]" title={taggingMedia.name}>
+                  {taggingMedia.name || 'Media asset'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeMediaTagsModal}
+                className="rounded-md p-1 text-gray-400 hover:bg-[#f5f5f7] hover:text-black"
+                aria-label="Close media tags"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMediaTags} className="space-y-4">
+              <div className="rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] p-2">
+                <div className="flex min-h-[38px] flex-wrap items-center gap-1.5">
+                  {mediaTagDrafts.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-[#1d1d1f] shadow-sm ring-1 ring-[#e5e5ea]"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeMediaTagDraft(tag)}
+                        className="rounded p-0.5 text-[#8e8e93] hover:bg-[#f5f5f7] hover:text-black"
+                        aria-label={`Remove ${tag}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    value={mediaTagInput}
+                    onChange={(e) => setMediaTagInput(e.target.value)}
+                    onKeyDown={handleMediaTagInputKeyDown}
+                    placeholder={mediaTagDrafts.length ? 'Add another tag...' : 'Type a tag and press Enter'}
+                    className="min-w-[150px] flex-1 bg-transparent px-1 py-1 text-xs text-black placeholder:text-gray-400 focus:outline-none"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => addMediaTagDraft()}
+                  disabled={!mediaTagInput.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 text-xs font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add</span>
+                </button>
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={closeMediaTagsModal}
+                    className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingMediaTagsId === taggingMedia._id}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#0071e3] px-4 py-2 text-xs font-semibold text-white hover:bg-[#147ce5] disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    <span>{savingMediaTagsId === taggingMedia._id ? 'Saving...' : 'Save tags'}</span>
                   </button>
                 </div>
               </div>

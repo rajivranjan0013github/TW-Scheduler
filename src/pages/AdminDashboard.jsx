@@ -9,6 +9,7 @@ import PlatformIcon from '../components/PlatformIcon';
 
 const numberFormat = new Intl.NumberFormat();
 const upcomingStatuses = 'scheduled,manual_ready,downloaded,publishing,paused';
+const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 const emptyMetrics = {
   accounts: 0,
@@ -391,14 +392,16 @@ export const AdminDashboard = () => {
     setMetricsLoading(true);
     setError('');
     try {
-      const queryKey = ['admin', 'campaign', campaignId, 'metrics'];
+      const queryKey = ['admin', 'campaign', campaignId, 'metrics', localTimeZone];
       if (force) {
         await queryClient.invalidateQueries({ queryKey });
       }
       const data = await queryClient.fetchQuery({
         queryKey,
         queryFn: async () => {
-          const response = await fetch(`${API_BASE_URL}/api/admin/campaigns/${campaignId}/metrics`, {
+          const params = new URLSearchParams();
+          params.set('timeZone', localTimeZone);
+          const response = await fetch(`${API_BASE_URL}/api/admin/campaigns/${campaignId}/metrics?${params.toString()}`, {
             headers: { Authorization: `Bearer ${localStorage.getItem('tw_token')}` },
           });
           const payload = await response.json();

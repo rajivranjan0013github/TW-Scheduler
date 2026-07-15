@@ -10,6 +10,33 @@ const formatDuration = (seconds) => {
   return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
 };
 
+const TagChips = ({ tags }) => {
+  const tagList = Array.isArray(tags) ? tags.filter(Boolean) : [];
+  if (tagList.length === 0) return null;
+
+  const visibleTags = tagList.slice(0, 2);
+  const extraCount = tagList.length - visibleTags.length;
+
+  return (
+    <span className="mt-2 flex flex-wrap gap-1">
+      {visibleTags.map((tag) => (
+        <span
+          key={tag}
+          className="max-w-[76px] truncate rounded bg-white px-1.5 py-0.5 text-[9px] font-bold text-gray-600 shadow-sm ring-1 ring-gray-200"
+          title={tag}
+        >
+          {tag}
+        </span>
+      ))}
+      {extraCount > 0 && (
+        <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-bold text-gray-600">
+          +{extraCount}
+        </span>
+      )}
+    </span>
+  );
+};
+
 const AudioCard = ({
   track,
   selected,
@@ -42,6 +69,7 @@ const AudioCard = ({
         <span className="mt-0.5 block truncate text-xs font-medium text-gray-950">
           {isNoAudio ? '' : duration || track.description || ''}
         </span>
+        {!isNoAudio && <TagChips tags={track.tags} />}
       </span>
 
       {track.url && (

@@ -300,7 +300,8 @@ export const PublishedFeed = () => {
     let allTime = 0;
 
     publishedPosts.forEach((post) => {
-      const pubDate = post.createdAt ? new Date(post.createdAt) : null;
+      const publishedAt = getPublishedDate(post);
+      const pubDate = publishedAt ? new Date(publishedAt) : null;
       const views = Number(post.views) || 0;
       
       allTime += views;

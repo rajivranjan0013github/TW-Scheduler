@@ -1715,7 +1715,8 @@ const CalendarView = ({ selectedAccounts }) => {
   }, [queueEditorPosts, queueEditorAccountId, queueEditorAccountKeySet, channels, folderById]);
 
   const fetchQueueEditorPosts = useCallback(async (accountId) => {
-    const accountKeys = queueEditorAccount?.keys?.length ? queueEditorAccount.keys : [accountId];
+    const option = accountFilterOptions.find((o) => String(o.id) === String(accountId));
+    const accountKeys = option?.keys?.length ? option.keys : [accountId];
     if (!accountId || accountKeys.length === 0) {
       setQueueEditorPosts([]);
       return;
@@ -1746,12 +1747,18 @@ const CalendarView = ({ selectedAccounts }) => {
     } finally {
       setLoadingQueueEditor(false);
     }
-  }, [queueEditorAccount]);
+  }, [accountFilterOptions]);
+
+  const openQueueEditorForAccount = useCallback((accountId) => {
+    setSelectedCalendarAccountIds([accountId]);
+    setShowQueueEditor(true);
+    setActiveTooltip(null);
+    fetchQueueEditorPosts(accountId);
+  }, [fetchQueueEditorPosts]);
 
   const openQueueEditor = () => {
     if (!queueEditorAccountId) return;
-    setShowQueueEditor(true);
-    fetchQueueEditorPosts(queueEditorAccountId);
+    openQueueEditorForAccount(queueEditorAccountId);
   };
 
   const toggleCalendarAccount = (accountId) => {
@@ -1883,6 +1890,9 @@ const CalendarView = ({ selectedAccounts }) => {
         overrides.status = getResumeStatusForPost(item.post);
       } else if (updates.status) {
         overrides.status = updates.status;
+      }
+      if (updates.scheduledAt) {
+        overrides.scheduledAt = updates.scheduledAt;
       }
       if (
         updates.reschedule
@@ -3210,14 +3220,26 @@ const CalendarView = ({ selectedAccounts }) => {
                           {activeTooltip.data.group.posts.length} post{activeTooltip.data.group.posts.length === 1 ? '' : 's'} scheduled
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTooltip(null)}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#70757a] hover:bg-[#f1f3f4] hover:text-[#202124]"
-                        title="Close"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {!isViewer && (
+                          <button
+                            type="button"
+                            onClick={() => openQueueEditorForAccount(activeTooltip.data.accountId)}
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-[#1a73e8] bg-[#eff6ff] px-3 text-[12px] font-semibold text-[#1a73e8] transition-colors hover:bg-[#dbeafe]"
+                          >
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>Edit Queue</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setActiveTooltip(null)}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#70757a] hover:bg-[#f1f3f4] hover:text-[#202124]"
+                          title="Close"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 scrollbar-thin">
                       {activeTooltip.data.group.posts.map((item) => (

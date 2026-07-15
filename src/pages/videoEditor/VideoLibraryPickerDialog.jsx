@@ -13,6 +13,33 @@ const naturalFileCollator = new Intl.Collator(undefined, {
   sensitivity: 'base',
 });
 
+const TagChips = ({ tags, tone = 'dark' }) => {
+  const tagList = Array.isArray(tags) ? tags.filter(Boolean) : [];
+  if (tagList.length === 0) return null;
+
+  const visibleTags = tagList.slice(0, 2);
+  const extraCount = tagList.length - visibleTags.length;
+  const chipClassName = tone === 'light'
+    ? 'max-w-[82px] truncate rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold text-gray-600'
+    : 'max-w-[82px] truncate rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-bold text-gray-950 shadow-sm';
+  const extraClassName = tone === 'light'
+    ? 'rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-bold text-gray-600'
+    : 'rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm';
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {visibleTags.map((tag) => (
+        <span key={tag} className={chipClassName} title={tag}>
+          {tag}
+        </span>
+      ))}
+      {extraCount > 0 && (
+        <span className={extraClassName}>+{extraCount}</span>
+      )}
+    </div>
+  );
+};
+
 const VideoPickerPreview = ({ item }) => {
   return (
     <LoadingVideoPreview
@@ -59,24 +86,11 @@ const AudioPickerPreview = ({ item }) => (
       preload="metadata"
       className="w-full"
     />
+    <TagChips tags={item.tags} />
   </div>
 );
 
 const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
-
-const buildFolderRows = (folders, parentId = 'root', depth = 0, query = '') => {
-  const children = folders
-    .filter((folder) => getFolderParentId(folder) === parentId)
-    .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
-
-  return children.flatMap((folder) => {
-    const childRows = buildFolderRows(folders, folder._id, depth + 1, query);
-    const matchesSearch = !query || (folder.name || '').toLowerCase().includes(query);
-    return matchesSearch || childRows.length > 0
-      ? [{ folder, depth }, ...childRows]
-      : [];
-  });
-};
 
 export const VideoLibraryPickerDialog = ({
   slotLabel,
@@ -354,6 +368,7 @@ export const VideoLibraryPickerDialog = ({
                               </span>
                             </span>
                             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent p-2.5">
+                              <TagChips tags={item.tags} />
                               <p className="truncate text-[10px] font-bold text-white shadow-sm" title={item.name}>
                                 {item.name || 'Untitled video'}
                               </p>
