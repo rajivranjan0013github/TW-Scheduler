@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { useLocation } from 'react-router-dom';
-import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search, Trash2 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search, Trash2, Loader2 } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
@@ -41,8 +41,11 @@ const MediaPreview = ({ item, className = 'h-full w-full object-cover block' }) 
 const CalendarView = ({ selectedAccounts }) => {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [posts, setPosts] = useState([]);
+  const [isLoadingCalendar, setIsLoadingCalendar] = useState(true);
+  const calendarLoadingRequestCountRef = useRef(0);
 
   // Composer data
   const [showComposer, setShowComposer] = useState(false);
@@ -74,7 +77,7 @@ const CalendarView = ({ selectedAccounts }) => {
     return toInputDate(end);
   });
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => toInputDate(today));
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [selectedCalendarAccountIds, setSelectedCalendarAccountIds] = useState([]);
   const [selectedCalendarHandlerEmails, setSelectedCalendarHandlerEmails] = useState([]);
   const [selectedCalendarStatus, setSelectedCalendarStatus] = useState('all');
@@ -122,7 +125,7 @@ const CalendarView = ({ selectedAccounts }) => {
     };
   }, []);
 
-  const PostPreviewRow = ({ item }) => {
+  const PostPreviewRow = ({ item, hideChannelIdentity = false, hideCaption = false }) => {
     const primaryChannel = item.accountRefs[0]?.channel;
     const statusLabel = getPostStatusLabel(item.post);
     const modeLabel = getScheduleModeLabel(item.post.scheduleMode);
@@ -189,17 +192,19 @@ const CalendarView = ({ selectedAccounts }) => {
 
 	          <div className="min-w-0 flex-1 flex flex-col gap-0.5">
 	            <div className="flex items-start justify-between gap-2">
-	              <div className="min-w-0">
-	                <div className="flex items-center gap-1.5 flex-wrap">
-	                  <span className="inline-flex items-center gap-1">
-	                    <PlatformIcon platform={primaryChannel?.platform} className="h-4.5 w-4.5 shrink-0" showFallback={true} />
-	                    <AccountAvatar account={primaryChannel} sizeClass="h-5 w-5" textClass="text-[8px]" />
-	                  </span>
-	                  <span className="text-[11px] font-black text-slate-800 truncate max-w-[120px]">
-	                    @{getAccountLabel(primaryChannel)}
-	                  </span>
+	              {!hideChannelIdentity && (
+	                <div className="min-w-0">
+	                  <div className="flex items-center gap-1.5 flex-wrap">
+	                    <span className="inline-flex items-center gap-1">
+	                      <PlatformIcon platform={primaryChannel?.platform} className="h-4.5 w-4.5 shrink-0" showFallback={true} />
+	                      <AccountAvatar account={primaryChannel} sizeClass="h-5 w-5" textClass="text-[8px]" />
+	                    </span>
+	                    <span className="text-[11px] font-black text-slate-800 truncate max-w-[120px]">
+	                      @{getAccountLabel(primaryChannel)}
+	                    </span>
+	                  </div>
 	                </div>
-	              </div>
+	              )}
 
 	              {hasMetrics ? (
 	                <div className="grid flex-shrink-0 grid-cols-3 overflow-hidden rounded-lg border border-slate-100 bg-white text-center shadow-sm">
@@ -238,14 +243,16 @@ const CalendarView = ({ selectedAccounts }) => {
           </div>
         </div>
 
-        {item.post.caption ? (
-          <p className="m-0 text-[10px] font-medium text-slate-600 line-clamp-2 bg-white/70 px-2 py-1 rounded border border-slate-100">
-            {item.post.caption}
-          </p>
-        ) : (
-          <p className="m-0 text-[10px] font-medium text-slate-400 italic bg-white/50 px-2 py-1 rounded border border-slate-100/50">
-            No caption
-          </p>
+        {!hideCaption && (
+          item.post.caption ? (
+            <p className="m-0 text-[10px] font-medium text-slate-600 line-clamp-2 bg-white/70 px-2 py-1 rounded border border-slate-100">
+              {item.post.caption}
+            </p>
+          ) : (
+            <p className="m-0 text-[10px] font-medium text-slate-400 italic bg-white/50 px-2 py-1 rounded border border-slate-100/50">
+              No caption
+            </p>
+          )
         )}
 
 	        <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-t border-slate-100 pt-1.5 text-[9px] font-semibold text-slate-500">
@@ -282,7 +289,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const [calendarHandlerSearchQuery, setCalendarHandlerSearchQuery] = useState('');
   const [showQueueEditor, setShowQueueEditor] = useState(false);
   const [queueEditorPosts, setQueueEditorPosts] = useState([]);
-  const [loadingQueueEditor, setLoadingQueueEditor] = useState(false);
+  const [loadingQueueEditor] = useState(false);
   const [queueEditDrafts, setQueueEditDrafts] = useState({});
   const [savingQueuePostIds, setSavingQueuePostIds] = useState([]);
   const calendarAccountMenuRef = useRef(null);
@@ -937,6 +944,8 @@ const CalendarView = ({ selectedAccounts }) => {
   }, [carouselSetFolders]);
 
   const fetchPosts = async ({ force = false } = {}) => {
+    calendarLoadingRequestCountRef.current += 1;
+    setIsLoadingCalendar(true);
     try {
       setQueueError('');
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('tw_token')}` };
@@ -999,6 +1008,11 @@ const CalendarView = ({ selectedAccounts }) => {
     } catch (error) {
       console.error('Failed to load scheduled posts:', error);
       setQueueError(error.message || 'Failed to load scheduled posts.');
+    } finally {
+      calendarLoadingRequestCountRef.current = Math.max(0, calendarLoadingRequestCountRef.current - 1);
+      if (calendarLoadingRequestCountRef.current === 0) {
+        setIsLoadingCalendar(false);
+      }
     }
   };
 
@@ -1714,51 +1728,18 @@ const CalendarView = ({ selectedAccounts }) => {
       .map((item, index) => ({ ...item, queueIndex: index + 1 }));
   }, [queueEditorPosts, queueEditorAccountId, queueEditorAccountKeySet, channels, folderById]);
 
-  const fetchQueueEditorPosts = useCallback(async (accountId) => {
-    const option = accountFilterOptions.find((o) => String(o.id) === String(accountId));
-    const accountKeys = option?.keys?.length ? option.keys : [accountId];
-    if (!accountId || accountKeys.length === 0) {
-      setQueueEditorPosts([]);
-      return;
-    }
-
-    setLoadingQueueEditor(true);
-    setQueueError('');
-    try {
-      const params = new URLSearchParams();
-      params.set('from', new Date().toISOString());
-      params.set('accountIds', accountKeys.join(','));
-      params.set('statuses', 'scheduled,manual_ready,downloaded,publishing,paused');
-      const response = await fetch(`${API_BASE_URL}/api/scheduler${withCampaignScope(params.toString())}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
-        },
-        cache: 'no-store',
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(data?.message || `Queue load failed: ${response.status}`);
-      }
-      setQueueEditorPosts(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Failed to load account queue:', error);
-      setQueueEditorPosts([]);
-      setQueueError(error.message || 'Failed to load account queue.');
-    } finally {
-      setLoadingQueueEditor(false);
-    }
-  }, [accountFilterOptions]);
-
   const openQueueEditorForAccount = useCallback((accountId) => {
     setSelectedCalendarAccountIds([accountId]);
-    setShowQueueEditor(true);
     setActiveTooltip(null);
-    fetchQueueEditorPosts(accountId);
-  }, [fetchQueueEditorPosts]);
+    navigate(`/scheduler/queue?accountId=${encodeURIComponent(accountId)}`);
+  }, [navigate]);
 
   const openQueueEditor = () => {
-    if (!queueEditorAccountId) return;
-    openQueueEditorForAccount(queueEditorAccountId);
+    if (queueEditorAccountId) {
+      openQueueEditorForAccount(queueEditorAccountId);
+      return;
+    }
+    navigate('/scheduler/queue');
   };
 
   const toggleCalendarAccount = (accountId) => {
@@ -1799,35 +1780,29 @@ const CalendarView = ({ selectedAccounts }) => {
     }
   }, [selectedCalendarAccountIds.length]);
 
-  const buildQueueUpdatePayload = (item, overrides = {}) => {
-    const postId = item?.post?._id;
-    const draft = queueEditDrafts[postId] || {};
-    return {
-      scheduledAt: overrides.scheduledAt || (draft.scheduledAt ? new Date(draft.scheduledAt).toISOString() : item.post.scheduledAt),
-      caption: overrides.caption ?? draft.caption ?? '',
-      status: overrides.status || draft.status || item.post.status || 'scheduled',
-    };
-  };
-
   const getResumeStatusForPost = (post) => (
     post?.scheduleMode === 'manual' ? 'manual_ready' : 'scheduled'
   );
 
-  const saveQueuePostUpdate = async (item, payload) => {
-    const postId = item?.post?._id;
-    const response = await fetch(`${API_BASE_URL}/api/scheduler/${postId}${withCampaignScope()}`, {
-      method: 'PUT',
+  const saveQueueBulkUpdate = async (itemPatches) => {
+    const response = await fetch(`${API_BASE_URL}/api/scheduler/queue/bulk-update${withCampaignScope()}`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        updates: itemPatches.map(({ item, patch }) => ({
+          id: item.post._id,
+          patch,
+        })),
+      }),
     });
     const data = await response.json().catch(() => null);
     if (!response.ok) {
       throw new Error(data?.message || `Update failed: ${response.status}`);
     }
-    return data;
+    return data || { posts: [] };
   };
 
   const invalidateQueueRelatedQueries = () => {
@@ -1861,14 +1836,20 @@ const CalendarView = ({ selectedAccounts }) => {
     ));
   };
 
-  const patchQueueDraft = (postId, payload) => {
+  const patchQueueDraft = (postId, patch) => {
     setQueueEditDrafts((current) => ({
       ...current,
       [postId]: {
         ...(current[postId] || {}),
-        scheduledAt: toDateTimeLocalValue(payload.scheduledAt),
-        caption: payload.caption ?? '',
-        status: payload.status || 'scheduled',
+        ...(Object.prototype.hasOwnProperty.call(patch, 'scheduledAt')
+          ? { scheduledAt: toDateTimeLocalValue(patch.scheduledAt) }
+          : {}),
+        ...(Object.prototype.hasOwnProperty.call(patch, 'caption')
+          ? { caption: patch.caption }
+          : {}),
+        ...(Object.prototype.hasOwnProperty.call(patch, 'status')
+          ? { status: patch.status }
+          : {}),
       },
     }));
   };
@@ -1884,15 +1865,15 @@ const CalendarView = ({ selectedAccounts }) => {
     const rescheduleStartMs = updates.reschedule
       ? new Date(updates.reschedule.startAt).getTime()
       : 0;
-    const itemPayloads = selectedItems.map((item, itemIndex) => {
-      const overrides = {};
+    const itemPatches = selectedItems.map((item, itemIndex) => {
+      const patch = {};
       if (updates.status === 'resume') {
-        overrides.status = getResumeStatusForPost(item.post);
+        patch.status = getResumeStatusForPost(item.post);
       } else if (updates.status) {
-        overrides.status = updates.status;
+        patch.status = updates.status;
       }
       if (updates.scheduledAt) {
-        overrides.scheduledAt = updates.scheduledAt;
+        patch.scheduledAt = updates.scheduledAt;
       }
       if (
         updates.reschedule
@@ -1900,9 +1881,9 @@ const CalendarView = ({ selectedAccounts }) => {
         && Number.isFinite(intervalMs)
         && intervalMs > 0
       ) {
-        overrides.scheduledAt = new Date(rescheduleStartMs + (itemIndex * intervalMs)).toISOString();
+        patch.scheduledAt = new Date(rescheduleStartMs + (itemIndex * intervalMs)).toISOString();
       }
-      return { item, payload: buildQueueUpdatePayload(item, overrides) };
+      return { item, patch };
     });
     const previousQueueEditorPosts = queueEditorPosts;
     const previousPosts = posts;
@@ -1910,26 +1891,26 @@ const CalendarView = ({ selectedAccounts }) => {
 
     setQueueError('');
     setSavingQueuePostIds((current) => [...new Set([...current, ...selectedIds])]);
-    itemPayloads.forEach(({ item, payload }) => {
-      patchQueuePostInState(item.post._id, payload);
-      patchQueueDraft(item.post._id, payload);
+    itemPatches.forEach(({ item, patch }) => {
+      patchQueuePostInState(item.post._id, patch);
+      patchQueueDraft(item.post._id, patch);
     });
     try {
-      const savedPosts = await Promise.all(
-        itemPayloads.map(({ item, payload }) => saveQueuePostUpdate(item, payload))
-      );
-      savedPosts.forEach((savedPost) => {
+      const result = await saveQueueBulkUpdate(itemPatches);
+      (result.posts || []).forEach((savedPost) => {
         if (!savedPost?._id) return;
         patchQueuePostInState(savedPost._id, savedPost);
         patchQueueDraft(savedPost._id, savedPost);
       });
       invalidateQueueRelatedQueries();
+      return true;
     } catch (error) {
       console.error('Failed to bulk update queue posts:', error);
       setQueueEditorPosts(previousQueueEditorPosts);
       setPosts(previousPosts);
       setQueueEditDrafts(previousDrafts);
       setQueueError(error.message || 'Failed to update selected queue posts.');
+      return false;
     } finally {
       setSavingQueuePostIds((current) => current.filter((id) => !selectedIds.includes(id)));
     }
@@ -1943,11 +1924,11 @@ const CalendarView = ({ selectedAccounts }) => {
     if (selectedItems.length === 0) return;
 
     const selectedIds = selectedItems.map((item) => item.post._id);
-    const itemPayloads = selectedItems.map((item) => {
+    const itemPatches = selectedItems.map((item) => {
       const postId = item.post._id;
       return {
         item,
-        payload: buildQueueUpdatePayload(item, { caption: captionsByPostId[postId] ?? '' }),
+        patch: { caption: captionsByPostId[postId] ?? '' },
       };
     });
     const previousQueueEditorPosts = queueEditorPosts;
@@ -1956,26 +1937,26 @@ const CalendarView = ({ selectedAccounts }) => {
 
     setQueueError('');
     setSavingQueuePostIds((current) => [...new Set([...current, ...selectedIds])]);
-    itemPayloads.forEach(({ item, payload }) => {
-      patchQueuePostInState(item.post._id, payload);
-      patchQueueDraft(item.post._id, payload);
+    itemPatches.forEach(({ item, patch }) => {
+      patchQueuePostInState(item.post._id, patch);
+      patchQueueDraft(item.post._id, patch);
     });
     try {
-      const savedPosts = await Promise.all(
-        itemPayloads.map(({ item, payload }) => saveQueuePostUpdate(item, payload))
-      );
-      savedPosts.forEach((savedPost) => {
+      const result = await saveQueueBulkUpdate(itemPatches);
+      (result.posts || []).forEach((savedPost) => {
         if (!savedPost?._id) return;
         patchQueuePostInState(savedPost._id, savedPost);
         patchQueueDraft(savedPost._id, savedPost);
       });
       invalidateQueueRelatedQueries();
+      return true;
     } catch (error) {
       console.error('Failed to save queue captions:', error);
       setQueueEditorPosts(previousQueueEditorPosts);
       setPosts(previousPosts);
       setQueueEditDrafts(previousDrafts);
       setQueueError(error.message || 'Failed to save selected captions.');
+      return false;
     } finally {
       setSavingQueuePostIds((current) => current.filter((id) => !selectedIds.includes(id)));
     }
@@ -2659,6 +2640,7 @@ const CalendarView = ({ selectedAccounts }) => {
 
       {showQueueEditor && (
         <AccountQueueEditor
+          key={`queue-editor-${queueEditorAccountId}`}
           account={queueEditorAccount}
           items={queueEditorItems}
           drafts={queueEditDrafts}
@@ -2673,7 +2655,15 @@ const CalendarView = ({ selectedAccounts }) => {
 
       {/* Schedule Overview — Calendar */}
       {!showComposer && !showQueueEditor && (
-        <section className="flex-1 min-h-0 bg-white flex flex-col overflow-hidden">
+        <section className="relative flex-1 min-h-0 bg-white flex flex-col overflow-hidden">
+          {isLoadingCalendar && (
+            <div className="absolute inset-0 z-[100] flex items-center justify-center bg-white/85 backdrop-blur-[1px]">
+              <div className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-lg">
+                <Loader2 className="h-6 w-6 animate-spin text-[#1a73e8]" />
+                <p className="m-0 text-xs font-semibold text-slate-600">Loading calendar…</p>
+              </div>
+            </div>
+          )}
           {/* Clean Filter Bar */}
           <div className="border-b border-[#e8eaed] bg-white px-4 py-2.5 flex-shrink-0">
               <div className="flex items-center justify-between gap-3">
@@ -2870,14 +2860,14 @@ const CalendarView = ({ selectedAccounts }) => {
                   </select>
                   <ChevronLeft className="h-3 w-3 -rotate-90 text-[#80868b] -ml-3" />
                 </div>
-                {queueEditorAccountId && (
+                {!isViewer && (
                   <button
                     type="button"
                     onClick={openQueueEditor}
                     className="flex h-8 items-center gap-1.5 rounded-lg border border-[#1a73e8] bg-[#eff6ff] px-3 text-[12px] font-semibold text-[#1a73e8] transition-colors hover:bg-[#dbeafe]"
                   >
                     <Clock className="h-3.5 w-3.5" />
-                    <span>Edit Queue</span>
+                    <span>Manage Queue</span>
                   </button>
                 )}
               </div>
@@ -3209,12 +3199,22 @@ const CalendarView = ({ selectedAccounts }) => {
                         <p className="m-0 truncate text-sm font-black text-[#202124]">
                           {(activeTooltip.data.date || parseInputDate(activeTooltip.dayKey) || new Date()).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
                         </p>
-                        <div className="mt-1.5 flex min-w-0 items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 p-1.5">
-                          <PlatformIcon platform={activeTooltip.data.group.channel?.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
-                          <AccountAvatar account={activeTooltip.data.group.channel} sizeClass="h-6 w-6" textClass="text-[8px]" />
-                          <span className="truncate text-xs font-black text-slate-800">
-                            @{getAccountLabel(activeTooltip.data.group.channel)}
-                          </span>
+                        <div className="mt-1.5 flex min-w-0 flex-wrap items-stretch gap-2">
+                          <div className="flex min-w-0 items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 p-1.5">
+                            <PlatformIcon platform={activeTooltip.data.group.channel?.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
+                            <AccountAvatar account={activeTooltip.data.group.channel} sizeClass="h-6 w-6" textClass="text-[8px]" />
+                            <span className="max-w-[220px] truncate text-xs font-black text-slate-800">
+                              @{getAccountLabel(activeTooltip.data.group.channel)}
+                            </span>
+                          </div>
+                          <div className="min-w-0 rounded-lg border border-blue-100 bg-blue-50/70 px-2 py-1">
+                            <p className="m-0 truncate text-[11px] font-bold text-slate-800">
+                              {activeTooltip.data.group.channel?.assignedHandlerName || 'Unassigned handler'}
+                            </p>
+                            <p className="m-0 mt-0.5 truncate text-[10px] font-medium text-slate-600">
+                              {activeTooltip.data.group.channel?.assignedHandlerEmail || 'No email assigned'}
+                            </p>
+                          </div>
                         </div>
                         <p className="m-0 mt-1 text-[11px] font-semibold text-[#70757a]">
                           {activeTooltip.data.group.posts.length} post{activeTooltip.data.group.posts.length === 1 ? '' : 's'} scheduled
@@ -3246,6 +3246,8 @@ const CalendarView = ({ selectedAccounts }) => {
                         <PostPreviewRow
                           key={`account-dialog-${item.post._id}-${item.accountRefs[0]?.id || 'account'}`}
                           item={item}
+                          hideChannelIdentity
+                          hideCaption
                         />
                       ))}
                     </div>
@@ -3348,7 +3350,7 @@ const CalendarView = ({ selectedAccounts }) => {
 	                        </div>
 	                        <div className="flex items-center gap-1.5">
 	                          <span className="text-[10px] font-bold text-white bg-[#1a73e8] rounded-full px-1.5 py-0.5">{group.posts.length}</span>
-                          {activePostIds.length > 0 && (
+                          {!isViewer && activePostIds.length > 0 && (
                             <button
                               type="button"
                               onClick={() => handleDeleteAccountQueue(group.id, getAccountLabel(group.channel))}

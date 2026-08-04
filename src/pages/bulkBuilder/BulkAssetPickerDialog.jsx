@@ -34,7 +34,6 @@ export const BulkAssetPickerDialog = ({
   const [folders, setFolders] = useState([]);
   const [folderSearch, setFolderSearch] = useState('');
   const [activeFolderId, setActiveFolderId] = useState(null);
-  const [activeFolderName, setActiveFolderName] = useState('');
   const [media, setMedia] = useState([]);
   const [loadingFolders, setLoadingFolders] = useState(false);
   const [loadingMedia, setLoadingMedia] = useState(false);
@@ -103,9 +102,8 @@ export const BulkAssetPickerDialog = ({
     return crumbs;
   }, [activeFolderId, folders]);
 
-  const openFolder = useCallback(async (folderId, folderName) => {
+  const openFolder = useCallback(async (folderId) => {
     setActiveFolderId(folderId);
-    setActiveFolderName(folderName);
     setLoadingMedia(true);
     setError('');
     try {

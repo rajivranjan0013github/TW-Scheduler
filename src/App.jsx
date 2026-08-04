@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import CampaignSelector from './pages/CampaignSelector';
 import MediaLibrary from './pages/MediaLibrary';
 import CalendarView from './pages/CalendarView';
+import QueueManagement from './pages/QueueManagement';
 import Channels from './pages/Channels';
 import PublishedFeed from './pages/PublishedFeed';
 import PostDetails from './pages/PostDetails';
@@ -31,7 +32,7 @@ import { BulkVideoBuilder } from './pages/BulkVideoBuilder';
 import OnboardingScreen from './pages/OnboardingScreen';
 import CreatorCampaigns from './pages/CreatorCampaigns';
 
-function MobileNav({ isCreator }) {
+function MobileNav({ isCreator, canViewAdmin }) {
   const items = isCreator
     ? [
         { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
@@ -40,7 +41,7 @@ function MobileNav({ isCreator }) {
       ]
     : [
         { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
-        { name: 'Performance', path: '/dashboard', icon: BarChart3 },
+        ...(canViewAdmin ? [{ name: 'Performance', path: '/dashboard', icon: BarChart3 }] : []),
         { name: 'Queue', path: '/scheduler', icon: Clock },
         { name: 'Media', path: '/media', icon: FolderHeart },
         { name: 'Channels', path: '/channels', icon: Link2 },
@@ -54,7 +55,7 @@ function MobileNav({ isCreator }) {
           popoverClassName="right-0"
         />
       </div>
-      <div className={`mx-auto grid h-full gap-0.5 ${isCreator ? 'max-w-xs grid-cols-3' : 'max-w-md grid-cols-5'}`}>
+      <div className={`mx-auto grid h-full gap-0.5 ${isCreator ? 'max-w-xs grid-cols-3' : `max-w-md ${canViewAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}`}>
         {items.map((item) => (
           <NavLink
             key={item.name}
@@ -80,6 +81,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const location = useLocation();
   const [campaignVersion, setCampaignVersion] = useState(0);
   const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
+  const canEditQueue = ['owner', 'admin', 'editor'].includes(user?.role);
   const isCreator = user?.userType === 'account_handler';
 
   useEffect(() => {
@@ -123,8 +125,10 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
             <>
               <Route path="/" element={hasActiveCampaign ? <Navigate to="/scheduler" replace /> : <CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
               <Route path="/campaigns" element={<CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
-              <Route path="/dashboard" element={<AdminDashboard />} />
+              <Route path="/dashboard" element={canViewAdmin ? <AdminDashboard /> : <Navigate to="/scheduler" replace />} />
               <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
+              <Route path="/scheduler/queue" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
+              <Route path="/scheduler/queue/:accountId" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
               <Route path="/media" element={<MediaLibrary />} />
               <Route path="/media/editor" element={<VideoEditor />} />
               <Route path="/media/bulk-builder" element={<BulkVideoBuilder />} />
@@ -143,7 +147,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
         </Routes>
       </main>
 
-      {!hideSidebar && <MobileNav isCreator={isCreator} />}
+      {!hideSidebar && <MobileNav isCreator={isCreator} canViewAdmin={canViewAdmin} />}
     </div>
   );
 }

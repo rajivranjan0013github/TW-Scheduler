@@ -102,7 +102,7 @@ export const PostDetails = () => {
         </div>
       ) : post ? (
         <div className="max-w-6xl mx-auto w-full grid grid-cols-1 md:grid-cols-3 gap-6 items-start flex-1 pb-12">
-          
+
           {/* Left Side: Post Content & Preview */}
           <div className="md:col-span-1 bg-white border border-[#e5e5ea] rounded-xl overflow-hidden shadow-sm flex flex-col">
             {post.mediaUrl && (
@@ -121,9 +121,9 @@ export const PostDetails = () => {
                   <span className="block font-bold text-gray-400 uppercase tracking-wider text-[8px] mb-0.5">Published At</span>
                   <span>{new Date(post.publishedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
                 </div>
-                <a 
-                  href={post.permalink} 
-                  target="_blank" 
+                <a
+                  href={post.permalink}
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-[10px] text-blue-600 font-semibold hover:underline"
                 >
@@ -136,7 +136,7 @@ export const PostDetails = () => {
 
           {/* Right Side: Metrics & Daily Insights */}
           <div className="md:col-span-2 space-y-6">
-            
+
             {/* Lifetime metrics banner */}
             <div className="grid grid-cols-3 gap-4">
               <div className="bg-white border border-[#e5e5ea] p-4 rounded-xl shadow-sm flex items-center gap-3">

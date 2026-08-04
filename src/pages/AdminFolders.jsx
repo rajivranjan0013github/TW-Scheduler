@@ -12,7 +12,7 @@ export const AdminFolders = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Create folder modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -25,11 +25,11 @@ export const AdminFolders = () => {
   const filteredFolders = folders.filter((folder) => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
-    
+
     const folderName = folder.name ? folder.name.toLowerCase() : '';
     const creatorName = folder.userId?.name ? folder.userId.name.toLowerCase() : '';
     const creatorEmail = folder.userId?.email ? folder.userId.email.toLowerCase() : '';
-    
+
     return folderName.includes(query) || creatorName.includes(query) || creatorEmail.includes(query);
   });
 
@@ -135,7 +135,7 @@ export const AdminFolders = () => {
           <h2 className="m-0 mt-1 text-xl font-semibold tracking-tight text-[#1d1d1f]">Media Folders</h2>
           <p className="m-0 mt-1 text-xs text-[#8e8e93]">View and audit campaign media folders across workspaces.</p>
         </div>
-        
+
         {/* Search & Create Actions */}
         <div className="flex flex-col sm:flex-row gap-3 items-center w-full lg:w-auto">
           {/* Search Input */}
@@ -297,7 +297,7 @@ export const AdminFolders = () => {
           >
             <h3 className="m-0 text-base font-semibold tracking-tight">Create Folder</h3>
             <p className="m-0 mt-1.5 text-xs text-[#8e8e93]">Give a name to the folder you want to create.</p>
-            
+
             {createError && (
               <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700">
                 {createError}

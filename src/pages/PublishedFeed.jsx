@@ -1,14 +1,49 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { API_BASE_URL } from '../config';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BarChart3, ExternalLink, RefreshCw, MoreVertical } from 'lucide-react';
-import { withCampaignScope } from '../utils/campaignScope';
+import { ArrowLeft, BarChart3, ExternalLink, RefreshCw } from 'lucide-react';
+import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
+import { useAuth } from '../context/AuthContext';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
+const cancellableStatuses = new Set(['scheduled', 'manual_ready', 'downloaded', 'paused']);
+const completedStatuses = new Set(['posted_manual', 'published', 'published_auto']);
+
+const getQueueStatusLabel = (status) => ({
+  manual_ready: 'Manual Ready',
+  downloaded: 'Downloaded',
+  paused: 'Paused',
+  scheduled: 'Scheduled',
+  publishing: 'Publishing',
+  posted_manual: 'Posted',
+  published: 'Posted',
+  published_auto: 'Posted',
+}[status] || status || 'Scheduled');
+
+const getQueueStatusClass = (status) => {
+  if (completedStatuses.has(status)) return 'bg-green-100 text-green-700';
+  if (status === 'manual_ready') return 'bg-amber-100 text-amber-700';
+  if (status === 'downloaded') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'paused') return 'bg-slate-200 text-slate-700';
+  if (status === 'publishing') return 'bg-violet-100 text-violet-700';
+  return 'bg-blue-100 text-blue-700';
+};
+
+const getCaptionPreview = (caption) => Array.from(caption || 'No caption').slice(0, 10).join('');
+
+const getPostDisplayDate = (post, fallbackDate) => {
+  if (!post) return fallbackDate;
+  if (post.status === 'posted_manual' && post.manualPostedAt) {
+    const manualDate = new Date(post.manualPostedAt);
+    if (!Number.isNaN(manualDate.getTime())) return manualDate;
+  }
+  const scheduledDate = post.scheduledAt ? new Date(post.scheduledAt) : null;
+  return scheduledDate && !Number.isNaN(scheduledDate.getTime()) ? scheduledDate : fallbackDate;
+};
 
 const MediaPreview = ({ item, className = 'h-full w-full object-cover block' }) => {
   const url = getAssetUrl(item?.url);
@@ -40,7 +75,7 @@ const getAccountAvatarUrl = (account) => (
 );
 
 const AccountAvatar = ({ account, sizeClass = 'h-10 w-10', textClass = 'text-xs' }) => {
-  const avatarUrl = getAccountAvatarUrl(account);
+  const avatarUrl = getAssetUrl(getAccountAvatarUrl(account));
   const label = account?.username || account?.handle || account?.name || 'Account';
   const initials = (label || 'A')
     .split(' ')
@@ -80,14 +115,35 @@ export const PublishedFeed = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const campaignId = getActiveCampaignId();
 
   const [activeTab, setActiveTab] = useState('published'); // 'published' | 'queued'
-  const [activeMenuPostId, setActiveMenuPostId] = useState(null);
-  const forceRefreshRef = useRef(false);
+  const [captionPost, setCaptionPost] = useState(null);
+  const [renderNow, setRenderNow] = useState(() => new Date());
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState('');
+  const canDeleteQueuePost = ['owner', 'admin', 'editor'].includes(user?.role);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setRenderNow(new Date()), 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    if (!captionPost) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setCaptionPost(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [captionPost]);
 
   // 1. Channel Details Query
   const channelQuery = useQuery({
-    queryKey: ['channel', id],
+    queryKey: ['channel', id, campaignId],
     queryFn: async () => {
       const token = localStorage.getItem('tw_token');
       const headers = { 'Authorization': `Bearer ${token}` };
@@ -112,17 +168,17 @@ export const PublishedFeed = () => {
       }
       return undefined;
     },
+    initialDataUpdatedAt: 0,
     enabled: !!id,
     staleTime: 5 * 60 * 1000,
   });
 
   // 2. Published Posts Query
   const publishedPostsQuery = useQuery({
-    queryKey: ['publishedPosts', id],
+    queryKey: ['publishedPosts', id, campaignId],
     queryFn: async () => {
       const token = localStorage.getItem('tw_token');
-      const refreshParam = forceRefreshRef.current ? '?refresh=true' : '';
-      const response = await fetch(`${API_BASE_URL}/api/accounts/${id}/posts${refreshParam}`, {
+      const response = await fetch(`${API_BASE_URL}/api/accounts/${id}/posts`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) {
@@ -137,12 +193,22 @@ export const PublishedFeed = () => {
 
   // 3. Queued Scheduler Posts Query
   const queuedPostsQuery = useQuery({
-    queryKey: ['queuedPosts', id],
+    queryKey: ['queuedPosts', id, campaignId],
     queryFn: async () => {
       const token = localStorage.getItem('tw_token');
       const params = new URLSearchParams();
       params.set('accountIds', id);
       params.set('statuses', 'scheduled,manual_ready,downloaded,publishing,paused,posted_manual,published,published_auto');
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const startDate = new Date(todayStart);
+      startDate.setDate(startDate.getDate() - 2);
+      const endDate = new Date(todayStart);
+      endDate.setDate(endDate.getDate() + 4);
+      endDate.setHours(23, 59, 59, 999);
+      params.set('from', startDate.toISOString());
+      params.set('to', endDate.toISOString());
+      params.set('includeManualPostedRange', 'true');
       const url = `${API_BASE_URL}/api/scheduler${withCampaignScope(params.toString())}`;
 
       const response = await fetch(url, {
@@ -153,39 +219,29 @@ export const PublishedFeed = () => {
         throw new Error(errData?.message || 'Failed to retrieve queued posts.');
       }
       const data = await response.json();
-      const posts = Array.isArray(data) ? data : [];
-      
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const startDate = new Date(todayStart);
-      startDate.setDate(startDate.getDate() - 2);
-      const endDate = new Date(todayStart);
-      endDate.setDate(endDate.getDate() + 4);
-      endDate.setHours(23, 59, 59, 999);
-      
-      return posts.filter((post) => {
-        const displayDate = getPostDisplayDate(post);
-        return displayDate >= startDate && displayDate <= endDate;
-      });
+      return Array.isArray(data) ? data : [];
     },
     enabled: !!id,
     staleTime: 2 * 60 * 1000,
   });
 
   const channel = channelQuery.data;
-  const publishedPosts = publishedPostsQuery.data || [];
-  const queuedPosts = queuedPostsQuery.data || [];
+  const publishedPosts = useMemo(() => publishedPostsQuery.data || [], [publishedPostsQuery.data]);
+  const queuedPosts = useMemo(() => queuedPostsQuery.data || [], [queuedPostsQuery.data]);
 
   const loading = channelQuery.isLoading || (publishedPostsQuery.isLoading && publishedPosts.length === 0);
   const loadingPosts = publishedPostsQuery.isFetching;
-  const loadingQueue = queuedPostsQuery.isFetching;
+  const loadingQueue = queuedPostsQuery.isPending;
+  const refreshingQueue = queuedPostsQuery.isFetching;
+  const errorChannel = channelQuery.error?.message || null;
   const errorPosts = publishedPostsQuery.error?.message || null;
   const errorQueue = queuedPostsQuery.error?.message || null;
 
-  const handleDeletePost = async (postId) => {
+  const handleDeletePost = async (post) => {
+    if (!canDeleteQueuePost || !cancellableStatuses.has(post?.status)) return;
     if (!window.confirm('Are you sure you want to delete this scheduled post?')) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/scheduler/${postId}${withCampaignScope()}`, {
+      const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}${withCampaignScope()}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
@@ -205,24 +261,54 @@ export const PublishedFeed = () => {
   };
 
   const handleRefresh = async () => {
-    forceRefreshRef.current = true;
+    setManualRefreshing(true);
+    setRefreshError('');
     try {
+      const token = localStorage.getItem('tw_token');
+      const headers = { 'Authorization': `Bearer ${token}` };
+      const startResponse = await fetch(`${API_BASE_URL}/api/accounts/${id}/sync`, {
+        method: 'POST',
+        headers,
+      });
+      if (!startResponse.ok) {
+        const payload = await startResponse.json().catch(() => ({}));
+        throw new Error(payload.message || 'Failed to start channel synchronization.');
+      }
+
+      let completedStatus = null;
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+        const statusResponse = await fetch(`${API_BASE_URL}/api/accounts/${id}/sync-status`, { headers });
+        if (!statusResponse.ok) continue;
+        const status = await statusResponse.json();
+        if (!['queued', 'running'].includes(status.status)) {
+          completedStatus = status;
+          break;
+        }
+      }
+      if (!completedStatus) throw new Error('Synchronization is still running. The feed will update on the next refresh.');
+      if (['failed', 'rate_limited'].includes(completedStatus.status)) {
+        throw new Error(completedStatus.lastError || 'Channel synchronization failed.');
+      }
       await Promise.all([
         publishedPostsQuery.refetch(),
         queuedPostsQuery.refetch(),
       ]);
       await queryClient.invalidateQueries({ queryKey: ['admin'] });
+      if (completedStatus.status === 'partial') {
+        setRefreshError(completedStatus.lastError || 'Some post metrics could not be refreshed.');
+      }
     } catch (error) {
       console.error('Refresh failed:', error);
+      setRefreshError(error.message || 'Refresh failed.');
     } finally {
-      forceRefreshRef.current = false;
+      setManualRefreshing(false);
     }
   };
 
   const getTimeSince = (dateStr) => {
-    const now = Date.now();
     const past = new Date(dateStr).getTime();
-    const diffMs = now - past;
+    const diffMs = renderNow.getTime() - past;
     const diffMin = Math.floor(diffMs / 60000);
     if (diffMin < 1) return 'just now';
     if (diffMin < 60) return `${diffMin} min ago`;
@@ -246,16 +332,6 @@ export const PublishedFeed = () => {
     };
   };
 
-  const getPostDisplayDate = (post) => {
-    if (!post) return new Date();
-    const isManualPosted = post.status === 'posted_manual';
-    if (isManualPosted && post.manualPostedAt) {
-      const d = new Date(post.manualPostedAt);
-      if (!Number.isNaN(d.getTime())) return d;
-    }
-    return new Date(post.scheduledAt || Date.now());
-  };
-
   const openLivePost = (post) => {
     if (post.permalink) {
       window.open(post.permalink, '_blank', 'noopener,noreferrer');
@@ -276,13 +352,13 @@ export const PublishedFeed = () => {
       .filter((time) => Number.isFinite(time));
 
     if (syncTimes.length === 0) return null;
-    return new Date(Math.min(...syncTimes)).toISOString();
+    return new Date(Math.max(...syncTimes)).toISOString();
   }, [publishedPosts]);
 
   const getFeedSyncedAt = () => feedSyncedAt;
 
   const viewsStats = useMemo(() => {
-    const now = new Date();
+    const now = renderNow;
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
     const yesterdayStart = new Date(todayStart);
@@ -323,7 +399,7 @@ export const PublishedFeed = () => {
     });
 
     return { today, yesterday, last7Days, thisMonth, allTime };
-  }, [publishedPosts]);
+  }, [publishedPosts, renderNow]);
 
   const upcomingQueuedCount = useMemo(() => {
     return queuedPosts.filter((post) => {
@@ -333,39 +409,6 @@ export const PublishedFeed = () => {
       return !isPosted;
     }).length;
   }, [queuedPosts]);
-
-  const getSevenDaysRange = () => {
-    const range = [];
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    for (let i = -2; i <= 4; i++) {
-      const date = new Date(todayStart);
-      date.setDate(date.getDate() + i);
-      range.push(date);
-    }
-    return range;
-  };
-
-  const isSameDay = (date1, date2) => {
-    return (
-      date1.getFullYear() === date2.getFullYear() &&
-      date1.getMonth() === date2.getMonth() &&
-      date1.getDate() === date2.getDate()
-    );
-  };
-
-  const getDayLabel = (date) => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (isSameDay(date, today)) {
-      return 'Today';
-    }
-    return date.toLocaleDateString([], { weekday: 'short' });
-  };
-
-  const getFormattedDateLabel = (date) => {
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  };
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] p-4 text-[#1d1d1f]">
@@ -383,15 +426,14 @@ export const PublishedFeed = () => {
           <div className="h-14 flex items-center justify-center">
             <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
           </div>
+        ) : errorChannel ? (
+          <div className="rounded-xl border border-red-200 bg-white p-4 text-sm font-semibold text-red-600">
+            {errorChannel}
+          </div>
         ) : channel ? (
           <div className="flex items-center justify-between rounded-xl border border-[#e5e5ea] bg-white px-4 py-3 shadow-sm">
             <div className="flex items-center gap-3 min-w-0">
-              <img
-                src={channel.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-                crossOrigin="anonymous"
-                alt=""
-                className="h-10 w-10 rounded-full border border-black/10 object-cover shrink-0"
-              />
+              <AccountAvatar account={channel} />
               <div className="min-w-0">
                 <p className="m-0 text-[10px] font-bold uppercase tracking-wider text-[#6e6e73]">Published feed</p>
                 <h2 className="m-0 mt-0.5 truncate text-base font-semibold leading-tight text-black">
@@ -407,21 +449,26 @@ export const PublishedFeed = () => {
             <div className="flex flex-shrink-0 items-center gap-3">
               <span className="text-[10px] font-medium text-gray-400">
                 {getFeedSyncedAt()
-                  ? `Last synced ${getTimeSince(getFeedSyncedAt())}`
+                  ? `Recent posts synced ${getTimeSince(getFeedSyncedAt())}`
                   : 'Cached data'
                 }
               </span>
               <button
                 onClick={handleRefresh}
-                disabled={loadingPosts || loadingQueue}
+                disabled={manualRefreshing || loadingPosts || refreshingQueue}
                 className="flex items-center gap-1.5 text-xs text-[#0071e3] hover:text-blue-700 bg-blue-50/50 hover:bg-blue-50 px-3.5 py-1.5 rounded-lg border border-blue-100 transition-all font-semibold disabled:opacity-50 active:scale-95"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingPosts || loadingQueue ? 'animate-spin' : ''}`} />
-                <span>{loadingPosts || loadingQueue ? 'Refreshing...' : 'Refresh'}</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${manualRefreshing || loadingPosts || refreshingQueue ? 'animate-spin' : ''}`} />
+                <span>{manualRefreshing || loadingPosts || refreshingQueue ? 'Refreshing...' : 'Refresh'}</span>
               </button>
             </div>
           </div>
         ) : null}
+        {refreshError && (
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+            {refreshError}
+          </div>
+        )}
       </div>
 
       {/* Views Metrics Summary */}
@@ -431,15 +478,16 @@ export const PublishedFeed = () => {
             const stats = viewsStats;
             const format = (num) => Intl.NumberFormat().format(num);
             return [
-              { label: 'Today', value: stats.today },
-              { label: 'Yesterday', value: stats.yesterday },
-              { label: 'Last 7 Days', value: stats.last7Days },
-              { label: 'This Month', value: stats.thisMonth },
-              { label: 'All Time', value: stats.allTime },
+              { label: 'Published Today', value: stats.today },
+              { label: 'Published Yesterday', value: stats.yesterday },
+              { label: 'Published in 7 Days', value: stats.last7Days },
+              { label: 'Published This Month', value: stats.thisMonth },
+              { label: '30-Day Feed', value: stats.allTime },
             ].map((card) => (
               <div key={card.label} className="rounded-xl border border-[#e5e5ea] bg-white p-2.5 shadow-sm">
                 <p className="m-0 text-[9px] font-bold uppercase tracking-wider text-[#6e6e73]">{card.label}</p>
                 <p className="m-0 mt-1 text-base font-bold leading-none text-[#1d1d1f]">{format(card.value)}</p>
+                <p className="m-0 mt-1 text-[8px] text-[#8e8e93]">Current lifetime views</p>
               </div>
             ));
           })()}
@@ -487,10 +535,11 @@ export const PublishedFeed = () => {
             </div>
           ) : publishedPosts.length === 0 ? (
             <div className="bg-white border border-[#e5e5ea] rounded-xl p-16 text-center text-sm text-gray-400 font-medium shadow-sm">
-              No cached published posts from the last 30 days. Refresh to sync this channel.
+              No cached published posts from the last 14 days. Refresh to sync this channel.
             </div>
           ) : (
-            <div className="w-full rounded-xl border border-[#d2d2d7] bg-white">
+            <div className="w-full overflow-x-auto rounded-xl border border-[#d2d2d7] bg-white">
+              <div className="min-w-[620px]">
               <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
                 <span>Published</span>
                 <span>Views</span>
@@ -511,15 +560,18 @@ export const PublishedFeed = () => {
                             <p className="m-0 mt-0.5 text-[10px] font-semibold text-[#6e6e73]">{publishedDisplay.time}</p>
                           )}
                         </div>
-                        <span className="font-semibold text-[#515154]">{compactNumber(post.views)}</span>
+                        <span className="font-semibold text-[#515154]">
+                          {post.views === null || post.views === undefined ? '—' : compactNumber(post.views)}
+                        </span>
                         <span className="font-semibold text-[#515154]">{compactNumber(post.likes)}</span>
                         <span className="font-semibold text-[#515154]">{compactNumber(post.comments)}</span>
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() => openLivePost(post)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#d2d2d7] bg-white text-[#515154] transition hover:border-[#0071e3] hover:text-[#0071e3]"
-                            title="Open live post"
+                            disabled={!post.permalink}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#d2d2d7] bg-white text-[#515154] transition hover:border-[#0071e3] hover:text-[#0071e3] disabled:cursor-not-allowed disabled:opacity-40"
+                            title={post.permalink ? 'Open live post' : 'Live-post link unavailable'}
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
                           </button>
@@ -537,6 +589,7 @@ export const PublishedFeed = () => {
                   );
                 })}
               </div>
+              </div>
             </div>
           )
         ) : (
@@ -552,162 +605,104 @@ export const PublishedFeed = () => {
             </div>
           ) : queuedPosts.length === 0 ? (
             <div className="bg-white border border-[#e5e5ea] rounded-xl p-16 text-center text-sm text-gray-400 font-medium shadow-sm">
-              No upcoming scheduled posts in the queue.
+              No posts in this seven-day queue window.
             </div>
           ) : (
-            <div className="w-full overflow-x-auto p-1 pb-4">
-              <div className="flex gap-3 items-start pb-1 w-full">
-                {getSevenDaysRange().map((dayDate) => {
-                  const dayPosts = queuedPosts.filter((post) => {
-                    const displayDate = getPostDisplayDate(post);
-                    return isSameDay(displayDate, dayDate);
-                  });
+            <div className="w-full overflow-x-auto rounded-xl border border-[#d2d2d7] bg-white">
+              <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+                <thead className="bg-[#fbfbfd] text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+                  <tr>
+                    <th className="px-3 py-2">Media</th>
+                    <th className="px-3 py-2">Schedule</th>
+                    <th className="px-3 py-2">Caption</th>
+                    <th className="px-3 py-2">Mode</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...queuedPosts]
+                    .sort((a, b) => getPostDisplayDate(a, renderNow) - getPostDisplayDate(b, renderNow))
+                    .map((post) => {
+                      const displayDate = getPostDisplayDate(post, renderNow);
+                      const display = formatPublishedDate(displayDate);
+                      const mediaItem = post.mediaIds?.[0];
+                      const isPosted = completedStatuses.has(post.status) || Boolean(post.manualPostedAt);
 
-                  const dayLabel = getDayLabel(dayDate);
-                  const dateLabel = getFormattedDateLabel(dayDate);
-                  const isToday = dayLabel === 'Today';
-
-                  return (
-                    <div key={dayDate.getTime()} className={`flex-1 min-w-[105px] w-full flex flex-col h-fit rounded-lg border p-1.5 bg-slate-50/50 shadow-sm ${
-                      isToday ? 'border-blue-200 bg-blue-50/10' : 'border-[#e5e5ea]'
-                    }`}>
-                      {/* Column Header */}
-                      <div className={`p-1 rounded mb-1.5 flex items-center justify-between border ${
-                        isToday 
-                          ? 'bg-blue-50 border-blue-200 text-blue-800' 
-                          : 'bg-[#f1f3f4]/80 border-transparent text-[#6e6e73]'
-                      }`}>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-[8px] font-black uppercase tracking-wider leading-none">{dayLabel}</span>
-                          <span className={`text-[9px] font-extrabold mt-0.5 truncate ${isToday ? 'text-blue-900' : 'text-slate-700'}`}>{dateLabel}</span>
-                        </div>
-                        <span className={`px-1 py-0.2 rounded-full text-[8px] font-black shrink-0 ${
-                          isToday ? 'bg-blue-200/60 text-blue-900' : 'bg-slate-200 text-slate-700'
-                        }`}>
-                          {dayPosts.length}
-                        </span>
-                      </div>
-
-                      {/* Column Body */}
-                      <div className="space-y-2">
-                        {dayPosts.length === 0 ? (
-                          <div className="flex h-16 items-center justify-center text-[9px] text-gray-400 italic font-medium">
-                            No posts
-                          </div>
-                        ) : (
-                          dayPosts.map((post) => {
-                            const displayDate = getPostDisplayDate(post);
-                            const pubDisplay = formatPublishedDate(displayDate);
-                            const mediaItem = post.mediaIds?.[0];
-                            
-                            const isManualPosted = post.status === 'posted_manual' || Boolean(post.manualPostedAt);
-                            const isAutoPublished = ['published', 'published_auto'].includes(post.status);
-                            const isPosted = isManualPosted || isAutoPublished;
-                            const postedCardClass = 'border-green-500 border-2 bg-green-50';
-                            const getStatusDotBg = (status) => {
-                              if (isPosted) return 'bg-green-500';
-                              switch (status) {
-                                case 'manual_ready': return 'bg-amber-500';
-                                case 'downloaded': return 'bg-emerald-500';
-                                case 'paused': return 'bg-slate-400';
-                                default: return 'bg-blue-500';
-                              }
-                            };
-                            const getStatusLabel = (status) => {
-                              if (isPosted) return 'Posted';
-                              switch (status) {
-                                case 'manual_ready': return 'Manual Ready';
-                                case 'downloaded': return 'Downloaded';
-                                case 'paused': return 'Paused';
-                                case 'scheduled': return 'Scheduled';
-                                case 'publishing': return 'Publishing';
-                                default: return status || 'Scheduled';
-                              }
-                            };
-                            return (
-                              <div key={post._id} className={`group flex flex-col items-center shrink-0 relative rounded-lg border p-1 shadow-sm hover:shadow-md transition-all w-full ${
-                                isPosted ? postedCardClass : 'border-[#e5e5ea] bg-white'
-                              }`}>
-                                {/* Media Preview on top */}
-                                <div className="w-full aspect-square bg-slate-50 relative overflow-hidden flex items-center justify-center rounded-md">
-                                  {mediaItem ? (
-                                    <MediaPreview item={mediaItem} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                  ) : (
-                                    <span className="text-[8px] text-gray-400 font-medium">No media</span>
-                                  )}
-
-                                  {/* More Actions Dropdown overlay */}
-                                  <div className="absolute top-0.5 right-0.5 z-10">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveMenuPostId(activeMenuPostId === post._id ? null : post._id);
-                                      }}
-                                      className="h-4 w-4 rounded bg-white/90 flex items-center justify-center text-slate-700 hover:bg-white shadow-sm hover:text-black transition-colors backdrop-blur-sm"
-                                      title="Actions"
-                                    >
-                                      <MoreVertical className="h-2.5 w-2.5" />
-                                    </button>
-                                    
-                                    {activeMenuPostId === post._id && (
-                                      <>
-                                        <div 
-                                          className="fixed inset-0 z-40 cursor-default" 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActiveMenuPostId(null);
-                                          }}
-                                        />
-                                        <div className="absolute right-0 top-5 z-50 w-28 rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setActiveMenuPostId(null);
-                                              alert(post.caption || "No caption");
-                                            }}
-                                            className="w-full px-2.5 py-1.5 text-left text-[10px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                                          >
-                                            View Caption
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setActiveMenuPostId(null);
-                                              handleDeletePost(post._id);
-                                            }}
-                                            className="w-full px-2.5 py-1.5 text-left text-[10px] font-semibold text-red-600 hover:bg-red-50 transition-colors border-t border-slate-100"
-                                          >
-                                            Delete Post
-                                          </button>
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Content details below */}
-                                <div 
-                                  className="mt-1 flex items-center justify-center gap-1 w-full text-center px-1 py-0.5"
-                                  title={`Status: ${getStatusLabel(post.status)}`}
-                                >
-                                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusDotBg(post.status)}`} />
-                                  <span className={`text-[9px] font-bold truncate ${isPosted ? 'text-green-800' : 'text-gray-700'}`}>{pubDisplay.time}</span>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                      return (
+                        <tr key={post._id} className={`border-t border-[#e5e5ea] transition hover:bg-[#f5f5f7] ${isPosted ? 'bg-green-50/60' : ''}`}>
+                          <td className="w-20 px-3 py-2">
+                            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-[#e5e5ea] bg-slate-50">
+                              {mediaItem ? (
+                                <MediaPreview item={mediaItem} className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="text-[8px] font-medium text-gray-400">No media</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2">
+                            <p className="m-0 font-semibold text-[#1d1d1f]">{display.date}</p>
+                            <p className="m-0 mt-0.5 text-[10px] text-[#6e6e73]">{display.time || 'Time unavailable'}</p>
+                          </td>
+                          <td className="max-w-[320px] px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => setCaptionPost(post)}
+                              className="block w-full truncate text-left font-medium text-[#515154] hover:text-[#0071e3]"
+                              title="View full caption"
+                            >
+                              {getCaptionPreview(post.caption)}
+                            </button>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 capitalize text-[#515154]">{post.scheduleMode || 'auto'}</td>
+                          <td className="whitespace-nowrap px-3 py-2">
+                            <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${getQueueStatusClass(post.status)}`}>
+                              {getQueueStatusLabel(post.status)}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setCaptionPost(post)}
+                              className="rounded-md border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#515154] transition hover:border-[#0071e3] hover:text-[#0071e3]"
+                            >
+                              View
+                            </button>
+                            {canDeleteQueuePost && cancellableStatuses.has(post.status) && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePost(post)}
+                                className="ml-2 rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-red-600 transition hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
             </div>
           ))}
       </div>
+      {captionPost && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="queued-caption-title"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setCaptionPost(null)}
+        >
+          <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <h3 id="queued-caption-title" className="m-0 text-sm font-semibold text-[#1d1d1f]">Post caption</h3>
+              <button type="button" onClick={() => setCaptionPost(null)} className="text-xs font-semibold text-[#0071e3]">Close</button>
+            </div>
+            <p className="m-0 mt-4 whitespace-pre-wrap text-sm leading-6 text-[#515154]">{captionPost.caption || 'No caption'}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

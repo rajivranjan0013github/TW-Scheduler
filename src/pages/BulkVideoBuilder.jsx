@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, Minus, Plus, Play, RotateCcw, Trash2, Eye, EyeOff, Folder, FileText, Music, Sparkles, Sliders, Layout, Crosshair, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Layers, Minus, Plus, Play, RotateCcw, Trash2, Folder, Sliders, Layout, Crosshair, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { DEFAULT_TEXT_SETTINGS, useBulkRows } from './bulkBuilder/useBulkRows';
 import { BulkVideoRow } from './bulkBuilder/BulkVideoRow';
@@ -11,7 +11,7 @@ import { usePreviewAudio } from './videoEditor/usePreviewAudio';
 import { BulkAssetPickerDialog } from './bulkBuilder/BulkAssetPickerDialog';
 import { TempAssetQuickPickerDialog, TempMediaLibraryDialog } from './bulkBuilder/TempAssetQuickPickerDialog';
 import { getOverlayTextHeight, getOverlayTextWidth } from './videoEditor/videoEditorUtils';
-import { FONT_WEIGHTS, PREVIEW_FRAME_HEIGHT, PREVIEW_FRAME_WIDTH } from './videoEditor/videoEditorConstants';
+import { PREVIEW_FRAME_HEIGHT, PREVIEW_FRAME_WIDTH } from './videoEditor/videoEditorConstants';
 
 const SOURCE_PREVIEW_WIDTH = PREVIEW_FRAME_WIDTH;
 const SOURCE_PREVIEW_HEIGHT = PREVIEW_FRAME_HEIGHT;
@@ -55,6 +55,7 @@ export const BulkVideoBuilder = () => {
   const [pan, setPan] = useState({ x: 80, y: 60 });
   const [pageZoom, setPageZoom] = useState(0.8);
   const canvasViewportRef = useRef(null);
+  const didInitialFitRef = useRef(false);
 
   // Sidebar visibility state (collapsible)
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
@@ -104,6 +105,7 @@ export const BulkVideoBuilder = () => {
   });
   const [quickPickerType, setQuickPickerType] = useState(null); // 'video1' | 'video2' | 'audio'
   const [quickPickerRowId, setQuickPickerRowId] = useState(null);
+  const [tempLibraryPersistenceError, setTempLibraryPersistenceError] = useState('');
 
   // AI captions suggestion state
   const [generatedSuggestions, setGeneratedSuggestions] = useState([]);
@@ -111,7 +113,13 @@ export const BulkVideoBuilder = () => {
 
   // Auto-save tempLibrary to localStorage
   useEffect(() => {
-    localStorage.setItem('tw_bulk_builder_temp_library', JSON.stringify(tempLibrary));
+    try {
+      localStorage.setItem('tw_bulk_builder_temp_library', JSON.stringify(tempLibrary));
+      queueMicrotask(() => setTempLibraryPersistenceError(''));
+    } catch (error) {
+      console.error('Unable to save the temporary asset library:', error);
+      queueMicrotask(() => setTempLibraryPersistenceError('Temporary assets could not be saved in this browser. Remove unused assets or keep this page open.'));
+    }
   }, [tempLibrary]);
 
   // Handle clicking outside caption text and controls to close controls
@@ -184,7 +192,7 @@ export const BulkVideoBuilder = () => {
       setIsDraggingCanvas(false);
       try {
         canvasViewportRef.current.releasePointerCapture(event.pointerId);
-      } catch (err) {
+      } catch {
         // Safe releases
       }
     }
@@ -218,12 +226,9 @@ export const BulkVideoBuilder = () => {
         const canvasY = (mouseY - currentPan.y) / currentZoom;
 
         const zoomFactor = 1.08;
-        let nextZoom = currentZoom;
-        if (event.deltaY < 0) {
-          nextZoom = Math.min(currentZoom * zoomFactor, 3.0);
-        } else {
-          nextZoom = Math.max(currentZoom / zoomFactor, 0.15);
-        }
+        const nextZoom = event.deltaY < 0
+          ? Math.min(currentZoom * zoomFactor, 3.0)
+          : Math.max(currentZoom / zoomFactor, 0.15);
 
         const nextPan = {
           x: mouseX - canvasX * nextZoom,
@@ -494,6 +499,10 @@ export const BulkVideoBuilder = () => {
   }, [bulk]);
 
   const handleClearAll = useCallback(() => {
+    const populatedRows = bulk.rows.filter((row) => row.video1 || row.video2 || row.audio || row.caption).length;
+    if (populatedRows > 0 && !window.confirm(`Clear all ${populatedRows} planned frame${populatedRows === 1 ? '' : 's'} and temporary assets? This cannot be undone.`)) {
+      return;
+    }
     bulk.clearAllRows();
     setTempLibrary({ video1: [], video2: [], audio: [] });
     setSelectedRowId(null);
@@ -518,29 +527,42 @@ export const BulkVideoBuilder = () => {
       caption: text,
       dragPos: getCenteredDragPos(text, row?.textSettings),
     });
-    setCaptionDrawerRowId(null);
   }, [captionDrawerRowId, selectedRowId, bulk]);
 
   const handleExportAll = useCallback(() => {
     const readyRows = bulk.getReadyRows();
     if (readyRows.length === 0) return;
+    const incompleteCount = bulk.rows.filter((row) => !row.video1 || (bulk.isDualVideo && !row.video2)).length;
+    if (incompleteCount > 0) {
+      const shouldContinue = window.confirm(
+        `${readyRows.length} frame${readyRows.length === 1 ? '' : 's'} are ready. ${incompleteCount} incomplete frame${incompleteCount === 1 ? '' : 's'} will be skipped. Continue to export?`
+      );
+      if (!shouldContinue) return;
+    }
     navigate('/media/editor?mode=bulk');
   }, [bulk, navigate]);
 
   // Auto center view on mount if nodes exist
   useEffect(() => {
-    if (bulk.rows.length > 0) {
-      setTimeout(fitView, 150);
-    }
-  }, []);
+    if (didInitialFitRef.current || bulk.rows.length === 0) return undefined;
+    const timeoutId = window.setTimeout(() => {
+      didInitialFitRef.current = true;
+      fitView();
+    }, 150);
+    return () => window.clearTimeout(timeoutId);
+  }, [bulk.rows.length, fitView]);
 
   // Compute references for right inspector panel values
   const selectedRow = bulk.rows.find(r => r.id === selectedRowId);
   const readyCount = bulk.getReadyRows().length;
-  const totalRows = bulk.rows.length;
 
   return (
     <div className="h-screen w-screen relative bg-[#0e0e10] text-[#e0e0e5] overflow-hidden select-none font-sans">
+      {(bulk.persistenceError || tempLibraryPersistenceError) && (
+        <div className="absolute left-1/2 top-20 z-50 w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-xl border border-red-800/60 bg-red-950/95 px-4 py-3 text-xs font-semibold text-red-200 shadow-2xl">
+          {bulk.persistenceError || tempLibraryPersistenceError}
+        </div>
+      )}
       
       {/* Figma 2D Infinite Canvas Viewport */}
       <div
@@ -572,6 +594,7 @@ export const BulkVideoBuilder = () => {
             {bulk.rows.map((row, idx) => (
               <div
                 key={row.id}
+                className="rounded-xl"
                 style={{
                   position: 'absolute',
                   left: `${row.canvasPos?.x || 100}px`,
@@ -581,6 +604,9 @@ export const BulkVideoBuilder = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedRowId(row.id);
+                  if (captionDrawerRowId !== null) {
+                    setCaptionDrawerRowId(row.id);
+                  }
                 }}
               >
                 <BulkVideoRow
@@ -589,6 +615,7 @@ export const BulkVideoBuilder = () => {
                   isDualVideo={bulk.isDualVideo}
                   inverseZoomScale={1 / pageZoom}
                   isActiveCaption={activeCaptionRowId === row.id}
+                  isCaptionTarget={captionDrawerRowId === row.id}
                   onPickVideo1={() => handlePickVideo1(row.id)}
                   onPickVideo2={() => handlePickVideo2(row.id)}
                   onPickAudio={() => handlePickAudio(row.id)}
@@ -694,11 +721,11 @@ export const BulkVideoBuilder = () => {
           <button
             type="button"
             onClick={bulk.addRow}
-            className="group flex items-center justify-center gap-0 hover:gap-1.5 p-1.5 hover:px-2.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-300"
+            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
             title="Add blank frame"
           >
             <Plus className="h-3.5 w-3.5 text-[#ff5500] shrink-0" />
-            <span className="max-w-0 overflow-hidden opacity-0 group-hover:max-w-[100px] group-hover:opacity-100 transition-all duration-300 ease-in-out text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
+            <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
               Add Frame
             </span>
           </button>
@@ -706,11 +733,11 @@ export const BulkVideoBuilder = () => {
           <button
             type="button"
             onClick={() => setShowTempMediaLibrary(true)}
-            className="group flex items-center justify-center gap-0 hover:gap-1.5 p-1.5 hover:px-2.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-300"
+            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
             title="Temporary Media Library"
           >
             <Folder className="h-3.5 w-3.5 text-[#0071e3] shrink-0" />
-            <span className="max-w-0 overflow-hidden opacity-0 group-hover:max-w-[120px] group-hover:opacity-100 transition-all duration-300 ease-in-out text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
+            <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
               Temp Library
             </span>
           </button>
@@ -718,11 +745,11 @@ export const BulkVideoBuilder = () => {
           <button
             type="button"
             onClick={alignAllCards}
-            className="group flex items-center justify-center gap-0 hover:gap-1.5 p-1.5 hover:px-2.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-300"
+            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
             title="Align Frames"
           >
             <Layout className="h-3.5 w-3.5 text-[#ff5500] shrink-0" />
-            <span className="max-w-0 overflow-hidden opacity-0 group-hover:max-w-[100px] group-hover:opacity-100 transition-all duration-300 ease-in-out text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
+            <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
               Align
             </span>
           </button>
@@ -730,11 +757,11 @@ export const BulkVideoBuilder = () => {
           <button
             type="button"
             onClick={fitView}
-            className="group flex items-center justify-center gap-0 hover:gap-1.5 p-1.5 hover:px-2.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-300"
+            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
             title="Fit View"
           >
             <Crosshair className="h-3.5 w-3.5 text-[#0071e3] shrink-0" />
-            <span className="max-w-0 overflow-hidden opacity-0 group-hover:max-w-[100px] group-hover:opacity-100 transition-all duration-300 ease-in-out text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
+            <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
               Fit
             </span>
           </button>
@@ -744,11 +771,11 @@ export const BulkVideoBuilder = () => {
           <button
             type="button"
             onClick={handleClearAll}
-            className="group flex items-center justify-center gap-0 hover:gap-1.5 p-1.5 hover:px-2.5 rounded-lg bg-red-950/30 border border-red-800/40 text-red-400 transition-all hover:bg-red-900/40 active:scale-95 duration-300"
+            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-950/30 border border-red-800/40 text-red-400 transition-all hover:bg-red-900/40 active:scale-95 duration-200"
             title="Clear all frames"
           >
             <Trash2 className="h-3.5 w-3.5 shrink-0" />
-            <span className="max-w-0 overflow-hidden opacity-0 group-hover:max-w-[100px] group-hover:opacity-100 transition-all duration-300 ease-in-out text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
+            <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
               Clear
             </span>
           </button>
@@ -883,6 +910,7 @@ export const BulkVideoBuilder = () => {
       {/* Caption AI generator Drawer */}
       {captionDrawerRowId && (
         <CaptionDrawer
+          targetRowId={captionDrawerRowId}
           token={token}
           currentCaption={bulk.rows.find((r) => r.id === captionDrawerRowId)?.caption || ''}
           suggestions={generatedSuggestions}

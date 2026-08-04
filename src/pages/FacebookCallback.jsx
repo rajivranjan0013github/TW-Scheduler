@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
@@ -6,11 +6,13 @@ export const FacebookCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const code = searchParams.get('code');
+  const exchangeStartedRef = useRef(false);
 
-  const navigateAfterConnect = () => {
+  const navigateAfterConnect = useCallback(() => {
     const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
     const returnPath = sessionStorage.getItem('connect_return_path') || '';
     sessionStorage.removeItem('connect_return_path');
+    sessionStorage.removeItem('reauthorize_account_id');
 
     if (returnPath) {
       navigate(returnPath);
@@ -18,20 +20,13 @@ export const FacebookCallback = () => {
     }
 
     navigate('/channels', { state: storedCampaignId ? { campaignId: storedCampaignId } : undefined });
-  };
+  }, [navigate]);
 
-  useEffect(() => {
-    if (code) {
-      exchangeToken();
-    } else {
-      navigateAfterConnect();
-    }
-  }, [code]);
-
-  const exchangeToken = async () => {
+  const exchangeToken = useCallback(async () => {
     try {
       const token = localStorage.getItem('tw_token');
       const campaignId = sessionStorage.getItem('connect_campaign_id') || localStorage.getItem('active-campaign-id') || '';
+      const reauthorizeAccountId = sessionStorage.getItem('reauthorize_account_id') || '';
       const apiBaseUrl = API_BASE_URL;
       const response = await fetch(`${apiBaseUrl}/api/accounts/facebook-callback`, {
         method: 'POST',
@@ -39,7 +34,7 @@ export const FacebookCallback = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ code, campaignId }),
+        body: JSON.stringify({ code, campaignId, reauthorizeAccountId }),
       });
 
       const data = await response.json();
@@ -54,7 +49,17 @@ export const FacebookCallback = () => {
     } finally {
       navigateAfterConnect();
     }
-  };
+  }, [code, navigateAfterConnect]);
+
+  useEffect(() => {
+    if (code) {
+      if (exchangeStartedRef.current) return;
+      exchangeStartedRef.current = true;
+      exchangeToken();
+    } else {
+      navigateAfterConnect();
+    }
+  }, [code, exchangeToken, navigateAfterConnect]);
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] flex flex-col items-center justify-center font-sans p-6 text-[#1d1d1f]">

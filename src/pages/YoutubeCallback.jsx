@@ -13,6 +13,7 @@ export const YoutubeCallback = () => {
     const storedCampaignId = sessionStorage.getItem('connect_campaign_id') || '';
     const returnPath = sessionStorage.getItem('connect_return_path') || '';
     sessionStorage.removeItem('connect_return_path');
+    sessionStorage.removeItem('reauthorize_account_id');
 
     if (returnPath) {
       navigate(returnPath);
@@ -26,13 +27,14 @@ export const YoutubeCallback = () => {
     try {
       const token = localStorage.getItem('tw_token');
       const campaignId = sessionStorage.getItem('connect_campaign_id') || localStorage.getItem('active-campaign-id') || '';
+      const reauthorizeAccountId = sessionStorage.getItem('reauthorize_account_id') || '';
       const response = await fetch(`${API_BASE_URL}/api/accounts/youtube-callback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ code, campaignId }),
+        body: JSON.stringify({ code, campaignId, reauthorizeAccountId }),
       });
 
       const data = await response.json();

@@ -1,14 +1,16 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { AlertCircle, Calendar, CheckCircle, Share2, RefreshCw } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle, MoreVertical, Share2, SkipForward, TimerOff, RefreshCw } from 'lucide-react';
 import { getMediaUrl } from '../utils/mediaUrls';
 import PlatformIcon from '../components/PlatformIcon';
 import { PwaInstallButton } from '../components/PwaInstallButton';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 const POST_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const HANDLER_DATA_REFRESH_MS = 30 * 60 * 1000;
 
 const copyToClipboard = (text) => {
   if (navigator.clipboard && window.isSecureContext) {
@@ -36,6 +38,7 @@ const copyToClipboard = (text) => {
 export const CreatorCampaigns = () => {
   const { token } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
   const [posts, setPosts] = useState([]);
   const [todayTracking, setTodayTracking] = useState({});
@@ -43,9 +46,13 @@ export const CreatorCampaigns = () => {
   const [error, setError] = useState('');
   const [sharingPostId, setSharingPostId] = useState(null);
   const [markingPostId, setMarkingPostId] = useState(null);
+  const [bypassingPostId, setBypassingPostId] = useState(null);
+  const [openQueueMenuId, setOpenQueueMenuId] = useState(null);
   const [postedToast, setPostedToast] = useState(null);
   const [nowMs, setNowMs] = useState(0);
   const shareBlobRef = useRef(null);
+  const lastDataRefreshAtRef = useRef(0);
+  const foregroundRefreshInFlightRef = useRef(false);
 
   // Pull-to-refresh state & refs
   const [pullDistance, setPullDistance] = useState(0);
@@ -128,7 +135,10 @@ export const CreatorCampaigns = () => {
     return `${minutes}m`;
   };
 
-  const getPostingCooldown = (tracking = {}, manualPostedAt = null) => {
+  const getPostingCooldown = (tracking = {}, manualPostedAt = null, post = null) => {
+    if (post?.cooldownBypassGrantedAt && !post?.cooldownBypassUsedAt) {
+      return { isLocked: false, remainingMs: 0, label: '', isBypassed: true };
+    }
     const trackedPublishedAt = parseDateValue(
       tracking.lastPublishedAt || tracking.posts?.[0]?.publishedAt
     );
@@ -349,6 +359,70 @@ export const CreatorCampaigns = () => {
     }
   };
 
+  const handleConfirmPostedOverride = async (post) => {
+    const confirmed = window.confirm(
+      'Confirm that this post is already live. Provider verification will be bypassed and the queue will move to the next post.'
+    );
+    if (!confirmed) return;
+
+    setMarkingPostId(post._id);
+    setOpenQueueMenuId(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/manual-posted-override`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Could not confirm this post manually.');
+
+      updatePostInList(data);
+      const headers = { Authorization: `Bearer ${token}` };
+      const trackingData = await fetchTodayTracking(headers, { force: true });
+      setTodayTracking(trackingData.accounts || {});
+      setPostedToast({
+        type: 'marked',
+        message: 'Post confirmed manually. The next queue item is ready.',
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['creator'] }),
+        queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setMarkingPostId(null);
+    }
+  };
+
+  const handleCooldownBypass = async (post) => {
+    const confirmed = window.confirm(
+      'Allow this post to bypass the six-hour cooldown once? The exception will be consumed when the post is shared.'
+    );
+    if (!confirmed) return;
+
+    setBypassingPostId(post._id);
+    setOpenQueueMenuId(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/cooldown-bypass`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Could not bypass the cooldown for this post.');
+
+      updatePostInList(data);
+      setPostedToast({
+        type: 'verified',
+        message: 'One-time cooldown bypass enabled for this post.',
+      });
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBypassingPostId(null);
+    }
+  };
+
   const handleNotPosted = (post) => {
     setPostedToast(null);
     const shareReadyPost = {
@@ -412,6 +486,7 @@ export const CreatorCampaigns = () => {
       setCampaigns(campData);
       setPosts(postData);
       setTodayTracking(trackingData.accounts || {});
+      lastDataRefreshAtRef.current = Date.now();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -495,6 +570,7 @@ export const CreatorCampaigns = () => {
         setCampaigns(campData);
         setPosts(postData);
         setTodayTracking(trackingData.accounts || {});
+        lastDataRefreshAtRef.current = Date.now();
       } catch (err) {
         if (active) setError(err.message);
       } finally {
@@ -510,6 +586,37 @@ export const CreatorCampaigns = () => {
       active = false;
     };
   }, [fetchTodayTracking, queryClient, token]);
+
+  useEffect(() => {
+    const refreshStaleHandlerData = () => {
+      if (!token || document.visibilityState === 'hidden') return;
+      if (!lastDataRefreshAtRef.current || foregroundRefreshInFlightRef.current) return;
+      if (Date.now() - lastDataRefreshAtRef.current < HANDLER_DATA_REFRESH_MS) return;
+
+      foregroundRefreshInFlightRef.current = true;
+      setIsRefreshing(true);
+      void loadData({ silent: true, force: true }).finally(() => {
+        foregroundRefreshInFlightRef.current = false;
+        setIsRefreshing(false);
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshStaleHandlerData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', refreshStaleHandlerData);
+    const intervalId = window.setInterval(refreshStaleHandlerData, 60 * 1000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', refreshStaleHandlerData);
+      window.clearInterval(intervalId);
+    };
+  }, [loadData, token]);
 
   useEffect(() => {
     const updateNow = () => {
@@ -564,6 +671,25 @@ export const CreatorCampaigns = () => {
     || account?.isVerified === false
     || account?.isConnected === false
   );
+  const getChannelConnectionNotice = (account) => {
+    if (['expired', 'reauth_required'].includes(account?.tokenStatus)) {
+      return { label: 'Token expired', detail: 'Reconnect this channel to resume posting.' };
+    }
+    if (account?.status === 'disconnected' || account?.isConnected === false) {
+      return { label: 'Channel disconnected', detail: 'Reconnect this channel to resume posting.' };
+    }
+    if (['manual_only', 'pending_verification'].includes(account?.status) || account?.isVerified === false) {
+      return { label: 'Needs verification', detail: 'Verify this channel before automatic posting.' };
+    }
+    return null;
+  };
+  const campaignConnectionIssues = assignedCampaigns.flatMap((camp) => (
+    (camp.channels || []).map((channel) => ({
+      camp,
+      channel,
+      notice: getChannelConnectionNotice(channel),
+    })).filter((item) => item.notice)
+  ));
   const getManualPostedToday = (items = []) => (
     items
       .filter((post) => post.status === 'posted_manual' && isTodayDate(post.manualPostedAt))
@@ -735,6 +861,55 @@ export const CreatorCampaigns = () => {
                   popoverClassName="right-0"
                 />
               </div>
+              {campaignConnectionIssues.length > 0 && (
+                <section className="overflow-hidden rounded-xl border border-[#e5e5ea] bg-white shadow-sm">
+                  <div className="border-b border-[#e5e5ea] px-4 py-4 sm:px-6">
+                    <h3 className="m-0 text-sm font-semibold text-black">Channels To Reconnect</h3>
+                  </div>
+                  <div className="grid gap-2 p-3 md:gap-3 md:p-4 lg:grid-cols-2">
+                    {campaignConnectionIssues.map(({ camp, channel, notice }) => (
+                      <div
+                        key={`${camp._id}-${channel._id}`}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 md:p-3"
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <PlatformIcon platform={channel.platform} className="h-7 w-7 md:h-8 md:w-8" />
+                            {channel.avatarUrl ? (
+                              <img
+                                src={channel.avatarUrl}
+                                crossOrigin="anonymous"
+                                className="h-7 w-7 rounded-full border border-amber-200/50 object-cover shadow-sm md:h-8 md:w-8"
+                                alt=""
+                              />
+                            ) : (
+                              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-amber-200/50 bg-amber-100 text-xs font-bold text-amber-700 md:h-8 md:w-8">
+                                {(getAccountLabel(channel).charAt(0) || '@').toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="m-0 truncate text-sm font-semibold text-[#1d1d1f]">
+                              {getAccountLabel(channel).startsWith('@')
+                                ? getAccountLabel(channel)
+                                : `@${getAccountLabel(channel)}`}
+                            </p>
+                            <p className="m-0 truncate text-xs text-[#8a6b1f]">{camp.name}</p>
+                            <p className="m-0 truncate text-[9px] font-semibold text-red-600">{notice.label}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => navigate('/channels', { state: { campaignId: camp._id } })}
+                          className="shrink-0 rounded-lg bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white transition hover:bg-black"
+                        >
+                          Reconnect
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
               {assignedCampaigns.length > 0 ? (
                 <div className="grid gap-x-5 gap-y-5 md:gap-x-7 md:gap-y-6 lg:grid-cols-2">
                   {campaignQueueViews.flatMap(({ camp, accountQueues }) => {
@@ -771,7 +946,10 @@ export const CreatorCampaigns = () => {
                         ...manualPostedToday,
                       ]);
                       const awaitingPostedDecision = isAwaitingPostedDecision(queuePost);
-                      const postingCooldown = getPostingCooldown(tracking, latestManualPostedAt);
+                      const postingCooldown = getPostingCooldown(tracking, latestManualPostedAt, queuePost);
+                      const canConfirmAndContinue = Boolean(queuePost && awaitingPostedDecision);
+                      const canBypassCooldown = Boolean(queuePost && postingCooldown.isLocked);
+                      const showQueueMenu = canConfirmAndContinue || canBypassCooldown;
 
                       return (
                         <div key={`${camp._id}-${queue.accountId}`} className="rounded-lg border border-[#e5e5ea] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
@@ -814,11 +992,62 @@ export const CreatorCampaigns = () => {
                                 */}
                               </div>
                             </div>
-                            {queue.nextPost && (
-                              <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                                {queue.actionableQueue.length} left
-                              </span>
-                            )}
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              {queue.nextPost && (
+                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                  {queue.actionableQueue.length} left
+                                </span>
+                              )}
+                              {showQueueMenu && (
+                                <div className="relative">
+                                  <button
+                                    type="button"
+                                    onClick={() => setOpenQueueMenuId((current) => (
+                                      current === queue.accountId ? null : queue.accountId
+                                    ))}
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#e5e5ea] bg-white text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-black"
+                                    aria-label="More queue actions"
+                                    aria-expanded={openQueueMenuId === queue.accountId}
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </button>
+                                  {openQueueMenuId === queue.accountId && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="fixed inset-0 z-20 cursor-default"
+                                        aria-label="Close queue actions"
+                                        onClick={() => setOpenQueueMenuId(null)}
+                                      />
+                                      <div className="absolute right-0 top-9 z-30 w-56 overflow-hidden rounded-lg border border-[#d2d2d7] bg-white p-1.5 shadow-[0_14px_36px_rgba(15,23,42,0.18)]">
+                                        {canConfirmAndContinue && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleConfirmPostedOverride(queuePost)}
+                                            disabled={markingPostId === queuePost._id}
+                                            className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition hover:bg-[#f5f5f7] disabled:opacity-60"
+                                          >
+                                            <SkipForward className="mt-0.5 h-4 w-4 shrink-0 text-[#1d1d1f]" />
+                                            <span className="text-[11px] font-bold text-[#1d1d1f]">Confirm posted & move next</span>
+                                          </button>
+                                        )}
+                                        {canBypassCooldown && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleCooldownBypass(queuePost)}
+                                            disabled={bypassingPostId === queuePost._id}
+                                            className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition hover:bg-[#f5f5f7] disabled:opacity-60"
+                                          >
+                                            <TimerOff className="mt-0.5 h-4 w-4 shrink-0 text-[#1d1d1f]" />
+                                            <span className="text-[11px] font-bold text-[#1d1d1f]">Allow next post now</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="mb-2 rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-2">

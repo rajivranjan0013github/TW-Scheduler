@@ -51,6 +51,7 @@ export const BulkVideoRow = ({
   row,
   rowIndex,
   isActiveCaption,
+  isCaptionTarget = false,
   inverseZoomScale = 1,
   onPickVideo1,
   onPickVideo2,
@@ -82,7 +83,6 @@ export const BulkVideoRow = ({
     width: SOURCE_PREVIEW_WIDTH,
     height: SOURCE_PREVIEW_HEIGHT,
   });
-  const [playingPreviewSlot, setPlayingPreviewSlot] = useState(null);
 
   // Calculate layout sizes on mount/resize
   useEffect(() => {
@@ -218,19 +218,14 @@ export const BulkVideoRow = ({
       if (otherRef.current && !otherRef.current.paused) {
         otherRef.current.pause();
       }
-      void videoEl.play()
-        .then(() => setPlayingPreviewSlot(slot))
-        .catch(() => setPlayingPreviewSlot(null));
+      void videoEl.play().catch(() => {});
       return;
     }
 
     videoEl.pause();
-    setPlayingPreviewSlot(null);
   };
 
-  const handlePreviewStopped = (slot) => {
-    setPlayingPreviewSlot((current) => (current === slot ? null : current));
-  };
+  const handlePreviewStopped = () => {};
 
   // Node Drag Handler (Header bar drag movement)
   const handleNodePointerDown = (event) => {
@@ -307,7 +302,7 @@ export const BulkVideoRow = ({
     setIsDraggingCaption(false);
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch (err) {
+    } catch {
       // Safe releases
     }
   };
@@ -330,7 +325,11 @@ export const BulkVideoRow = ({
   };
 
   return (
-    <div className="w-[340px] bg-[#1c1c1e] border border-[#2d2d30] rounded-2xl p-4 shadow-xl select-none hover:border-[#3a3a3c] transition-all flex flex-col gap-3 relative z-10 pointer-events-auto">
+    <div className={`w-[340px] bg-[#1c1c1e] border rounded-2xl p-4 shadow-xl select-none transition-colors flex flex-col gap-3 relative z-10 pointer-events-auto ${
+      isCaptionTarget
+        ? 'border-[#ff5500]'
+        : 'border-[#2d2d30] hover:border-[#3a3a3c]'
+    }`}>
       
       {/* Node Header (Acts as Canvas Drag Handle) */}
       <div
@@ -348,7 +347,7 @@ export const BulkVideoRow = ({
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <div className="relative group/tooltip">
+          <div className="relative">
             <button
               type="button"
               onClick={(e) => {
@@ -367,11 +366,6 @@ export const BulkVideoRow = ({
                 Text
               </span>
             </button>
-            {caption && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-[#18181b] border border-[#2d2d30] text-white text-[9px] px-2.5 py-1.5 rounded-lg shadow-2xl z-30 max-w-[180px] break-words text-center leading-normal">
-                {caption}
-              </div>
-            )}
           </div>
 
           <div className="relative group/tooltip">
@@ -437,7 +431,6 @@ export const BulkVideoRow = ({
                   playsInline
                   preload="metadata"
                   crossOrigin="anonymous"
-                  onPlay={() => setPlayingPreviewSlot('video1')}
                   onPause={() => handlePreviewStopped('video1')}
                   onEnded={() => handlePreviewStopped('video1')}
                 />
@@ -619,7 +612,6 @@ export const BulkVideoRow = ({
                     playsInline
                     preload="metadata"
                     crossOrigin="anonymous"
-                    onPlay={() => setPlayingPreviewSlot('video2')}
                     onPause={() => handlePreviewStopped('video2')}
                     onEnded={() => handlePreviewStopped('video2')}
                   />

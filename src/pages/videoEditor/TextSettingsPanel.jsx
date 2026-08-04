@@ -45,7 +45,7 @@ export const TextSettingsPanel = ({
   return (
     <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl p-4 shadow-sm select-none max-h-[580px] flex flex-col">
       <div className="space-y-5 overflow-y-auto pr-0.5 scrollbar-thin">
-        
+
         {/* Audio Section */}
         <div className="space-y-2">
           <button
@@ -190,11 +190,10 @@ export const TextSettingsPanel = ({
                   key={type}
                   type="button"
                   onClick={() => handleBgTypeClick(type)}
-                  className={`flex-1 py-1.5 text-xs font-semibold rounded-full border transition-all ${
-                    bgType === type
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-full border transition-all ${bgType === type
                       ? 'bg-[#ff5500] border-[#ff5500] text-white'
                       : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   {type}
                 </button>

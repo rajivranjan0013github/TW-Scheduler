@@ -112,6 +112,7 @@ export const VideoEditor = () => {
   const [bulkSavingRowId, setBulkSavingRowId] = useState(null);
   const [folderPickerError, setFolderPickerError] = useState('');
   const [folderSearch, setFolderSearch] = useState('');
+  const [uploadQueue, setUploadQueue] = useState(null);
 
   const toggleFolderExpanded = useCallback((folderId) => {
     setExpandedFolderIds((prev) => {
@@ -390,12 +391,12 @@ export const VideoEditor = () => {
 
         filterComplex = hasReplacementAudio
           ? baseVideoFilters +
-            `[v0text][v1]concat=n=2:v=1:a=0[outv];` +
-            selectedAudioFilter
+          `[v0text][v1]concat=n=2:v=1:a=0[outv];` +
+          selectedAudioFilter
           : baseVideoFilters +
-            audio0Filter +
-            audio1Filter +
-            `[v0text][a0][v1][a1]concat=n=2:v=1:a=1[outv][a]`;
+          audio0Filter +
+          audio1Filter +
+          `[v0text][a0][v1][a1]concat=n=2:v=1:a=1[outv][a]`;
       } else {
         const baseVideoFilters =
           `[0:v]setpts=PTS-STARTPTS,scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,pad=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${OUTPUT_FPS}[v0];` +
@@ -404,9 +405,9 @@ export const VideoEditor = () => {
         filterComplex = hasReplacementAudio
           ? baseVideoFilters + selectedAudioFilter
           : baseVideoFilters +
-            (video1HasAudio
-              ? `[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,asetpts=PTS-STARTPTS[a];`
-              : `anullsrc=channel_layout=stereo:sample_rate=44100:d=${Math.max(input1Duration, 0.1)},asetpts=PTS-STARTPTS[a];`);
+          (video1HasAudio
+            ? `[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,asetpts=PTS-STARTPTS[a];`
+            : `anullsrc=channel_layout=stereo:sample_rate=44100:d=${Math.max(input1Duration, 0.1)},asetpts=PTS-STARTPTS[a];`);
       }
 
       const exitCode = await ffmpeg.exec([
@@ -582,11 +583,10 @@ export const VideoEditor = () => {
             <div key={folder._id} className="flex flex-col">
               <div
                 style={{ paddingLeft: `${depth * 16}px` }}
-                className={`flex items-center justify-between rounded-xl px-2 py-1.5 transition-colors border ${
-                  isSelected
+                className={`flex items-center justify-between rounded-xl px-2 py-1.5 transition-colors border ${isSelected
                     ? 'bg-[#ff5500]/10 border-[#ff5500]/25'
                     : 'bg-gray-50 border-transparent hover:bg-gray-100'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
                   {hasSubfolders ? (
@@ -610,9 +610,8 @@ export const VideoEditor = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedSaveFolderId(folder._id)}
-                    className={`flex flex-1 items-center gap-2 text-left text-xs font-bold ${
-                      isSelected ? 'text-[#ff5500]' : 'text-gray-700'
-                    }`}
+                    className={`flex flex-1 items-center gap-2 text-left text-xs font-bold ${isSelected ? 'text-[#ff5500]' : 'text-gray-700'
+                      }`}
                   >
                     <Folder className={`h-4 w-4 ${isSelected ? 'text-[#ff5500]' : 'text-gray-400'}`} />
                     <span className="truncate">{folder.name}</span>
@@ -732,9 +731,42 @@ export const VideoEditor = () => {
         if (rowsToSave.length === 0) {
           throw new Error('No generated videos are available to save.');
         }
-        for (const row of rowsToSave) {
-          await saveOneBulkRowToMediaLibrary(row);
+        setUploadQueue({
+          active: true,
+          items: rowsToSave.map((row, index) => ({
+            id: row.id,
+            name: row.resultMediaName || `Video ${index + 1}`,
+            status: 'pending',
+          })),
+        });
+        for (let index = 0; index < rowsToSave.length; index += 1) {
+          const row = rowsToSave[index];
+          setUploadQueue((queue) => ({
+            ...queue,
+            items: queue.items.map((item) => (
+              item.id === row.id ? { ...item, status: 'uploading' } : item
+            )),
+          }));
+          try {
+            await saveOneBulkRowToMediaLibrary(row);
+            setUploadQueue((queue) => ({
+              ...queue,
+              items: queue.items.map((item) => (
+                item.id === row.id ? { ...item, status: 'success' } : item
+              )),
+            }));
+          } catch (error) {
+            setUploadQueue((queue) => ({
+              ...queue,
+              active: false,
+              items: queue.items.map((item) => (
+                item.id === row.id ? { ...item, status: 'error', error: error.message } : item
+              )),
+            }));
+            throw error;
+          }
         }
+        setUploadQueue((queue) => ({ ...queue, active: false }));
         setStatusMessage({ type: 'success', text: `${rowsToSave.length} videos saved successfully to your Media Library!` });
       } else if (folderPickerMode === 'single-editor') {
         await saveToMediaLibrary();
@@ -745,6 +777,7 @@ export const VideoEditor = () => {
       }
 
       setFolderPickerRowId(null);
+      setUploadQueue(null);
     } catch (err) {
       setFolderPickerError(err.message || 'Failed to save video.');
     } finally {
@@ -771,13 +804,13 @@ export const VideoEditor = () => {
       const resetRows = queueRows.map((row) => (
         hasVideo(row)
           ? {
-              ...row,
-              status: 'ready',
-              resultMediaId: '',
-              resultMediaUrl: '',
-              resultMediaName: '',
-              resultVideoUrl: '',
-            }
+            ...row,
+            status: 'ready',
+            resultMediaId: '',
+            resultMediaUrl: '',
+            resultMediaName: '',
+            resultVideoUrl: '',
+          }
           : row
       ));
       setBulkRows(resetRows);
@@ -809,13 +842,13 @@ export const VideoEditor = () => {
       const next = prev.map((row) => (
         row.id === rowId
           ? {
-              ...row,
-              status: 'ready',
-              resultMediaId: '',
-              resultMediaUrl: '',
-              resultMediaName: '',
-              resultVideoUrl: '',
-            }
+            ...row,
+            status: 'ready',
+            resultMediaId: '',
+            resultMediaUrl: '',
+            resultMediaName: '',
+            resultVideoUrl: '',
+          }
           : row
       ));
       try {
@@ -1086,13 +1119,13 @@ export const VideoEditor = () => {
           prev.map((r) => (
             r.id === row.id
               ? {
-                  ...r,
-                  status: 'done',
-                  resultVideoUrl: result.url,
-                  resultMediaId: '',
-                  resultMediaUrl: '',
-                  resultMediaName: `bulk_video_${idx + 1}.mp4`,
-                }
+                ...r,
+                status: 'done',
+                resultVideoUrl: result.url,
+                resultMediaId: '',
+                resultMediaUrl: '',
+                resultMediaName: `bulk_video_${idx + 1}.mp4`,
+              }
               : r
           ))
         );
@@ -1101,13 +1134,13 @@ export const VideoEditor = () => {
           const updated = saved.map((r) => (
             r.id === row.id
               ? {
-                  ...r,
-                  status: 'done',
-                  resultVideoUrl: result.url,
-                  resultMediaId: '',
-                  resultMediaUrl: '',
-                  resultMediaName: `bulk_video_${idx + 1}.mp4`,
-                }
+                ...r,
+                status: 'done',
+                resultVideoUrl: result.url,
+                resultMediaId: '',
+                resultMediaUrl: '',
+                resultMediaName: `bulk_video_${idx + 1}.mp4`,
+              }
               : r
           ));
           localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(updated.map(sanitizeBulkRowForStorage)));
@@ -1217,13 +1250,13 @@ export const VideoEditor = () => {
           prev.map((r) => (
             r.id === row.id
               ? {
-                  ...r,
-                  status: 'done',
-                  resultVideoUrl: result.url,
-                  resultMediaId: '',
-                  resultMediaUrl: '',
-                  resultMediaName: `bulk_video_${currentQueueIndex + 1}.mp4`,
-                }
+                ...r,
+                status: 'done',
+                resultVideoUrl: result.url,
+                resultMediaId: '',
+                resultMediaUrl: '',
+                resultMediaName: `bulk_video_${currentQueueIndex + 1}.mp4`,
+              }
               : r
           ))
         );
@@ -1232,13 +1265,13 @@ export const VideoEditor = () => {
           const resetSaved = saved.map((r) => (
             r.id === row.id
               ? {
-                  ...r,
-                  status: 'ready',
-                  resultMediaId: '',
-                  resultMediaUrl: '',
-                  resultMediaName: '',
-                  resultVideoUrl: '',
-                }
+                ...r,
+                status: 'ready',
+                resultMediaId: '',
+                resultMediaUrl: '',
+                resultMediaName: '',
+                resultVideoUrl: '',
+              }
               : r
           ));
           localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(resetSaved.map(sanitizeBulkRowForStorage)));
@@ -1402,11 +1435,10 @@ export const VideoEditor = () => {
                     }
                   }}
                   disabled={readyBulkCount === 0}
-                  className={`px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all active:scale-95 ${
-                    isQueueRunning
+                  className={`px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all active:scale-95 ${isQueueRunning
                       ? 'bg-red-500 text-white hover:bg-red-600'
                       : 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed'
-                  }`}
+                    }`}
                 >
                   {isQueueRunning ? 'Stop' : pendingBulkCount > 0 ? 'Start' : 'Again'}
                 </button>
@@ -1430,9 +1462,8 @@ export const VideoEditor = () => {
 
             {/* General Status Messages */}
             {statusMessage && (
-              <div className={`p-2.5 rounded-xl border text-[10px] font-semibold ${
-                statusMessage.type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'
-              }`}>
+              <div className={`p-2.5 rounded-xl border text-[10px] font-semibold ${statusMessage.type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'
+                }`}>
                 {statusMessage.text}
               </div>
             )}
@@ -1457,12 +1488,11 @@ export const VideoEditor = () => {
                         setCurrentQueueIndex(idx);
                       }
                     }}
-                    className={`relative flex items-center justify-between p-2 transition-colors ${
-                      isQueueRunning
+                    className={`relative flex items-center justify-between p-2 transition-colors ${isQueueRunning
                         ? 'cursor-not-allowed opacity-80'
                         : 'cursor-pointer hover:bg-gray-50'
-                    } ${isActive ? 'bg-slate-50' : 'bg-white'
-                    }`}
+                      } ${isActive ? 'bg-slate-50' : 'bg-white'
+                      }`}
                   >
                     {isActive && (
                       <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full bg-[#0071e3]" />
@@ -1488,18 +1518,17 @@ export const VideoEditor = () => {
                           <Play className="h-3 w-3 fill-current" />
                         </button>
                       )}
-                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
-            row.status === 'done' ? 'bg-green-50 text-green-600' :
-            row.status === 'processing' ? 'bg-amber-50 text-amber-600 animate-pulse' :
-            row.status === 'saving' ? 'bg-purple-50 text-purple-600 animate-pulse' :
-            row.status === 'error' ? 'bg-red-50 text-red-600' :
-            'bg-gray-100 text-gray-500'
-                      }`}>
-            {row.status === 'done' ? 'Done' :
-             row.status === 'processing' ? 'Proc' :
-             row.status === 'saving' ? 'Save' :
-             row.status === 'error' ? 'Err' :
-             'Pend'}
+                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full ${row.status === 'done' ? 'bg-green-50 text-green-600' :
+                          row.status === 'processing' ? 'bg-amber-50 text-amber-600 animate-pulse' :
+                            row.status === 'saving' ? 'bg-purple-50 text-purple-600 animate-pulse' :
+                              row.status === 'error' ? 'bg-red-50 text-red-600' :
+                                'bg-gray-100 text-gray-500'
+                        }`}>
+                        {row.status === 'done' ? 'Done' :
+                          row.status === 'processing' ? 'Proc' :
+                            row.status === 'saving' ? 'Save' :
+                              row.status === 'error' ? 'Err' :
+                                'Pend'}
                       </span>
                     </div>
                   </div>
@@ -1731,7 +1760,7 @@ export const VideoEditor = () => {
                       </div>
                     </div>
                     {row.generatedCaption && (
-                      <p 
+                      <p
                         className="text-[9px] font-medium text-gray-500 line-clamp-3 whitespace-pre-line border-t border-gray-100 pt-1.5 mt-1 cursor-help"
                         onMouseEnter={(e) => showTooltip(e, row.generatedCaption)}
                         onMouseLeave={hideTooltip}
@@ -1749,7 +1778,7 @@ export const VideoEditor = () => {
 
       {folderPickerRowId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl h-[520px] flex flex-col">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl h-[520px] flex flex-col">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 shrink-0">
               <div>
                 <h3 className="text-sm font-bold text-gray-950">Choose Save Folder</h3>
@@ -1761,7 +1790,13 @@ export const VideoEditor = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setFolderPickerRowId(null)}
+                onClick={() => {
+                  if (!uploadQueue?.active) {
+                    setFolderPickerRowId(null);
+                    setUploadQueue(null);
+                  }
+                }}
+                disabled={uploadQueue?.active}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-800"
               >
                 <X className="h-4 w-4" />
@@ -1805,11 +1840,10 @@ export const VideoEditor = () => {
                               key={folder._id}
                               type="button"
                               onClick={() => setSelectedSaveFolderId(folder._id)}
-                              className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold border transition-colors ${
-                                isSelected
+                              className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold border transition-colors ${isSelected
                                   ? 'bg-[#ff5500]/10 border-[#ff5500]/25 text-[#ff5500]'
                                   : 'bg-gray-50 border-transparent text-gray-700 hover:bg-gray-100'
-                              }`}
+                                }`}
                             >
                               <Folder className={`h-4 w-4 ${isSelected ? 'text-[#ff5500]' : 'text-gray-450'}`} />
                               <span className="truncate">{folder.name}</span>
@@ -1832,7 +1866,11 @@ export const VideoEditor = () => {
             <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 shrink-0">
               <button
                 type="button"
-                onClick={() => setFolderPickerRowId(null)}
+                onClick={() => {
+                  setFolderPickerRowId(null);
+                  setUploadQueue(null);
+                }}
+                disabled={uploadQueue?.active}
                 className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-100"
               >
                 Cancel
@@ -1850,6 +1888,60 @@ export const VideoEditor = () => {
                     : 'Save Here'}
               </button>
             </div>
+
+            {uploadQueue && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 p-6 backdrop-blur-sm">
+                <div className="w-full rounded-2xl border border-gray-200 bg-white p-5 shadow-xl">
+                  <div className="mb-4 flex items-center gap-3">
+                    {uploadQueue.active ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-[#0071e3]" />
+                    ) : uploadQueue.items.some((item) => item.status === 'error') ? (
+                      <span className="text-lg text-red-600">!</span>
+                    ) : (
+                      <span className="text-lg text-green-600">✓</span>
+                    )}
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-950">
+                        {uploadQueue.active ? 'Uploading videos' : 'Upload queue finished'}
+                      </h4>
+                      <p className="text-[11px] font-semibold text-gray-500">
+                        {uploadQueue.items.filter((item) => item.status === 'success').length} of {uploadQueue.items.length} uploaded
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mb-4 h-2 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full bg-[#0071e3] transition-all duration-300"
+                      style={{ width: `${(uploadQueue.items.filter((item) => item.status === 'success').length / uploadQueue.items.length) * 100}%` }}
+                    />
+                  </div>
+                  <div className="max-h-64 space-y-2 overflow-y-auto">
+                    {uploadQueue.items.map((item, index) => (
+                      <div key={item.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2.5">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-bold text-gray-500 ring-1 ring-gray-200">
+                          {item.status === 'uploading' ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#0071e3]" /> : item.status === 'success' ? '✓' : item.status === 'error' ? '!' : index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-bold text-gray-800">{item.name}</p>
+                          <p className={`text-[10px] font-semibold ${item.status === 'error' ? 'text-red-600' : item.status === 'success' ? 'text-green-600' : 'text-gray-400'}`}>
+                            {item.status === 'uploading' ? 'Uploading…' : item.status === 'success' ? 'Uploaded' : item.status === 'error' ? (item.error || 'Upload failed') : 'Waiting'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {!uploadQueue.active && uploadQueue.items.some((item) => item.status === 'error') && (
+                    <button
+                      type="button"
+                      onClick={() => setUploadQueue(null)}
+                      className="mt-4 w-full rounded-xl bg-gray-950 px-4 py-2.5 text-xs font-bold text-white"
+                    >
+                      Back to folder selection
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { X, Sparkles, Loader2, Plus, Bookmark, Trash2, ArrowLeft } from 'lucide-react';
+import { X, Sparkles, Loader2, Plus, Bookmark, ArrowLeft, Search } from 'lucide-react';
 import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
 
 /**
@@ -7,6 +7,7 @@ import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
  * Supports manual input and AI generation.
  */
 export const CaptionDrawer = ({
+  targetRowId,
   token,
   currentCaption,
   suggestions = [],
@@ -17,17 +18,22 @@ export const CaptionDrawer = ({
   onClose,
 }) => {
   const [manualText, setManualText] = useState(currentCaption || '');
+  const [activeTargetRowId, setActiveTargetRowId] = useState(targetRowId);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [savedCaptions, setSavedCaptions] = useState([]);
-  const [loadingSaved, setLoadingSaved] = useState(false);
+  const [savedCaptionSearch, setSavedCaptionSearch] = useState('');
   const [viewMode, setViewMode] = useState('main'); // 'main' | 'bookmarks'
+
+  if (activeTargetRowId !== targetRowId) {
+    setActiveTargetRowId(targetRowId);
+    setManualText(currentCaption || '');
+  }
 
   // Load saved captions from database
   useEffect(() => {
     const fetchSavedCaptions = async () => {
-      setLoadingSaved(true);
       try {
         const response = await fetch(`${API_BASE_URL}/api/ai/saved-captions`, {
           headers: {
@@ -40,9 +46,7 @@ export const CaptionDrawer = ({
         }
       } catch (err) {
         console.error('Error fetching saved captions:', err);
-      } finally {
-        setLoadingSaved(false);
-      }
+      } finally { /* request completed */ }
     };
     void fetchSavedCaptions();
   }, [token]);
@@ -170,12 +174,6 @@ export const CaptionDrawer = ({
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/40"
-        onClick={onClose}
-      />
-
       {/* Drawer */}
       <div className="fixed right-0 top-0 bottom-0 z-50 w-[380px] max-w-[90vw] bg-[#18181b] border-l border-[#2d2d30] flex flex-col animate-slide-in-right text-[#e0e0e5] shadow-2xl">
         {/* Header */}
@@ -235,15 +233,24 @@ export const CaptionDrawer = ({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
-                    Click to apply bookmark
-                  </p>
-                  {savedCaptions.map((item) => (
-                    <div key={item._id} className="flex items-center gap-2">
+                  <label className="mb-3 flex items-center gap-2 rounded-xl border border-[#2d2d30] bg-[#121214] px-3 py-2.5 text-gray-500 focus-within:border-[#ff5500]/60 focus-within:text-[#ff5500]">
+                    <Search className="h-3.5 w-3.5 shrink-0" />
+                    <input
+                      type="search"
+                      value={savedCaptionSearch}
+                      onChange={(event) => setSavedCaptionSearch(event.target.value)}
+                      placeholder="Filter saved captions..."
+                      className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-gray-200 outline-none placeholder:text-gray-600"
+                    />
+                  </label>
+                  {savedCaptions
+                    .filter((item) => item.text?.toLowerCase().includes(savedCaptionSearch.trim().toLowerCase()))
+                    .map((item) => (
+                    <div key={item._id} className="relative">
                       <button
                         type="button"
                         onClick={() => handleSelectSuggestion(item.text)}
-                        className="flex-1 rounded-xl border border-[#2d2d30] bg-[#121214] p-3 text-left text-xs font-semibold text-gray-300 hover:border-[#ff5500]/40 hover:bg-[#1a1a1e] hover:text-white truncate"
+                        className="w-full min-w-0 whitespace-pre-wrap break-words rounded-xl border border-[#2d2d30] bg-[#121214] py-3 pl-3 pr-10 text-left text-xs font-semibold leading-relaxed text-gray-300 hover:border-[#ff5500]/40 hover:bg-[#1a1a1e] hover:text-white"
                         title={item.text}
                       >
                         {item.text}
@@ -251,13 +258,19 @@ export const CaptionDrawer = ({
                       <button
                         type="button"
                         onClick={() => handleToggleBookmark(item.text)}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#2d2d30] bg-[#121214] text-red-500 hover:bg-red-950/40 hover:text-red-400 hover:border-red-900/40 transition-colors"
-                        title="Remove Bookmark"
+                        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-red-950/50 hover:text-red-400"
+                        title="Remove saved caption"
+                        aria-label="Remove saved caption"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ))}
+                  {savedCaptionSearch.trim() && savedCaptions.filter((item) => item.text?.toLowerCase().includes(savedCaptionSearch.trim().toLowerCase())).length === 0 && (
+                    <div className="rounded-xl border border-dashed border-[#2d2d30] px-4 py-8 text-center text-xs font-semibold text-gray-500">
+                      No saved captions match “{savedCaptionSearch.trim()}”.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -410,16 +423,6 @@ export const CaptionDrawer = ({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end border-t border-[#2d2d30] px-4 py-2.5 bg-[#121214]">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-[#2d2d30] bg-[#27272a] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 hover:bg-[#3f3f46] hover:text-white transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
       </div>
 
       <style>{`

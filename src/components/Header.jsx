@@ -96,10 +96,10 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
 
   return (
     <header className="h-16 border-b border-[#e5e5ea] bg-white px-3 flex items-center justify-between sticky top-0 z-30 text-[#1d1d1f]">
-      
+
       {/* Social Account Selector Dropdown */}
       <div className="relative">
-        <button 
+        <button
           onClick={() => {
             setShowAccountDropdown(!showAccountDropdown);
           }}
@@ -124,7 +124,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
             </div>
             <div className="space-y-1 max-h-60 overflow-y-auto">
               {accounts.map(acc => (
-                <div 
+                <div
                   key={acc._id}
                   onClick={() => toggleAccountSelection(acc._id)}
                   className="flex items-center justify-between p-2 rounded-lg hover:bg-[#f5f5f7] cursor-pointer transition-all"
@@ -157,11 +157,11 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
         {/* Profile Details */}
         {user && (
           <div className="flex items-center gap-3 border-l border-[#e5e5ea] pl-6">
-            <img 
-              src={displayedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
+            <img
+              src={displayedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
               crossOrigin="anonymous"
-              className="w-7 h-7 rounded-full object-cover border border-black/10" 
-              alt="Avatar" 
+              className="w-7 h-7 rounded-full object-cover border border-black/10"
+              alt="Avatar"
             />
             <div className="hidden md:block">
               <p className="text-xs font-semibold text-[#1d1d1f] leading-none">{displayedUserName}</p>
@@ -181,7 +181,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
                 <span className="hidden lg:inline">Exit view</span>
               </button>
             )}
-            <button 
+            <button
               onClick={logout}
               className="p-1 hover:text-[#0071e3] text-gray-400 rounded-lg transition-all"
               title="Logout"

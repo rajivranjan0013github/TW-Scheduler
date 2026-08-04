@@ -3,7 +3,7 @@ import { API_BASE_URL } from '../config';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Trash2, ShieldCheck, Link2, Eye } from 'lucide-react';
+import { AlertTriangle, Trash2, ShieldCheck, Link2, Eye } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
 
@@ -122,29 +122,34 @@ export const Channels = () => {
     }
   };
 
-  const setConnectCampaignContext = (campaignId = activeConnectCampaignId) => {
+  const setConnectCampaignContext = (campaignId = activeConnectCampaignId, reauthorizeAccountId = '') => {
     if (campaignId) {
       sessionStorage.setItem('connect_campaign_id', campaignId);
     }
+    if (reauthorizeAccountId) {
+      sessionStorage.setItem('reauthorize_account_id', reauthorizeAccountId);
+    } else {
+      sessionStorage.removeItem('reauthorize_account_id');
+    }
   };
 
-  const connectMetaOAuth = (campaignId = activeConnectCampaignId) => {
-    setConnectCampaignContext(campaignId);
+  const connectMetaOAuth = (campaignId = activeConnectCampaignId, reauthorizeAccountId = '') => {
+    setConnectCampaignContext(campaignId, reauthorizeAccountId);
     const appId = import.meta.env.VITE_META_APP_ID || 'your-meta-app-id';
     const redirectUri = encodeURIComponent(window.location.origin + '/auth/facebook/callback');
     const scope = encodeURIComponent('pages_show_list,pages_read_engagement,pages_read_user_content,pages_manage_posts,instagram_basic,instagram_content_publish,read_insights,instagram_manage_insights');
-    const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code`;
+    const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${redirectUri}&scope=${scope}&response_type=code&auth_type=rerequest&return_scopes=true`;
     window.location.assign(oauthUrl);
   };
 
-  const connectInstagramOAuth = (campaignId = activeConnectCampaignId) => {
+  const connectInstagramOAuth = (campaignId = activeConnectCampaignId, reauthorizeAccountId = '') => {
     const appId = import.meta.env.VITE_INSTAGRAM_APP_ID;
     const facebookAppId = import.meta.env.VITE_META_APP_ID;
     if (!appId || appId === facebookAppId) {
       alert('Set VITE_INSTAGRAM_APP_ID to the Instagram App ID from Meta Dashboard > Instagram > API setup with Instagram login. It cannot be the Facebook App ID.');
       return;
     }
-    setConnectCampaignContext(campaignId);
+    setConnectCampaignContext(campaignId, reauthorizeAccountId);
     const rawRedirectUri = import.meta.env.VITE_INSTAGRAM_REDIRECT_URI || `${window.location.origin}/auth/instagram/callback`;
     sessionStorage.setItem('instagram_oauth_redirect_uri', rawRedirectUri);
     const redirectUri = encodeURIComponent(rawRedirectUri);
@@ -153,9 +158,9 @@ export const Channels = () => {
     window.location.assign(oauthUrl);
   };
 
-  const connectYoutubeOAuth = async (campaignId = activeConnectCampaignId) => {
+  const connectYoutubeOAuth = async (campaignId = activeConnectCampaignId, reauthorizeAccountId = '') => {
     try {
-      setConnectCampaignContext(campaignId);
+      setConnectCampaignContext(campaignId, reauthorizeAccountId);
       const token = localStorage.getItem('tw_token');
       const response = await fetch(`${API_BASE_URL}/api/accounts/youtube/auth-url`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -175,18 +180,19 @@ export const Channels = () => {
   };
 
   const handleVerifyChannel = (channel) => {
+    const reauthorizeAccountId = channel.matchedAccountId || channel.socialAccountId || '';
     if (channel.platform === 'instagram') {
-      connectInstagramOAuth(channel.campaignId);
+      connectInstagramOAuth(channel.campaignId, reauthorizeAccountId);
       return;
     }
 
     if (channel.platform === 'youtube') {
-      void connectYoutubeOAuth(channel.campaignId);
+      void connectYoutubeOAuth(channel.campaignId, reauthorizeAccountId);
       return;
     }
 
     if (channel.platform === 'facebook') {
-      connectMetaOAuth(channel.campaignId);
+      connectMetaOAuth(channel.campaignId, reauthorizeAccountId);
       return;
     }
   };
@@ -217,6 +223,9 @@ export const Channels = () => {
     const accountId = getChannelAccountId(channel);
     return !disconnectedChannelIds.includes(accountId) && !disconnectedChannelIds.includes(channel._id);
   });
+  const channelsMissingAnalyticsPermission = visibleChannels.filter((channel) => (
+    channel.platform === 'facebook' && channel.analyticsStatus === 'permission_missing'
+  ));
   const loading = channelsQuery.isLoading && normalizedChannels.length === 0;
 
   return (
@@ -280,6 +289,40 @@ export const Channels = () => {
                     className="shrink-0 rounded-lg bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white transition hover:bg-black"
                   >
                     Verify
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {channelsMissingAnalyticsPermission.length > 0 && (
+          <section className="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+            <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-3 sm:px-6">
+              <AlertTriangle className="h-4 w-4 text-amber-700" />
+              <h3 className="m-0 text-sm font-semibold text-amber-900">Facebook Analytics Access Needed</h3>
+            </div>
+            <div className="grid gap-2 p-3 md:gap-3 md:p-4 lg:grid-cols-2">
+              {channelsMissingAnalyticsPermission.map((channel) => (
+                <div
+                  key={`analytics-${channel._id}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <PlatformIcon platform={channel.platform} className="h-8 w-8 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="m-0 truncate text-sm font-semibold text-[#1d1d1f]">
+                        @{channel.username || channel.handle || 'facebook-page'}
+                      </p>
+                      <p className="m-0 truncate text-xs text-amber-800">Publishing remains connected</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => connectMetaOAuth(channel.campaignId, getChannelAccountId(channel))}
+                    className="shrink-0 rounded-lg bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white transition hover:bg-black"
+                  >
+                    Reconnect
                   </button>
                 </div>
               ))}

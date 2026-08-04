@@ -91,6 +91,7 @@ const createEmptyRow = (index = 0) => ({
  */
 export const useBulkRows = () => {
   const [isDualVideo, setIsDualVideo] = useState(getIsDualVideoFromStorage);
+  const [persistenceError, setPersistenceError] = useState('');
 
   const [rows, setRows] = useState(() => {
     try {
@@ -111,7 +112,13 @@ export const useBulkRows = () => {
 
   // Auto-save to localStorage on every change
   useEffect(() => {
-    localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(rows.map(sanitizeBulkRowForStorage)));
+    try {
+      localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(rows.map(sanitizeBulkRowForStorage)));
+      queueMicrotask(() => setPersistenceError(''));
+    } catch (error) {
+      console.error('Unable to save the bulk planning board:', error);
+      queueMicrotask(() => setPersistenceError('Changes could not be saved in this browser. Keep this page open and remove unused frames or temporary assets.'));
+    }
   }, [rows]);
 
   const addRow = useCallback(() => {
@@ -248,5 +255,6 @@ export const useBulkRows = () => {
     DEFAULT_TEXT_SETTINGS,
     isDualVideo,
     toggleDualVideo,
+    persistenceError,
   };
 };

@@ -29,9 +29,6 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   const isAdminViewingUser = canViewAdmin && Boolean(adminViewContext?.userId);
   const adminViewChannel = (!isChannelInsightRoute && location.state?.fromAdmin ? location.state.channel : null) || adminViewContext?.channel || null;
   const adminViewUserId = adminViewChannel?.user?._id || adminViewChannel?.userId?._id || adminViewChannel?.userId || adminViewContext?.userId || '';
-  const displayedUserName = isAdminViewingUser
-    ? (adminViewContext?.userName || adminViewChannel?.user?.name || adminViewChannel?.userId?.name || 'Selected user')
-    : user?.name;
   const displayedUserEmail = isAdminViewingUser
     ? (adminViewContext?.userEmail || adminViewChannel?.user?.email || adminViewChannel?.userId?.email || '')
     : user?.email;
@@ -187,7 +184,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     { name: 'Settings', label: 'Settings', path: '/settings', icon: SettingsIcon },
   ] : [
     { name: 'Campaigns', label: 'Campaigns', path: '/campaigns', icon: Megaphone },
-    { name: 'Performance', label: 'Perf', path: '/dashboard', icon: BarChart3 },
+    ...(canViewAdmin ? [{ name: 'Performance', label: 'Perf', path: '/dashboard', icon: BarChart3 }] : []),
     { name: 'Scheduled Queue', label: 'Queue', path: '/scheduler', icon: Clock },
     { name: 'Media Library', label: 'Media', path: '/media', icon: FolderHeart },
     { name: 'Video Editor', label: 'Editor', path: '/media/editor', icon: Film },
