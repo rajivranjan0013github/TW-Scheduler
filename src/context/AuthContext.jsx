@@ -4,10 +4,39 @@ import { queryClient } from '../lib/queryClient';
 
 const AuthContext = createContext(null);
 
+const getHandlerPreviewContext = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem('admin_view_context') || 'null');
+  } catch {
+    return null;
+  }
+};
+
+const buildPreviewUser = (baseUser, previewContext) => {
+  if (!baseUser || !previewContext || previewContext.viewAs !== 'account_handler') {
+    return baseUser;
+  }
+
+  return {
+    ...baseUser,
+    _id: previewContext.userId || baseUser._id,
+    name: previewContext.userName || baseUser.name,
+    email: previewContext.userEmail || baseUser.email,
+    avatar: previewContext.userAvatar || baseUser.avatar,
+    userType: 'account_handler',
+    role: previewContext.userRole || 'editor',
+    __previewMode: 'handler',
+  };
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('tw_token') || null);
   const [loading, setLoading] = useState(true);
+  const [previewContextVersion, setPreviewContextVersion] = useState(0);
+
+  const previewContext = getHandlerPreviewContext();
+  const effectiveUser = buildPreviewUser(user, previewContext);
 
   useEffect(() => {
     // Validate local token
@@ -99,10 +128,25 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('tw_token');
     queryClient.clear();
+    sessionStorage.removeItem('admin_view_context');
+    window.dispatchEvent(new CustomEvent('handler-preview-changed'));
     setToken(null);
     setUser(null);
     setLoading(false);
   };
+
+  useEffect(() => {
+    const syncPreviewContext = () => {
+      setPreviewContextVersion((version) => version + 1);
+    };
+
+    window.addEventListener('storage', syncPreviewContext);
+    window.addEventListener('handler-preview-changed', syncPreviewContext);
+    return () => {
+      window.removeEventListener('storage', syncPreviewContext);
+      window.removeEventListener('handler-preview-changed', syncPreviewContext);
+    };
+  }, []);
 
   const updateProfile = async (userData) => {
     try {
@@ -147,7 +191,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, facebookLogin, logout, updateProfile, deleteAccount }}>
+    <AuthContext.Provider value={{ user: effectiveUser, token, loading, login, facebookLogin, logout, updateProfile, deleteAccount, previewContextVersion }}>
       {children}
     </AuthContext.Provider>
   );

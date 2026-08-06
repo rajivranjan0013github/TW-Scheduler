@@ -552,8 +552,8 @@ export const AdminCampaigns = () => {
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-baseline gap-2">
-                                  <span className="truncate text-sm font-semibold text-[#1d1d1f]">
-                                    {ch.handle.startsWith('@') ? ch.handle : `@${ch.handle}`}
+                                  <span className="truncate text-xs font-semibold text-[#1d1d1f] capitalize">
+                                    {ch.platform}
                                   </span>
                                   {ch.displayName && (
                                     <span className="truncate text-xs text-[#8e8e93]">
@@ -566,7 +566,21 @@ export const AdminCampaigns = () => {
                                 </p>
                               </div>
 
-                              <div className="w-56">
+                              <div className="w-44">
+                                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#8e8e93]">
+                                  Handle / ID
+                                </label>
+                                <input
+                                  type="text"
+                                  value={ch.handle || ch.requestedHandle || ''}
+                                  onChange={(e) => updateChannel(idx, { handle: e.target.value.trim(), requestedHandle: e.target.value.trim() })}
+                                  placeholder="@handle or ID"
+                                  disabled={ch.isVerified}
+                                  className="w-full rounded-lg border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-xs text-[#1d1d1f] outline-none transition focus:border-[#3478f6] focus:ring-2 focus:ring-[#3478f6]/10 disabled:bg-[#f5f5f7] disabled:text-[#8e8e93] disabled:cursor-not-allowed"
+                                />
+                              </div>
+
+                              <div className="w-48">
                                 <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[#8e8e93]">
                                   Handler Email
                                 </label>
@@ -576,7 +590,7 @@ export const AdminCampaigns = () => {
                                   onChange={(e) => updateChannel(idx, { assignedHandlerEmail: e.target.value.trim().toLowerCase() })}
                                   placeholder="creator@example.com"
                                   disabled={ch.isVerified}
-                                  className="w-full rounded-lg border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-xs text-[#1d1d1f] outline-none transition focus:border-[#3478f6] focus:ring-2 focus:ring-[#3478f6]/10 disabled:bg-[#f5f5f7] disabled:text-[#8e8e93]"
+                                  className="w-full rounded-lg border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-xs text-[#1d1d1f] outline-none transition focus:border-[#3478f6] focus:ring-2 focus:ring-[#3478f6]/10 disabled:bg-[#f5f5f7] disabled:text-[#8e8e93] disabled:cursor-not-allowed"
                                 />
                               </div>
 

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { LogOut, ChevronDown, Check, Globe, X } from 'lucide-react';
 import { withCampaignScope } from '../utils/campaignScope';
 import PlatformIcon from './PlatformIcon';
+import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
 
 export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
   const { user, logout } = useAuth();
@@ -39,9 +40,9 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
 
   const fetchAccounts = async () => {
     try {
-      const headers = {
+      const headers = withHandlerPreviewHeaders({
         'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
-      };
+      });
       const accountQuery = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');
       const response = await fetch(
         `${API_BASE_URL}/api/accounts${accountQuery}`,
@@ -87,6 +88,7 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
 
   const exitAdminUserView = () => {
     sessionStorage.removeItem('admin_view_context');
+    window.dispatchEvent(new CustomEvent('handler-preview-changed'));
     setSelectedAccounts([]);
     setViewContextVersion(version => version + 1);
     navigate('/', { replace: true, state: {} });

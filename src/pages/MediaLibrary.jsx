@@ -1510,7 +1510,7 @@ export const MediaLibrary = () => {
 
   const handleScheduleSelectedMedia = () => {
     if (selectedMediaIds.length === 0) return;
-    navigate('/scheduler', { state: { preselectedMediaIds: selectedMediaIds } });
+    navigate('/scheduler/new', { state: { preselectedMediaIds: selectedMediaIds } });
   };
 
   const updateFileUploadCaption = (draftId, caption) => {
@@ -2155,7 +2155,7 @@ export const MediaLibrary = () => {
 	                          e.stopPropagation();
                           if (isDeletingThisFolder) return;
 	                          setOpenFolderMenuId(null);
-	                          navigate('/scheduler', { state: { preselectedFolderId: folder._id } });
+	                          navigate('/scheduler/new', { state: { preselectedFolderId: folder._id } });
 	                        }}
 	                        disabled={isDeletingThisFolder}
 	                        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
@@ -2535,7 +2535,7 @@ export const MediaLibrary = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setOpenMediaMenuId(null);
-                                  navigate('/scheduler', { state: { preselectedMediaId: item._id } });
+                                  navigate('/scheduler/new', { state: { preselectedMediaId: item._id } });
                                 }}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
                               >

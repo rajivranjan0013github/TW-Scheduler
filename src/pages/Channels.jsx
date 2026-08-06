@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Trash2, ShieldCheck, Link2, Eye } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
+import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
 
 export const Channels = () => {
   const { user } = useAuth();
@@ -59,7 +60,7 @@ export const Channels = () => {
     queryFn: async () => {
       const token = localStorage.getItem('tw_token');
       const response = await fetch(`${API_BASE_URL}${channelEndpoint}${channelQueryParam}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: withHandlerPreviewHeaders({ 'Authorization': `Bearer ${token}` })
       });
       if (!response.ok) {
         throw new Error(`Failed to fetch connected channels: ${response.status}`);
@@ -70,11 +71,11 @@ export const Channels = () => {
     enabled: Boolean(user),
   });
   const creatorCampaignsQuery = useQuery({
-    queryKey: ['creator', 'campaigns', 'channels-verification'],
+    queryKey: ['creator', adminViewUserId, 'campaigns', 'channels-verification'],
     queryFn: async () => {
       const token = localStorage.getItem('tw_token');
       const response = await fetch(`${API_BASE_URL}/api/accounts/creator/campaigns`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: withHandlerPreviewHeaders({ 'Authorization': `Bearer ${token}` })
       });
       if (!response.ok) {
         throw new Error(`Failed to fetch campaign channels: ${response.status}`);
@@ -105,7 +106,7 @@ export const Channels = () => {
       const token = localStorage.getItem('tw_token');
       const response = await fetch(`${API_BASE_URL}/api/accounts/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: withHandlerPreviewHeaders({ 'Authorization': `Bearer ${token}` })
       });
       if (response.ok) {
         setDisconnectedChannelIds((current) => (
@@ -163,7 +164,7 @@ export const Channels = () => {
       setConnectCampaignContext(campaignId, reauthorizeAccountId);
       const token = localStorage.getItem('tw_token');
       const response = await fetch(`${API_BASE_URL}/api/accounts/youtube/auth-url`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: withHandlerPreviewHeaders({ 'Authorization': `Bearer ${token}` })
       });
       const data = await response.json();
 

@@ -3,12 +3,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search, Trash2, Loader2, ExternalLink } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
 import PlatformIcon from '../components/PlatformIcon';
-import AccountQueueEditor from '../components/AccountQueueEditor';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 
@@ -38,7 +37,7 @@ const MediaPreview = ({ item, className = 'h-full w-full object-cover block' }) 
   return <img src={url} className={className} alt="" />;
 };
 
-const CalendarView = ({ selectedAccounts }) => {
+const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -48,7 +47,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const calendarLoadingRequestCountRef = useRef(0);
 
   // Composer data
-  const [showComposer, setShowComposer] = useState(false);
+  const [showComposer, setShowComposer] = useState(composerOnly);
   const [mediaList, setMediaList] = useState([]);
   const [folders, setFolders] = useState([]);
   const [channels, setChannels] = useState([]);
@@ -62,18 +61,23 @@ const CalendarView = ({ selectedAccounts }) => {
     const day = String(safeDate.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+  const toCurrentDateTimeLocalValue = (date) => {
+    const safeDate = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
+    const localDate = new Date(safeDate.getTime() - safeDate.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 16);
+  };
   const [calendarMode, setCalendarMode] = useState('week');
   const [calendarGroupingMode, setCalendarGroupingMode] = useState(() => {
     return localStorage.getItem('calendar-grouping-mode') || 'posts';
   });
   const [calendarRangeStart, setCalendarRangeStart] = useState(() => {
     const start = new Date(today);
-    start.setDate(start.getDate() - start.getDay());
+    start.setDate(start.getDate() - 3);
     return toInputDate(start);
   });
   const [calendarRangeEnd, setCalendarRangeEnd] = useState(() => {
     const end = new Date(today);
-    end.setDate(end.getDate() + (6 - end.getDay()));
+    end.setDate(end.getDate() + 3);
     return toInputDate(end);
   });
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => toInputDate(today));
@@ -287,11 +291,6 @@ const CalendarView = ({ selectedAccounts }) => {
   const [calendarAccountSearchQuery, setCalendarAccountSearchQuery] = useState('');
   const [showCalendarHandlerMenu, setShowCalendarHandlerMenu] = useState(false);
   const [calendarHandlerSearchQuery, setCalendarHandlerSearchQuery] = useState('');
-  const [showQueueEditor, setShowQueueEditor] = useState(false);
-  const [queueEditorPosts, setQueueEditorPosts] = useState([]);
-  const [loadingQueueEditor] = useState(false);
-  const [queueEditDrafts, setQueueEditDrafts] = useState({});
-  const [savingQueuePostIds, setSavingQueuePostIds] = useState([]);
   const calendarAccountMenuRef = useRef(null);
   const calendarHandlerMenuRef = useRef(null);
   const handledPreselectedFolderIdRef = useRef(null);
@@ -317,7 +316,7 @@ const CalendarView = ({ selectedAccounts }) => {
   const [librarySearchQuery, setLibrarySearchQuery] = useState('');
   const [accountsSearchQuery, setAccountsSearchQuery] = useState('');
 
-  const [bulkInterval, setBulkInterval] = useState('6');
+  const [bulkInterval, setBulkInterval] = useState('12');
   const [activeFolderId, setActiveFolderId] = useState('root');
   const [selectedFolderId, setSelectedFolderId] = useState('root');
   const [selectedCarouselSets, setSelectedCarouselSets] = useState([]);
@@ -410,6 +409,127 @@ const CalendarView = ({ selectedAccounts }) => {
   const getAccountLabel = (account) => {
     const label = account?.username || account?.handle || account?.name || 'Account';
     return label.startsWith('@') ? label.substring(1) : label;
+  };
+  const getChannelProfileUrl = (channel) => {
+    if (!channel) return null;
+
+    const parseUrlIfValid = (val) => {
+      if (!val || typeof val !== 'string') return null;
+      const str = val.trim();
+      if (/^https?:\/\//i.test(str)) return str;
+      if (/^(www\.)?facebook\.com\//i.test(str)) return `https://${str.replace(/^www\./i, '')}`;
+      if (/^(www\.)?instagram\.com\//i.test(str)) return `https://${str.replace(/^www\./i, '')}`;
+      if (/^(www\.)?youtube\.com\//i.test(str)) return `https://${str.replace(/^www\./i, '')}`;
+      if (/^(www\.)?tiktok\.com\//i.test(str)) return `https://${str.replace(/^www\./i, '')}`;
+      return null;
+    };
+
+    const directUrl = parseUrlIfValid(channel.profileUrl)
+      || parseUrlIfValid(channel.url)
+      || parseUrlIfValid(channel.link)
+      || parseUrlIfValid(channel.permalink)
+      || parseUrlIfValid(channel.profile_url)
+      || parseUrlIfValid(channel.facebookUrl)
+      || parseUrlIfValid(channel.username)
+      || parseUrlIfValid(channel.handle)
+      || parseUrlIfValid(channel.requestedHandle);
+    if (directUrl) return directUrl;
+
+    const platform = String(channel.platform || '').toLowerCase();
+    const rawCandidates = [
+      channel.username,
+      channel.handle,
+      channel.requestedHandle,
+      channel.name,
+    ].filter((val) => val && typeof val === 'string');
+
+    const possibleNumericIds = [
+      channel.accountId,
+      channel.socialAccountId,
+      channel.matchedAccountId,
+      channel.facebookPageId,
+      channel.pageId,
+      channel.id,
+      channel._id,
+    ].filter((val) => val && /^\d{5,}$/.test(String(val)));
+
+    switch (platform) {
+      case 'facebook': {
+        if (possibleNumericIds.length > 0) {
+          return `https://facebook.com/${possibleNumericIds[0]}`;
+        }
+        for (const candidate of rawCandidates) {
+          const clean = candidate.trim().replace(/^@/, '');
+          const parsed = parseUrlIfValid(clean);
+          if (parsed) return parsed;
+
+          const matchId = clean.match(/\b\d{5,}\b/);
+          if (matchId) return `https://facebook.com/${matchId[0]}`;
+
+          if (clean && !clean.includes(' ')) {
+            return `https://facebook.com/${clean}`;
+          }
+        }
+        return null;
+      }
+      case 'instagram': {
+        for (const candidate of rawCandidates) {
+          const clean = candidate.trim().replace(/^@/, '').replace(/\s+/g, '');
+          if (clean) return `https://instagram.com/${clean}`;
+        }
+        return null;
+      }
+      case 'youtube': {
+        if (possibleNumericIds.length > 0 && String(possibleNumericIds[0]).startsWith('UC')) {
+          return `https://youtube.com/channel/${possibleNumericIds[0]}`;
+        }
+        for (const candidate of rawCandidates) {
+          const clean = candidate.trim().replace(/^@/, '');
+          if (clean.startsWith('UC') && !clean.includes(' ')) {
+            return `https://youtube.com/channel/${clean}`;
+          }
+          const noSpace = clean.replace(/\s+/g, '');
+          if (noSpace) return `https://youtube.com/@${noSpace}`;
+        }
+        return null;
+      }
+      case 'tiktok': {
+        for (const candidate of rawCandidates) {
+          const clean = candidate.trim().replace(/^@/, '').replace(/\s+/g, '');
+          if (clean) return `https://tiktok.com/@${clean}`;
+        }
+        return null;
+      }
+      case 'twitter':
+      case 'x': {
+        for (const candidate of rawCandidates) {
+          const clean = candidate.trim().replace(/^@/, '').replace(/\s+/g, '');
+          if (clean) return `https://x.com/${clean}`;
+        }
+        return null;
+      }
+      case 'linkedin': {
+        for (const candidate of rawCandidates) {
+          const clean = candidate.trim().replace(/^@/, '');
+          if (clean) return `https://linkedin.com/in/${encodeURIComponent(clean)}`;
+        }
+        return null;
+      }
+      case 'threads': {
+        for (const candidate of rawCandidates) {
+          const clean = candidate.trim().replace(/^@/, '').replace(/\s+/g, '');
+          if (clean) return `https://threads.net/@${clean}`;
+        }
+        return null;
+      }
+      default: {
+        for (const candidate of rawCandidates) {
+          const clean = candidate.trim().replace(/^@/, '').replace(/\s+/g, '');
+          if (clean) return `https://instagram.com/${clean}`;
+        }
+        return null;
+      }
+    }
   };
   const getAssignedHandlerLabel = (account) => {
     const label = account?.assignedHandlerName || account?.assignedHandlerEmail || '';
@@ -846,6 +966,12 @@ const CalendarView = ({ selectedAccounts }) => {
     setSelectedMedia(getFolderAssetIds(folder._id));
     return true;
   }, [folders, getFolderAssetIds, normalizeFolderId]);
+
+  useEffect(() => {
+    if (composerOnly) {
+      setShowComposer(true);
+    }
+  }, [composerOnly]);
 
   useEffect(() => {
     if (!showComposer) {
@@ -1336,7 +1462,6 @@ const CalendarView = ({ selectedAccounts }) => {
       if (response.ok) {
         await queryClient.invalidateQueries({ queryKey: ['scheduler'] });
         await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-        setShowComposer(false);
         setSelectedChannels([]);
         setSelectedMedia([]);
         setSelectedCarouselSets([]);
@@ -1350,6 +1475,7 @@ const CalendarView = ({ selectedAccounts }) => {
         setYoutubeTags('');
         setYoutubeMadeForKids(false);
         await fetchPosts({ force: true });
+        navigate('/scheduler');
       } else {
         const error = await response.json();
         alert(`Scheduling failed: ${error.message || 'Unable to save scheduled post'}`);
@@ -1427,8 +1553,8 @@ const CalendarView = ({ selectedAccounts }) => {
     const base = parseInputDate(selectedCalendarDate) || new Date();
     setCalendarMode(mode);
     if (mode === 'week') {
-      setCalendarRangeStart(toInputDate(startOfWeek(base)));
-      setCalendarRangeEnd(toInputDate(endOfWeek(base)));
+      setCalendarRangeStart(toInputDate(addDays(base, -3)));
+      setCalendarRangeEnd(toInputDate(addDays(base, 3)));
       return;
     }
     setCalendarRangeStart(toInputDate(new Date(base.getFullYear(), base.getMonth(), 1)));
@@ -1443,7 +1569,7 @@ const CalendarView = ({ selectedAccounts }) => {
       const nextEnd = addDays(end, direction * 7);
       setCalendarRangeStart(toInputDate(nextStart));
       setCalendarRangeEnd(toInputDate(nextEnd));
-      setSelectedCalendarDate(toInputDate(nextStart));
+      setSelectedCalendarDate(toInputDate(addDays(nextStart, 3)));
       return;
     }
     const nextMonth = new Date(start.getFullYear(), start.getMonth() + direction, 1);
@@ -1653,8 +1779,8 @@ const CalendarView = ({ selectedAccounts }) => {
   const calendarDays = useMemo(() => {
     const start = parseInputDate(calendarRangeStart) || new Date();
     const end = parseInputDate(calendarRangeEnd) || start;
-    const paddedStart = startOfWeek(start);
-    const paddedEnd = endOfWeek(end);
+    const paddedStart = calendarMode === 'month' ? startOfWeek(start) : start;
+    const paddedEnd = calendarMode === 'month' ? endOfWeek(end) : end;
     const days = [];
     for (let cursor = paddedStart; cursor <= paddedEnd; cursor = addDays(cursor, 1)) {
       const date = new Date(cursor);
@@ -1669,7 +1795,7 @@ const CalendarView = ({ selectedAccounts }) => {
       });
     }
     return days;
-  }, [calendarPostsByDate, calendarRangeEnd, calendarRangeStart, selectedCalendarDate]);
+  }, [calendarMode, calendarPostsByDate, calendarRangeEnd, calendarRangeStart, selectedCalendarDate]);
 
   const selectedDayPosts = calendarPostsByDate.get(selectedCalendarDate) || [];
   const selectedDayGroups = useMemo(() => {
@@ -1692,41 +1818,6 @@ const CalendarView = ({ selectedAccounts }) => {
   }, [selectedDayPosts]);
 
   const queueEditorAccountId = selectedCalendarAccountIds.length === 1 ? String(selectedCalendarAccountIds[0]) : '';
-  const queueEditorAccount = useMemo(() => (
-    accountFilterOptions.find((option) => String(option.id) === queueEditorAccountId) || null
-  ), [accountFilterOptions, queueEditorAccountId]);
-  const queueEditorAccountKeys = useMemo(() => (
-    queueEditorAccount?.keys?.length ? queueEditorAccount.keys.map(String) : (queueEditorAccountId ? [queueEditorAccountId] : [])
-  ), [queueEditorAccount, queueEditorAccountId]);
-  const queueEditorAccountKeySet = useMemo(() => (
-    new Set(queueEditorAccountKeys)
-  ), [queueEditorAccountKeys]);
-  const queueEditorItems = useMemo(() => {
-    if (!queueEditorAccountId) return [];
-    return queueEditorPosts
-      .map((post) => {
-        const scheduledDate = new Date(post.scheduledAt);
-        const accountRefs = getPostAccountRefs(post);
-        const statusGroup = getPostStatusGroup(post);
-        return {
-          post,
-          accountRefs,
-          statusGroup,
-          scheduledDate,
-          mediaItem: post.mediaIds?.[0],
-          mediaLabel: getPostMediaLabel(post),
-          folderLabel: getPostSourceLabel(post),
-        };
-      })
-      .filter((item) => {
-        if (Number.isNaN(item.scheduledDate.getTime())) return false;
-        return item.accountRefs.some((ref) => (
-          (ref.keys || [ref.id]).some((key) => queueEditorAccountKeySet.has(String(key)))
-        ));
-      })
-      .sort((a, b) => a.scheduledDate - b.scheduledDate)
-      .map((item, index) => ({ ...item, queueIndex: index + 1 }));
-  }, [queueEditorPosts, queueEditorAccountId, queueEditorAccountKeySet, channels, folderById]);
 
   const openQueueEditorForAccount = useCallback((accountId) => {
     setSelectedCalendarAccountIds([accountId]);
@@ -1756,210 +1847,6 @@ const CalendarView = ({ selectedAccounts }) => {
         ? current.filter((item) => item !== email)
         : [...current, email]
     ));
-  };
-
-  useEffect(() => {
-    if (!showQueueEditor) return;
-    setQueueEditDrafts((current) => {
-      const next = {};
-      queueEditorItems.forEach((item) => {
-        const postId = item.post._id;
-        next[postId] = current[postId] || {
-          scheduledAt: toDateTimeLocalValue(item.post.scheduledAt),
-          caption: item.post.caption || '',
-          status: item.post.status || 'scheduled',
-        };
-      });
-      return next;
-    });
-  }, [showQueueEditor, queueEditorItems]);
-
-  useEffect(() => {
-    if (selectedCalendarAccountIds.length !== 1) {
-      setShowQueueEditor(false);
-    }
-  }, [selectedCalendarAccountIds.length]);
-
-  const getResumeStatusForPost = (post) => (
-    post?.scheduleMode === 'manual' ? 'manual_ready' : 'scheduled'
-  );
-
-  const saveQueueBulkUpdate = async (itemPatches) => {
-    const response = await fetch(`${API_BASE_URL}/api/scheduler/queue/bulk-update${withCampaignScope()}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
-      },
-      body: JSON.stringify({
-        updates: itemPatches.map(({ item, patch }) => ({
-          id: item.post._id,
-          patch,
-        })),
-      }),
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok) {
-      throw new Error(data?.message || `Update failed: ${response.status}`);
-    }
-    return data || { posts: [] };
-  };
-
-  const invalidateQueueRelatedQueries = () => {
-    void queryClient.invalidateQueries({ queryKey: ['scheduler'] });
-    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-  };
-
-  const mergeQueuePostPatch = (post, patch = {}) => ({
-    ...post,
-    ...patch,
-    mediaIds: patch.mediaIds || post.mediaIds,
-    socialAccountIds: patch.socialAccountIds || post.socialAccountIds,
-    campaignChannelIds: patch.campaignChannelIds || post.campaignChannelIds,
-    platformSpecifics: patch.platformSpecifics || post.platformSpecifics,
-  });
-
-  const patchQueuePostInState = (postId, patch) => {
-    setQueueEditorPosts((current) => (
-      current.map((post) => (
-        String(post._id) === String(postId)
-          ? mergeQueuePostPatch(post, patch)
-          : post
-      ))
-    ));
-    setPosts((current) => (
-      current.map((post) => (
-        String(post._id) === String(postId)
-          ? mergeQueuePostPatch(post, patch)
-          : post
-      ))
-    ));
-  };
-
-  const patchQueueDraft = (postId, patch) => {
-    setQueueEditDrafts((current) => ({
-      ...current,
-      [postId]: {
-        ...(current[postId] || {}),
-        ...(Object.prototype.hasOwnProperty.call(patch, 'scheduledAt')
-          ? { scheduledAt: toDateTimeLocalValue(patch.scheduledAt) }
-          : {}),
-        ...(Object.prototype.hasOwnProperty.call(patch, 'caption')
-          ? { caption: patch.caption }
-          : {}),
-        ...(Object.prototype.hasOwnProperty.call(patch, 'status')
-          ? { status: patch.status }
-          : {}),
-      },
-    }));
-  };
-
-  const handleBulkUpdateQueuePosts = async (items, updates = {}) => {
-    const selectedItems = (items || []).filter((item) => item?.post?._id);
-    if (selectedItems.length === 0) return;
-
-    const selectedIds = selectedItems.map((item) => item.post._id);
-    const intervalMs = updates.reschedule
-      ? Number(updates.reschedule.intervalHours) * 60 * 60 * 1000
-      : 0;
-    const rescheduleStartMs = updates.reschedule
-      ? new Date(updates.reschedule.startAt).getTime()
-      : 0;
-    const itemPatches = selectedItems.map((item, itemIndex) => {
-      const patch = {};
-      if (updates.status === 'resume') {
-        patch.status = getResumeStatusForPost(item.post);
-      } else if (updates.status) {
-        patch.status = updates.status;
-      }
-      if (updates.scheduledAt) {
-        patch.scheduledAt = updates.scheduledAt;
-      }
-      if (
-        updates.reschedule
-        && Number.isFinite(rescheduleStartMs)
-        && Number.isFinite(intervalMs)
-        && intervalMs > 0
-      ) {
-        patch.scheduledAt = new Date(rescheduleStartMs + (itemIndex * intervalMs)).toISOString();
-      }
-      return { item, patch };
-    });
-    const previousQueueEditorPosts = queueEditorPosts;
-    const previousPosts = posts;
-    const previousDrafts = queueEditDrafts;
-
-    setQueueError('');
-    setSavingQueuePostIds((current) => [...new Set([...current, ...selectedIds])]);
-    itemPatches.forEach(({ item, patch }) => {
-      patchQueuePostInState(item.post._id, patch);
-      patchQueueDraft(item.post._id, patch);
-    });
-    try {
-      const result = await saveQueueBulkUpdate(itemPatches);
-      (result.posts || []).forEach((savedPost) => {
-        if (!savedPost?._id) return;
-        patchQueuePostInState(savedPost._id, savedPost);
-        patchQueueDraft(savedPost._id, savedPost);
-      });
-      invalidateQueueRelatedQueries();
-      return true;
-    } catch (error) {
-      console.error('Failed to bulk update queue posts:', error);
-      setQueueEditorPosts(previousQueueEditorPosts);
-      setPosts(previousPosts);
-      setQueueEditDrafts(previousDrafts);
-      setQueueError(error.message || 'Failed to update selected queue posts.');
-      return false;
-    } finally {
-      setSavingQueuePostIds((current) => current.filter((id) => !selectedIds.includes(id)));
-    }
-  };
-
-  const handleBulkSaveQueueCaptions = async (items, captionsByPostId = {}) => {
-    const selectedItems = (items || []).filter((item) => {
-      const postId = item?.post?._id;
-      return postId && Object.prototype.hasOwnProperty.call(captionsByPostId, postId);
-    });
-    if (selectedItems.length === 0) return;
-
-    const selectedIds = selectedItems.map((item) => item.post._id);
-    const itemPatches = selectedItems.map((item) => {
-      const postId = item.post._id;
-      return {
-        item,
-        patch: { caption: captionsByPostId[postId] ?? '' },
-      };
-    });
-    const previousQueueEditorPosts = queueEditorPosts;
-    const previousPosts = posts;
-    const previousDrafts = queueEditDrafts;
-
-    setQueueError('');
-    setSavingQueuePostIds((current) => [...new Set([...current, ...selectedIds])]);
-    itemPatches.forEach(({ item, patch }) => {
-      patchQueuePostInState(item.post._id, patch);
-      patchQueueDraft(item.post._id, patch);
-    });
-    try {
-      const result = await saveQueueBulkUpdate(itemPatches);
-      (result.posts || []).forEach((savedPost) => {
-        if (!savedPost?._id) return;
-        patchQueuePostInState(savedPost._id, savedPost);
-        patchQueueDraft(savedPost._id, savedPost);
-      });
-      invalidateQueueRelatedQueries();
-      return true;
-    } catch (error) {
-      console.error('Failed to save queue captions:', error);
-      setQueueEditorPosts(previousQueueEditorPosts);
-      setPosts(previousPosts);
-      setQueueEditDrafts(previousDrafts);
-      setQueueError(error.message || 'Failed to save selected captions.');
-      return false;
-    } finally {
-      setSavingQueuePostIds((current) => current.filter((id) => !selectedIds.includes(id)));
-    }
   };
 
   useEffect(() => {
@@ -2019,20 +1906,57 @@ const CalendarView = ({ selectedAccounts }) => {
   return (
     <div className="py-2 px-0 bg-[#f5f5f7] h-screen text-[#1d1d1f] font-sans flex flex-col overflow-hidden">
 
-      {/* Page Header */}
-      <div className="flex items-center justify-between pb-1.5 border-b border-[#e5e5ea] px-3 flex-shrink-0">
-        <h2 className="text-sm font-bold text-black tracking-tight m-0">Scheduled Queue</h2>
+      {!showComposer && (
+        <>
+          {/* Page Header */}
+          <div className="flex items-center justify-between pb-1.5 border-b border-[#e5e5ea] px-3 flex-shrink-0">
+            <h2 className="text-sm font-bold text-black tracking-tight m-0">Scheduled Queue</h2>
 
-        {!isViewer && (
-          <button
-            onClick={() => setShowComposer(true)}
-            className="flex items-center gap-1 bg-[#0071e3] hover:bg-[#147ce5] text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all shadow-sm"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Schedule Queue</span>
-          </button>
-        )}
-      </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => moveCalendarRange(-1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dadce0] bg-white text-[#5f6368] transition-colors hover:bg-[#f8f9fa]"
+                  title="Previous range"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                <div className="flex h-8 items-center gap-1.5 rounded-lg border border-[#dadce0] bg-white px-3 text-[12px] font-medium text-[#3c4043]">
+                  <svg className="h-3.5 w-3.5 text-[#5f6368]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                  <span>
+                    {(() => {
+                      const s = parseInputDate(calendarRangeStart);
+                      const e = parseInputDate(calendarRangeEnd);
+                      if (!s || !e) return 'Select range';
+                      return `${s.toLocaleDateString([], { month: 'short', day: 'numeric' })} - ${e.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+                    })()}
+                  </span>
+                  <ChevronLeft className="h-3 w-3 -rotate-90 text-[#80868b]" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => moveCalendarRange(1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dadce0] bg-white text-[#5f6368] transition-colors hover:bg-[#f8f9fa]"
+                  title="Next range"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5 rotate-180" />
+                </button>
+              </div>
+              {!isViewer && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/scheduler/new')}
+                  className="flex items-center gap-1 bg-[#0071e3] hover:bg-[#147ce5] text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Schedule Queue</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {queueError && (
         <div className="mx-2 mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
@@ -2051,7 +1975,7 @@ const CalendarView = ({ selectedAccounts }) => {
             </div>
             <button
               type="button"
-              onClick={() => setShowComposer(false)}
+              onClick={() => navigate('/scheduler')}
               disabled={submittingSchedule}
               className="px-2.5 py-1 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-md text-xs font-semibold border border-[#e5e5ea] transition-all disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -2435,13 +2359,20 @@ const CalendarView = ({ selectedAccounts }) => {
                         ? (isBulk || isCarouselMode ? 'Target Start' : 'Target Time')
                         : (isBulk || isCarouselMode ? 'Start Time' : 'Post Time')}
                     </span>
-                    <div className="relative">
+                    <div className="flex items-center gap-2">
                       <input
                         type="datetime-local"
                         value={scheduleTime}
                         onChange={(e) => setScheduleTime(e.target.value)}
-                        className="w-full rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#2563eb] focus:border-[#2563eb]"
+                        className="min-w-0 flex-1 rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#2563eb] focus:border-[#2563eb]"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setScheduleTime(toCurrentDateTimeLocalValue(new Date()))}
+                        className="shrink-0 rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-[#2563eb] hover:text-[#2563eb]"
+                      >
+                        Now
+                      </button>
                     </div>
                   </div>
 
@@ -2454,11 +2385,9 @@ const CalendarView = ({ selectedAccounts }) => {
                         onChange={(e) => setBulkInterval(e.target.value)}
                         className="w-full rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
                       >
-                        <option value="1">Every 1 hour</option>
-                        <option value="2">Every 2 hours</option>
-                        <option value="4">Every 4 hours</option>
                         <option value="6">Every 6 hours</option>
                         <option value="8">Every 8 hours</option>
+                        <option value="10">Every 10 hours</option>
                         <option value="12">Every 12 hours</option>
                         <option value="24">Every 1 day</option>
                       </select>
@@ -2638,23 +2567,8 @@ const CalendarView = ({ selectedAccounts }) => {
         </section>
       )}
 
-      {showQueueEditor && (
-        <AccountQueueEditor
-          key={`queue-editor-${queueEditorAccountId}`}
-          account={queueEditorAccount}
-          items={queueEditorItems}
-          drafts={queueEditDrafts}
-          loading={loadingQueueEditor}
-          savingPostIds={savingQueuePostIds}
-          onBulkSave={handleBulkUpdateQueuePosts}
-          onBulkCaptionSave={handleBulkSaveQueueCaptions}
-          onClose={() => setShowQueueEditor(false)}
-          getStatusLabel={getPostStatusLabel}
-        />
-      )}
-
       {/* Schedule Overview — Calendar */}
-      {!showComposer && !showQueueEditor && (
+      {!showComposer && (
         <section className="relative flex-1 min-h-0 bg-white flex flex-col overflow-hidden">
           {isLoadingCalendar && (
             <div className="absolute inset-0 z-[100] flex items-center justify-center bg-white/85 backdrop-blur-[1px]">
@@ -2668,36 +2582,6 @@ const CalendarView = ({ selectedAccounts }) => {
           <div className="border-b border-[#e8eaed] bg-white px-4 py-2.5 flex-shrink-0">
               <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => moveCalendarRange(-1)}
-                    className="h-7 w-7 rounded-md border border-[#dadce0] bg-white text-[#5f6368] hover:bg-[#f8f9fa] flex items-center justify-center transition-colors"
-                    title="Previous range"
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </button>
-                  <div className="flex items-center gap-1.5 h-8 rounded-lg border border-[#dadce0] bg-white px-3 text-[12px] font-medium text-[#3c4043]">
-                    <svg className="h-3.5 w-3.5 text-[#5f6368]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                    <span>
-                      {(() => {
-                        const s = parseInputDate(calendarRangeStart);
-                        const e = parseInputDate(calendarRangeEnd);
-                        if (!s || !e) return 'Select range';
-                        return `${s.toLocaleDateString([], { month: 'short', day: 'numeric' })} - ${e.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
-                      })()}
-                    </span>
-                    <ChevronLeft className="h-3 w-3 -rotate-90 text-[#80868b]" />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => moveCalendarRange(1)}
-                    className="h-7 w-7 rounded-md border border-[#dadce0] bg-white text-[#5f6368] hover:bg-[#f8f9fa] flex items-center justify-center transition-colors"
-                    title="Next range"
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5 rotate-180" />
-                  </button>
-                </div>
 		                <div ref={calendarAccountMenuRef} className="relative group">
 	                  <button
 	                    type="button"
@@ -3221,6 +3105,22 @@ const CalendarView = ({ selectedAccounts }) => {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        {(() => {
+                          const profileUrl = getChannelProfileUrl(activeTooltip.data.group.channel);
+                          if (!profileUrl) return null;
+                          return (
+                            <a
+                              href={profileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[12px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                              title="Open social channel in new tab"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 text-slate-500" />
+                              <span>View Channel</span>
+                            </a>
+                          );
+                        })()}
                         {!isViewer && (
                           <button
                             type="button"
@@ -3350,6 +3250,21 @@ const CalendarView = ({ selectedAccounts }) => {
 	                        </div>
 	                        <div className="flex items-center gap-1.5">
 	                          <span className="text-[10px] font-bold text-white bg-[#1a73e8] rounded-full px-1.5 py-0.5">{group.posts.length}</span>
+                          {(() => {
+                            const profileUrl = getChannelProfileUrl(group.channel);
+                            if (!profileUrl) return null;
+                            return (
+                              <a
+                                href={profileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#5f6368] hover:text-[#1a73e8] transition-colors"
+                                title="Open social channel in new tab"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            );
+                          })()}
                           {!isViewer && activePostIds.length > 0 && (
                             <button
                               type="button"

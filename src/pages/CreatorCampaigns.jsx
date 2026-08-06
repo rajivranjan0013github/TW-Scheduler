@@ -7,6 +7,7 @@ import { AlertCircle, Calendar, CheckCircle, MoreVertical, Share2, SkipForward, 
 import { getMediaUrl } from '../utils/mediaUrls';
 import PlatformIcon from '../components/PlatformIcon';
 import { PwaInstallButton } from '../components/PwaInstallButton';
+import { getHandlerPreviewContext, withHandlerPreviewHeaders } from '../utils/handlerPreview';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 const POST_COOLDOWN_MS = 6 * 60 * 60 * 1000;
@@ -37,6 +38,7 @@ const copyToClipboard = (text) => {
 
 export const CreatorCampaigns = () => {
   const { token } = useAuth();
+  const handlerPreviewUserId = getHandlerPreviewContext()?.userId || '';
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
@@ -167,7 +169,7 @@ export const CreatorCampaigns = () => {
   const fetchTodayTracking = useCallback((headers, { force = false } = {}) => {
     const query = getTodayTrackingQuery();
     return queryClient.fetchQuery({
-      queryKey: ['creator', 'today-tracking', query],
+      queryKey: ['creator', handlerPreviewUserId, 'today-tracking', query],
       queryFn: async () => {
         const response = await fetch(`${API_BASE_URL}/api/scheduler/creator/today-tracking?${query}`, { headers });
         const contentType = response.headers.get('content-type') || '';
@@ -183,7 +185,7 @@ export const CreatorCampaigns = () => {
       },
       staleTime: force ? 0 : 60 * 1000,
     });
-  }, [queryClient]);
+  }, [handlerPreviewUserId, queryClient]);
 
   const updatePostInList = (updatedPost) => {
     setPosts((current) => current.map((post) => (
@@ -194,7 +196,7 @@ export const CreatorCampaigns = () => {
   const markPostDownloaded = async (post) => {
     const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/downloaded`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }),
     });
     if (response.ok) {
       const updatedPost = await response.json();
@@ -315,14 +317,14 @@ export const CreatorCampaigns = () => {
         .filter((account) => account?.isConnected !== false && account?.status !== 'manual_only')
         .map(getAccountId)
         .filter(Boolean);
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` });
 
       const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/manual-posted`, {
         method: 'POST',
-        headers: {
+        headers: withHandlerPreviewHeaders({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
-        },
+        }),
         body: JSON.stringify({ manualPostUrl: '' }),
       });
       const data = await response.json();
@@ -370,13 +372,13 @@ export const CreatorCampaigns = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/manual-posted-override`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Could not confirm this post manually.');
 
       updatePostInList(data);
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` });
       const trackingData = await fetchTodayTracking(headers, { force: true });
       setTodayTracking(trackingData.accounts || {});
       setPostedToast({
@@ -406,7 +408,7 @@ export const CreatorCampaigns = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}/cooldown-bypass`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Could not bypass the cooldown for this post.');
@@ -437,7 +439,7 @@ export const CreatorCampaigns = () => {
 
     fetch(`${API_BASE_URL}/api/scheduler/${post._id}/not-posted`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }),
     })
       .then(async (response) => {
         const data = await response.json();
@@ -458,10 +460,13 @@ export const CreatorCampaigns = () => {
     }
     setError('');
     try {
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` });
       const fetchJson = async (url) => {
         const response = await fetch(url, { headers });
-        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.message || `Request failed: ${response.status}`);
+        }
         return response.json();
       };
 
@@ -471,12 +476,12 @@ export const CreatorCampaigns = () => {
 
       const [campData, postData, trackingData] = await Promise.all([
         queryClient.fetchQuery({
-          queryKey: ['creator', 'campaigns'],
+          queryKey: ['creator', handlerPreviewUserId, 'campaigns'],
           queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
           staleTime: opts.force ? 0 : 2 * 60 * 1000,
         }),
         queryClient.fetchQuery({
-          queryKey: ['creator', 'posts'],
+          queryKey: ['creator', handlerPreviewUserId, 'posts'],
           queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler/creator/posts`),
           staleTime: opts.force ? 0 : 20 * 1000,
         }),
@@ -494,7 +499,7 @@ export const CreatorCampaigns = () => {
         setLoading(false);
       }
     }
-  }, [fetchTodayTracking, queryClient, token]);
+  }, [fetchTodayTracking, handlerPreviewUserId, queryClient, token]);
 
   const handleTouchStart = (e) => {
     if (isRefreshing) return;
@@ -545,20 +550,23 @@ export const CreatorCampaigns = () => {
     let active = true;
     const initialFetch = async () => {
       try {
-        const headers = { Authorization: `Bearer ${token}` };
+        const headers = withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` });
         const fetchJson = async (url) => {
           const response = await fetch(url, { headers });
-          if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.message || `Request failed: ${response.status}`);
+          }
           return response.json();
         };
         const [campData, postData, trackingData] = await Promise.all([
           queryClient.fetchQuery({
-            queryKey: ['creator', 'campaigns'],
+            queryKey: ['creator', handlerPreviewUserId, 'campaigns'],
             queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
             staleTime: 2 * 60 * 1000,
           }),
           queryClient.fetchQuery({
-            queryKey: ['creator', 'posts'],
+            queryKey: ['creator', handlerPreviewUserId, 'posts'],
             queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler/creator/posts`),
             staleTime: 20 * 1000,
           }),
@@ -585,7 +593,7 @@ export const CreatorCampaigns = () => {
     return () => {
       active = false;
     };
-  }, [fetchTodayTracking, queryClient, token]);
+  }, [fetchTodayTracking, handlerPreviewUserId, queryClient, token]);
 
   useEffect(() => {
     const refreshStaleHandlerData = () => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, RefreshCw, Shield, UserCog, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getActiveCampaignId } from '../utils/campaignScope';
 
@@ -60,6 +61,7 @@ const tokenStatus = (accountHealth = {}) => {
 
 export const AdminUsers = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [users, setUsers] = useState([]);
   const hasLoadedUsersRef = useRef(false);
@@ -73,6 +75,27 @@ export const AdminUsers = () => {
     acc.media += item.metrics?.media || 0;
     return acc;
   }, { users: 0, connectedAccounts: 0, failedPosts: 0, media: 0 }), [users]);
+
+  const openUserView = (item) => {
+    if (!item?._id || item.campaignRole !== 'account_handler' || item.userType !== 'account_handler') return;
+
+    sessionStorage.setItem('admin_view_context', JSON.stringify({
+      userId: item._id,
+      userName: item.name || 'Selected user',
+      userEmail: item.email || '',
+      userAvatar: item.avatar || '',
+      userRole: item.role || 'editor',
+      viewAs: 'account_handler',
+    }));
+    window.dispatchEvent(new CustomEvent('handler-preview-changed'));
+    navigate('/campaigns', {
+      state: {
+        fromAdmin: true,
+        preserveWorkspace: true,
+        previewAsHandler: true,
+      },
+    });
+  };
 
   const fetchUsers = useCallback(async ({ force = false } = {}) => {
     if (!hasLoadedUsersRef.current) setLoading(true);
@@ -192,9 +215,17 @@ export const AdminUsers = () => {
             const health = tokenStatus(item.accountHealth);
             const isSelf = item._id === user?._id;
             const campaignRole = item.campaignRole || 'account_handler';
+            const canPreviewHandler = campaignRole === 'account_handler' && item.userType === 'account_handler';
 
             return (
-              <div key={item._id} className="grid grid-cols-[1.5fr_0.75fr_1fr_1fr] items-center gap-4 border-b border-[#e5e5ea] px-5 py-4 last:border-b-0">
+              <button
+                key={item._id}
+                type="button"
+                onClick={() => openUserView(item)}
+                disabled={!canPreviewHandler}
+                title={canPreviewHandler ? 'Open handler view' : 'Only account handlers can be previewed'}
+                className={`grid w-full grid-cols-[1.5fr_0.75fr_1fr_1fr] items-center gap-4 border-b border-[#e5e5ea] px-5 py-4 text-left transition last:border-b-0 ${canPreviewHandler ? 'cursor-pointer hover:bg-[#fbfbfd] focus:outline-none focus-visible:bg-[#fbfbfd]' : 'cursor-default'}`}
+              >
                 <div className="flex min-w-0 items-center gap-3">
                   <img
                     src={item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
@@ -242,7 +273,7 @@ export const AdminUsers = () => {
                     </p>
                   )}
                 </div>
-              </div>
+              </button>
             );
           })
         )}

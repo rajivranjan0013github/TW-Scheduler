@@ -289,6 +289,7 @@ const AccountQueueEditor = ({
     if (detectedInterval) {
       setRescheduleIntervalHours(detectedInterval);
     }
+    setShowCaptionEditor(false);
     setShowTimeEditor(true);
   };
 
@@ -668,6 +669,7 @@ const AccountQueueEditor = ({
               type="button"
               onClick={() => {
                 initializeCaptionDrafts();
+                setShowTimeEditor(false);
                 setShowCaptionEditor(true);
               }}
               className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2.5 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#dbeafe]"

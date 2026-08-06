@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
 
 export const InstagramCallback = () => {
   const [searchParams] = useSearchParams();
@@ -40,10 +41,10 @@ export const InstagramCallback = () => {
         || `${window.location.origin}/auth/instagram/callback`;
       const response = await fetch(`${apiBaseUrl}/api/accounts/instagram-callback`, {
         method: 'POST',
-        headers: {
+        headers: withHandlerPreviewHeaders({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
+        }),
         body: JSON.stringify({ code, redirectUri, campaignId, reauthorizeAccountId }),
       });
 

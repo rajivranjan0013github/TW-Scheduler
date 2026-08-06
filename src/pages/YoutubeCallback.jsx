@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
 
 export const YoutubeCallback = () => {
   const [searchParams] = useSearchParams();
@@ -30,10 +31,10 @@ export const YoutubeCallback = () => {
       const reauthorizeAccountId = sessionStorage.getItem('reauthorize_account_id') || '';
       const response = await fetch(`${API_BASE_URL}/api/accounts/youtube-callback`, {
         method: 'POST',
-        headers: {
+        headers: withHandlerPreviewHeaders({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-        },
+        }),
         body: JSON.stringify({ code, campaignId, reauthorizeAccountId }),
       });
 

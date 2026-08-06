@@ -6,6 +6,7 @@ import { Clock, FolderHeart, Film, Link2, Settings as SettingsIcon, X, Megaphone
 import { useAuth } from '../context/AuthContext';
 import { PwaInstallButton } from './PwaInstallButton';
 import { withCampaignScope } from '../utils/campaignScope';
+import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
 
 export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} }) => {
   const { user, logout } = useAuth();
@@ -26,7 +27,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     }
   })();
   const adminViewContext = isChannelInsightRoute ? null : rawAdminViewContext;
-  const isAdminViewingUser = canViewAdmin && Boolean(adminViewContext?.userId);
+  const isAdminViewingUser = Boolean(adminViewContext?.userId);
   const adminViewChannel = (!isChannelInsightRoute && location.state?.fromAdmin ? location.state.channel : null) || adminViewContext?.channel || null;
   const adminViewUserId = adminViewChannel?.user?._id || adminViewChannel?.userId?._id || adminViewChannel?.userId || adminViewContext?.userId || '';
   const displayedUserEmail = isAdminViewingUser
@@ -84,9 +85,9 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   useEffect(() => {
     const fetchCampaignWorkspace = async () => {
       try {
-        const headers = {
+        const headers = withHandlerPreviewHeaders({
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`
-        };
+        });
         if (canViewAdmin && !adminViewUserId) {
           const response = await fetch(`${API_BASE_URL}/api/admin/campaigns/list?scope=workspace`, { headers });
           if (response.ok) {
@@ -172,6 +173,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
 
   const exitAdminUserView = () => {
     sessionStorage.removeItem('admin_view_context');
+    window.dispatchEvent(new CustomEvent('handler-preview-changed'));
     setSelectedAccounts([]);
     navigate('/', { replace: true, state: {} });
   };

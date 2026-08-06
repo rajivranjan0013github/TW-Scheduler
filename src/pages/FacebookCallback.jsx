@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../config';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
 
 export const FacebookCallback = () => {
   const [searchParams] = useSearchParams();
@@ -30,10 +31,10 @@ export const FacebookCallback = () => {
       const apiBaseUrl = API_BASE_URL;
       const response = await fetch(`${apiBaseUrl}/api/accounts/facebook-callback`, {
         method: 'POST',
-        headers: {
+        headers: withHandlerPreviewHeaders({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
+        }),
         body: JSON.stringify({ code, campaignId, reauthorizeAccountId }),
       });
 

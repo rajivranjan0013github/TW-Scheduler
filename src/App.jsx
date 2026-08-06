@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import CampaignSelector from './pages/CampaignSelector';
 import MediaLibrary from './pages/MediaLibrary';
 import CalendarView from './pages/CalendarView';
+import ScheduleQueue from './pages/ScheduleQueue';
 import QueueManagement from './pages/QueueManagement';
 import Channels from './pages/Channels';
 import PublishedFeed from './pages/PublishedFeed';
@@ -82,7 +83,15 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const [campaignVersion, setCampaignVersion] = useState(0);
   const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
   const canEditQueue = ['owner', 'admin', 'editor'].includes(user?.role);
-  const isCreator = user?.userType === 'account_handler';
+  const handlerPreviewContext = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem('admin_view_context') || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const isHandlerPreview = handlerPreviewContext?.viewAs === 'account_handler' || Boolean(location.state?.previewAsHandler);
+  const isCreator = user?.userType === 'account_handler' || isHandlerPreview;
 
   useEffect(() => {
     const refreshCampaignScopedRoutes = () => {
@@ -127,6 +136,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
               <Route path="/campaigns" element={<CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
               <Route path="/dashboard" element={canViewAdmin ? <AdminDashboard /> : <Navigate to="/scheduler" replace />} />
               <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
+              <Route path="/scheduler/new" element={canEditQueue ? <ScheduleQueue selectedAccounts={selectedAccounts} /> : <Navigate to="/scheduler" replace />} />
               <Route path="/scheduler/queue" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
               <Route path="/scheduler/queue/:accountId" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
               <Route path="/media" element={<MediaLibrary />} />
