@@ -946,9 +946,10 @@ export const CreatorCampaigns = () => {
                       const manualPostedToday = shouldShowManualPostedTimes(queue.account)
                         ? getManualPostedToday(queue.posts)
                         : [];
-                      const latestManualPostedAt = shouldShowManualPostedTimes(queue.account)
-                        ? getLatestManualPostedAt(queue.posts)
-                        : null;
+                      // Always include manually confirmed posts in the cooldown calculation.
+                      // Verified channels can still have a posted_manual queue record, and the
+                      // backend uses that timestamp when deciding whether sharing is allowed.
+                      const latestManualPostedAt = getLatestManualPostedAt(queue.posts);
                       const postedToday = sortPostsByPublishedAt([
                         ...(tracking.posts || []),
                         ...manualPostedToday,
