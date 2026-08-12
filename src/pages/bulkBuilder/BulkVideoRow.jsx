@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Video, Music, Type, X, Move, Pencil } from 'lucide-react';
+import { AlertTriangle, Video, Music, Type, X, Move, Pencil } from 'lucide-react';
 import {
   FONT_FAMILY_CSS,
   PREVIEW_FRAME_HEIGHT,
@@ -66,6 +66,7 @@ export const BulkVideoRow = ({
   zoomScale = 1,
   onUpdateCanvasPos,
   onHeaderDoubleClick,
+  onEditTimeline,
   isDualVideo = true,
 }) => {
   const { video1, video1Url, video2, video2Url, audio, caption, textSettings, status, resultMediaUrl } = row;
@@ -347,6 +348,19 @@ export const BulkVideoRow = ({
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEditTimeline?.();
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            className="flex h-5 items-center gap-1 rounded-md border border-blue-500/25 bg-blue-500/10 px-1.5 text-[8px] font-bold uppercase text-blue-300 transition hover:bg-blue-500/20 hover:text-blue-200"
+            title="Open this row in Timeline Editor"
+          >
+            <Pencil className="h-2.5 w-2.5" />
+            Edit
+          </button>
           <div className="relative">
             <button
               type="button"
@@ -402,6 +416,17 @@ export const BulkVideoRow = ({
           </button>
         </div>
       </div>
+
+      {row.editorProjectStale && (
+        <div
+          className="-mt-1 flex items-center justify-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[8px] font-extrabold uppercase tracking-wider text-amber-300"
+          role="status"
+          title="This row changed after its timeline project was saved. Open the Timeline Editor to review and sync it."
+        >
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          Timeline out of sync
+        </div>
+      )}
 
       {/* Video Cards Grid */}
       <div className={isDualVideo ? "grid grid-cols-2 gap-2.5" : "flex justify-center"}>

@@ -87,6 +87,7 @@ export const AdminDashboard = () => {
   const [searchChannel, setSearchChannel] = useState('');
   const [filterPlatform, setFilterPlatform] = useState('all');
   const [searchUser, setSearchUser] = useState('');
+  const [selectedGraphDate, setSelectedGraphDate] = useState(null);
 
   const campaignsQuery = useQuery({
     queryKey: ['admin', 'campaigns', 'overview'],
@@ -114,6 +115,7 @@ export const AdminDashboard = () => {
     setSearchChannel('');
     setFilterPlatform('all');
     setSearchUser('');
+    setSelectedGraphDate(null);
     if (!persist) return;
 
     localStorage.setItem('active-campaign-id', campaign._id);
@@ -135,6 +137,7 @@ export const AdminDashboard = () => {
         setSearchChannel('');
         setFilterPlatform('all');
         setSearchUser('');
+        setSelectedGraphDate(null);
       }
     };
 
@@ -227,7 +230,10 @@ export const AdminDashboard = () => {
             <select
               id="time-range-select"
               value={selectedTimeRange}
-              onChange={(event) => setSelectedTimeRange(event.target.value)}
+              onChange={(event) => {
+                setSelectedTimeRange(event.target.value);
+                setSelectedGraphDate(null);
+              }}
               className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
             >
               {Object.entries(timeRanges).map(([value, config]) => (
@@ -319,7 +325,26 @@ export const AdminDashboard = () => {
             />
           </div>
 
-          <DailyViewsChart data={activeMetrics.last30DaysPostedViews || []} />
+          <DailyViewsChart
+            data={activeMetrics.last30DaysPostedViews || []}
+            selectedDate={selectedGraphDate}
+            onSelectDate={setSelectedGraphDate}
+          />
+
+          {selectedGraphDate && (
+            <div className="mt-3 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm">
+              <span>
+                Filtering channel activity for date: <strong>{new Date(`${selectedGraphDate}T00:00:00`).toLocaleDateString([], { dateStyle: 'medium' })}</strong> ({selectedGraphDate})
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedGraphDate(null)}
+                className="rounded-md bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-emerald-700 shadow-xs"
+              >
+                Clear Selection (Reset to {selectedTimeLabel})
+              </button>
+            </div>
+          )}
 
           {/* Table Filters Bar */}
           <div className="mt-3 grid gap-2.5 rounded-xl border border-[#d2d2d7] bg-white p-3 sm:grid-cols-3">
@@ -369,17 +394,16 @@ export const AdminDashboard = () => {
               />
             </div>
           </div>
-
           <div className="mt-3 overflow-x-auto rounded-xl border border-[#d2d2d7] bg-white">
             <div className="min-w-[900px]">
               <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
                 <span>Channel</span>
                 <span>User</span>
-                <span>Activity</span>
-                <span>Posts</span>
-                <span>{selectedTimeLabel} views</span>
+                <span>{selectedGraphDate ? `Activity (${selectedGraphDate})` : 'Activity'}</span>
+                <span>{selectedGraphDate ? `Posts (${selectedGraphDate})` : 'Posts'}</span>
+                <span>{selectedGraphDate ? `Views (${selectedGraphDate})` : `${selectedTimeLabel} views`}</span>
                 <span>Upcoming</span>
-                <span>Engagement</span>
+                <span>{selectedGraphDate ? `Engagement (${selectedGraphDate})` : 'Engagement'}</span>
               </div>
               {(activeMetrics.accountRows || []).length === 0 ? (
                 <div className="px-5 py-8 text-center text-sm text-[#6e6e73]">
@@ -391,41 +415,66 @@ export const AdminDashboard = () => {
                 </div>
               ) : (
                 <div>
-                  {filteredAccountRows.map((account) => (
-                    <div
-                      key={account._id}
-                      onClick={() => openAccountFeed(account)}
-                      className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] items-center gap-3 border-b border-[#e5e5ea] px-3 py-2 text-xs transition hover:bg-[#f5f5f7] last:border-b-0"
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          openAccountFeed(account);
-                        }
-                      }}
-                    >
-                      <AccountIdentity account={account} />
-                      <div className="min-w-0">
-                        <p className="m-0 truncate font-semibold text-[#1d1d1f]">{account.user?.name || 'Unknown user'}</p>
-                        <p className="m-0 truncate text-[10px] text-[#6e6e73]">{account.user?.email || 'No email'}</p>
+                  {filteredAccountRows.map((account) => {
+                    const dateActivity = selectedGraphDate
+                      ? (account.last30DaysActivity || []).find((day) => day.dateStr === selectedGraphDate)
+                      : null;
+
+                    return (
+                      <div
+                        key={account._id}
+                        onClick={() => openAccountFeed(account)}
+                        className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] items-center gap-3 border-b border-[#e5e5ea] px-3 py-2 text-xs transition hover:bg-[#f5f5f7] last:border-b-0"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openAccountFeed(account);
+                          }
+                        }}
+                      >
+                        <AccountIdentity account={account} />
+                        <div className="min-w-0">
+                          <p className="m-0 truncate font-semibold text-[#1d1d1f]">{account.user?.name || 'Unknown user'}</p>
+                          <p className="m-0 truncate text-[10px] text-[#6e6e73]">{account.user?.email || 'No email'}</p>
+                        </div>
+                        <ActivityCell
+                          account={account}
+                          selectedTimeRange={selectedTimeRange}
+                          selectedRange={selectedRange}
+                          selectedGraphDate={selectedGraphDate}
+                        />
+                        <span className="text-[#515154]">
+                          {selectedGraphDate ? (dateActivity?.count || 0) : (account[selectedRange.postsKey] || 0)}
+                        </span>
+                        <div>
+                          {selectedGraphDate ? (
+                            <span className="font-semibold text-[#1d1d1f]">
+                              {numberFormat.format(dateActivity?.views || 0)}
+                            </span>
+                          ) : (
+                            <span className="text-[#515154]">
+                              {numberFormat.format(account[selectedRange.viewsKey] || 0)}
+                              {(account.recentViewDelta || 0) > 0 && (
+                                <span className="ml-1 text-[9px] font-semibold text-green-600">+{numberFormat.format(account.recentViewDelta)}</span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        <span className={(account.upcomingPosts || 0) < 3 ? 'text-[#ff3b30] font-medium' : 'text-[#515154]'}>
+                          {numberFormat.format(account.upcomingPosts || 0)}
+                        </span>
+                        <span className="text-[#515154]">
+                          {selectedGraphDate ? (
+                            `${numberFormat.format(dateActivity?.likes || 0)} / ${numberFormat.format(dateActivity?.comments || 0)}`
+                          ) : (
+                            `${numberFormat.format(account[selectedRange.likesKey] || 0)} / ${numberFormat.format(account[selectedRange.commentsKey] || 0)}`
+                          )}
+                        </span>
                       </div>
-                      <ActivityCell account={account} selectedTimeRange={selectedTimeRange} selectedRange={selectedRange} />
-                      <span className="text-[#515154]">{account[selectedRange.postsKey] || 0}</span>
-                      <span className="text-[#515154]">
-                        {numberFormat.format(account[selectedRange.viewsKey] || 0)}
-                        {(account.recentViewDelta || 0) > 0 && (
-                          <span className="ml-1 text-[9px] font-semibold text-green-600">+{numberFormat.format(account.recentViewDelta)}</span>
-                        )}
-                      </span>
-                      <span className={(account.upcomingPosts || 0) < 3 ? 'text-[#ff3b30] font-medium' : 'text-[#515154]'}>
-                        {numberFormat.format(account.upcomingPosts || 0)}
-                      </span>
-                      <span className="text-[#515154]">
-                        {numberFormat.format(account[selectedRange.likesKey] || 0)} / {numberFormat.format(account[selectedRange.commentsKey] || 0)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

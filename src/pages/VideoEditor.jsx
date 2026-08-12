@@ -1,8 +1,7 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchFile } from '@ffmpeg/util';
-import { Download, Folder, Layers, Loader2, UploadCloud, X, ChevronRight, ChevronDown, Search, RotateCcw, Play } from 'lucide-react';
+import { Download, Folder, Layers, Loader2, UploadCloud, X, ChevronRight, ChevronDown, Search, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { OUTPUT_WIDTH, OUTPUT_HEIGHT, OUTPUT_FPS, API_BASE_URL } from './videoEditor/videoEditorConstants';
 import { useFFmpeg } from './videoEditor/useFFmpeg';
@@ -19,11 +18,23 @@ import { TextGeneratorDialog } from './videoEditor/TextGeneratorDialog';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { getMediaUrl } from '../utils/mediaUrls';
 import {
-  BULK_ROWS_STORAGE_KEY,
   DEFAULT_DRAG_POS,
   normalizeBulkRowsFromStorage,
   sanitizeBulkRowForStorage,
 } from './bulkBuilder/useBulkRows';
+import {
+  readBulkRowsSnapshot,
+  subscribeToBulkRows,
+  writeBulkRowsSnapshot,
+} from './bulkBuilder/bulkProjectStore';
+import {
+  bulkRowToProject,
+  deserializeProject,
+  hydrateBulkProjectDurations,
+  projectToBulkRow,
+  serializeProject,
+  syncBulkRowContent,
+} from './videoEditorV2/project';
 
 const getUploadedMediaSummary = (media) => ({
   resultMediaId: media?._id || media?.id || media?.mediaId || '',
@@ -32,14 +43,22 @@ const getUploadedMediaSummary = (media) => ({
 });
 
 const getBulkResultUrl = (row) => row.resultVideoUrl || getMediaUrl(row.resultMediaUrl);
+const V2_DRAFT_STORAGE_KEY = 'tw_video_editor_v2_draft';
+const LEGACY_TIMELINE_PROJECT_KEY = 'tw_legacy_editor_timeline_project_id';
 
-const getAudioIdentity = (track) => (
-  track ? `${track.sourceType || ''}:${track.id || track.mediaId || track.url || track.name || ''}` : ''
+const getMediaIdentity = (media) => (
+  media
+    ? `${media.sourceType || ''}:${media._id || media.id || media.mediaId || media.url || media.name || ''}`
+    : ''
 );
+
+const getAudioIdentity = getMediaIdentity;
 
 const getRowLoadSignature = (row) => JSON.stringify({
   id: row?.id || '',
+  video1: getMediaIdentity(row?.video1),
   video1Url: row?.video1Url || '',
+  video2: getMediaIdentity(row?.video2),
   video2Url: row?.video2Url || '',
   audio: getAudioIdentity(row?.audio),
   caption: row?.caption || '',
@@ -63,6 +82,62 @@ const getTextSettingsSignature = (settings) => JSON.stringify({
   bgColor: settings?.bgColor || '',
 });
 
+const getStoredBulkRows = (options) => normalizeBulkRowsFromStorage(
+  readBulkRowsSnapshot(),
+  options,
+);
+
+const persistVisibleBulkRows = (visibleRows, rowId = '') => {
+  const rowsToPersist = rowId
+    ? visibleRows.filter((row) => String(row.id) === String(rowId))
+    : visibleRows;
+  const updates = new Map(rowsToPersist.map((row) => [String(row.id), row]));
+  const storedRows = getStoredBulkRows();
+  const storedIds = new Set(storedRows.map((row) => String(row.id)));
+  const mergedRows = storedRows.map((row) => (
+    updates.has(String(row.id)) ? updates.get(String(row.id)) : row
+  ));
+  rowsToPersist.forEach((row) => {
+    if (!storedIds.has(String(row.id))) mergedRows.push(row);
+  });
+  const sanitizedRows = mergedRows.map(sanitizeBulkRowForStorage);
+  writeBulkRowsSnapshot(sanitizedRows, { source: 'legacy-bulk-queue', rowId });
+  return sanitizedRows;
+};
+
+const hydrateBulkRowWithDurations = (row, videoDurations, isDualVideo) => {
+  if (!row?.editorProject) {
+    return { row, project: null, changed: false };
+  }
+  const currentSnapshot = serializeProject(row.editorProject);
+  const project = hydrateBulkProjectDurations(row.editorProject, videoDurations);
+  const nextSnapshot = serializeProject(project);
+  if (nextSnapshot === currentSnapshot) {
+    return { row, project, changed: false };
+  }
+  return {
+    row: sanitizeBulkRowForStorage(projectToBulkRow(project, row, {
+      isDualVideo,
+      clearResult: false,
+    })),
+    project,
+    changed: true,
+  };
+};
+
+const assertCanonicalProjectUnchanged = (result) => {
+  if (!result?.rowId || !result.projectSnapshot) return;
+  const latestRow = getStoredBulkRows().find((row) => (
+    String(row.id) === String(result.rowId)
+  ));
+  if (!latestRow?.editorProject) {
+    throw new Error('This bulk row was removed while it was exporting.');
+  }
+  if (serializeProject(latestRow.editorProject) !== result.projectSnapshot) {
+    throw new Error('This row changed while it was exporting. Export it again so the result matches the latest timeline.');
+  }
+};
+
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
 const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
 
@@ -71,6 +146,18 @@ export const VideoEditor = () => {
   const [searchParams] = useSearchParams();
   const { token } = useAuth();
   const isBulkMode = searchParams.get('mode') === 'bulk';
+  const [linkedTimelineProject, setLinkedTimelineProject] = useState(() => {
+    if (isBulkMode) return null;
+    try {
+      const projectId = sessionStorage.getItem(LEGACY_TIMELINE_PROJECT_KEY);
+      const serializedProject = localStorage.getItem(V2_DRAFT_STORAGE_KEY);
+      if (!projectId || !serializedProject) return null;
+      const project = deserializeProject(serializedProject);
+      return String(project.id) === String(projectId) ? project : null;
+    } catch {
+      return null;
+    }
+  });
 
   // Video file state
   const [video1, setVideo1] = useState(null);
@@ -244,6 +331,83 @@ export const VideoEditor = () => {
 
   // --- Process video (coordinates across hooks) ---
   const processVideo = useCallback(async () => {
+    const stateBulkRow = isBulkMode && currentQueueIndex >= 0
+      ? bulkRows[currentQueueIndex]
+      : null;
+    let activeBulkRow = stateBulkRow;
+    if (stateBulkRow?.id) {
+      try {
+        activeBulkRow = getStoredBulkRows().find((row) => (
+          String(row.id) === String(stateBulkRow.id)
+        )) || stateBulkRow;
+      } catch (error) {
+        console.error('Failed to read the latest canonical bulk project:', error);
+      }
+    }
+    let advancedBulkProject = activeBulkRow?.editorProject;
+
+    if (advancedBulkProject) {
+      const videoDurations = preview.videoDurationsRef.current;
+      const activeVideo1Url = activeBulkRow.video1Url || activeBulkRow.video1?.url || '';
+      const activeVideo2Url = activeBulkRow.video2Url || activeBulkRow.video2?.url || '';
+      const hydration = hydrateBulkRowWithDurations(
+        activeBulkRow,
+        {
+          video1: !activeVideo1Url || activeVideo1Url === video1Url
+            ? (videoDurations.input1 || preview.video1Ref.current?.duration || 0)
+            : 0,
+          video2: !activeVideo2Url || activeVideo2Url === video2Url
+            ? (videoDurations.input2 || preview.video2Ref.current?.duration || 0)
+            : 0,
+        },
+        isDualVideo,
+      );
+      advancedBulkProject = hydration.project;
+      if (hydration.changed) {
+        activeBulkRow = hydration.row;
+        setBulkRows((current) => current.map((row) => (
+          String(row.id) === String(activeBulkRow.id) ? activeBulkRow : row
+        )));
+        persistVisibleBulkRows([activeBulkRow], activeBulkRow.id);
+      }
+    }
+
+    if (advancedBulkProject) {
+      if (!ffmpegLoaded) {
+        setStatusMessage({ type: 'error', text: 'Video processing engine is still loading. Please wait a moment.' });
+        return;
+      }
+
+      try {
+        setProcessing(true);
+        setStatusMessage(null);
+        setProgressMsg('Preparing timeline project...');
+        const { exportProjectInBrowser } = await import('./videoEditorV2/export/index.js');
+        const result = await exportProjectInBrowser({
+          project: advancedBulkProject,
+          ffmpeg: ffmpegRef.current,
+          onProgress: ({ message }) => setProgressMsg(message || 'Rendering timeline project...'),
+        });
+        const nextResultUrl = URL.createObjectURL(result.blob);
+        bulkResultUrlsRef.current.push(nextResultUrl);
+        setResultVideoUrl(nextResultUrl);
+        setProgressMsg('');
+        return {
+          blob: result.blob,
+          url: nextResultUrl,
+          rowId: activeBulkRow?.id || '',
+          projectSnapshot: serializeProject(advancedBulkProject),
+        };
+      } catch (err) {
+        console.error('Error processing timeline project client-side:', err);
+        setStatusMessage({ type: 'error', text: `Processing error: ${err.message || 'Please verify the project media.'}` });
+        setProgressMsg('');
+        throw err;
+      } finally {
+        setProcessing(false);
+      }
+    }
+
     if (!video1 || (isDualVideo && !video2)) {
       setStatusMessage({ type: 'error', text: isDualVideo ? 'Please select both video files before merging.' : 'Please select a video file before exporting.' });
       return;
@@ -471,7 +635,7 @@ export const VideoEditor = () => {
       }
       setProcessing(false);
     }
-  }, [video1, video2, ffmpegLoaded, ffmpegRef, audio.selectedAudio, hasAudioStream, removeIfExists, overlay, preview.videoDurationsRef, ffmpegLogHandlerRef, ffmpegLogLinesRef, isBulkMode, isDualVideo]);
+  }, [video1, video2, video1Url, video2Url, ffmpegLoaded, ffmpegRef, audio.selectedAudio, hasAudioStream, removeIfExists, overlay, preview.video1Ref, preview.video2Ref, preview.videoDurationsRef, ffmpegLogHandlerRef, ffmpegLogLinesRef, isBulkMode, isDualVideo, currentQueueIndex, bulkRows]);
 
   const handleGenerateSingleCaption = useCallback(async () => {
     if (!resultVideoUrl) return;
@@ -512,9 +676,9 @@ export const VideoEditor = () => {
       prev.map((r) => (r.id === rowId ? { ...r, ...partialData } : r))
     );
     try {
-      const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
+      const saved = getStoredBulkRows();
       const updated = saved.map((r) => (r.id === rowId ? sanitizeBulkRowForStorage({ ...r, ...partialData }) : r));
-      localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(updated));
+      writeBulkRowsSnapshot(updated, { source: 'legacy-bulk-queue', rowId });
     } catch (err) {
       console.error('Failed to update row data in localStorage:', err);
     }
@@ -815,7 +979,7 @@ export const VideoEditor = () => {
       ));
       setBulkRows(resetRows);
       try {
-        localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(resetRows.map(sanitizeBulkRowForStorage)));
+        persistVisibleBulkRows(resetRows);
       } catch (err) {
         console.error('Failed to reset bulk rows for re-export:', err);
       }
@@ -827,7 +991,7 @@ export const VideoEditor = () => {
     }
     setBulkRows(queueRows);
     try {
-      localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(queueRows.map(sanitizeBulkRowForStorage)));
+      persistVisibleBulkRows(queueRows);
     } catch (err) {
       console.error('Failed to normalize bulk rows for export:', err);
     }
@@ -836,31 +1000,6 @@ export const VideoEditor = () => {
     setIsQueueRunning(true);
     setStatusMessage(null);
   }, [bulkRows, isDualVideo]);
-
-  const resetSingleBulkRow = useCallback((rowId) => {
-    setBulkRows((prev) => {
-      const next = prev.map((row) => (
-        row.id === rowId
-          ? {
-            ...row,
-            status: 'ready',
-            resultMediaId: '',
-            resultMediaUrl: '',
-            resultMediaName: '',
-            resultVideoUrl: '',
-          }
-          : row
-      ));
-      try {
-        localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(next.map(sanitizeBulkRowForStorage)));
-      } catch (err) {
-        console.error('Failed to reset bulk row for re-export:', err);
-      }
-      return next;
-    });
-  }, []);
-
-
 
   const handleGenerateAllCaptions = useCallback(async () => {
     setGeneratingCaptions(true);
@@ -916,7 +1055,7 @@ export const VideoEditor = () => {
   useEffect(() => {
     if (isBulkMode) {
       try {
-        const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
+        const saved = getStoredBulkRows({ resetTransientStatus: true });
         // Load all ready rows
         const readyRows = saved.filter((r) => r.video1 && (!isDualVideo || r.video2));
         setBulkRows(readyRows);
@@ -929,7 +1068,27 @@ export const VideoEditor = () => {
         console.error('Error loading bulk rows:', err);
       }
     }
-  }, [isBulkMode]);
+  }, [isBulkMode, isDualVideo]);
+
+  useEffect(() => {
+    if (!isBulkMode || isQueueRunning) return undefined;
+    return subscribeToBulkRows(({ source }) => {
+      if (source === 'legacy-bulk-queue') return;
+      const activeRowId = bulkRows[currentQueueIndex]?.id;
+      const nextRows = getStoredBulkRows().filter((row) => (
+        row.video1 && (!isDualVideo || row.video2)
+      ));
+      setBulkRows(nextRows);
+      if (nextRows.length === 0) {
+        setCurrentQueueIndex(-1);
+        return;
+      }
+      const nextActiveIndex = nextRows.findIndex((row) => (
+        String(row.id) === String(activeRowId || '')
+      ));
+      setCurrentQueueIndex(nextActiveIndex >= 0 ? nextActiveIndex : 0);
+    });
+  }, [bulkRows, currentQueueIndex, isBulkMode, isDualVideo, isQueueRunning]);
 
   // Sync active row data to editor states when active index changes
   useEffect(() => {
@@ -1012,28 +1171,53 @@ export const VideoEditor = () => {
     const settingsChanged = getTextSettingsSignature(activeRow.textSettings) !== getTextSettingsSignature(nextTextSettings);
     const dragChanged = currentDragPos.x !== nextDragPos.x || currentDragPos.y !== nextDragPos.y;
     const audioChanged = getAudioIdentity(activeRow.audio) !== getAudioIdentity(audio.selectedAudio);
+    const video1Changed = (
+      getMediaIdentity(activeRow.video1) !== getMediaIdentity(video1)
+      || (activeRow.video1Url || '') !== (video1Url || '')
+    );
+    const video2Changed = (
+      getMediaIdentity(activeRow.video2) !== getMediaIdentity(video2)
+      || (activeRow.video2Url || '') !== (video2Url || '')
+    );
 
-    if (!captionChanged && !settingsChanged && !dragChanged && !audioChanged) return;
+    if (
+      !captionChanged
+      && !settingsChanged
+      && !dragChanged
+      && !audioChanged
+      && !video1Changed
+      && !video2Changed
+    ) return;
+
+    const contentPatch = {};
+    if (captionChanged) contentPatch.caption = overlay.text || '';
+    if (settingsChanged) contentPatch.textSettings = nextTextSettings;
+    if (dragChanged) contentPatch.dragPos = nextDragPos;
+    if (audioChanged) contentPatch.audio = audio.selectedAudio;
+    if (video1Changed) {
+      contentPatch.video1 = video1;
+      contentPatch.video1Url = video1Url || '';
+    }
+    if (video2Changed) {
+      contentPatch.video2 = video2;
+      contentPatch.video2Url = video2Url || '';
+    }
+
+    const synchronizedRow = sanitizeBulkRowForStorage(syncBulkRowContent(
+      activeRow,
+      contentPatch,
+      { isDualVideo, clearResult: true },
+    ));
+    loadedBulkRowSignatureRef.current = getRowLoadSignature(synchronizedRow);
 
     const updatedRows = bulkRows.map((row, idx) => {
       if (idx !== currentQueueIndex) return row;
-      return sanitizeBulkRowForStorage({
-        ...row,
-        caption: overlay.text || '',
-        textSettings: nextTextSettings,
-        dragPos: nextDragPos,
-        audio: audio.selectedAudio,
-        status: row.video1 && (!isDualVideo || row.video2) ? 'ready' : 'draft',
-        resultMediaId: '',
-        resultMediaUrl: '',
-        resultMediaName: '',
-        resultVideoUrl: '',
-      });
+      return synchronizedRow;
     });
 
     setBulkRows(updatedRows);
     try {
-      localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(updatedRows.map(sanitizeBulkRowForStorage)));
+      persistVisibleBulkRows(updatedRows, activeRow.id);
     } catch (err) {
       console.error('Failed to sync active bulk row edits:', err);
     }
@@ -1053,7 +1237,53 @@ export const VideoEditor = () => {
     overlay.bgType,
     overlay.bgColor,
     overlay.dragPos,
-    audio.selectedAudio
+    audio.selectedAudio,
+    video1,
+    video2,
+    video1Url,
+    video2Url,
+    isDualVideo,
+  ]);
+
+  // Replace temporary canonical timeline estimates as soon as the legacy
+  // preview has read the real media metadata. This is a metadata correction,
+  // so a previously valid exported result remains attached to the row.
+  useEffect(() => {
+    if (!isBulkMode || currentQueueIndex < 0 || currentQueueIndex >= bulkRows.length) return;
+    const activeRow = bulkRows[currentQueueIndex];
+    if (!activeRow?.editorProject) return;
+
+    const videoDurations = preview.videoDurationsRef.current;
+    const input1Duration = videoDurations.input1 || preview.video1Ref.current?.duration || 0;
+    const input2Duration = videoDurations.input2 || preview.video2Ref.current?.duration || 0;
+    if (input1Duration <= 0 && input2Duration <= 0) return;
+
+    const hydration = hydrateBulkRowWithDurations(
+      activeRow,
+      { video1: input1Duration, video2: input2Duration },
+      isDualVideo,
+    );
+    if (!hydration.changed) return;
+
+    loadedBulkRowSignatureRef.current = getRowLoadSignature(hydration.row);
+    const updatedRows = bulkRows.map((row, index) => (
+      index === currentQueueIndex ? hydration.row : row
+    ));
+    setBulkRows(updatedRows);
+    try {
+      persistVisibleBulkRows(updatedRows, activeRow.id);
+    } catch (error) {
+      console.error('Failed to save resolved bulk video durations:', error);
+    }
+  }, [
+    bulkRows,
+    currentQueueIndex,
+    isBulkMode,
+    isDualVideo,
+    preview.previewTotalTime,
+    preview.video1Ref,
+    preview.video2Ref,
+    preview.videoDurationsRef,
   ]);
 
   // Automated single-row export effect
@@ -1115,6 +1345,7 @@ export const VideoEditor = () => {
         if (!result?.blob) {
           throw new Error('Video export did not produce an output file.');
         }
+        assertCanonicalProjectUnchanged(result);
         setBulkRows((prev) =>
           prev.map((r) => (
             r.id === row.id
@@ -1130,7 +1361,7 @@ export const VideoEditor = () => {
           ))
         );
         try {
-          const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
+          const saved = getStoredBulkRows();
           const updated = saved.map((r) => (
             r.id === row.id
               ? {
@@ -1143,7 +1374,10 @@ export const VideoEditor = () => {
               }
               : r
           ));
-          localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(updated.map(sanitizeBulkRowForStorage)));
+          writeBulkRowsSnapshot(updated.map(sanitizeBulkRowForStorage), {
+            source: 'legacy-bulk-queue',
+            rowId: row.id,
+          });
         } catch (err) {
           console.error('Failed to save bulk row update in localStorage:', err);
         }
@@ -1165,7 +1399,8 @@ export const VideoEditor = () => {
     processing,
     processVideo,
     updateBulkRowData,
-    preview
+    preview,
+    isDualVideo,
   ]);
 
   // Automated queue runner effect
@@ -1245,6 +1480,7 @@ export const VideoEditor = () => {
         if (!result?.blob) {
           throw new Error('Video export did not produce an output file.');
         }
+        assertCanonicalProjectUnchanged(result);
 
         setBulkRows((prev) =>
           prev.map((r) => (
@@ -1261,7 +1497,7 @@ export const VideoEditor = () => {
           ))
         );
         try {
-          const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
+          const saved = getStoredBulkRows();
           const resetSaved = saved.map((r) => (
             r.id === row.id
               ? {
@@ -1274,7 +1510,10 @@ export const VideoEditor = () => {
               }
               : r
           ));
-          localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(resetSaved.map(sanitizeBulkRowForStorage)));
+          writeBulkRowsSnapshot(resetSaved.map(sanitizeBulkRowForStorage), {
+            source: 'legacy-bulk-queue',
+            rowId: row.id,
+          });
         } catch (err) {
           console.error('Failed to clear transient bulk result from localStorage:', err);
         }
@@ -1330,7 +1569,8 @@ export const VideoEditor = () => {
     audio.selectedAudio,
     processing,
     processVideo,
-    updateBulkRowData
+    updateBulkRowData,
+    isDualVideo,
   ]);
 
 
@@ -1346,8 +1586,93 @@ export const VideoEditor = () => {
   const activeBulkRow = currentQueueIndex >= 0 && currentQueueIndex < bulkRows.length
     ? bulkRows[currentQueueIndex]
     : null;
+  const openCurrentClipsInTimeline = () => {
+    const videoDurations = {
+      video1: preview.videoDurationsRef.current.input1 || preview.video1Ref.current?.duration || 0,
+      video2: preview.videoDurationsRef.current.input2 || preview.video2Ref.current?.duration || 0,
+    };
+    const contentPatch = {
+      video1,
+      video1Url,
+      video2: isDualVideo ? video2 : null,
+      video2Url: isDualVideo ? video2Url : '',
+      audio: audio.selectedAudio,
+      caption: overlay.text || '',
+      textSettings: {
+        fontFamily: overlay.fontFamily,
+        fontWeight: overlay.fontWeight,
+        fontSize: overlay.fontSize,
+        fontColor: overlay.fontColor,
+        strokeWidth: overlay.strokeWidth,
+        strokeColor: overlay.strokeColor,
+        bgType: overlay.bgType,
+        bgColor: overlay.bgColor,
+      },
+      dragPos: normalizeDragPosForCompare(overlay.dragPos),
+    };
+
+    try {
+      if (isBulkMode && activeBulkRow?.id) {
+        const latestRows = getStoredBulkRows();
+        const rowIndex = latestRows.findIndex((row) => (
+          String(row.id) === String(activeBulkRow.id)
+        ));
+        if (rowIndex < 0) throw new Error('The active bulk row no longer exists.');
+        latestRows[rowIndex] = sanitizeBulkRowForStorage(syncBulkRowContent(
+          latestRows[rowIndex],
+          contentPatch,
+          { isDualVideo, videoDurations },
+        ));
+        writeBulkRowsSnapshot(latestRows, {
+          source: 'legacy-bulk-queue',
+          rowId: activeBulkRow.id,
+        });
+        navigate(`/media/editor-v2?mode=bulk&rowId=${encodeURIComponent(activeBulkRow.id)}&returnTo=legacy-editor`);
+        return;
+      }
+
+      const hasTemporaryMedia = [video1Url, video2Url, audio.selectedAudio?.url]
+        .some((url) => String(url || '').startsWith('blob:'));
+      if (hasTemporaryMedia) {
+        setStatusMessage({
+          type: 'error',
+          text: 'Upload these local clips to Media Library before opening them in Timeline Editor.',
+        });
+        return;
+      }
+      const project = linkedTimelineProject
+        ? syncBulkRowContent(projectToBulkRow(linkedTimelineProject, {
+          id: linkedTimelineProject.id,
+          ...contentPatch,
+        }, { isDualVideo, clearResult: false }), contentPatch, {
+          isDualVideo,
+          videoDurations,
+          clearResult: false,
+        }).editorProject
+        : bulkRowToProject({
+          id: 'legacy-single-editor-draft',
+          ...contentPatch,
+        }, {
+          isDualVideo,
+          videoDurations,
+          name: 'Video editor project',
+        });
+      localStorage.setItem(V2_DRAFT_STORAGE_KEY, serializeProject(project));
+      sessionStorage.setItem(LEGACY_TIMELINE_PROJECT_KEY, project.id);
+      setLinkedTimelineProject(project);
+      navigate('/media/editor-v2?returnTo=legacy-editor');
+    } catch (error) {
+      setStatusMessage({
+        type: 'error',
+        text: error.message || 'The clips could not be opened in Timeline Editor.',
+      });
+    }
+  };
   const showBulkGeneratingCard = isBulkMode && Boolean(activeBulkRow) && isQueueRunning && activeBulkRow.status !== 'done';
   const showBulkOutputGallery = isBulkMode && (doneBulkRows.length > 0 || showBulkGeneratingCard);
+  const canonicalPreviewProject = isBulkMode
+    ? activeBulkRow?.editorProject || null
+    : linkedTimelineProject;
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] py-3 px-4 sm:px-6 flex flex-col items-center">
@@ -1356,14 +1681,24 @@ export const VideoEditor = () => {
         <div className="flex items-center gap-3">
           <h2 className="text-xs font-bold text-gray-800 uppercase tracking-wider">Video Editor</h2>
           {!isBulkMode ? (
-            <button
-              type="button"
-              onClick={() => navigate('/media/bulk-builder')}
-              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-bold text-gray-600 transition-all hover:bg-gray-50 active:scale-95 flex items-center gap-1 shadow-sm uppercase tracking-wider"
-            >
-              <Layers className="h-3 w-3 text-[#ff5500]" />
-              Bulk Video Builder
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={openCurrentClipsInTimeline}
+                className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700 transition-all hover:bg-blue-100 active:scale-95 flex items-center gap-1 shadow-sm uppercase tracking-wider"
+              >
+                <Play className="h-3 w-3" />
+                Timeline Editor
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/media/bulk-builder')}
+                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-bold text-gray-600 transition-all hover:bg-gray-50 active:scale-95 flex items-center gap-1 shadow-sm uppercase tracking-wider"
+              >
+                <Layers className="h-3 w-3 text-[#ff5500]" />
+                Bulk Video Builder
+              </button>
+            </div>
           ) : (
             <button
               type="button"
@@ -1594,7 +1929,9 @@ export const VideoEditor = () => {
             onPointerDown={overlay.handlePointerDown}
             onPointerMove={overlay.handlePointerMove}
             onPointerUp={overlay.handlePointerUp}
+            onOpenTimeline={openCurrentClipsInTimeline}
             isDualVideo={isDualVideo}
+            canonicalProject={canonicalPreviewProject}
           />
 
           {!isBulkMode && (

@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Video, Play, Pause } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Video, Play, Pause, PanelsTopLeft } from 'lucide-react';
 import { WEIGHT_MAP } from './videoEditorConstants';
 import { hexToRgba, formatTime } from './videoEditorUtils';
+import { ProjectPreviewCanvas } from '../videoEditorV2/components/PreviewStage';
 
 const IgIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -141,11 +142,60 @@ export const VideoPreview = ({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onOpenTimeline,
   isDualVideo = true,
+  canonicalProject = null,
 }) => {
   const [showIgOverlay, setShowIgOverlay] = useState(false);
+  const [canonicalCurrentTime, setCanonicalCurrentTime] = useState(0);
+  const [canonicalIsPlaying, setCanonicalIsPlaying] = useState(false);
+  const canonicalDuration = useMemo(() => {
+    if (!canonicalProject) return 0;
+    const contentDuration = (canonicalProject.tracks || []).reduce((projectEnd, track) => (
+      (track.clips || []).reduce((trackEnd, clip) => Math.max(
+        trackEnd,
+        Number(clip.timelineStart || 0) + Number(clip.duration || 0),
+      ), projectEnd)
+    ), 0);
+    return Math.max(0, Math.min(
+      Number(canonicalProject.output?.maxDuration || 30),
+      Number(canonicalProject.duration || contentDuration),
+    ));
+  }, [canonicalProject]);
+  const canonicalTextClip = canonicalProject?.tracks
+    ?.flatMap((track) => track.clips || [])
+    .find((clip) => clip.enabled !== false && clip.type === 'text' && clip.metadata?.bulkCaption)
+    || canonicalProject?.tracks
+      ?.flatMap((track) => track.clips || [])
+      .find((clip) => clip.enabled !== false && clip.type === 'text');
 
-  if (!video1Url || (isDualVideo && !video2Url)) {
+  useEffect(() => {
+    if (!canonicalProject || !canonicalIsPlaying || canonicalDuration <= 0) return undefined;
+    let frameId;
+    let previousTime = performance.now();
+    const tick = (now) => {
+      const elapsed = Math.max(0, (now - previousTime) / 1000);
+      previousTime = now;
+      setCanonicalCurrentTime((current) => {
+        const next = current + elapsed;
+        return next >= canonicalDuration ? 0 : next;
+      });
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [canonicalDuration, canonicalIsPlaying, canonicalProject]);
+
+  const resolvedCanonicalCurrentTime = Math.min(canonicalCurrentTime, canonicalDuration);
+  const displayedCurrentTime = canonicalProject ? resolvedCanonicalCurrentTime : previewCurrentTime;
+  const displayedTotalTime = canonicalProject ? canonicalDuration : previewTotalTime;
+  const displayedIsPlaying = canonicalProject ? canonicalIsPlaying : isPlaying;
+  const handleTogglePlayback = () => {
+    if (canonicalProject) setCanonicalIsPlaying((playing) => !playing);
+    onTogglePlay();
+  };
+
+  if (!canonicalProject && (!video1Url || (isDualVideo && !video2Url))) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
         <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Placement Preview</h4>
@@ -163,20 +213,32 @@ export const VideoPreview = ({
     <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Placement Preview</h4>
-        {/* Instagram Overlay Toggle */}
-        <button
-          type="button"
-          onClick={() => setShowIgOverlay((prev) => !prev)}
-          className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[9px] font-bold uppercase tracking-wider transition-all active:scale-95 ${
-            showIgOverlay
-              ? 'bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 text-white shadow-sm'
-              : 'border border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
-          }`}
-          title={showIgOverlay ? 'Hide Instagram overlay' : 'Show Instagram overlay'}
-        >
-          <IgIcon className="h-3 w-3" />
-          {showIgOverlay ? 'IG On' : 'IG Off'}
-        </button>
+        <div className="flex items-center gap-1.5">
+          {/* Instagram Overlay Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowIgOverlay((prev) => !prev)}
+            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[9px] font-bold uppercase tracking-wider transition-all active:scale-95 ${
+              showIgOverlay
+                ? 'bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 text-white shadow-sm'
+                : 'border border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+            }`}
+            title={showIgOverlay ? 'Hide Instagram overlay' : 'Show Instagram overlay'}
+          >
+            <IgIcon className="h-3 w-3" />
+            {showIgOverlay ? 'IG On' : 'IG Off'}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenTimeline}
+            disabled={!onOpenTimeline}
+            className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-blue-700 transition-all hover:bg-blue-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            title="Open these clips in Timeline Editor"
+          >
+            <PanelsTopLeft className="h-3 w-3" />
+            Timeline
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -197,7 +259,7 @@ export const VideoPreview = ({
             onDurationChange={(e) => onDurationChange('input1', e)}
             onTimeUpdate={() => onTimeUpdate('input1')}
             muted={Boolean(selectedAudio)}
-            className={`absolute inset-0 w-full h-full object-contain ${activeVideo === 1 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            className={`absolute inset-0 h-full w-full object-contain ${!canonicalProject && activeVideo === 1 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           />
           {/* Video 2 */}
           {isDualVideo && video2Url && (
@@ -212,7 +274,19 @@ export const VideoPreview = ({
               onDurationChange={(e) => onDurationChange('input2', e)}
               onTimeUpdate={() => onTimeUpdate('input2')}
               muted={Boolean(selectedAudio)}
-              className={`absolute inset-0 w-full h-full object-contain ${activeVideo === 2 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              className={`absolute inset-0 h-full w-full object-contain ${!canonicalProject && activeVideo === 2 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            />
+          )}
+
+          {canonicalProject && (
+            <ProjectPreviewCanvas
+              project={canonicalProject}
+              currentTime={resolvedCanonicalCurrentTime}
+              isPlaying={canonicalIsPlaying}
+              hiddenClipIds={canonicalTextClip && (isEditingOverlay || isDragging)
+                ? [canonicalTextClip.id]
+                : []}
+              className="absolute inset-0 z-[5]"
             />
           )}
 
@@ -221,17 +295,17 @@ export const VideoPreview = ({
 
           {/* Time HUD */}
           <div className="absolute left-3 top-3 z-20 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white shadow-lg backdrop-blur-sm">
-            {formatTime(previewCurrentTime)} / {formatTime(previewTotalTime)}
+            {formatTime(displayedCurrentTime)} / {formatTime(displayedTotalTime)}
           </div>
 
           {/* Play/Pause */}
           <button
             type="button"
-            onClick={onTogglePlay}
-            aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
+            onClick={handleTogglePlayback}
+            aria-label={displayedIsPlaying ? 'Pause preview' : 'Play preview'}
             className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white shadow-lg backdrop-blur-sm transition-all hover:bg-black/75 active:scale-95"
           >
-            {isPlaying ? (
+            {displayedIsPlaying ? (
               <Pause className="h-4 w-4" />
             ) : (
               <Play className="h-4 w-4 translate-x-[1px]" />
@@ -267,7 +341,7 @@ export const VideoPreview = ({
                 : isDragging
                   ? '1.5px dashed rgba(255,255,255,0.45)'
                   : 'none',
-              opacity: activeVideo === 1 ? 1 : 0,
+              opacity: activeVideo === 1 && (!canonicalProject || isEditingOverlay || isDragging) ? 1 : 0,
               pointerEvents: activeVideo === 1 ? 'auto' : 'none',
               zIndex: 31,
             }}

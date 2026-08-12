@@ -644,6 +644,7 @@ export const BulkVideoBuilder = () => {
                   zoomScale={pageZoom}
                   onUpdateCanvasPos={(canvasPos) => bulk.updateRow(row.id, { canvasPos })}
                   onHeaderDoubleClick={() => focusAndZoomOnRow(row)}
+                  onEditTimeline={() => navigate(`/media/editor-v2?mode=bulk&rowId=${encodeURIComponent(row.id)}`)}
                 />
               </div>
             ))}

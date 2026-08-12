@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import PlatformIcon from '../PlatformIcon';
 
 const numberFormat = new Intl.NumberFormat();
@@ -20,7 +20,7 @@ export const MetricCard = ({ icon: Icon, label, value, note }) => (
   </div>
 );
 
-export const DailyViewsChart = ({ data = [] }) => {
+export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }) => {
   const chartData = data.map((item) => {
     const date = item.dateStr ? new Date(`${item.dateStr}T00:00:00`) : null;
     return {
@@ -28,6 +28,7 @@ export const DailyViewsChart = ({ data = [] }) => {
       label: date ? `${date.getDate()}` : '',
       views: Number(item.views || 0),
       posts: Number(item.posts || 0),
+      isSelected: selectedDate === item.dateStr,
     };
   });
 
@@ -38,11 +39,22 @@ export const DailyViewsChart = ({ data = [] }) => {
           <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Last 30 days</p>
           <p className="m-0 mt-0.5 text-sm font-semibold text-[#1d1d1f]">Views by publish day</p>
         </div>
-        <p className="m-0 text-[10px] font-medium text-[#8e8e93]">Published posts only</p>
+        <div className="flex items-center gap-2">
+          {selectedDate && (
+            <button
+              type="button"
+              onClick={() => onSelectDate?.(null)}
+              className="text-[10px] font-semibold text-[#3478f6] hover:underline"
+            >
+              Clear date selection
+            </button>
+          )}
+          <p className="m-0 text-[10px] font-medium text-[#8e8e93]">Click any bar to inspect date activity</p>
+        </div>
       </div>
-      <div className="h-36 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+      <div className="h-36 w-full cursor-pointer outline-none focus:outline-none focus-visible:outline-none [&_*]:outline-none [&_*]:focus:outline-none [&_*]:focus-visible:outline-none select-none">
+        <ResponsiveContainer width="100%" height="100%" style={{ outline: 'none' }}>
+          <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} style={{ outline: 'none' }}>
             <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6e6e73' }} tickLine={false} axisLine={false} interval={0} />
             <YAxis
               tick={{ fontSize: 9, fill: '#6e6e73' }}
@@ -57,7 +69,24 @@ export const DailyViewsChart = ({ data = [] }) => {
               labelFormatter={(_, payload) => payload?.[0]?.payload?.dateStr || ''}
               contentStyle={{ borderRadius: 8, border: '1px solid #d2d2d7', fontSize: 11 }}
             />
-            <Bar dataKey="views" fill="#3478f6" radius={[3, 3, 0, 0]} maxBarSize={14} />
+            <Bar
+              dataKey="views"
+              radius={[3, 3, 0, 0]}
+              maxBarSize={14}
+              onClick={(entry) => {
+                if (entry && entry.dateStr) {
+                  onSelectDate?.(selectedDate === entry.dateStr ? null : entry.dateStr);
+                }
+              }}
+            >
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.isSelected ? '#10b981' : '#3478f6'}
+                  style={{ outline: 'none' }}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -79,7 +108,7 @@ const formatPostDateTime = (value) => {
   return `${date.toLocaleDateString([], { dateStyle: 'medium' })}, ${formatPostTime(value)}`;
 };
 
-export const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
+export const ActivityCell = ({ account, selectedTimeRange, selectedRange, selectedGraphDate }) => {
   const getDayTitle = (day) => {
     const dateLabel = day.dateStr
       ? new Date(`${day.dateStr}T00:00:00`).toLocaleDateString([], { dateStyle: 'medium' })
@@ -88,6 +117,38 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange }) => {
     const times = day.posts.map((post, index) => `${index + 1}. ${post.publishedAt ? formatPostDateTime(post.publishedAt) : 'Unknown time'}`);
     return `${dateLabel}\n${times.join('\n')}`;
   };
+
+  if (selectedGraphDate) {
+    const activityList = account.last30DaysActivity || account.last7DaysActivity || [];
+    const activityDay = activityList.find((day) => day.dateStr === selectedGraphDate);
+    const visiblePosts = (activityDay?.posts || []).slice().sort((a, b) => new Date(a.publishedAt || 0) - new Date(b.publishedAt || 0));
+    const totalPostsCount = activityDay?.count || visiblePosts.length;
+    const checkedCount = Math.min(totalPostsCount, 3);
+
+    return (
+      <div className="flex items-center gap-1">
+        {[0, 1, 2].map((slot) => {
+          const post = visiblePosts[slot];
+          const hasPost = slot < checkedCount;
+          const timeLabel = post?.publishedAt ? formatPostTime(post.publishedAt) : '';
+          return (
+            <span
+              key={slot}
+              title={post?.publishedAt ? formatPostDateTime(post.publishedAt) : hasPost ? 'Posted time unavailable' : 'No post'}
+              className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${hasPost ? 'border-[#10b981] bg-[#10b981] text-white' : 'border-[#d2d2d7] bg-white text-transparent'}`}
+            >
+              {hasPost ? timeLabel || '✓' : '✓'}
+            </span>
+          );
+        })}
+        {totalPostsCount > 3 && (
+          <span className="text-[9px] font-semibold text-[#6e6e73]" title={`${totalPostsCount} posts on ${selectedGraphDate}`}>
+            +{totalPostsCount - 3}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   if (selectedTimeRange === 'today' || selectedTimeRange === 'yesterday') {
     const activityDay = (account.last7DaysActivity || [])[selectedTimeRange === 'today' ? 0 : 1];

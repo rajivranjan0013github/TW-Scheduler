@@ -1,6 +1,12 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import {
+  BULK_ROWS_STORAGE_KEY,
+  subscribeToBulkRows,
+  writeBulkRowsSnapshot,
+} from './bulkProjectStore';
+import { syncBulkRowContent } from '../videoEditorV2/project';
 
-export const BULK_ROWS_STORAGE_KEY = 'tw_bulk_builder_rows';
+export { BULK_ROWS_STORAGE_KEY } from './bulkProjectStore';
 
 export const DEFAULT_TEXT_SETTINGS = {
   fontFamily: 'TikTok Sans',
@@ -16,6 +22,26 @@ export const DEFAULT_TEXT_SETTINGS = {
 export const DEFAULT_DRAG_POS = { x: 20, y: 220 };
 
 const isBlobUrl = (url) => typeof url === 'string' && url.startsWith('blob:');
+
+const NON_CONTENT_ROW_FIELDS = new Set(['status', 'canvasPos']);
+const CANONICAL_CONTENT_FIELDS = new Set([
+  'video1',
+  'video1Url',
+  'video2',
+  'video2Url',
+  'audio',
+  'caption',
+  'textSettings',
+  'dragPos',
+]);
+
+const isStatusOrCanvasOnlyUpdate = (partialData) => {
+  const fields = Object.keys(partialData || {});
+  return fields.every((field) => NON_CONTENT_ROW_FIELDS.has(field));
+};
+
+const hasCanonicalContentUpdate = (partialData) => Object.keys(partialData || {})
+  .some((field) => CANONICAL_CONTENT_FIELDS.has(field));
 
 const getIsDualVideoFromStorage = () => {
   try {
@@ -49,18 +75,24 @@ export const sanitizeBulkRowForStorage = (row) => {
   };
 };
 
-export const normalizeBulkRowsFromStorage = (rows) => {
+export const normalizeBulkRowsFromStorage = (rows, { resetTransientStatus = false } = {}) => {
   const isDual = getIsDualVideoFromStorage();
   return Array.isArray(rows)
     ? rows.map((row) => {
         const sanitized = sanitizeBulkRowForStorage(row);
-        if (sanitized.status === 'processing' || sanitized.status === 'saving') {
+        const synchronized = syncBulkRowContent(sanitized, {}, {
+          isDualVideo: isDual,
+        });
+        if (
+          resetTransientStatus
+          && (synchronized.status === 'processing' || synchronized.status === 'saving')
+        ) {
           return {
-            ...sanitized,
-            status: sanitized.video1 && (!isDual || sanitized.video2) ? 'ready' : 'draft',
+            ...synchronized,
+            status: synchronized.video1 && (!isDual || synchronized.video2) ? 'ready' : 'draft',
           };
         }
-        return sanitized;
+        return synchronized;
       })
     : [];
 };
@@ -92,10 +124,13 @@ const createEmptyRow = (index = 0) => ({
 export const useBulkRows = () => {
   const [isDualVideo, setIsDualVideo] = useState(getIsDualVideoFromStorage);
   const [persistenceError, setPersistenceError] = useState('');
+  const lastPersistedSnapshotRef = useRef('');
 
   const [rows, setRows] = useState(() => {
     try {
-      const saved = normalizeBulkRowsFromStorage(JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'));
+      const saved = normalizeBulkRowsFromStorage(
+        JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]'),
+      );
       if (saved.length > 0) return saved;
     } catch { /* ignore parse errors */ }
     return [createEmptyRow(0)];
@@ -113,13 +148,35 @@ export const useBulkRows = () => {
   // Auto-save to localStorage on every change
   useEffect(() => {
     try {
-      localStorage.setItem(BULK_ROWS_STORAGE_KEY, JSON.stringify(rows.map(sanitizeBulkRowForStorage)));
+      const dualVideoEnabled = getIsDualVideoFromStorage();
+      const synchronizedRows = rows.map((row) => sanitizeBulkRowForStorage(
+        syncBulkRowContent(row, {}, {
+          isDualVideo: dualVideoEnabled,
+          clearResult: false,
+        }),
+      ));
+      const snapshot = JSON.stringify(synchronizedRows);
+      if (snapshot === lastPersistedSnapshotRef.current) return;
+      writeBulkRowsSnapshot(synchronizedRows, { source: 'bulk-board' });
+      lastPersistedSnapshotRef.current = snapshot;
       queueMicrotask(() => setPersistenceError(''));
     } catch (error) {
       console.error('Unable to save the bulk planning board:', error);
       queueMicrotask(() => setPersistenceError('Changes could not be saved in this browser. Keep this page open and remove unused frames or temporary assets.'));
     }
   }, [rows]);
+
+  useEffect(() => subscribeToBulkRows(({ source }) => {
+    if (source === 'bulk-board') return;
+    try {
+      const storedRows = JSON.parse(localStorage.getItem(BULK_ROWS_STORAGE_KEY) || '[]');
+      lastPersistedSnapshotRef.current = JSON.stringify(storedRows);
+      const nextRows = normalizeBulkRowsFromStorage(storedRows);
+      setRows(nextRows.length > 0 ? nextRows : [createEmptyRow(0)]);
+    } catch {
+      // Keep the current in-memory board when an external snapshot is invalid.
+    }
+  }), []);
 
   const addRow = useCallback(() => {
     setRows((prev) => [...prev, createEmptyRow(prev.length)]);
@@ -137,10 +194,16 @@ export const useBulkRows = () => {
       prev.map((r) => {
         if (r.id !== rowId) return r;
         const updated = { ...r, ...partialData };
-        if (Object.prototype.hasOwnProperty.call(partialData, 'status') || Object.prototype.hasOwnProperty.call(partialData, 'canvasPos')) {
+        if (isStatusOrCanvasOnlyUpdate(partialData)) {
           return sanitizeBulkRowForStorage(updated);
         }
         const isDual = getIsDualVideoFromStorage();
+        if (hasCanonicalContentUpdate(partialData)) {
+          return sanitizeBulkRowForStorage(syncBulkRowContent(r, partialData, {
+            isDualVideo: isDual,
+            clearResult: true,
+          }));
+        }
         return {
           ...sanitizeBulkRowForStorage(updated),
           status: updated.video1 && (!isDual || updated.video2) ? 'ready' : 'draft',
@@ -158,15 +221,12 @@ export const useBulkRows = () => {
       prev.map((r) => {
         if (r.id !== rowId) return r;
         const isDual = getIsDualVideoFromStorage();
-        return {
-          ...r,
-          textSettings: { ...r.textSettings, ...partialSettings },
-          status: r.video1 && (!isDual || r.video2) ? 'ready' : 'draft',
-          resultMediaId: '',
-          resultMediaUrl: '',
-          resultMediaName: '',
-          resultVideoUrl: '',
-        };
+        return sanitizeBulkRowForStorage(syncBulkRowContent(r, {
+          textSettings: partialSettings,
+        }, {
+          isDualVideo: isDual,
+          clearResult: true,
+        }));
       })
     );
   }, []);
@@ -176,15 +236,12 @@ export const useBulkRows = () => {
       prev.map((r) => {
         if (r.id !== rowId) return r;
         const isDual = getIsDualVideoFromStorage();
-        return {
-          ...r,
+        return sanitizeBulkRowForStorage(syncBulkRowContent(r, {
           dragPos: { ...DEFAULT_DRAG_POS, ...dragPos },
-          status: r.video1 && (!isDual || r.video2) ? 'ready' : 'draft',
-          resultMediaId: '',
-          resultMediaUrl: '',
-          resultMediaName: '',
-          resultVideoUrl: '',
-        };
+        }, {
+          isDualVideo: isDual,
+          clearResult: true,
+        }));
       })
     );
   }, []);

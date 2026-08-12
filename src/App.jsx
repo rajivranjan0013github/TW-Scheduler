@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BarChart3, Clock, FolderHeart, Link2, Megaphone, Settings as SettingsIcon } from 'lucide-react';
@@ -32,6 +32,17 @@ import { VideoEditor } from './pages/VideoEditor';
 import { BulkVideoBuilder } from './pages/BulkVideoBuilder';
 import OnboardingScreen from './pages/OnboardingScreen';
 import CreatorCampaigns from './pages/CreatorCampaigns';
+
+const VideoEditorV2 = lazy(() => import('./pages/videoEditorV2/VideoEditorV2'));
+
+const TimelineEditorFallback = () => (
+  <div className="flex h-[100dvh] items-center justify-center bg-[#f5f5f7]">
+    <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 text-xs font-bold text-gray-600 shadow-sm">
+      <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#0071e3] border-t-transparent" />
+      Opening Timeline Editor…
+    </div>
+  </div>
+);
 
 function MobileNav({ isCreator, canViewAdmin }) {
   const items = isCreator
@@ -107,9 +118,11 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const hasActiveCampaign = Boolean(localStorage.getItem('active-campaign-id'));
   const isOnCampaignPage = location.pathname === '/' || location.pathname === '/campaigns';
   const isBulkBuilderPage = location.pathname === '/media/bulk-builder';
+  const isTimelineEditorPage = location.pathname === '/media/editor-v2';
   
   // Creators always see their sidebar since they aren't restricted by campaign selection state
-  const hideSidebar = isCreator ? false : (isBulkBuilderPage || (isOnCampaignPage && !hasActiveCampaign));
+  const hideSidebar = isTimelineEditorPage
+    || (isCreator ? false : (isBulkBuilderPage || (isOnCampaignPage && !hasActiveCampaign)));
 
   return (
     <div className="flex bg-[#f5f5f7] h-[100dvh] text-[#1d1d1f] antialiased overflow-x-visible overflow-y-hidden font-sans">
@@ -141,6 +154,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
               <Route path="/scheduler/queue/:accountId" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
               <Route path="/media" element={<MediaLibrary />} />
               <Route path="/media/editor" element={<VideoEditor />} />
+              <Route path="/media/editor-v2" element={<Suspense fallback={<TimelineEditorFallback />}><VideoEditorV2 /></Suspense>} />
               <Route path="/media/bulk-builder" element={<BulkVideoBuilder />} />
               <Route path="/channels" element={<Channels selectedAccounts={selectedAccounts} />} />
               <Route path="/channels/:id/feed" element={<PublishedFeed />} />

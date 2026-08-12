@@ -97,6 +97,9 @@ export const VideoLibraryPickerDialog = ({
   token,
   onClose,
   onSelectVideo,
+  onSelectAudio,
+  mediaType = 'video',
+  theme = 'light',
 }) => {
   const [folders, setFolders] = useState([]);
   const [activeFolderId, setActiveFolderId] = useState(null);
@@ -105,6 +108,7 @@ export const VideoLibraryPickerDialog = ({
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [error, setError] = useState('');
   const [folderSearchQuery, setFolderSearchQuery] = useState('');
+  const isDark = theme === 'dark';
 
   const headers = useMemo(() => (
     token ? { Authorization: `Bearer ${token}` } : {}
@@ -181,7 +185,9 @@ export const VideoLibraryPickerDialog = ({
 
       const mediaData = await response.json();
       const mediaItems = Array.isArray(mediaData)
-        ? mediaData.filter((item) => ['video', 'audio'].includes(item.type) && item.url)
+        ? mediaData.filter((item) => (
+            (mediaType === 'all' ? ['video', 'audio'] : [mediaType]).includes(item.type) && item.url
+          ))
         : [];
       setMedia(mediaItems);
     } catch (err) {
@@ -190,7 +196,7 @@ export const VideoLibraryPickerDialog = ({
     } finally {
       setLoadingMedia(false);
     }
-  }, [headers]);
+  }, [headers, mediaType]);
 
   const handleSelectVideo = useCallback((item) => {
     onSelectVideo({
@@ -202,27 +208,45 @@ export const VideoLibraryPickerDialog = ({
     });
   }, [onSelectVideo]);
 
+  const handleSelectAudio = useCallback((item) => {
+    onSelectAudio?.({
+      id: item._id,
+      mediaId: item._id,
+      name: item.name || 'Library audio',
+      sourceType: 'library',
+      type: 'audio',
+      url: mediaUrl(item.url),
+      originalUrl: item.url,
+      duration: item.duration || item.metadata?.duration || 0,
+      mimeType: item.mimeType || item.mimetype || '',
+    });
+  }, [onSelectAudio]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
-      <div className="flex h-[78vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-2.5">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/35'}`}>
+      <div className={`flex h-[78vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl shadow-2xl ${isDark ? 'border border-white/10 bg-[#18181b] shadow-black/60' : 'bg-white'}`}>
+        <div className={`flex items-center justify-between border-b px-5 py-2.5 ${isDark ? 'border-white/10 bg-[#18181b]' : 'border-gray-100'}`}>
           <div>
-            <h3 className="text-sm font-bold text-gray-950">
-              {slotLabel?.includes('First') ? 'Select First Video' : 'Select Second Video'}
+            <h3 className={`text-sm font-bold ${isDark ? 'text-gray-50' : 'text-gray-950'}`}>
+              {mediaType === 'audio'
+                ? 'Select Audio'
+                : slotLabel?.includes('First')
+                  ? 'Select First Video'
+                  : 'Select Second Video'}
             </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close video picker"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-950"
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isDark ? 'text-gray-400 hover:bg-white/10 hover:text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-950'}`}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_1fr]">
-          <aside className="min-h-0 overflow-y-auto border-r border-gray-100 bg-gray-50 p-4 flex flex-col">
+          <aside className={`min-h-0 overflow-y-auto border-r p-4 flex flex-col ${isDark ? 'border-white/10 bg-[#111114]' : 'border-gray-100 bg-gray-50'}`}>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Folders</p>
 
             <div className="mb-3 relative">
@@ -231,13 +255,13 @@ export const VideoLibraryPickerDialog = ({
                 value={folderSearchQuery}
                 onChange={(e) => setFolderSearchQuery(e.target.value)}
                 placeholder="Search folders..."
-                className="w-full rounded-lg border border-gray-200 bg-white pl-7 pr-3 py-1 text-[11px] font-semibold outline-none focus:border-[#ff5500] focus:ring-1 focus:ring-[#ff5500]/10 transition-all text-gray-950"
+                className={`w-full rounded-lg border pl-7 pr-3 py-1 text-[11px] font-semibold outline-none transition-all focus:border-[#ff5500] focus:ring-1 ${isDark ? 'border-white/10 bg-white/[0.06] text-gray-100 placeholder:text-gray-400 focus:ring-[#ff5500]/25' : 'border-gray-200 bg-white text-gray-950 focus:ring-[#ff5500]/10'}`}
               />
-              <Search className="absolute left-2 top-2.5 h-3 w-3 text-gray-400" />
+              <Search className={`absolute left-2 top-2.5 h-3 w-3 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
             </div>
 
             {loadingFolders ? (
-              <div className="flex items-center gap-2 rounded-lg bg-white p-3 text-xs font-semibold text-gray-500">
+              <div className={`flex items-center gap-2 rounded-lg p-3 text-xs font-semibold ${isDark ? 'bg-white/[0.06] text-gray-300' : 'bg-white text-gray-500'}`}>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading folders...
               </div>
@@ -247,7 +271,13 @@ export const VideoLibraryPickerDialog = ({
                   type="button"
                   onClick={() => openFolder('root', 'Library Root')}
                   className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold transition-colors ${
-                    activeFolderId === 'root' ? 'bg-[#ff5500] text-white' : 'bg-white text-gray-700 hover:bg-gray-100'
+                    activeFolderId === 'root'
+                      ? isDark
+                        ? 'bg-orange-700 text-white'
+                        : 'bg-[#ff5500] text-white'
+                      : isDark
+                        ? 'bg-white/[0.05] text-gray-200 hover:bg-white/10 hover:text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   <Folder className="h-4 w-4" />
@@ -260,7 +290,13 @@ export const VideoLibraryPickerDialog = ({
                     type="button"
                     onClick={() => openFolder(folder._id, folder.name)}
                     className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold transition-colors ${
-                      activeFolderId === folder._id ? 'bg-[#ff5500] text-white' : 'bg-white text-gray-700 hover:bg-gray-100'
+                      activeFolderId === folder._id
+                        ? isDark
+                          ? 'bg-orange-700 text-white'
+                          : 'bg-[#ff5500] text-white'
+                        : isDark
+                          ? 'bg-white/[0.05] text-gray-200 hover:bg-white/10 hover:text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-100'
                     }`}
                     style={{ paddingLeft: `${12 + depth * 14}px` }}
                   >
@@ -272,7 +308,7 @@ export const VideoLibraryPickerDialog = ({
             )}
           </aside>
 
-          <main className="min-h-0 overflow-y-auto p-5">
+          <main className={`min-h-0 overflow-y-auto p-5 ${isDark ? 'bg-[#18181b]' : ''}`}>
             <div className="mb-4 flex items-center justify-between gap-3">
               {/* Breadcrumb path */}
               <div className="flex items-center gap-1 flex-wrap text-[11px] min-w-0">
@@ -280,14 +316,14 @@ export const VideoLibraryPickerDialog = ({
                   const isLast = idx === breadcrumbPath.length - 1;
                   return (
                     <span key={crumb.id} className="flex items-center gap-1">
-                      {idx > 0 && <ChevronRight className="h-3 w-3 text-gray-300 flex-shrink-0" />}
+                      {idx > 0 && <ChevronRight className={`h-3 w-3 flex-shrink-0 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} />}
                       {isLast ? (
-                        <span className="font-bold text-gray-900">{crumb.name}</span>
+                        <span className={`font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{crumb.name}</span>
                       ) : (
                         <button
                           type="button"
                           onClick={() => openFolder(crumb.id, crumb.name)}
-                          className="font-semibold text-gray-500 hover:text-[#ff5500] transition-colors"
+                          className={`font-semibold transition-colors hover:text-[#ff5500] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
                         >
                           {crumb.name}
                         </button>
@@ -304,21 +340,21 @@ export const VideoLibraryPickerDialog = ({
             </div>
 
             {error && (
-              <div className="mb-4 rounded-lg border border-red-100 bg-red-50 p-3 text-xs font-semibold text-red-600">
+              <div className={`mb-4 rounded-lg border p-3 text-xs font-semibold ${isDark ? 'border-red-400/25 bg-red-500/10 text-red-300' : 'border-red-100 bg-red-50 text-red-600'}`}>
                 {error}
               </div>
             )}
             {!activeFolderId ? (
-              <div className="flex h-full min-h-[260px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm font-semibold text-gray-400">
-                Select a folder to view videos.
+              <div className={`flex h-full min-h-[260px] items-center justify-center rounded-xl border border-dashed text-sm font-semibold ${isDark ? 'border-white/15 bg-white/[0.02] text-gray-400' : 'border-gray-200 text-gray-400'}`}>
+                Select a folder to view {mediaType === 'audio' ? 'audio' : 'videos'}.
               </div>
             ) : loadingMedia ? (
-              <div className="flex h-full min-h-[260px] items-center justify-center gap-2 rounded-xl border border-gray-100 text-sm font-semibold text-gray-500">
+              <div className={`flex h-full min-h-[260px] items-center justify-center gap-2 rounded-xl border text-sm font-semibold ${isDark ? 'border-white/10 bg-white/[0.02] text-gray-300' : 'border-gray-100 text-gray-500'}`}>
                 <Loader2 className="h-5 w-5 animate-spin" />
                 Loading media...
               </div>
             ) : media.length === 0 && activeChildFolders.length === 0 ? (
-              <div className="flex h-full min-h-[260px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm font-semibold text-gray-400">
+              <div className={`flex h-full min-h-[260px] items-center justify-center rounded-xl border border-dashed text-sm font-semibold ${isDark ? 'border-white/15 bg-white/[0.02] text-gray-400' : 'border-gray-200 text-gray-400'}`}>
                 No media found in this folder.
               </div>
             ) : (
@@ -330,9 +366,9 @@ export const VideoLibraryPickerDialog = ({
                         key={folder._id}
                         type="button"
                         onClick={() => openFolder(folder._id, folder.name)}
-                        className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-left text-xs font-bold text-gray-700 transition-colors hover:border-[#ff5500]/40 hover:bg-white"
+                        className={`flex items-center gap-2 rounded-xl border px-3 py-3 text-left text-xs font-bold transition-colors hover:border-[#ff5500]/40 ${isDark ? 'border-white/10 bg-white/[0.05] text-gray-200 hover:bg-white/10 hover:text-white' : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-white'}`}
                       >
-                        <Folder className="h-4 w-4 text-gray-400" />
+                        <Folder className={`h-4 w-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} />
                         <span className="truncate">{folder.name}</span>
                       </button>
                     ))}
@@ -340,7 +376,7 @@ export const VideoLibraryPickerDialog = ({
                 )}
 
                 {media.length === 0 ? (
-                  <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm font-semibold text-gray-400">
+                  <div className={`flex min-h-[180px] items-center justify-center rounded-xl border border-dashed text-sm font-semibold ${isDark ? 'border-white/15 bg-white/[0.02] text-gray-400' : 'border-gray-200 text-gray-400'}`}>
                     Open a child folder to view its media.
                   </div>
                 ) : (
@@ -349,16 +385,25 @@ export const VideoLibraryPickerDialog = ({
                       item.type === 'audio' ? (
                         <div
                           key={item._id}
-                          className="relative aspect-[9/16] overflow-hidden rounded-xl border border-gray-200 bg-black shadow-sm"
+                          className={`relative aspect-[9/16] overflow-hidden rounded-xl border bg-black shadow-sm ${isDark ? 'border-white/15 shadow-black/30' : 'border-gray-200'}`}
                         >
                           <AudioPickerPreview item={item} />
+                          {onSelectAudio && (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectAudio(item)}
+                              className={`absolute right-2 top-2 rounded-lg px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-lg transition ${isDark ? 'bg-orange-700 hover:bg-orange-600' : 'bg-[#ff5500] hover:bg-orange-600'}`}
+                            >
+                              Add audio
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <button
                           key={item._id}
                           type="button"
                           onClick={() => handleSelectVideo(item)}
-                          className="group relative overflow-hidden rounded-xl border border-gray-200 bg-black text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md"
+                          className={`group relative overflow-hidden rounded-xl border bg-black text-left shadow-sm transition-all hover:border-[#ff5500]/60 hover:shadow-md ${isDark ? 'border-white/15 shadow-black/30 hover:shadow-black/50' : 'border-gray-200'}`}
                         >
                           <div className="relative aspect-[9/16]">
                             <VideoPickerPreview item={item} />
