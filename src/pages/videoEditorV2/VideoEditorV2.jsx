@@ -50,7 +50,6 @@ import {
   createInitialEditorState,
   createTextClip,
   createVideoClip,
-  deserializeProject,
   editorActions,
   editorReducer,
   findClipById,
@@ -131,24 +130,6 @@ const persistProjectToBulkRow = (project, bulkRowId, { clearResult = true } = {}
   return serializeProject(project);
 };
 
-const removeExpiredUploadClips = (project) => {
-  let removedCount = 0;
-  const nextProject = createEditorProject({
-    ...project,
-    tracks: project.tracks.map((track) => ({
-      ...track,
-      clips: track.clips.filter((clip) => {
-        const expired = clip.sourceType === 'upload'
-          && String(clip.sourceUrl || '').startsWith('blob:');
-        if (expired) removedCount += 1;
-        return !expired;
-      }),
-    })),
-  });
-
-  return { project: nextProject, removedCount };
-};
-
 const loadInitialContext = ({ bulkRowId, isBulkProject }) => {
   if (isBulkProject && bulkRowId) {
     const rows = getBulkRows();
@@ -173,23 +154,6 @@ const loadInitialContext = ({ bulkRowId, isBulkProject }) => {
     };
   }
 
-  try {
-    const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
-    if (saved) {
-      const restored = removeExpiredUploadClips(deserializeProject(saved));
-      return {
-        project: restored.project,
-        bulkRow: null,
-        contextKey: 'draft',
-        projectPersisted: true,
-        warning: restored.removedCount > 0
-          ? `${restored.removedCount} local upload${restored.removedCount === 1 ? '' : 's'} could not survive the browser reload and were removed. Re-import them or use Media Library assets for persistent drafts.`
-          : '',
-      };
-    }
-  } catch {
-    // Start with a clean project if a stale draft cannot be restored.
-  }
   return {
     project: createEditorProject(),
     bulkRow: null,
@@ -1151,6 +1115,25 @@ export const VideoEditorV2 = () => {
     savingResult,
   ]);
 
+  const openBulkVideoBuilder = useCallback(() => {
+    if (bulkQueueState.running || exportState.exporting || savingResult || extractingAudioClipId) {
+      setStatus({
+        type: 'error',
+        text: 'Finish or cancel the active export, upload, or audio extraction before opening the Bulk Video Builder.',
+      });
+      return;
+    }
+    if (!saveProject()) return;
+    navigate('/media/bulk-builder');
+  }, [
+    bulkQueueState.running,
+    exportState.exporting,
+    extractingAudioClipId,
+    navigate,
+    saveProject,
+    savingResult,
+  ]);
+
   const openBulkQueueRow = useCallback((nextRowId) => {
     if (!isBulkProject || !nextRowId || String(nextRowId) === String(bulkRowId)) return;
     if (bulkQueueState.running || savingResult || exportState.exporting || extractingAudioClipId) {
@@ -1566,6 +1549,7 @@ export const VideoEditorV2 = () => {
         onPreview={() => setPlaying(!isPlaying)}
         onExport={openExportDialog}
         onSaveProject={saveProject}
+        onOpenBulkBuilder={openBulkVideoBuilder}
         onBack={handleBack}
       />
 

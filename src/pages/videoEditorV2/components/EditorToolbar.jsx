@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Download,
+  Layers3,
   Loader2,
   Play,
   Redo2,
@@ -23,6 +24,7 @@ export const EditorToolbar = ({
   onPreview,
   onExport,
   onSaveProject,
+  onOpenBulkBuilder,
   onBack,
   backLabel,
 }) => (
@@ -76,6 +78,18 @@ export const EditorToolbar = ({
     </div>
 
     <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onOpenBulkBuilder}
+        className="flex h-9 items-center gap-1.5 rounded-xl border border-[#ff5500]/35 bg-[#ff5500]/10 px-3 text-[11px] font-bold text-orange-300 transition hover:border-[#ff5500]/60 hover:bg-[#ff5500]/20 hover:text-orange-200"
+        aria-label="Open Bulk Video Builder"
+        title="Open Bulk Video Builder"
+      >
+        <Layers3 className="h-3.5 w-3.5" />
+        <span className="hidden lg:inline">Bulk Video Builder</span>
+        <span className="lg:hidden">Bulk Builder</span>
+      </button>
+
       <button
         type="button"
         onClick={onOpenProjectSettings}
