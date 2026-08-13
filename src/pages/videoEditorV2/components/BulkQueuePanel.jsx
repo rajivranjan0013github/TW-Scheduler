@@ -1,0 +1,517 @@
+import { useEffect, useMemo, useRef } from 'react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock3,
+  ExternalLink,
+  Film,
+  Layers3,
+  ListChecks,
+  Loader2,
+  PencilLine,
+  Play,
+  RefreshCw,
+  UploadCloud,
+  X,
+} from 'lucide-react';
+
+const STATUS_ALIASES = {
+  ready: 'ready',
+  pending: 'ready',
+  queued: 'queued',
+  waiting: 'ready',
+  draft: 'ready',
+  changed: 'changed',
+  dirty: 'changed',
+  stale: 'changed',
+  'needs-export': 'changed',
+  'needs-reexport': 'changed',
+  needs_export: 'changed',
+  needs_reexport: 'changed',
+  exporting: 'exporting',
+  processing: 'exporting',
+  rendering: 'exporting',
+  rendered: 'ready',
+  uploading: 'uploading',
+  saving: 'uploading',
+  done: 'done',
+  success: 'done',
+  complete: 'done',
+  completed: 'done',
+  failed: 'failed',
+  error: 'failed',
+};
+
+const STATUS_META = {
+  ready: {
+    label: 'Ready',
+    Icon: CheckCircle2,
+    badgeClass: 'border-white/10 bg-white/[0.05] text-[#aeb3bc]',
+    iconClass: 'text-[#8b929d]',
+  },
+  queued: {
+    label: 'Queued',
+    Icon: Clock3,
+    badgeClass: 'border-violet-400/20 bg-violet-400/10 text-violet-300',
+    iconClass: 'text-violet-300',
+  },
+  changed: {
+    label: 'Changed',
+    Icon: PencilLine,
+    badgeClass: 'border-amber-400/20 bg-amber-400/10 text-amber-300',
+    iconClass: 'text-amber-300',
+  },
+  exporting: {
+    label: 'Exporting',
+    Icon: Loader2,
+    badgeClass: 'border-[#ff7043]/25 bg-[#ff5500]/10 text-[#ff8a61]',
+    iconClass: 'animate-spin text-[#ff7043]',
+  },
+  uploading: {
+    label: 'Uploading',
+    Icon: UploadCloud,
+    badgeClass: 'border-blue-400/20 bg-blue-400/10 text-blue-300',
+    iconClass: 'text-blue-300',
+  },
+  done: {
+    label: 'Done',
+    Icon: CheckCircle2,
+    badgeClass: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300',
+    iconClass: 'text-emerald-300',
+  },
+  failed: {
+    label: 'Failed',
+    Icon: AlertCircle,
+    badgeClass: 'border-red-400/20 bg-red-400/10 text-red-300',
+    iconClass: 'text-red-300',
+  },
+};
+
+const getStringUrl = (value) => {
+  if (typeof value === 'string') return value;
+  if (value && typeof value.url === 'string') return value.url;
+  return '';
+};
+
+const getRowStatus = (row) => {
+  const rawStatus = String(
+    row.queueStatus || row.exportStatus || row.status || 'ready',
+  ).toLowerCase();
+  const status = STATUS_ALIASES[rawStatus] || 'ready';
+  const hasUnexportedChanges = Boolean(
+    row.changed
+      || row.dirty
+      || row.isDirty
+      || row.needsExport
+      || row.needsReexport
+      || row.editorProjectStale,
+  );
+
+  if (
+    hasUnexportedChanges
+    && !['exporting', 'uploading', 'failed'].includes(status)
+  ) {
+    return 'changed';
+  }
+  return status;
+};
+
+const getRowName = (row, index) => (
+  row.name
+  || row.title
+  || row.resultMediaName
+  || row.video1?.name
+  || row.video?.name
+  || row.caption
+  || `Video ${index + 1}`
+);
+
+const getRowPreview = (row) => {
+  const completedVideoUrl = getStringUrl(row.queueResultUrl)
+    || getStringUrl(row.resultVideoUrl)
+    || getStringUrl(row.resultMediaUrl);
+  if (getRowStatus(row) === 'done' && completedVideoUrl) {
+    return { type: 'video', url: completedVideoUrl };
+  }
+  const imageUrl = getStringUrl(row.thumbnailUrl)
+    || getStringUrl(row.thumbnail)
+    || getStringUrl(row.posterUrl)
+    || getStringUrl(row.poster)
+    || getStringUrl(row.video1?.thumbnailUrl)
+    || getStringUrl(row.video1?.thumbnail);
+
+  if (imageUrl) return { type: 'image', url: imageUrl };
+
+  const videoUrl = getStringUrl(row.previewVideoUrl)
+    || getStringUrl(row.video1Url)
+    || getStringUrl(row.video1)
+    || getStringUrl(row.video?.url)
+    || getStringUrl(row.resultVideoUrl)
+    || getStringUrl(row.resultMediaUrl);
+
+  return videoUrl ? { type: 'video', url: videoUrl } : null;
+};
+
+const QueueCheckbox = ({ checked, mixed = false, disabled, label, onChange }) => {
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (inputRef.current) inputRef.current.indeterminate = mixed;
+  }, [mixed]);
+
+  return (
+    <input
+      ref={inputRef}
+      type="checkbox"
+      checked={checked}
+      disabled={disabled}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => onChange(event.target.checked)}
+      aria-label={label}
+      className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-white/20 bg-[#0d0f13] accent-[#ff5500] disabled:cursor-not-allowed disabled:opacity-40"
+    />
+  );
+};
+
+const QueueRow = ({
+  entry,
+  checked,
+  current,
+  interactionDisabled,
+  selectionDisabled,
+  onOpen,
+  onToggle,
+}) => {
+  const { row, status, preview, name, index } = entry;
+  const statusMeta = STATUS_META[status];
+  const StatusIcon = statusMeta.Icon;
+  const errorMessage = row.bulkExportError || row.errorMessage || row.error || '';
+  const resultUrl = getStringUrl(row.queueResultUrl)
+    || getStringUrl(row.resultVideoUrl)
+    || getStringUrl(row.resultMediaUrl);
+  const secondaryText = errorMessage || (
+    row.caption && row.caption !== name ? row.caption : ''
+  );
+
+  return (
+    <div
+      className={`group relative flex items-center gap-2 rounded-xl border p-2 transition ${current
+        ? 'border-[#ff5500]/50 bg-[#ff5500]/10 shadow-[0_8px_24px_rgba(255,85,0,0.08)]'
+        : 'border-white/[0.08] bg-[#171a20] hover:border-white/15 hover:bg-[#1b1f27]'}`}
+    >
+      {current && (
+        <span className="absolute bottom-2 left-0 top-2 w-0.5 rounded-r-full bg-[#ff5500]" />
+      )}
+
+      <QueueCheckbox
+        checked={checked}
+        disabled={selectionDisabled}
+        label={`${checked ? 'Deselect' : 'Select'} ${name}`}
+        onChange={(nextChecked) => onToggle(entry, nextChecked)}
+      />
+
+      <button
+        type="button"
+        onClick={() => onOpen(entry)}
+        disabled={interactionDisabled || !onOpen}
+        aria-current={current ? 'true' : undefined}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-default"
+      >
+        <span className="relative flex h-11 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[#0b0d10] text-[#727985]">
+          {preview?.type === 'image' && (
+            <img src={preview.url} alt="" className="h-full w-full object-cover" />
+          )}
+          {preview?.type === 'video' && (
+            <video
+              src={preview.url}
+              muted
+              playsInline
+              preload="metadata"
+              className="h-full w-full object-cover"
+            />
+          )}
+          {!preview && <Film className="h-4 w-4" />}
+          <span className="absolute bottom-0.5 left-0.5 rounded bg-black/75 px-1 text-[7px] font-extrabold tabular-nums text-white/80">
+            {index + 1}
+          </span>
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className={`block truncate text-[10px] font-extrabold ${current ? 'text-white' : 'text-[#d7dbe2]'}`}>
+            {name}
+          </span>
+          {secondaryText && (
+            <span className={`mt-0.5 block truncate text-[8px] font-semibold ${status === 'failed' ? 'text-red-300/80' : 'text-[#727985]'}`}>
+              {secondaryText}
+            </span>
+          )}
+          <span
+            className={`mt-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[7px] font-extrabold uppercase tracking-[0.08em] ${statusMeta.badgeClass}`}
+          >
+            <StatusIcon className={`h-2.5 w-2.5 ${statusMeta.iconClass}`} />
+            {statusMeta.label}
+          </span>
+        </span>
+      </button>
+      {status === 'done' && resultUrl && (
+        <a
+          href={resultUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(event) => event.stopPropagation()}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-emerald-400/15 bg-emerald-400/10 text-emerald-300 transition hover:border-emerald-400/30 hover:bg-emerald-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+          aria-label={`Open exported result for ${name}`}
+          title="Open exported result"
+        >
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
+    </div>
+  );
+};
+
+const ActionButton = ({ children, disabled, onClick, primary = false, wide = false }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className={`${wide ? 'col-span-2' : ''} flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-[9px] font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-not-allowed disabled:opacity-40 ${primary
+      ? 'border-[#ff5500] bg-[#ff5500] text-white hover:border-[#ff6a1a] hover:bg-[#ff6a1a]'
+      : 'border-white/10 bg-[#171a20] text-[#d7dbe2] hover:border-white/20 hover:bg-[#20242c] hover:text-white'}`}
+  >
+    {children}
+  </button>
+);
+
+/**
+ * Controlled bulk-export queue UI for the Timeline Editor's bulk mode.
+ * The parent owns row selection, row navigation, and all export behavior.
+ */
+export const BulkQueuePanel = ({
+  isBulkMode = true,
+  rows = [],
+  currentRowId = null,
+  selectedRowIds = [],
+  queueState = null,
+  disabled = false,
+  className = '',
+  onSelectionChange,
+  onOpenRow,
+  onExportCurrent,
+  onExportSelected,
+  onExportAll,
+  onRetryFailed,
+  onCancel,
+}) => {
+  const entries = useMemo(() => (
+    (Array.isArray(rows) ? rows : []).map((row, index) => {
+      const id = row.id ?? row.rowId ?? index;
+      return {
+        id,
+        key: String(id),
+        row,
+        index,
+        name: getRowName(row, index),
+        preview: getRowPreview(row),
+        status: getRowStatus(row),
+      };
+    })
+  ), [rows]);
+
+  const selectedKeys = useMemo(() => new Set(
+    (selectedRowIds instanceof Set ? [...selectedRowIds] : selectedRowIds || [])
+      .map((id) => String(id)),
+  ), [selectedRowIds]);
+  const currentKey = currentRowId == null ? '' : String(currentRowId);
+  const currentEntry = entries.find((entry) => entry.key === currentKey) || null;
+  const selectedEntries = entries.filter((entry) => selectedKeys.has(entry.key));
+  const failedEntries = entries.filter((entry) => entry.status === 'failed');
+  const completedCount = entries.filter((entry) => entry.status === 'done').length;
+  const queueRunning = Boolean(queueState?.running) || entries.some((entry) => (
+    entry.status === 'exporting' || entry.status === 'uploading'
+  ));
+  const queueProgress = Math.max(0, Math.min(100, Number(queueState?.progress) || 0));
+  const allSelected = entries.length > 0 && selectedEntries.length === entries.length;
+  const someSelected = selectedEntries.length > 0 && !allSelected;
+  const exportDisabled = disabled || queueRunning;
+  const hasActions = Boolean(
+    onExportCurrent || onExportSelected || onExportAll || onRetryFailed,
+  );
+
+  if (!isBulkMode) return null;
+
+  const emitSelection = (nextKeys) => {
+    const nextIds = entries
+      .filter((entry) => nextKeys.has(entry.key))
+      .map((entry) => entry.id);
+    onSelectionChange?.(nextIds);
+  };
+
+  const toggleEntry = (entry, checked) => {
+    const nextKeys = new Set(selectedKeys);
+    if (checked) nextKeys.add(entry.key);
+    else nextKeys.delete(entry.key);
+    emitSelection(nextKeys);
+  };
+
+  const toggleAll = (checked) => {
+    emitSelection(checked ? new Set(entries.map((entry) => entry.key)) : new Set());
+  };
+
+  return (
+    <section
+      aria-label="Bulk export queue"
+      className={`flex min-h-0 flex-col text-[#f5f7fa] ${className}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-xs font-extrabold text-[#f5f7fa]">Bulk queue</h3>
+          <p className="mt-0.5 text-[9px] font-semibold text-[#727985]">
+            {completedCount} of {entries.length} completed
+          </p>
+        </div>
+        {queueRunning && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#ff7043]/20 bg-[#ff5500]/10 px-2 py-1 text-[8px] font-extrabold uppercase tracking-wider text-[#ff8a61]">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Running
+          </span>
+        )}
+      </div>
+
+      {queueRunning && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-3 rounded-xl border border-[#ff7043]/20 bg-[#ff5500]/[0.07] p-2.5"
+        >
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#ff7043]" />
+            <span className="min-w-0 flex-1 truncate text-[9px] font-bold text-[#e6e8ec]">
+              {queueState?.message || 'Processing bulk queue…'}
+            </span>
+            <span className="shrink-0 text-[8px] font-extrabold tabular-nums text-[#ff8a61]">
+              {Math.round(queueProgress)}%
+            </span>
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-[#aeb3bc] transition hover:border-red-400/25 hover:bg-red-400/10 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
+                aria-label="Cancel bulk export"
+                title="Cancel bulk export"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-black/35">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#ff4d00] to-[#ff7a45] transition-[width] duration-300"
+              style={{ width: `${queueProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.025] px-2.5 py-2">
+        <label className="flex min-w-0 items-center gap-2 text-[9px] font-bold text-[#aeb3bc]">
+          <QueueCheckbox
+            checked={allSelected}
+            mixed={someSelected}
+            disabled={disabled || !onSelectionChange || entries.length === 0}
+            label={allSelected ? 'Deselect all videos' : 'Select all videos'}
+            onChange={toggleAll}
+          />
+          <span className="truncate">
+            {selectedEntries.length > 0
+              ? `${selectedEntries.length} selected`
+              : 'Select videos'}
+          </span>
+        </label>
+        <span className="text-[8px] font-bold tabular-nums text-[#666d78]">
+          {entries.length} {entries.length === 1 ? 'video' : 'videos'}
+        </span>
+      </div>
+
+      <div className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
+        {entries.map((entry) => (
+          <QueueRow
+            key={entry.key}
+            entry={entry}
+            checked={selectedKeys.has(entry.key)}
+            current={entry.key === currentKey}
+            interactionDisabled={disabled}
+            selectionDisabled={disabled || !onSelectionChange}
+            onOpen={onOpenRow
+              ? (nextEntry) => onOpenRow(nextEntry.id, nextEntry.row)
+              : null}
+            onToggle={toggleEntry}
+          />
+        ))}
+
+        {entries.length === 0 && (
+          <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">
+            <Layers3 className="mx-auto h-5 w-5 text-[#555c67]" />
+            <p className="mt-2 text-[10px] font-bold text-[#a6abb4]">No planned videos</p>
+            <p className="mt-1 text-[9px] font-medium text-[#666d78]">
+              Add videos on the Bulk Planning Board first.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {hasActions && (
+        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.08] pt-3">
+          {onExportCurrent && (
+            <ActionButton
+              primary
+              disabled={exportDisabled || !currentEntry}
+              onClick={() => onExportCurrent(currentEntry.id, currentEntry.row)}
+            >
+              <Play className="h-3.5 w-3.5 fill-current" />
+              Export current
+            </ActionButton>
+          )}
+          {onExportSelected && (
+            <ActionButton
+              disabled={exportDisabled || selectedEntries.length === 0}
+              onClick={() => onExportSelected(
+                selectedEntries.map((entry) => entry.id),
+                selectedEntries.map((entry) => entry.row),
+              )}
+            >
+              <ListChecks className="h-3.5 w-3.5" />
+              <span className="truncate">Export selected</span>
+            </ActionButton>
+          )}
+          {onExportAll && (
+            <ActionButton
+              wide
+              disabled={exportDisabled || entries.length === 0}
+              onClick={() => onExportAll(
+                entries.map((entry) => entry.id),
+                entries.map((entry) => entry.row),
+              )}
+            >
+              <Layers3 className="h-3.5 w-3.5" />
+              Export all ({entries.length})
+            </ActionButton>
+          )}
+          {onRetryFailed && failedEntries.length > 0 && (
+            <ActionButton
+              wide
+              disabled={exportDisabled}
+              onClick={() => onRetryFailed(
+                failedEntries.map((entry) => entry.id),
+                failedEntries.map((entry) => entry.row),
+              )}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Retry failed ({failedEntries.length})
+            </ActionButton>
+          )}
+        </div>
+      )}
+    </section>
+  );
+};

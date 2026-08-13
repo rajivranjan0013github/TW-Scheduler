@@ -7,6 +7,7 @@ import {
 } from './constants.js';
 import { VideoExportError } from './errors.js';
 import {
+  DEFAULT_TEXT_STYLE,
   MAX_PLAYBACK_RATE,
   MIN_CROP_SIZE,
   MIN_PLAYBACK_RATE,
@@ -76,12 +77,12 @@ const normalizeFit = (fit) => {
 };
 
 const normalizeStyle = (style = {}) => ({
-  fontFamily: String(style.fontFamily || 'Arial'),
-  fontWeight: style.fontWeight ?? 700,
-  fontSize: clamp(positiveNumber(style.fontSize, 64), 1, 1000),
+  fontFamily: String(style.fontFamily || DEFAULT_TEXT_STYLE.fontFamily),
+  fontWeight: style.fontWeight ?? DEFAULT_TEXT_STYLE.fontWeight,
+  fontSize: clamp(positiveNumber(style.fontSize, DEFAULT_TEXT_STYLE.fontSize), 1, 1000),
   color: String(style.color || style.fontColor || '#FFFFFF'),
   strokeColor: String(style.strokeColor || '#000000'),
-  strokeWidth: clamp(finiteNumber(style.strokeWidth, 0), 0, 100),
+  strokeWidth: clamp(finiteNumber(style.strokeWidth, DEFAULT_TEXT_STYLE.strokeWidth), 0, 100),
   backgroundColor: String(style.backgroundColor || 'transparent'),
   backgroundType: String(style.backgroundType || style.bgType || 'none'),
   textAlign: ['left', 'right', 'center'].includes(style.textAlign)

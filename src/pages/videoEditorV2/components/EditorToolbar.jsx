@@ -32,8 +32,8 @@ export const EditorToolbar = ({
         type="button"
         onClick={onBack}
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9298a3] transition hover:bg-white/10 hover:text-white"
-        aria-label={backLabel || (isBulkProject ? 'Return to Bulk Planning Board' : 'Return to Media Library')}
-        title={backLabel || (isBulkProject ? 'Return to Bulk Planning Board' : 'Return to Media Library')}
+        aria-label={backLabel || (isBulkProject ? 'Back to Bulk Planning Board' : 'Back to Media Library')}
+        title={backLabel || (isBulkProject ? 'Back to Bulk Planning Board' : 'Back to Media Library')}
       >
         <ArrowLeft className="h-4 w-4" />
       </button>
@@ -41,7 +41,7 @@ export const EditorToolbar = ({
       <div className="hidden h-6 w-px bg-white/10 sm:block" />
       <div className="min-w-0">
         <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#ff5500]">
-          Video Editor
+          Timeline Editor
         </p>
         <input
           value={projectName}

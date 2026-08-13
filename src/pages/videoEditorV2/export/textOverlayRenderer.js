@@ -184,7 +184,10 @@ export const renderTextClipToPng = async (
   const fontFamily = String(style.fontFamily || 'Arial').replace(/["\\]/g, '');
   const maxWidth = style.maxWidth <= 1 ? width * style.maxWidth : style.maxWidth;
   const lineHeight = fontSize * style.lineHeight;
-  const automaticPadding = style.padding || fontSize * 0.25;
+  const hasBackground =
+    style.backgroundType.toLowerCase() !== 'none' &&
+    style.backgroundColor !== 'transparent';
+  const automaticPadding = style.padding || (hasBackground ? fontSize * 0.25 : 0);
   const paddingX = style.paddingX === null || style.paddingX === undefined
     ? automaticPadding
     : style.paddingX;
@@ -233,9 +236,6 @@ export const renderTextClipToPng = async (
 
   const blockX = -blockWidth / 2;
   const blockY = -blockHeight / 2;
-  const hasBackground =
-    style.backgroundType.toLowerCase() !== 'none' &&
-    style.backgroundColor !== 'transparent';
   if (hasBackground) {
     context.fillStyle = safeCanvasColor(style.backgroundColor, '#000000');
     roundedRectangle(

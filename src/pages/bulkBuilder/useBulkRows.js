@@ -10,14 +10,53 @@ export { BULK_ROWS_STORAGE_KEY } from './bulkProjectStore';
 
 export const DEFAULT_TEXT_SETTINGS = {
   fontFamily: 'TikTok Sans',
-  fontWeight: 'Regular',
+  fontWeight: 'SemiBold',
+  // Bulk controls use the 270px preview coordinate space. These values map
+  // exactly to 40px text and a 3px stroke in the 720px timeline output.
   fontSize: 15,
   fontColor: '#FFFFFF',
-  strokeWidth: 3,
+  strokeWidth: 1.125,
   strokeColor: '#000000',
   bgType: 'None',
   bgColor: '#000000',
 };
+
+// Keep incomplete rows created by older releases visually stable. New rows are
+// explicitly stamped with DEFAULT_TEXT_SETTINGS below.
+const STORED_TEXT_SETTINGS_FALLBACK = {
+  ...DEFAULT_TEXT_SETTINGS,
+  fontWeight: 'Regular',
+  fontSize: 15,
+  strokeWidth: 3,
+};
+
+const BULK_TEXT_SIZING_VERSION = 1;
+
+const hasUnscaledTimelineDefaults = (settings = {}) => (
+  settings.fontFamily === 'TikTok Sans'
+  && settings.fontWeight === 'SemiBold'
+  && Number(settings.fontSize) === 40
+  && Number(settings.strokeWidth) === 3
+);
+
+const getTextDefaultMigrationPatch = (row) => (
+  hasUnscaledTimelineDefaults(row?.textSettings)
+    ? {
+        textSettings: {
+          ...row.textSettings,
+          fontSize: DEFAULT_TEXT_SETTINGS.fontSize,
+          strokeWidth: DEFAULT_TEXT_SETTINGS.strokeWidth,
+        },
+      }
+    : null
+);
+
+const hasScaledTimelineDefaults = (settings = {}) => (
+  settings.fontFamily === DEFAULT_TEXT_SETTINGS.fontFamily
+  && settings.fontWeight === DEFAULT_TEXT_SETTINGS.fontWeight
+  && Number(settings.fontSize) === DEFAULT_TEXT_SETTINGS.fontSize
+  && Math.abs(Number(settings.strokeWidth) - DEFAULT_TEXT_SETTINGS.strokeWidth) < 0.01
+);
 
 export const DEFAULT_DRAG_POS = { x: 20, y: 220 };
 
@@ -53,7 +92,9 @@ const getIsDualVideoFromStorage = () => {
 };
 
 const deriveRowStatus = (row) => {
-  if (row.status === 'processing' || row.status === 'saving') return row.status;
+  if (['queued', 'processing', 'exporting', 'saving', 'uploading'].includes(row.status)) {
+    return row.status;
+  }
   if (row.status === 'done' && (row.resultMediaId || row.resultMediaUrl)) return 'done';
   if (row.status === 'error') return 'error';
   const isDual = getIsDualVideoFromStorage();
@@ -63,7 +104,7 @@ const deriveRowStatus = (row) => {
 export const sanitizeBulkRowForStorage = (row) => {
   const sanitized = {
     ...row,
-    textSettings: { ...DEFAULT_TEXT_SETTINGS, ...(row.textSettings || {}) },
+    textSettings: { ...STORED_TEXT_SETTINGS_FALLBACK, ...(row.textSettings || {}) },
     dragPos: { ...DEFAULT_DRAG_POS, ...(row.dragPos || {}) },
     canvasPos: row.canvasPos || { x: 100, y: 100 },
     resultVideoUrl: isBlobUrl(row.resultVideoUrl) ? '' : (row.resultVideoUrl || ''),
@@ -79,10 +120,30 @@ export const normalizeBulkRowsFromStorage = (rows, { resetTransientStatus = fals
   const isDual = getIsDualVideoFromStorage();
   return Array.isArray(rows)
     ? rows.map((row) => {
-        const sanitized = sanitizeBulkRowForStorage(row);
-        const synchronized = syncBulkRowContent(sanitized, {}, {
-          isDualVideo: isDual,
-        });
+        const migrationPatch = getTextDefaultMigrationPatch(row);
+        const shouldRepairTextGeometry = Boolean(migrationPatch) || (
+          row?.bulkTextSizingVersion !== BULK_TEXT_SIZING_VERSION
+          && hasScaledTimelineDefaults(row?.textSettings)
+        );
+        const sanitized = sanitizeBulkRowForStorage(
+          shouldRepairTextGeometry
+            ? {
+                ...row,
+                ...(migrationPatch || {}),
+                bulkTextSizingVersion: BULK_TEXT_SIZING_VERSION,
+              }
+            : row,
+        );
+        const synchronized = syncBulkRowContent(
+          sanitized,
+          migrationPatch || (shouldRepairTextGeometry
+            ? { textSettings: sanitized.textSettings }
+            : {}),
+          {
+            isDualVideo: isDual,
+            resetTextGeometry: shouldRepairTextGeometry,
+          },
+        );
         if (
           resetTransientStatus
           && (synchronized.status === 'processing' || synchronized.status === 'saving')
@@ -106,6 +167,7 @@ const createEmptyRow = (index = 0) => ({
   audio: null,
   caption: '',
   textSettings: { ...DEFAULT_TEXT_SETTINGS },
+  bulkTextSizingVersion: BULK_TEXT_SIZING_VERSION,
   dragPos: { ...DEFAULT_DRAG_POS },
   canvasPos: {
     x: 50 + (index % 6) * 370,
@@ -273,6 +335,7 @@ export const useBulkRows = () => {
         audio: null,
         caption: '',
         textSettings: { ...DEFAULT_TEXT_SETTINGS },
+        bulkTextSizingVersion: BULK_TEXT_SIZING_VERSION,
         dragPos: { ...DEFAULT_DRAG_POS },
         canvasPos: {
           x: 50 + ((startIdx + idx) % 6) * 370,

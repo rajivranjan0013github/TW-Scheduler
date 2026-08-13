@@ -715,7 +715,7 @@ const textClipToLegacySettings = (clip, fallbackSettings = {}, fontScale = 1) =>
     fontWeight: toLegacyFontWeight(clip.style?.fontWeight || fallback.fontWeight),
     fontSize: Math.round(((clip.style?.fontSize ?? fallback.fontSize) / fontScale) * 100) / 100,
     fontColor: clip.style?.color || fallback.fontColor,
-    strokeWidth: Math.round(((clip.style?.strokeWidth ?? fallback.strokeWidth) / fontScale) * 100) / 100,
+    strokeWidth: Math.round(((clip.style?.strokeWidth ?? fallback.strokeWidth) / fontScale) * 1000) / 1000,
     strokeColor: clip.style?.strokeColor || fallback.strokeColor,
     bgType: normalizeLegacyBackgroundType(clip.style?.backgroundType || fallback.bgType),
     bgColor: clip.style?.backgroundColor || fallback.bgColor,
@@ -1170,7 +1170,7 @@ const mergeCaptionBinding = (project, row, patch, options) => {
   const duration = currentClip?.duration
     || firstVideo?.duration
     || Math.max(0.1, project.duration || clampNumber(options.defaultClipDuration, 0.1, 30, 5));
-  const legacyStylePatch = settingsChanged ? {
+  const legacyStylePatch = settingsChanged || !currentClip ? {
     fontFamily: importedStyle.fontFamily,
     fontWeight: importedStyle.fontWeight,
     fontSize: importedStyle.fontSize,
@@ -1181,16 +1181,17 @@ const mergeCaptionBinding = (project, row, patch, options) => {
     backgroundColor: importedStyle.backgroundColor,
     borderRadius: importedStyle.borderRadius,
   } : {};
-  const geometryPatch = currentClip
-    ? {}
-    : {
+  const shouldResetGeometry = !currentClip || options.resetTextGeometry === true;
+  const geometryPatch = shouldResetGeometry
+    ? {
         boxWidth: importedStyle.boxWidth,
         boxHeight: importedStyle.boxHeight,
         paddingX: importedStyle.paddingX,
-        paddingY: importedStyle.paddingY,
-        lineHeight: importedStyle.lineHeight,
-      };
-  const nextTransform = currentClip
+      paddingY: importedStyle.paddingY,
+      lineHeight: importedStyle.lineHeight,
+      }
+    : {};
+  const nextTransform = currentClip && !shouldResetGeometry
     ? {
         ...currentClip.transform,
         ...(positionChanged ? { x: importedTransform.x, y: importedTransform.y } : {}),

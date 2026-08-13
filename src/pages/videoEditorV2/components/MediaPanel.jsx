@@ -3,6 +3,7 @@ import {
   Film,
   FolderOpen,
   Image as ImageIcon,
+  ListVideo,
   Music2,
   Plus,
   Search,
@@ -10,6 +11,7 @@ import {
   Type,
   UploadCloud,
 } from 'lucide-react';
+import { BulkQueuePanel } from './BulkQueuePanel';
 
 const TABS = [
   { id: 'media', label: 'Media', icon: Film },
@@ -80,8 +82,11 @@ export const MediaPanel = ({
   onOpenLibrary,
   onAddAsset,
   onAddText,
+  bulkQueue = null,
 }) => {
-  const [activeTab, setActiveTab] = useState('media');
+  const [activeTab, setActiveTab] = useState(() => (
+    bulkQueue?.initiallyOpen ? 'bulk' : 'media'
+  ));
   const [search, setSearch] = useState('');
   const fileInputRef = useRef(null);
 
@@ -100,7 +105,7 @@ export const MediaPanel = ({
   return (
     <aside className="flex min-h-0 border-r border-white/10 bg-[#111318]">
       <nav className="flex w-16 shrink-0 flex-col gap-1 border-r border-white/10 px-1.5 py-2" aria-label="Editor assets">
-        {TABS.map((tab) => {
+        {[...TABS, ...(bulkQueue ? [{ id: 'bulk', label: 'Queue', icon: ListVideo }] : [])].map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
           return (
@@ -227,6 +232,10 @@ export const MediaPanel = ({
               ))}
             </div>
           </div>
+        )}
+
+        {activeTab === 'bulk' && bulkQueue && (
+          <BulkQueuePanel {...bulkQueue} />
         )}
       </div>
     </aside>

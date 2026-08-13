@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getActiveCampaignId } from '../../utils/campaignScope';
+import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 import { getMediaUrl } from '../../utils/mediaUrls';
 import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
 import { VideoLibraryPickerDialog } from '../videoEditor/VideoLibraryPickerDialog';
@@ -23,11 +23,16 @@ import {
 } from '../bulkBuilder/bulkProjectStore';
 import { EditorToolbar } from './components/EditorToolbar';
 import { ExportDialog } from './components/ExportDialog';
+import { BulkExportDialog } from './components/BulkExportDialog';
 import { InspectorPanel } from './components/InspectorPanel';
 import { MediaPanel } from './components/MediaPanel';
 import { PreviewStage } from './components/PreviewStage';
 import { ProjectSettingsDialog } from './components/ProjectSettingsDialog';
 import { usePlaybackClock } from './hooks/usePlaybackClock';
+import {
+  updateStoredBulkRowById,
+  useBulkExportQueue,
+} from './hooks/useBulkExportQueue';
 import {
   createAssetFromFile,
   createGeneratedAudioAsset,
@@ -72,6 +77,18 @@ const createEmptyExportState = (overrides = {}) => ({
   resultUrl: '',
   resultFileName: '',
   resultMimeType: '',
+  ...overrides,
+});
+
+const createEmptyBulkExportDialog = (overrides = {}) => ({
+  open: false,
+  rowIds: [],
+  generatingCaptions: false,
+  folderId: 'root',
+  folders: [],
+  foldersLoading: false,
+  folderError: '',
+  phase: 'rendering',
   ...overrides,
 });
 
@@ -147,6 +164,13 @@ const loadInitialContext = ({ bulkRowId, isBulkProject }) => {
           : '',
       };
     }
+    return {
+      project: createEditorProject({ name: 'Missing bulk project' }),
+      bulkRow: null,
+      contextKey: `bulk-missing:${bulkRowId}`,
+      projectPersisted: false,
+      warning: 'This Bulk Planning Board row no longer exists. Choose another project from Bulk Queue or return to the board.',
+    };
   }
 
   try {
@@ -226,9 +250,27 @@ export const VideoEditorV2 = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { token } = useAuth();
-  const isBulkProject = searchParams.get('mode') === 'bulk';
-  const bulkRowId = searchParams.get('rowId') || '';
-  const openedFromLegacyEditor = searchParams.get('returnTo') === 'legacy-editor';
+  const requestedBulkRowId = searchParams.get('rowId') || '';
+  const requestedBulkMode = searchParams.get('mode') === 'bulk';
+  const fallbackBulkRowId = useMemo(() => (
+    requestedBulkMode && !requestedBulkRowId
+      ? String(getBulkRows()[0]?.id || '')
+      : ''
+  ), [requestedBulkMode, requestedBulkRowId]);
+  const bulkRowId = requestedBulkRowId || fallbackBulkRowId;
+  const isBulkProject = requestedBulkMode && Boolean(bulkRowId);
+  useEffect(() => {
+    if (!requestedBulkMode || requestedBulkRowId) return;
+    if (!fallbackBulkRowId) {
+      navigate('/media/bulk-builder', { replace: true });
+      return;
+    }
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('mode', 'bulk');
+    nextParams.set('rowId', fallbackBulkRowId);
+    nextParams.set('panel', 'bulk');
+    navigate(`/media/editor?${nextParams.toString()}`, { replace: true });
+  }, [fallbackBulkRowId, navigate, requestedBulkMode, requestedBulkRowId, searchParams]);
   const initialContext = useMemo(
     () => loadInitialContext({ bulkRowId, isBulkProject }),
     [bulkRowId, isBulkProject],
@@ -250,7 +292,11 @@ export const VideoEditorV2 = () => {
       : null
   ));
   const [exportState, setExportState] = useState(createEmptyExportState);
+  const [bulkExportDialog, setBulkExportDialog] = useState(createEmptyBulkExportDialog);
   const [savingResult, setSavingResult] = useState(false);
+  const [selectedBulkRowIds, setSelectedBulkRowIds] = useState(() => (
+    isBulkProject && bulkRowId ? [bulkRowId] : []
+  ));
   const [timelineHeight, setTimelineHeight] = useState(getInitialTimelineHeight);
   const [timelineMaximum, setTimelineMaximum] = useState(getInitialTimelineMaximum);
   const assetsRef = useRef(assets);
@@ -268,11 +314,117 @@ export const VideoEditorV2 = () => {
     initialContext.projectPersisted ? serializeProject(initialContext.project) : '',
   );
 
+  const uploadBulkQueueResult = useCallback(async ({
+    row,
+    blob,
+    fileName,
+    mimeType,
+    signal,
+    uploadOptions,
+    onProgress,
+  }) => {
+    if (signal.aborted) throw signal.reason || new Error('Bulk export cancelled.');
+    let generatedCaption = row.generatedCaption || '';
+    if (uploadOptions?.generateCaptions) {
+      onProgress?.(0.05, 'Generating AI caption…');
+      const captionResponse = await fetch(`${API_BASE_URL}/api/ai/generate-caption`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          videoName: row.caption || row.video1?.name || row.id || 'short video',
+        }),
+        signal,
+      });
+      if (!captionResponse.ok) {
+        const payload = await captionResponse.json().catch(() => ({}));
+        throw new Error(payload.message || 'The AI caption could not be generated.');
+      }
+      const captionPayload = await captionResponse.json();
+      generatedCaption = captionPayload.caption || '';
+      onProgress?.(0.35, 'Caption generated. Saving video…');
+    }
+    const resolvedName = fileName || `${row.caption || row.id || 'bulk-video'}.mp4`;
+    const formData = new FormData();
+    formData.append('file', new File([blob], resolvedName, { type: mimeType || 'video/mp4' }));
+    const folderId = uploadOptions?.folderId || 'root';
+    formData.append('folderId', folderId === 'root' ? 'null' : folderId);
+    formData.append('tags', 'editor,timeline,bulk');
+    formData.append('campaignId', getActiveCampaignId());
+    if (generatedCaption) formData.append('caption', generatedCaption);
+    onProgress?.(0.5, 'Uploading to Media Library…');
+    const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+      signal,
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.message || 'The rendered video could not be uploaded to Media Library.');
+    }
+    const payload = await response.json();
+    onProgress?.(1, 'Saved to Media Library.');
+    return {
+      media: payload?.media || payload,
+      generatedCaption,
+    };
+  }, [token]);
+
+  const bulkExportQueue = useBulkExportQueue({
+    ffmpegRef,
+    uploadResult: uploadBulkQueueResult,
+  });
+  const bulkQueueState = useMemo(() => ({
+    running: bulkExportQueue.isRunning,
+    progress: Math.round(Number(bulkExportQueue.overallProgress) * 100),
+    message: bulkExportQueue.currentItem?.message
+      || (bulkExportQueue.isRunning ? 'Preparing bulk queue…' : ''),
+    completed: bulkExportQueue.queue.completed,
+    total: bulkExportQueue.queue.total,
+    status: bulkExportQueue.queue.status,
+  }), [
+    bulkExportQueue.currentItem,
+    bulkExportQueue.isRunning,
+    bulkExportQueue.overallProgress,
+    bulkExportQueue.queue.completed,
+    bulkExportQueue.queue.status,
+    bulkExportQueue.queue.total,
+  ]);
+  const bulkQueueRows = useMemo(() => bulkExportQueue.rows.map((row) => {
+    const item = bulkExportQueue.queue.items[String(row.id)];
+    const itemMatchesStoredResult = item && (
+      (row.status === 'done' && item.status === 'done')
+      || (row.status === 'error' && item.status === 'error')
+      || item.status === 'rendered'
+    );
+    return item && (bulkExportQueue.isRunning || itemMatchesStoredResult) ? {
+      ...row,
+      queueStatus: item.status,
+      bulkExportError: item.error || '',
+      queueMessage: item.message || '',
+      renderedVideoUrl: item.renderedVideoUrl || '',
+      renderedFileName: item.renderedFileName || '',
+      generatedCaption: item.generatedCaption ?? row.generatedCaption,
+      queueResultUrl: getMediaUrl(row.resultMediaUrl || row.resultVideoUrl),
+    } : {
+      ...row,
+      queueResultUrl: getMediaUrl(row.resultMediaUrl || row.resultVideoUrl),
+    };
+  }), [bulkExportQueue.isRunning, bulkExportQueue.queue.items, bulkExportQueue.rows]);
+  const bulkExportDialogRows = useMemo(() => {
+    const requestedIds = new Set(bulkExportDialog.rowIds.map(String));
+    return bulkQueueRows.filter((row) => requestedIds.has(String(row.id)));
+  }, [bulkExportDialog.rowIds, bulkQueueRows]);
+
   const { project, currentTime, isPlaying, selectedClipId } = state;
   const projectRef = useRef(project);
   const selectedClip = findClipById(project, selectedClipId);
   const selectedClipTrack = selectedClipId ? getClipTrack(project, selectedClipId) : null;
   const extractAudioDisabled = Boolean(extractingAudioClipId)
+    || bulkQueueState.running
     || selectedClip?.type !== 'video'
     || selectedClipTrack?.locked
     || (!selectedClip?.sourceUrl && !selectedClip?.mediaId)
@@ -283,6 +435,22 @@ export const VideoEditorV2 = () => {
   useEffect(() => {
     projectRef.current = project;
   }, [project]);
+
+  useEffect(() => {
+    if (!isBulkProject) return;
+    const storedRows = readBulkRowsSnapshot();
+    const canonicalRows = getBulkRows().map(sanitizeBulkRowForStorage);
+    if (JSON.stringify(storedRows) !== JSON.stringify(canonicalRows)) {
+      writeBulkRowsSnapshot(canonicalRows, { source: 'editor-v2-bulk-migration' });
+    }
+  }, [isBulkProject]);
+
+  useEffect(() => {
+    if (!isBulkProject || !bulkRowId) return;
+    queueMicrotask(() => setSelectedBulkRowIds((current) => (
+      current.length > 0 ? current : [bulkRowId]
+    )));
+  }, [bulkRowId, isBulkProject]);
 
   useEffect(() => {
     if (!isBulkProject || !bulkRowId) return undefined;
@@ -741,8 +909,8 @@ export const VideoEditorV2 = () => {
       duration,
       style: {
         fontFamily: 'Outfit',
-        fontWeight: '700',
-        fontSize: 72,
+        fontWeight: '600',
+        fontSize: 40,
         color: '#ffffff',
         strokeColor: '#000000',
         strokeWidth: 3,
@@ -934,6 +1102,13 @@ export const VideoEditorV2 = () => {
   }, [bulkRowId, isBulkProject, project]);
 
   const handleBack = useCallback(() => {
+    if (bulkQueueState.running || exportState.exporting || savingResult || extractingAudioClipId) {
+      setStatus({
+        type: 'error',
+        text: 'Finish or cancel the active export, upload, or audio extraction before leaving the editor.',
+      });
+      return;
+    }
     if (isBulkProject && bulkRowId) {
       const currentProject = projectRef.current;
       const snapshot = serializeProject(currentProject);
@@ -952,18 +1127,81 @@ export const VideoEditorV2 = () => {
           return;
         }
       }
+    } else {
+      try {
+        const snapshot = serializeProject(projectRef.current);
+        localStorage.setItem(DRAFT_STORAGE_KEY, snapshot);
+        savedProjectRef.current = snapshot;
+      } catch {
+        setStatus({
+          type: 'error',
+          text: 'This browser could not save the project before leaving the editor.',
+        });
+        return;
+      }
     }
-    if (!isBulkProject && openedFromLegacyEditor) {
-      const snapshot = serializeProject(projectRef.current);
-      localStorage.setItem(DRAFT_STORAGE_KEY, snapshot);
-      savedProjectRef.current = snapshot;
+    navigate(isBulkProject ? '/media/bulk-builder' : '/media', { replace: true });
+  }, [
+    bulkQueueState.running,
+    bulkRowId,
+    exportState.exporting,
+    extractingAudioClipId,
+    isBulkProject,
+    navigate,
+    savingResult,
+  ]);
+
+  const openBulkQueueRow = useCallback((nextRowId) => {
+    if (!isBulkProject || !nextRowId || String(nextRowId) === String(bulkRowId)) return;
+    if (bulkQueueState.running || savingResult || exportState.exporting || extractingAudioClipId) {
+      setStatus({
+        type: 'error',
+        text: 'Wait for the current export, upload, or audio extraction to finish before switching rows.',
+      });
+      return;
     }
-    navigate(openedFromLegacyEditor
-      ? (isBulkProject ? '/media/editor?mode=bulk' : '/media/editor')
-      : (isBulkProject ? '/media/bulk-builder' : '/media'));
-  }, [bulkRowId, isBulkProject, navigate, openedFromLegacyEditor]);
+    try {
+      const currentProject = projectRef.current;
+      const snapshot = serializeProject(currentProject);
+      if (snapshot !== bulkSyncedProjectRef.current) {
+        const savedSnapshot = persistProjectToBulkRow(currentProject, bulkRowId, {
+          clearResult: true,
+        });
+        bulkSyncedProjectRef.current = savedSnapshot;
+        savedProjectRef.current = savedSnapshot;
+      }
+      const rows = getBulkRows();
+      if (!rows.some((row) => String(row.id) === String(nextRowId))) {
+        throw new Error('That Bulk Planning Board row no longer exists.');
+      }
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('mode', 'bulk');
+      nextParams.set('rowId', String(nextRowId));
+      setSelectedBulkRowIds((current) => (
+        current.some((rowId) => String(rowId) === String(nextRowId))
+          ? current
+          : [...current, nextRowId]
+      ));
+      navigate(`/media/editor?${nextParams.toString()}`, { replace: true });
+    } catch (error) {
+      setStatus({ type: 'error', text: error.message || 'Could not open that bulk project.' });
+    }
+  }, [
+    bulkQueueState.running,
+    bulkRowId,
+    exportState.exporting,
+    extractingAudioClipId,
+    isBulkProject,
+    navigate,
+    savingResult,
+    searchParams,
+  ]);
 
   const openExportDialog = useCallback(() => {
+    if (bulkQueueState.running) {
+      setStatus({ type: 'error', text: 'Stop or finish the Bulk Queue before exporting this project separately.' });
+      return;
+    }
     if (resultUrlRef.current) {
       URL.revokeObjectURL(resultUrlRef.current);
       resultUrlRef.current = '';
@@ -972,9 +1210,18 @@ export const VideoEditorV2 = () => {
       open: true,
       format: current.format,
     }));
-  }, []);
+  }, [bulkQueueState.running]);
 
   const handleExport = useCallback(async (requestedFormat = 'video') => {
+    if (bulkQueueState.running) {
+      setExportState((current) => ({
+        ...current,
+        open: true,
+        exporting: false,
+        error: 'Stop or finish the Bulk Queue before starting another export.',
+      }));
+      return;
+    }
     if (calculateProjectDuration(project) <= 0) {
       setExportState((current) => ({
         ...current,
@@ -1037,9 +1284,9 @@ export const VideoEditorV2 = () => {
         error: error.message || `The ${format === 'audio' ? 'audio' : 'video'} could not be exported.`,
       }));
     } finally {
-      exportAbortRef.current = null;
+      if (exportAbortRef.current === controller) exportAbortRef.current = null;
     }
-  }, [project, setPlaying]);
+  }, [bulkQueueState.running, project, setPlaying]);
 
   const saveResultToLibrary = useCallback(async () => {
     if (!resultUrlRef.current) return;
@@ -1106,6 +1353,203 @@ export const VideoEditorV2 = () => {
     }
   }, [bulkRowId, exportState.format, exportState.resultFileName, exportState.resultMimeType, isBulkProject, project, token]);
 
+  const loadBulkExportFolders = useCallback(async () => {
+    setBulkExportDialog((current) => ({
+      ...current,
+      foldersLoading: true,
+      folderError: '',
+    }));
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('Unable to load Media Library folders.');
+      const payload = await response.json();
+      const folders = Array.isArray(payload) ? payload : (payload.folders || []);
+      setBulkExportDialog((current) => ({
+        ...current,
+        folders,
+        foldersLoading: false,
+      }));
+    } catch (error) {
+      setBulkExportDialog((current) => ({
+        ...current,
+        folders: [],
+        foldersLoading: false,
+        folderError: error.message || 'Unable to load Media Library folders.',
+      }));
+    }
+  }, [token]);
+
+  const openBulkExportAllDialog = useCallback(async () => {
+    const rowIds = bulkQueueRows
+      .filter((row) => (
+        row.editorProject
+        && row.status !== 'done'
+        && calculateProjectDuration(row.editorProject) > 0
+      ))
+      .map((row) => String(row.id));
+    if (rowIds.length === 0) {
+      setStatus({ type: 'error', text: 'There are no pending bulk videos ready to export.' });
+      return;
+    }
+    bulkExportQueue.reset();
+    setBulkExportDialog(createEmptyBulkExportDialog({
+      open: true,
+      rowIds,
+      phase: 'rendering',
+    }));
+    void loadBulkExportFolders();
+    try {
+      const currentSnapshot = serializeProject(projectRef.current);
+      if (currentSnapshot !== bulkSyncedProjectRef.current) {
+        const savedSnapshot = persistProjectToBulkRow(projectRef.current, bulkRowId, {
+          clearResult: true,
+        });
+        bulkSyncedProjectRef.current = savedSnapshot;
+        savedProjectRef.current = savedSnapshot;
+      }
+      setPlaying(false);
+      const summary = await bulkExportQueue.render(rowIds);
+      setBulkExportDialog((current) => ({
+        ...current,
+        phase: summary.succeeded.length > 0 ? 'ready-to-save' : 'complete',
+      }));
+    } catch (error) {
+      setBulkExportDialog((current) => ({ ...current, phase: 'complete' }));
+      setStatus({ type: 'error', text: error.message || 'The bulk videos could not be rendered.' });
+    }
+  }, [bulkExportQueue, bulkQueueRows, bulkRowId, loadBulkExportFolders, setPlaying]);
+
+  const runBulkQueue = useCallback(async (requestedRowIds, runOptions = {}) => {
+    if (!isBulkProject || bulkExportQueue.isRunning) return;
+    if (exportState.exporting || savingResult || extractingAudioClipId) {
+      setStatus({
+        type: 'error',
+        text: 'Finish the current export, upload, or audio extraction before starting Bulk Queue.',
+      });
+      return;
+    }
+    const requestedIds = [...new Set((requestedRowIds || []).map(String).filter(Boolean))];
+    if (requestedIds.length === 0) {
+      setStatus({ type: 'error', text: 'Select at least one ready bulk project to export.' });
+      return;
+    }
+
+    try {
+      const currentSnapshot = serializeProject(projectRef.current);
+      if (currentSnapshot !== bulkSyncedProjectRef.current) {
+        const savedSnapshot = persistProjectToBulkRow(projectRef.current, bulkRowId, {
+          clearResult: true,
+        });
+        bulkSyncedProjectRef.current = savedSnapshot;
+        savedProjectRef.current = savedSnapshot;
+      }
+    } catch (error) {
+      setStatus({ type: 'error', text: error.message || 'The current row could not be saved.' });
+      return;
+    }
+
+    setPlaying(false);
+    try {
+      const summary = await bulkExportQueue.run(requestedIds, runOptions);
+      const completed = summary.succeeded.length;
+      const failed = summary.failed.length;
+      const cancelled = summary.cancelled.length;
+      setStatus(cancelled > 0
+        ? { type: 'error', text: 'Bulk export stopped. Completed rows were kept.' }
+        : failed > 0
+          ? { type: 'error', text: `${completed} row${completed === 1 ? '' : 's'} exported; ${failed} failed. Open Bulk Queue to retry.` }
+          : null);
+    } catch (error) {
+      setStatus({ type: 'error', text: error.message || 'The bulk export queue could not start.' });
+    }
+  }, [
+    bulkExportQueue,
+    bulkRowId,
+    exportState.exporting,
+    extractingAudioClipId,
+    isBulkProject,
+    savingResult,
+    setPlaying,
+  ]);
+
+  const startBulkExportDialogQueue = useCallback(async (targetRowId = null) => {
+    const savingOne = Boolean(targetRowId);
+    const requestedRowIds = savingOne ? [String(targetRowId)] : bulkExportDialog.rowIds;
+    if (!savingOne) {
+      setBulkExportDialog((current) => ({ ...current, phase: 'saving' }));
+    }
+    try {
+      const summary = await bulkExportQueue.saveRendered(requestedRowIds, {
+        uploadOptions: {
+          folderId: bulkExportDialog.folderId,
+        },
+      });
+      const completed = summary.succeeded.length;
+      const failed = summary.failed.length;
+      if (!savingOne) {
+        setBulkExportDialog((current) => ({ ...current, phase: 'complete' }));
+      }
+      if (failed > 0) {
+        setStatus({
+          type: 'error',
+          text: `${completed} video${completed === 1 ? '' : 's'} saved; ${failed} failed.`,
+        });
+      } else if (savingOne) {
+        setStatus({ type: 'success', text: 'Video saved successfully to your Media Library!' });
+      }
+    } catch (error) {
+      if (!savingOne) {
+        setBulkExportDialog((current) => ({ ...current, phase: 'complete' }));
+      }
+      setStatus({ type: 'error', text: error.message || 'The rendered videos could not be saved.' });
+    }
+  }, [bulkExportDialog.folderId, bulkExportDialog.rowIds, bulkExportQueue]);
+
+  const generateBulkExportCaptions = useCallback(async () => {
+    const renderedRows = bulkExportDialogRows.filter((row) => Boolean(row.renderedVideoUrl));
+    if (renderedRows.length === 0 || bulkExportDialog.generatingCaptions) return;
+
+    setBulkExportDialog((current) => ({ ...current, generatingCaptions: true }));
+    setStatus(null);
+    try {
+      for (const row of renderedRows) {
+        const response = await fetch(`${API_BASE_URL}/api/ai/generate-caption`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ videoName: row.caption || 'couple video' }),
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.message || 'Failed to generate one or more captions.');
+        }
+        const payload = await response.json();
+        await updateStoredBulkRowById(row.id, (current) => ({
+          ...current,
+          generatedCaption: payload.caption || '',
+        }), { source: 'editor-v2-bulk-captions' });
+      }
+      setStatus({
+        type: 'success',
+        text: `Captions generated successfully for ${renderedRows.length} video${renderedRows.length === 1 ? '' : 's'}!`,
+      });
+    } catch (error) {
+      setStatus({ type: 'error', text: error.message || 'Failed to generate captions.' });
+    } finally {
+      setBulkExportDialog((current) => ({ ...current, generatingCaptions: false }));
+    }
+  }, [bulkExportDialog.generatingCaptions, bulkExportDialogRows, token]);
+
+  const closeBulkExportDialog = useCallback(() => {
+    if (bulkExportQueue.isRunning) return;
+    setBulkExportDialog(createEmptyBulkExportDialog());
+    bulkExportQueue.reset();
+  }, [bulkExportQueue]);
+
   return (
     <div className="flex h-[100dvh] min-w-[1080px] flex-col overflow-hidden bg-[#090a0d] text-[#f5f7fa] [color-scheme:dark]">
       <EditorToolbar
@@ -1113,7 +1557,7 @@ export const VideoEditorV2 = () => {
         output={project.output}
         canUndo={canUndo(state)}
         canRedo={canRedo(state)}
-        isExporting={exportState.exporting}
+        isExporting={exportState.exporting || bulkQueueState.running}
         isBulkProject={isBulkProject}
         onProjectNameChange={(name) => dispatch(editorActions.renameProject(name))}
         onUndo={() => dispatch(editorActions.undo())}
@@ -1123,9 +1567,6 @@ export const VideoEditorV2 = () => {
         onExport={openExportDialog}
         onSaveProject={saveProject}
         onBack={handleBack}
-        backLabel={openedFromLegacyEditor
-          ? 'Return to old Video Editor'
-          : undefined}
       />
 
       <div
@@ -1136,6 +1577,7 @@ export const VideoEditorV2 = () => {
         }}
       >
         <MediaPanel
+          key={isBulkProject ? 'bulk-editor-media' : 'single-editor-media'}
           assets={assets}
           onFilesSelected={handleFilesSelected}
           onOpenLibrary={(mode) => {
@@ -1144,6 +1586,26 @@ export const VideoEditorV2 = () => {
           }}
           onAddAsset={addAssetToTimeline}
           onAddText={addText}
+          bulkQueue={isBulkProject ? {
+            initiallyOpen: searchParams.get('panel') === 'bulk',
+            rows: bulkQueueRows,
+            currentRowId: bulkRowId,
+            selectedRowIds: selectedBulkRowIds,
+            queueState: bulkQueueState,
+            disabled: bulkExportQueue.isRunning
+              || exportState.exporting
+              || savingResult
+              || Boolean(extractingAudioClipId),
+            onSelectionChange: setSelectedBulkRowIds,
+            onOpenRow: openBulkQueueRow,
+            onExportCurrent: () => runBulkQueue([bulkRowId]),
+            onExportSelected: () => runBulkQueue(selectedBulkRowIds),
+            onExportAll: openBulkExportAllDialog,
+            onRetryFailed: () => runBulkQueue(
+              bulkQueueRows.filter((row) => row.status === 'error').map((row) => row.id),
+            ),
+            onCancel: bulkExportQueue.cancel,
+          } : null}
         />
         <InspectorPanel
           selectedClip={selectedClip}
@@ -1263,6 +1725,26 @@ export const VideoEditorV2 = () => {
         onClose={() => setExportState((current) => ({ ...current, open: false }))}
         onCancel={() => exportAbortRef.current?.abort(new Error('Export cancelled by user.'))}
         onSaveToLibrary={saveResultToLibrary}
+      />
+
+      <BulkExportDialog
+        open={bulkExportDialog.open}
+        rows={bulkExportDialogRows}
+        folders={bulkExportDialog.folders}
+        foldersLoading={bulkExportDialog.foldersLoading}
+        folderError={bulkExportDialog.folderError}
+        selectedFolderId={bulkExportDialog.folderId}
+        generatingCaptions={bulkExportDialog.generatingCaptions}
+        queueState={bulkQueueState}
+        phase={bulkExportDialog.phase}
+        onFolderChange={(folderId) => setBulkExportDialog((current) => ({
+          ...current,
+          folderId,
+        }))}
+        onGenerateCaptions={generateBulkExportCaptions}
+        onStart={startBulkExportDialogQueue}
+        onCancel={bulkExportQueue.cancel}
+        onClose={closeBulkExportDialog}
       />
     </div>
   );

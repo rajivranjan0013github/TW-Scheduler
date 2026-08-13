@@ -44,11 +44,11 @@ export const DEFAULT_TRANSFORM = Object.freeze({
 
 export const DEFAULT_TEXT_STYLE = Object.freeze({
   fontFamily: 'Outfit',
-  fontWeight: 700,
-  fontSize: 48,
+  fontWeight: 600,
+  fontSize: 40,
   color: '#ffffff',
   strokeColor: '#000000',
-  strokeWidth: 2,
+  strokeWidth: 3,
   backgroundColor: '#000000',
   backgroundType: 'none',
   textAlign: 'center',

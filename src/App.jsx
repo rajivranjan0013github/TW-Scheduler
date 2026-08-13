@@ -28,7 +28,6 @@ import InstagramCallback from './pages/InstagramCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
 import YoutubeCallback from './pages/YoutubeCallback';
-import { VideoEditor } from './pages/VideoEditor';
 import { BulkVideoBuilder } from './pages/BulkVideoBuilder';
 import OnboardingScreen from './pages/OnboardingScreen';
 import CreatorCampaigns from './pages/CreatorCampaigns';
@@ -118,7 +117,8 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const hasActiveCampaign = Boolean(localStorage.getItem('active-campaign-id'));
   const isOnCampaignPage = location.pathname === '/' || location.pathname === '/campaigns';
   const isBulkBuilderPage = location.pathname === '/media/bulk-builder';
-  const isTimelineEditorPage = location.pathname === '/media/editor-v2';
+  const isTimelineEditorPage = location.pathname === '/media/editor'
+    || location.pathname === '/media/editor-v2';
   
   // Creators always see their sidebar since they aren't restricted by campaign selection state
   const hideSidebar = isTimelineEditorPage
@@ -153,8 +153,8 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
               <Route path="/scheduler/queue" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
               <Route path="/scheduler/queue/:accountId" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
               <Route path="/media" element={<MediaLibrary />} />
-              <Route path="/media/editor" element={<VideoEditor />} />
-              <Route path="/media/editor-v2" element={<Suspense fallback={<TimelineEditorFallback />}><VideoEditorV2 /></Suspense>} />
+              <Route path="/media/editor" element={<Suspense fallback={<TimelineEditorFallback />}><VideoEditorV2 /></Suspense>} />
+              <Route path="/media/editor-v2" element={<Navigate to={`/media/editor${location.search}`} replace />} />
               <Route path="/media/bulk-builder" element={<BulkVideoBuilder />} />
               <Route path="/channels" element={<Channels selectedAccounts={selectedAccounts} />} />
               <Route path="/channels/:id/feed" element={<PublishedFeed />} />

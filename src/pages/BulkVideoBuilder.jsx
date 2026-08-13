@@ -539,7 +539,7 @@ export const BulkVideoBuilder = () => {
       );
       if (!shouldContinue) return;
     }
-    navigate('/media/editor?mode=bulk');
+    navigate(`/media/editor?mode=bulk&rowId=${encodeURIComponent(readyRows[0].id)}&panel=bulk`);
   }, [bulk, navigate]);
 
   // Auto center view on mount if nodes exist
@@ -644,7 +644,7 @@ export const BulkVideoBuilder = () => {
                   zoomScale={pageZoom}
                   onUpdateCanvasPos={(canvasPos) => bulk.updateRow(row.id, { canvasPos })}
                   onHeaderDoubleClick={() => focusAndZoomOnRow(row)}
-                  onEditTimeline={() => navigate(`/media/editor-v2?mode=bulk&rowId=${encodeURIComponent(row.id)}`)}
+                  onEditTimeline={() => navigate(`/media/editor?mode=bulk&rowId=${encodeURIComponent(row.id)}`)}
                 />
               </div>
             ))}

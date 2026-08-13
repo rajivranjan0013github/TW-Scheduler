@@ -10,7 +10,12 @@ import {
   RotateCcw,
   X,
 } from 'lucide-react';
-import { MAX_PLAYBACK_RATE, MIN_CROP_SIZE, MIN_PLAYBACK_RATE } from '../project';
+import {
+  DEFAULT_TEXT_STYLE,
+  MAX_PLAYBACK_RATE,
+  MIN_CROP_SIZE,
+  MIN_PLAYBACK_RATE,
+} from '../project';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const VISUAL_LAYER_PRIORITY = { video: 0, image: 1, text: 2 };
@@ -345,11 +350,12 @@ const PreviewTextLayer = ({
   const visibleBoxWidth = resizeDraft?.boxWidth ?? persistedBoxWidth;
   const visibleBoxHeight = resizeDraft?.boxHeight ?? persistedBoxHeight;
   const previewScale = stageSize.height > 0 ? stageSize.height / output.height : 0.25;
-  const outputFontSize = Number(style.fontSize || 64);
+  const outputFontSize = Number(style.fontSize || DEFAULT_TEXT_STYLE.fontSize);
   const fontSize = clamp(outputFontSize * previewScale, 8, 96);
+  const hasTextBackground = String(style.backgroundType || 'none').toLowerCase() !== 'none';
   const automaticPreviewPadding = Math.max(
     0,
-    Number(style.padding || outputFontSize * 0.25) * previewScale,
+    Number(style.padding || (hasTextBackground ? outputFontSize * 0.25 : 0)) * previewScale,
   );
   const previewPaddingX = style.paddingX === null || style.paddingX === undefined
     ? automaticPreviewPadding
@@ -357,7 +363,10 @@ const PreviewTextLayer = ({
   const previewPaddingY = style.paddingY === null || style.paddingY === undefined
     ? automaticPreviewPadding
     : Math.max(0, Number(style.paddingY) * previewScale);
-  const strokeWidth = Math.max(0, Number(style.strokeWidth || 0) * previewScale);
+  const strokeWidth = Math.max(
+    0,
+    Number(style.strokeWidth ?? DEFAULT_TEXT_STYLE.strokeWidth) * previewScale,
+  );
   const localTime = Math.max(0, currentTime - Number(clip.timelineStart || 0));
   const remaining = Math.max(0, Number(clip.duration || 0) - localTime);
   const fadeIn = clip.animation?.in === 'fade'
@@ -719,7 +728,7 @@ const PreviewTextLayer = ({
         opacity: visibleTransform.opacity * animationOpacity,
         fontFamily: style.fontFamily || 'Outfit, sans-serif',
         fontSize,
-        fontWeight: style.fontWeight || 700,
+        fontWeight: style.fontWeight || DEFAULT_TEXT_STYLE.fontWeight,
         lineHeight: Number(style.lineHeight || 1.2),
         letterSpacing: Number(style.letterSpacing || 0) * previewScale,
         color: style.color || '#ffffff',
@@ -729,7 +738,7 @@ const PreviewTextLayer = ({
         WebkitTextFillColor: style.color || '#ffffff',
         paintOrder: 'stroke fill',
         textRendering: 'geometricPrecision',
-        backgroundColor: String(style.backgroundType || 'None').toLowerCase() === 'none'
+        backgroundColor: !hasTextBackground
           ? 'transparent'
           : (style.backgroundColor || 'transparent'),
         borderRadius: Number(style.borderRadius ?? style.backgroundRadius ?? 12) * previewScale,

@@ -132,7 +132,7 @@ export const FloatingTextControls = ({
           title="Double-click to reset size"
           onDoubleClick={() => onUpdate({ fontSize: DEFAULT_TEXT_SETTINGS.fontSize })}
         >
-          Size: {fontSize}px
+          Size: {Number(fontSize).toFixed(2).replace(/\.00$/, '')}px
         </span>
         <input
           type="range" min="10" max="48" step="1"
@@ -240,10 +240,10 @@ export const FloatingTextControls = ({
           title="Double-click to reset stroke width"
           onDoubleClick={() => onUpdate({ strokeWidth: DEFAULT_TEXT_SETTINGS.strokeWidth })}
         >
-          Stroke: {strokeWidth}px
+          Stroke: {Number(strokeWidth).toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}px
         </span>
         <input
-          type="range" min="0" max="10" step="1"
+          type="range" min="0" max="10" step="0.125"
           value={strokeWidth}
           onChange={(e) => onUpdate({ strokeWidth: Number(e.target.value) })}
           className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"

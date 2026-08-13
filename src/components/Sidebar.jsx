@@ -189,7 +189,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     ...(canViewAdmin ? [{ name: 'Performance', label: 'Perf', path: '/dashboard', icon: BarChart3 }] : []),
     { name: 'Scheduled Queue', label: 'Queue', path: '/scheduler', icon: Clock },
     { name: 'Media Library', label: 'Media', path: '/media', icon: FolderHeart },
-    { name: 'Video Editor', label: 'Editor', path: '/media/editor', icon: Film },
+    { name: 'Timeline Editor', label: 'Editor', path: '/media/editor', icon: Film },
     { name: 'Publishing Channels', label: 'Channels', path: '/channels', icon: Link2 },
     { name: 'Settings', label: 'Settings', path: '/settings', icon: SettingsIcon },
   ];

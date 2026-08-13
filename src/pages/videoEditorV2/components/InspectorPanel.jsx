@@ -10,6 +10,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import {
+  DEFAULT_TEXT_STYLE,
   MAX_PLAYBACK_RATE,
   MIN_CLIP_DURATION,
   MIN_CROP_SIZE,
@@ -290,10 +291,10 @@ const TextInspector = ({ clip, onUpdate }) => {
   const transform = clip.transform || {};
   const positionX = Number(transform.x ?? 0.5);
   const positionY = Number(transform.y ?? 0.25);
-  const fontSize = clamp(Number(style.fontSize) || 64, 12, 240);
+  const fontSize = clamp(Number(style.fontSize) || DEFAULT_TEXT_STYLE.fontSize, 12, 240);
   const rawStrokeWidth = Number(style.strokeWidth);
   const strokeWidth = clamp(
-    Number.isFinite(rawStrokeWidth) ? rawStrokeWidth : 0,
+    Number.isFinite(rawStrokeWidth) ? rawStrokeWidth : DEFAULT_TEXT_STYLE.strokeWidth,
     0,
     MAX_TEXT_STROKE_WIDTH,
   );
@@ -312,7 +313,7 @@ const TextInspector = ({ clip, onUpdate }) => {
     Medium: '500',
     SemiBold: '600',
     Bold: '700',
-  })[style.fontWeight] || String(style.fontWeight || 700);
+  })[style.fontWeight] || String(style.fontWeight || DEFAULT_TEXT_STYLE.fontWeight);
   const updateStyle = (changes) => onUpdate({ style: { ...style, ...changes } });
   const updateTransform = (changes) => onUpdate({ transform: { ...transform, ...changes } });
   const updateStrokeWidth = (value) => {
