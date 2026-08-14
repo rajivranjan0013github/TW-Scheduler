@@ -193,7 +193,7 @@ export const createVideoClip = (input = {}) => ({
   ...createMediaIdentity(input),
   volume: clampNumber(input.volume, 0, 2, 1),
   muted: Boolean(input.muted),
-  fit: ['fit', 'fill', 'stretch'].includes(input.fit) ? input.fit : 'fill',
+  fit: ['fit', 'fill', 'stretch'].includes(input.fit) ? input.fit : 'fit',
   crop: normalizeCrop(input.crop),
   transform: normalizeTransform(input.transform),
   effects: {

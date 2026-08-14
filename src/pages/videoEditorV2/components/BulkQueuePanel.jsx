@@ -195,12 +195,12 @@ const QueueRow = ({
 
   return (
     <div
-      className={`group relative flex items-center gap-2 rounded-xl border p-2 transition ${current
-        ? 'border-[#ff5500]/50 bg-[#ff5500]/10 shadow-[0_8px_24px_rgba(255,85,0,0.08)]'
-        : 'border-white/[0.08] bg-[#171a20] hover:border-white/15 hover:bg-[#1b1f27]'}`}
+      className={`group relative flex min-h-12 items-center gap-2 border-b border-white/[0.07] px-1.5 py-1.5 transition ${current
+        ? 'bg-[#ff5500]/[0.08]'
+        : 'hover:bg-white/[0.035]'}`}
     >
       {current && (
-        <span className="absolute bottom-2 left-0 top-2 w-0.5 rounded-r-full bg-[#ff5500]" />
+        <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-r-full bg-[#ff5500]" />
       )}
 
       <QueueCheckbox
@@ -215,9 +215,9 @@ const QueueRow = ({
         onClick={() => onOpen(entry)}
         disabled={interactionDisabled || !onOpen}
         aria-current={current ? 'true' : undefined}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-default"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-default"
       >
-        <span className="relative flex h-11 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-[#0b0d10] text-[#727985]">
+        <span className="relative flex h-9 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#0b0d10] text-[#727985] ring-1 ring-white/10">
           {preview?.type === 'image' && (
             <img src={preview.url} alt="" className="h-full w-full object-cover" />
           )}
@@ -231,35 +231,30 @@ const QueueRow = ({
             />
           )}
           {!preview && <Film className="h-4 w-4" />}
-          <span className="absolute bottom-0.5 left-0.5 rounded bg-black/75 px-1 text-[7px] font-extrabold tabular-nums text-white/80">
-            {index + 1}
-          </span>
         </span>
 
         <span className="min-w-0 flex-1">
-          <span className={`block truncate text-[10px] font-extrabold ${current ? 'text-white' : 'text-[#d7dbe2]'}`}>
-            {name}
+          <span className={`block truncate text-[10px] font-bold ${current ? 'text-white' : 'text-[#d7dbe2]'}`}>
+            <span className="mr-1.5 tabular-nums text-[#666d78]">{index + 1}.</span>{name}
           </span>
           {secondaryText && (
-            <span className={`mt-0.5 block truncate text-[8px] font-semibold ${status === 'failed' ? 'text-red-300/80' : 'text-[#727985]'}`}>
+            <span className={`mt-0.5 block truncate text-[8px] font-medium ${status === 'failed' ? 'text-red-300/80' : 'text-[#777e89]'}`}>
               {secondaryText}
             </span>
           )}
-          <span
-            className={`mt-1 inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[7px] font-extrabold uppercase tracking-[0.08em] ${statusMeta.badgeClass}`}
-          >
-            <StatusIcon className={`h-2.5 w-2.5 ${statusMeta.iconClass}`} />
-            {statusMeta.label}
-          </span>
         </span>
       </button>
+      <span className={`inline-flex shrink-0 items-center gap-1 text-[8px] font-bold ${statusMeta.iconClass.replace('animate-spin ', '')}`}>
+        <StatusIcon className={`h-3 w-3 ${statusMeta.iconClass}`} />
+        {statusMeta.label}
+      </span>
       {status === 'done' && resultUrl && (
         <a
           href={resultUrl}
           target="_blank"
           rel="noreferrer"
           onClick={(event) => event.stopPropagation()}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-emerald-400/15 bg-emerald-400/10 text-emerald-300 transition hover:border-emerald-400/30 hover:bg-emerald-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-emerald-300 transition hover:bg-emerald-400/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60"
           aria-label={`Open exported result for ${name}`}
           title="Open exported result"
         >
@@ -275,7 +270,7 @@ const ActionButton = ({ children, disabled, onClick, primary = false, wide = fal
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className={`${wide ? 'col-span-2' : ''} flex h-9 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-[9px] font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-not-allowed disabled:opacity-40 ${primary
+    className={`${wide ? 'col-span-3' : ''} flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-not-allowed disabled:opacity-40 ${primary
       ? 'border-[#ff5500] bg-[#ff5500] text-white hover:border-[#ff6a1a] hover:bg-[#ff6a1a]'
       : 'border-white/10 bg-[#171a20] text-[#d7dbe2] hover:border-white/20 hover:bg-[#20242c] hover:text-white'}`}
   >
@@ -361,17 +356,17 @@ export const BulkQueuePanel = ({
   return (
     <section
       aria-label="Bulk export queue"
-      className={`flex min-h-0 flex-col text-[#f5f7fa] ${className}`}
+      className={`flex h-full min-h-0 flex-col text-[#f5f7fa] ${className}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="text-xs font-extrabold text-[#f5f7fa]">Bulk queue</h3>
-          <p className="mt-0.5 text-[9px] font-semibold text-[#727985]">
-            {completedCount} of {entries.length} completed
-          </p>
+      <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-white/[0.08]">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h3 className="text-[11px] font-extrabold !text-[#f5f7fa]">Bulk queue</h3>
+          <span className="text-[8px] font-semibold tabular-nums text-[#777e89]">
+            {completedCount}/{entries.length} done
+          </span>
         </div>
         {queueRunning && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#ff7043]/20 bg-[#ff5500]/10 px-2 py-1 text-[8px] font-extrabold uppercase tracking-wider text-[#ff8a61]">
+          <span className="inline-flex shrink-0 items-center gap-1 text-[8px] font-bold text-[#ff8a61]">
             <Loader2 className="h-3 w-3 animate-spin" />
             Running
           </span>
@@ -382,7 +377,7 @@ export const BulkQueuePanel = ({
         <div
           role="status"
           aria-live="polite"
-          className="mt-3 rounded-xl border border-[#ff7043]/20 bg-[#ff5500]/[0.07] p-2.5"
+          className="mt-2 shrink-0 border-b border-[#ff7043]/15 bg-[#ff5500]/[0.05] px-2 py-1.5"
         >
           <div className="flex items-center gap-2">
             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#ff7043]" />
@@ -404,7 +399,7 @@ export const BulkQueuePanel = ({
               </button>
             )}
           </div>
-          <div className="mt-2 h-1 overflow-hidden rounded-full bg-black/35">
+          <div className="mt-1.5 h-0.5 overflow-hidden rounded-full bg-black/35">
             <div
               className="h-full rounded-full bg-gradient-to-r from-[#ff4d00] to-[#ff7a45] transition-[width] duration-300"
               style={{ width: `${queueProgress}%` }}
@@ -413,7 +408,7 @@ export const BulkQueuePanel = ({
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.025] px-2.5 py-2">
+      <div className="flex h-9 shrink-0 items-center justify-between border-b border-white/[0.08] px-1.5">
         <label className="flex min-w-0 items-center gap-2 text-[9px] font-bold text-[#aeb3bc]">
           <QueueCheckbox
             checked={allSelected}
@@ -433,7 +428,7 @@ export const BulkQueuePanel = ({
         </span>
       </div>
 
-      <div className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {entries.map((entry) => (
           <QueueRow
             key={entry.key}
@@ -450,7 +445,7 @@ export const BulkQueuePanel = ({
         ))}
 
         {entries.length === 0 && (
-          <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center">
+          <div className="border-b border-dashed border-white/10 px-4 py-8 text-center">
             <Layers3 className="mx-auto h-5 w-5 text-[#555c67]" />
             <p className="mt-2 text-[10px] font-bold text-[#a6abb4]">No planned videos</p>
             <p className="mt-1 text-[9px] font-medium text-[#666d78]">
@@ -461,7 +456,7 @@ export const BulkQueuePanel = ({
       </div>
 
       {hasActions && (
-        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.08] pt-3">
+        <div className="grid shrink-0 grid-cols-3 gap-1.5 border-t border-white/[0.08] bg-[#111318] pt-2">
           {onExportCurrent && (
             <ActionButton
               primary
@@ -469,7 +464,7 @@ export const BulkQueuePanel = ({
               onClick={() => onExportCurrent(currentEntry.id, currentEntry.row)}
             >
               <Play className="h-3.5 w-3.5 fill-current" />
-              Export current
+              Current
             </ActionButton>
           )}
           {onExportSelected && (
@@ -481,12 +476,11 @@ export const BulkQueuePanel = ({
               )}
             >
               <ListChecks className="h-3.5 w-3.5" />
-              <span className="truncate">Export selected</span>
+              <span className="truncate">Selected</span>
             </ActionButton>
           )}
           {onExportAll && (
             <ActionButton
-              wide
               disabled={exportDisabled || entries.length === 0}
               onClick={() => onExportAll(
                 entries.map((entry) => entry.id),
@@ -494,7 +488,7 @@ export const BulkQueuePanel = ({
               )}
             >
               <Layers3 className="h-3.5 w-3.5" />
-              Export all ({entries.length})
+              All ({entries.length})
             </ActionButton>
           )}
           {onRetryFailed && failedEntries.length > 0 && (

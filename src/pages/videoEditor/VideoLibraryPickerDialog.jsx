@@ -225,9 +225,9 @@ export const VideoLibraryPickerDialog = ({
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${isDark ? 'bg-black/70' : 'bg-black/35'}`}>
       <div className={`flex h-[78vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl shadow-2xl ${isDark ? 'border border-white/10 bg-[#18181b] shadow-black/60' : 'bg-white'}`}>
-        <div className={`flex items-center justify-between border-b px-5 py-2.5 ${isDark ? 'border-white/10 bg-[#18181b]' : 'border-gray-100'}`}>
+        <div className={`flex items-center justify-between border-b px-5 py-2.5 ${isDark ? 'border-white/15 bg-[#111114] text-white' : 'border-gray-100'}`}>
           <div>
-            <h3 className={`text-sm font-bold ${isDark ? 'text-gray-50' : 'text-gray-950'}`}>
+            <h3 className={`text-sm font-bold ${isDark ? '!text-white' : '!text-gray-950'}`}>
               {mediaType === 'audio'
                 ? 'Select Audio'
                 : slotLabel?.includes('First')
@@ -239,7 +239,7 @@ export const VideoLibraryPickerDialog = ({
             type="button"
             onClick={onClose}
             aria-label="Close video picker"
-            className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isDark ? 'text-gray-400 hover:bg-white/10 hover:text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-950'}`}
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${isDark ? '!text-gray-300 hover:bg-white/10 hover:!text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-950'}`}
           >
             <X className="h-4 w-4" />
           </button>

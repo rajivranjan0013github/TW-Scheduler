@@ -10,9 +10,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 import { getMediaUrl } from '../../utils/mediaUrls';
-import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
-import { VideoLibraryPickerDialog } from '../videoEditor/VideoLibraryPickerDialog';
 import {
+  API_BASE_URL,
+  PLATFORM_AUDIO_FOLDER_ID,
+  PREVIEW_FRAME_WIDTH,
+} from '../videoEditor/videoEditorConstants';
+import { VideoLibraryPickerDialog } from '../videoEditor/VideoLibraryPickerDialog';
+import { CaptionDrawer } from '../bulkBuilder/CaptionDrawer';
+import {
+  DEFAULT_TEXT_SETTINGS,
   normalizeBulkRowsFromStorage,
   sanitizeBulkRowForStorage,
 } from '../bulkBuilder/useBulkRows';
@@ -57,12 +63,15 @@ import {
   hydrateBulkProjectDurations,
   projectToBulkRow,
   serializeProject,
+  sortClipsByTimeline,
 } from './project';
 import { Timeline } from './timeline';
 
 const DRAFT_STORAGE_KEY = 'tw_video_editor_v2_draft';
 const TIMELINE_MIN_HEIGHT = 220;
 const TIMELINE_MAX_HEIGHT = 480;
+// 40px toolbar + 36px ruler + three 62px tracks + scrollbar/borders.
+const TIMELINE_DEFAULT_HEIGHT = 268;
 const WORKSPACE_MIN_HEIGHT = 260;
 const EDITOR_TOOLBAR_HEIGHT = 58;
 
@@ -76,6 +85,10 @@ const createEmptyExportState = (overrides = {}) => ({
   resultUrl: '',
   resultFileName: '',
   resultMimeType: '',
+  folderId: 'root',
+  folders: [],
+  foldersLoading: false,
+  folderError: '',
   ...overrides,
 });
 
@@ -97,8 +110,15 @@ const clampTimelineHeight = (value, maximum = TIMELINE_MAX_HEIGHT) => Math.min(
 );
 
 const getInitialTimelineHeight = () => {
-  if (typeof window === 'undefined') return 260;
-  return clampTimelineHeight(window.innerHeight * 0.32, 280);
+  if (typeof window === 'undefined') return TIMELINE_DEFAULT_HEIGHT;
+  const availableHeight = Math.max(
+    TIMELINE_MIN_HEIGHT,
+    Math.min(
+      TIMELINE_MAX_HEIGHT,
+      window.innerHeight - EDITOR_TOOLBAR_HEIGHT - WORKSPACE_MIN_HEIGHT,
+    ),
+  );
+  return clampTimelineHeight(TIMELINE_DEFAULT_HEIGHT, availableHeight);
 };
 
 const getInitialTimelineMaximum = () => {
@@ -168,6 +188,17 @@ const getUploadedMediaSummary = (media) => ({
   resultMediaUrl: media?.url || '',
   resultMediaName: media?.name || media?.filename || '',
 });
+
+const hasBulkQueueVideo = (row) => Boolean(
+  row?.video1
+  || row?.video1Url
+  || row?.video
+  || row?.videoUrl
+  || row?.resultMediaId
+  || row?.resultMediaUrl
+  || row?.resultVideoUrl
+  || (row?.editorProject && calculateProjectDuration(row.editorProject) > 0)
+);
 
 const projectAssets = (project) => {
   const assets = new Map();
@@ -245,9 +276,18 @@ export const VideoEditorV2 = () => {
     createInitialEditorState,
   );
   const [assets, setAssets] = useState(() => projectAssets(initialContext.project));
+  const [audioPoolLoading, setAudioPoolLoading] = useState(true);
+  const [audioPoolError, setAudioPoolError] = useState('');
+  const [promoAssets, setPromoAssets] = useState([]);
+  const [promoFolderName, setPromoFolderName] = useState('');
+  const [promoLoading, setPromoLoading] = useState(true);
+  const [promoError, setPromoError] = useState('');
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryMode, setLibraryMode] = useState('video');
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
+  const [textAiDrawerClipId, setTextAiDrawerClipId] = useState(null);
+  const [textAiSuggestions, setTextAiSuggestions] = useState([]);
+  const [textAiVibe, setTextAiVibe] = useState('');
   const [rippleDeleteEnabled, setRippleDeleteEnabled] = useState(false);
   const [extractingAudioClipId, setExtractingAudioClipId] = useState(null);
   const [status, setStatus] = useState(() => (
@@ -357,27 +397,29 @@ export const VideoEditorV2 = () => {
     bulkExportQueue.queue.status,
     bulkExportQueue.queue.total,
   ]);
-  const bulkQueueRows = useMemo(() => bulkExportQueue.rows.map((row) => {
-    const item = bulkExportQueue.queue.items[String(row.id)];
-    const itemMatchesStoredResult = item && (
-      (row.status === 'done' && item.status === 'done')
-      || (row.status === 'error' && item.status === 'error')
-      || item.status === 'rendered'
-    );
-    return item && (bulkExportQueue.isRunning || itemMatchesStoredResult) ? {
-      ...row,
-      queueStatus: item.status,
-      bulkExportError: item.error || '',
-      queueMessage: item.message || '',
-      renderedVideoUrl: item.renderedVideoUrl || '',
-      renderedFileName: item.renderedFileName || '',
-      generatedCaption: item.generatedCaption ?? row.generatedCaption,
-      queueResultUrl: getMediaUrl(row.resultMediaUrl || row.resultVideoUrl),
-    } : {
-      ...row,
-      queueResultUrl: getMediaUrl(row.resultMediaUrl || row.resultVideoUrl),
-    };
-  }), [bulkExportQueue.isRunning, bulkExportQueue.queue.items, bulkExportQueue.rows]);
+  const bulkQueueRows = useMemo(() => bulkExportQueue.rows
+    .filter(hasBulkQueueVideo)
+    .map((row) => {
+      const item = bulkExportQueue.queue.items[String(row.id)];
+      const itemMatchesStoredResult = item && (
+        (row.status === 'done' && item.status === 'done')
+        || (row.status === 'error' && item.status === 'error')
+        || item.status === 'rendered'
+      );
+      return item && (bulkExportQueue.isRunning || itemMatchesStoredResult) ? {
+        ...row,
+        queueStatus: item.status,
+        bulkExportError: item.error || '',
+        queueMessage: item.message || '',
+        renderedVideoUrl: item.renderedVideoUrl || '',
+        renderedFileName: item.renderedFileName || '',
+        generatedCaption: item.generatedCaption ?? row.generatedCaption,
+        queueResultUrl: getMediaUrl(row.resultMediaUrl || row.resultVideoUrl),
+      } : {
+        ...row,
+        queueResultUrl: getMediaUrl(row.resultMediaUrl || row.resultVideoUrl),
+      };
+    }), [bulkExportQueue.isRunning, bulkExportQueue.queue.items, bulkExportQueue.rows]);
   const bulkExportDialogRows = useMemo(() => {
     const requestedIds = new Set(bulkExportDialog.rowIds.map(String));
     return bulkQueueRows.filter((row) => requestedIds.has(String(row.id)));
@@ -386,6 +428,9 @@ export const VideoEditorV2 = () => {
   const { project, currentTime, isPlaying, selectedClipId } = state;
   const projectRef = useRef(project);
   const selectedClip = findClipById(project, selectedClipId);
+  const textAiTargetClip = textAiDrawerClipId
+    ? findClipById(project, textAiDrawerClipId)
+    : null;
   const selectedClipTrack = selectedClipId ? getClipTrack(project, selectedClipId) : null;
   const extractAudioDisabled = Boolean(extractingAudioClipId)
     || bulkQueueState.running
@@ -485,17 +530,18 @@ export const VideoEditorV2 = () => {
   useEffect(() => {
     assetsRef.current = assets;
     const registry = new Map();
-    assets.forEach((asset) => registry.set(asset.id, asset));
+    const availableAssets = [...assets, ...promoAssets];
+    availableAssets.forEach((asset) => registry.set(asset.id, asset));
     project.tracks.forEach((track) => {
       track.clips.forEach((clip) => {
-        const asset = assets.find((candidate) => (
+        const asset = availableAssets.find((candidate) => (
           candidate.id === clip.mediaId || candidate.mediaId === clip.mediaId
         ));
         if (clip.mediaId && asset) registry.set(clip.mediaId, asset);
       });
     });
     mediaRegistryRef.current = registry;
-  }, [assets, project.tracks]);
+  }, [assets, project.tracks, promoAssets]);
 
   useEffect(() => () => {
     assetsRef.current.forEach(revokeAssetUrl);
@@ -636,6 +682,142 @@ export const VideoEditorV2 = () => {
       ? { type: 'warning', text: initialContext.warning }
       : null);
   }, [initialContext]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadPlatformAudio = async () => {
+      setAudioPoolLoading(true);
+      setAudioPoolError('');
+      try {
+        const params = new URLSearchParams();
+        const campaignId = getActiveCampaignId();
+        if (campaignId) params.set('campaignId', campaignId);
+        params.set('folderId', PLATFORM_AUDIO_FOLDER_ID);
+        const response = await fetch(`${API_BASE_URL}/api/media?${params.toString()}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error('Unable to load audio from the Bulk Queue folder.');
+
+        const payload = await response.json();
+        const tracks = (Array.isArray(payload) ? payload : [])
+          .filter((item) => item?.url)
+          .map((item) => ({
+            id: String(item._id || item.id || item.mediaId),
+            mediaId: String(item._id || item.id || item.mediaId),
+            sourceType: 'library',
+            type: 'audio',
+            name: item.name || item.filename || 'Platform audio',
+            url: getMediaUrl(item.url, { apiBaseUrl: API_BASE_URL }),
+            originalUrl: item.url,
+            mimeType: item.mimeType || item.mimetype || '',
+            duration: Number(item.duration || 0),
+            width: 0,
+            height: 0,
+          }));
+
+        setAssets((current) => {
+          const existingIds = new Set(current.map((asset) => String(asset.id)));
+          return [...current, ...tracks.filter((track) => !existingIds.has(track.id))];
+        });
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          setAudioPoolError(error.message || 'Unable to load audio from the Bulk Queue folder.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setAudioPoolLoading(false);
+      }
+    };
+
+    void loadPlatformAudio();
+    return () => controller.abort();
+  }, [initialContext.contextKey, token]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadPromoVideos = async () => {
+      setPromoLoading(true);
+      setPromoError('');
+      setPromoAssets([]);
+      setPromoFolderName('');
+
+      const campaignId = getActiveCampaignId();
+      if (!campaignId) {
+        setPromoLoading(false);
+        return;
+      }
+
+      try {
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const campaignsResponse = await fetch(`${API_BASE_URL}/api/accounts/campaigns`, {
+          headers,
+          signal: controller.signal,
+        });
+        const campaignsPayload = await campaignsResponse.json();
+        if (!campaignsResponse.ok) {
+          throw new Error(campaignsPayload.message || 'Unable to load the campaign promo folder.');
+        }
+        const campaign = (Array.isArray(campaignsPayload) ? campaignsPayload : [])
+          .find((item) => String(item._id) === String(campaignId));
+        const promoFolderId = String(campaign?.promoFolderId?._id || campaign?.promoFolderId || '');
+        if (!promoFolderId) return;
+
+        const scope = new URLSearchParams({ campaignId });
+        const mediaParams = new URLSearchParams({ campaignId, folderId: promoFolderId });
+        const [foldersResponse, mediaResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/media/folders?${scope.toString()}`, {
+            headers,
+            signal: controller.signal,
+          }),
+          fetch(`${API_BASE_URL}/api/media?${mediaParams.toString()}`, {
+            headers,
+            signal: controller.signal,
+          }),
+        ]);
+        const [foldersPayload, mediaPayload] = await Promise.all([
+          foldersResponse.json(),
+          mediaResponse.json(),
+        ]);
+        if (!foldersResponse.ok) {
+          throw new Error(foldersPayload.message || 'Unable to read the assigned promo folder.');
+        }
+        if (!mediaResponse.ok) {
+          throw new Error(mediaPayload.message || 'Unable to load promo videos.');
+        }
+
+        const folder = (Array.isArray(foldersPayload) ? foldersPayload : [])
+          .find((item) => String(item._id) === promoFolderId);
+        setPromoFolderName(folder?.name || 'Promo folder');
+        setPromoAssets((Array.isArray(mediaPayload) ? mediaPayload : [])
+          .filter((item) => item?.type === 'video' && item.url)
+          .map((item) => ({
+            id: String(item._id || item.id || item.mediaId),
+            mediaId: String(item._id || item.id || item.mediaId),
+            sourceType: 'library',
+            type: 'video',
+            name: item.name || item.filename || 'Promo video',
+            url: getMediaUrl(item.url, { apiBaseUrl: API_BASE_URL }),
+            originalUrl: item.url,
+            thumbnailUrl: item.thumbnailUrl || '',
+            mimeType: item.mimeType || item.mimetype || '',
+            duration: Number(item.duration || 0),
+            width: Number(item.width || 0),
+            height: Number(item.height || 0),
+          })));
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          setPromoError(error.message || 'Unable to load promo videos.');
+        }
+      } finally {
+        if (!controller.signal.aborted) setPromoLoading(false);
+      }
+    };
+
+    void loadPromoVideos();
+    return () => controller.abort();
+  }, [initialContext.contextKey, token]);
 
   useEffect(() => {
     const bulkRow = initialContext.bulkRow;
@@ -796,41 +978,58 @@ export const VideoEditorV2 = () => {
     setPlaying,
   ]);
 
-  const addAssetToTimeline = useCallback((asset) => {
-    const type = asset.type;
-    const track = getPrimaryTrackByType(project, type);
-    if (!track) {
-      setStatus({ type: 'error', text: `The project has no ${type} track.` });
-      return;
+  const addAssetToTimeline = useCallback(async (asset) => {
+    try {
+      const type = asset.type;
+      const needsDuration = ['audio', 'video'].includes(type)
+        && Number(asset.duration || 0) <= 0;
+      const resolvedAsset = needsDuration
+        ? await createLibraryAsset(asset)
+        : asset;
+      const sourceDuration = Number(resolvedAsset.duration || 0);
+
+      if (type === 'audio' && sourceDuration <= 0) {
+        throw new Error('The full audio duration could not be read. Try the track again after it finishes loading.');
+      }
+
+      const track = getPrimaryTrackByType(project, type);
+      if (!track) throw new Error(`The project has no ${type} track.`);
+
+      const timelineStart = getNextTrackStart(track, currentTime, project.output.maxDuration);
+      const remaining = project.output.maxDuration - timelineStart;
+      if (remaining < 0.1) throw new Error('The 30-second timeline is full.');
+
+      const duration = Math.min(
+        remaining,
+        type === 'image' ? 3 : Math.max(0.1, sourceDuration || 5),
+      );
+      const input = {
+        name: resolvedAsset.name,
+        mediaId: resolvedAsset.id,
+        sourceUrl: resolvedAsset.url,
+        originalUrl: resolvedAsset.originalUrl || '',
+        sourceType: resolvedAsset.sourceType,
+        mimeType: resolvedAsset.mimeType || '',
+        sourceDuration: type === 'image' ? 0 : (sourceDuration || duration),
+        timelineStart,
+        duration,
+      };
+      const clip = type === 'audio'
+        ? createAudioClip(input)
+        : type === 'image'
+          ? createImageClip(input)
+          : createVideoClip(input);
+
+      if (resolvedAsset !== asset) {
+        setAssets((current) => current.map((candidate) => (
+          candidate.id === asset.id ? resolvedAsset : candidate
+        )));
+      }
+      dispatch(editorActions.addClip(clip));
+      seek(timelineStart);
+    } catch (error) {
+      setStatus({ type: 'error', text: error.message || 'The media could not be added to the timeline.' });
     }
-    const timelineStart = getNextTrackStart(track, currentTime, project.output.maxDuration);
-    const remaining = project.output.maxDuration - timelineStart;
-    if (remaining < 0.1) {
-      setStatus({ type: 'error', text: 'The 30-second timeline is full.' });
-      return;
-    }
-    const duration = Math.min(
-      remaining,
-      type === 'image' ? 3 : Math.max(0.1, Number(asset.duration || 5)),
-    );
-    const input = {
-      name: asset.name,
-      mediaId: asset.id,
-      sourceUrl: asset.url,
-      originalUrl: asset.originalUrl || '',
-      sourceType: asset.sourceType,
-      mimeType: asset.mimeType || '',
-      sourceDuration: type === 'image' ? 0 : Number(asset.duration || duration),
-      timelineStart,
-      duration,
-    };
-    const clip = type === 'audio'
-      ? createAudioClip(input)
-      : type === 'image'
-        ? createImageClip(input)
-        : createVideoClip(input);
-    dispatch(editorActions.addClip(clip));
-    seek(timelineStart);
   }, [currentTime, project, seek]);
 
   const handleFilesSelected = useCallback(async (files) => {
@@ -856,35 +1055,64 @@ export const VideoEditorV2 = () => {
 
   const handleLibrarySelection = useCallback(async (item) => {
     const asset = await createLibraryAsset({ ...item, type: item.type || libraryMode });
-    setAssets((current) => current.some((candidate) => candidate.id === asset.id)
-      ? current
-      : [asset, ...current]);
+    setAssets((current) => (
+      current.some((candidate) => candidate.id === asset.id)
+        ? current
+        : [asset, ...current]
+    ));
     setLibraryOpen(false);
-    addAssetToTimeline(asset);
-  }, [addAssetToTimeline, libraryMode]);
+    setStatus({
+      type: 'success',
+      text: `${asset.name || 'Media'} added to the media pool. Click it when you want to add it to the timeline.`,
+    });
+  }, [libraryMode]);
+
+  const addPromoAssetToTimeline = useCallback(async (asset) => {
+    try {
+      const hydratedAsset = Number(asset.duration || 0) > 0
+        ? asset
+        : await createLibraryAsset(asset);
+      setPromoAssets((current) => current.map((item) => (
+        item.id === asset.id ? hydratedAsset : item
+      )));
+      await addAssetToTimeline(hydratedAsset);
+    } catch (error) {
+      setStatus({ type: 'error', text: error.message || 'The promo video could not be added.' });
+    }
+  }, [addAssetToTimeline]);
 
   const addText = useCallback((text) => {
-    const duration = Math.min(3, Math.max(0.1, project.output.maxDuration - currentTime));
+    const videoTrack = getPrimaryTrackByType(project, 'video');
+    const firstVideoClip = sortClipsByTimeline(videoTrack?.clips || [])[0] || null;
+    const timelineStart = firstVideoClip
+      ? Number(firstVideoClip.timelineStart || 0)
+      : currentTime;
+    const availableDuration = Math.max(0.1, project.output.maxDuration - timelineStart);
+    const duration = firstVideoClip
+      ? Math.min(Number(firstVideoClip.duration || 0), availableDuration)
+      : Math.min(3, availableDuration);
     if (duration < 0.1) return;
+    const bulkTextScale = project.output.width / PREVIEW_FRAME_WIDTH;
     dispatch(editorActions.addClip(createTextClip({
       name: text,
       text,
-      timelineStart: currentTime,
+      timelineStart,
       duration,
       style: {
         fontFamily: 'Outfit',
         fontWeight: '600',
-        fontSize: 40,
+        fontSize: DEFAULT_TEXT_SETTINGS.fontSize * bulkTextScale,
         color: '#ffffff',
         strokeColor: '#000000',
-        strokeWidth: 3,
+        strokeWidth: DEFAULT_TEXT_SETTINGS.strokeWidth * bulkTextScale,
         backgroundColor: 'transparent',
         backgroundType: 'None',
         textAlign: 'center',
+        lineHeight: 1.3,
       },
       transform: { x: 0.5, y: 0.25, scale: 1, rotation: 0, opacity: 1 },
     })));
-  }, [currentTime, project.output.maxDuration]);
+  }, [currentTime, project]);
 
   const updateSelectedClip = useCallback((changes) => {
     if (selectedClipId) dispatch(editorActions.updateClip(selectedClipId, changes));
@@ -1071,6 +1299,10 @@ export const VideoEditorV2 = () => {
         type: 'error',
         text: 'Finish or cancel the active export, upload, or audio extraction before leaving the editor.',
       });
+      return;
+    }
+    const destination = isBulkProject ? 'Bulk Video Builder' : 'Media Library';
+    if (!window.confirm(`Leave the video editor and go back to ${destination}? Your current changes will be saved.`)) {
       return;
     }
     if (isBulkProject && bulkRowId) {
@@ -1271,8 +1503,8 @@ export const VideoEditorV2 = () => {
     }
   }, [bulkQueueState.running, project, setPlaying]);
 
-  const saveResultToLibrary = useCallback(async () => {
-    if (!resultUrlRef.current) return;
+  const saveResultToLibrary = useCallback(async (folderId = 'root') => {
+    if (!resultUrlRef.current) return false;
     setSavingResult(true);
     try {
       const isAudioExport = exportState.format === 'audio';
@@ -1286,7 +1518,7 @@ export const VideoEditorV2 = () => {
       const mimeType = exportState.resultMimeType || (isAudioExport ? 'audio/mpeg' : 'video/mp4');
       const formData = new FormData();
       formData.append('file', new File([blob], fileName, { type: mimeType }));
-      formData.append('folderId', 'null');
+      formData.append('folderId', folderId && folderId !== 'root' ? String(folderId) : 'null');
       formData.append('tags', isAudioExport ? 'editor,timeline,audio' : 'editor,timeline');
       formData.append('campaignId', getActiveCampaignId());
       const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
@@ -1329,12 +1561,43 @@ export const VideoEditorV2 = () => {
         });
       }
       setExportState((current) => ({ ...current, open: false }));
+      return true;
     } catch (error) {
       setExportState((current) => ({ ...current, error: error.message || 'Save failed.' }));
+      return false;
     } finally {
       setSavingResult(false);
     }
   }, [bulkRowId, exportState.format, exportState.resultFileName, exportState.resultMimeType, isBulkProject, project, token]);
+
+  const loadExportFolders = useCallback(async () => {
+    setExportState((current) => ({
+      ...current,
+      foldersLoading: true,
+      folderError: '',
+      error: '',
+    }));
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('Unable to load Media Library folders.');
+      const payload = await response.json();
+      const folders = Array.isArray(payload) ? payload : (payload.folders || []);
+      setExportState((current) => ({
+        ...current,
+        folders,
+        foldersLoading: false,
+      }));
+    } catch (error) {
+      setExportState((current) => ({
+        ...current,
+        folders: [],
+        foldersLoading: false,
+        folderError: error.message || 'Unable to load Media Library folders.',
+      }));
+    }
+  }, [token]);
 
   const loadBulkExportFolders = useCallback(async () => {
     setBulkExportDialog((current) => ({
@@ -1364,25 +1627,16 @@ export const VideoEditorV2 = () => {
     }
   }, [token]);
 
-  const openBulkExportAllDialog = useCallback(async () => {
-    const rowIds = bulkQueueRows
-      .filter((row) => (
-        row.editorProject
-        && row.status !== 'done'
-        && calculateProjectDuration(row.editorProject) > 0
-      ))
-      .map((row) => String(row.id));
-    if (rowIds.length === 0) {
-      setStatus({ type: 'error', text: 'There are no pending bulk videos ready to export.' });
+  const openBulkExportDialog = useCallback(async (requestedRowIds = null) => {
+    if (!isBulkProject || bulkExportQueue.isRunning) return;
+    if (exportState.exporting || savingResult || extractingAudioClipId) {
+      setStatus({
+        type: 'error',
+        text: 'Finish the current export, upload, or audio extraction before starting Bulk Queue.',
+      });
       return;
     }
-    bulkExportQueue.reset();
-    setBulkExportDialog(createEmptyBulkExportDialog({
-      open: true,
-      rowIds,
-      phase: 'rendering',
-    }));
-    void loadBulkExportFolders();
+
     try {
       const currentSnapshot = serializeProject(projectRef.current);
       if (currentSnapshot !== bulkSyncedProjectRef.current) {
@@ -1392,6 +1646,38 @@ export const VideoEditorV2 = () => {
         bulkSyncedProjectRef.current = savedSnapshot;
         savedProjectRef.current = savedSnapshot;
       }
+
+      const requestedKeys = Array.isArray(requestedRowIds)
+        ? new Set(requestedRowIds.map(String).filter(Boolean))
+        : null;
+      const rowIds = bulkQueueRows
+        .filter((row) => {
+          const rowId = String(row.id);
+          if (requestedKeys ? !requestedKeys.has(rowId) : row.status === 'done') return false;
+          const rowProject = rowId === String(bulkRowId)
+            ? projectRef.current
+            : row.editorProject;
+          return rowProject && calculateProjectDuration(rowProject) > 0;
+        })
+        .map((row) => String(row.id));
+
+      if (rowIds.length === 0) {
+        setStatus({
+          type: 'error',
+          text: requestedKeys
+            ? 'The chosen videos are not ready to export.'
+            : 'There are no pending bulk videos ready to export.',
+        });
+        return;
+      }
+
+      bulkExportQueue.reset();
+      setBulkExportDialog(createEmptyBulkExportDialog({
+        open: true,
+        rowIds,
+        phase: 'rendering',
+      }));
+      void loadBulkExportFolders();
       setPlaying(false);
       const summary = await bulkExportQueue.render(rowIds);
       setBulkExportDialog((current) => ({
@@ -1402,57 +1688,14 @@ export const VideoEditorV2 = () => {
       setBulkExportDialog((current) => ({ ...current, phase: 'complete' }));
       setStatus({ type: 'error', text: error.message || 'The bulk videos could not be rendered.' });
     }
-  }, [bulkExportQueue, bulkQueueRows, bulkRowId, loadBulkExportFolders, setPlaying]);
-
-  const runBulkQueue = useCallback(async (requestedRowIds, runOptions = {}) => {
-    if (!isBulkProject || bulkExportQueue.isRunning) return;
-    if (exportState.exporting || savingResult || extractingAudioClipId) {
-      setStatus({
-        type: 'error',
-        text: 'Finish the current export, upload, or audio extraction before starting Bulk Queue.',
-      });
-      return;
-    }
-    const requestedIds = [...new Set((requestedRowIds || []).map(String).filter(Boolean))];
-    if (requestedIds.length === 0) {
-      setStatus({ type: 'error', text: 'Select at least one ready bulk project to export.' });
-      return;
-    }
-
-    try {
-      const currentSnapshot = serializeProject(projectRef.current);
-      if (currentSnapshot !== bulkSyncedProjectRef.current) {
-        const savedSnapshot = persistProjectToBulkRow(projectRef.current, bulkRowId, {
-          clearResult: true,
-        });
-        bulkSyncedProjectRef.current = savedSnapshot;
-        savedProjectRef.current = savedSnapshot;
-      }
-    } catch (error) {
-      setStatus({ type: 'error', text: error.message || 'The current row could not be saved.' });
-      return;
-    }
-
-    setPlaying(false);
-    try {
-      const summary = await bulkExportQueue.run(requestedIds, runOptions);
-      const completed = summary.succeeded.length;
-      const failed = summary.failed.length;
-      const cancelled = summary.cancelled.length;
-      setStatus(cancelled > 0
-        ? { type: 'error', text: 'Bulk export stopped. Completed rows were kept.' }
-        : failed > 0
-          ? { type: 'error', text: `${completed} row${completed === 1 ? '' : 's'} exported; ${failed} failed. Open Bulk Queue to retry.` }
-          : null);
-    } catch (error) {
-      setStatus({ type: 'error', text: error.message || 'The bulk export queue could not start.' });
-    }
   }, [
     bulkExportQueue,
+    bulkQueueRows,
     bulkRowId,
     exportState.exporting,
     extractingAudioClipId,
     isBulkProject,
+    loadBulkExportFolders,
     savingResult,
     setPlaying,
   ]);
@@ -1563,12 +1806,19 @@ export const VideoEditorV2 = () => {
         <MediaPanel
           key={isBulkProject ? 'bulk-editor-media' : 'single-editor-media'}
           assets={assets}
+          audioPoolLoading={audioPoolLoading}
+          audioPoolError={audioPoolError}
+          promoAssets={promoAssets}
+          promoFolderName={promoFolderName}
+          promoLoading={promoLoading}
+          promoError={promoError}
           onFilesSelected={handleFilesSelected}
           onOpenLibrary={(mode) => {
             setLibraryMode(mode);
             setLibraryOpen(true);
           }}
           onAddAsset={addAssetToTimeline}
+          onAddPromoAsset={addPromoAssetToTimeline}
           onAddText={addText}
           bulkQueue={isBulkProject ? {
             initiallyOpen: searchParams.get('panel') === 'bulk',
@@ -1582,10 +1832,10 @@ export const VideoEditorV2 = () => {
               || Boolean(extractingAudioClipId),
             onSelectionChange: setSelectedBulkRowIds,
             onOpenRow: openBulkQueueRow,
-            onExportCurrent: () => runBulkQueue([bulkRowId]),
-            onExportSelected: () => runBulkQueue(selectedBulkRowIds),
-            onExportAll: openBulkExportAllDialog,
-            onRetryFailed: () => runBulkQueue(
+            onExportCurrent: () => openBulkExportDialog([bulkRowId]),
+            onExportSelected: () => openBulkExportDialog(selectedBulkRowIds),
+            onExportAll: () => openBulkExportDialog(),
+            onRetryFailed: () => openBulkExportDialog(
               bulkQueueRows.filter((row) => row.status === 'error').map((row) => row.id),
             ),
             onCancel: bulkExportQueue.cancel,
@@ -1597,6 +1847,12 @@ export const VideoEditorV2 = () => {
           onUpdateClip={updateSelectedClip}
           onSetPlaybackRate={setSelectedClipPlaybackRate}
           onExtractAudio={extractSelectedVideoAudio}
+          onGenerateText={() => {
+            if (!selectedClip || selectedClip.type !== 'text') return;
+            setTextAiSuggestions([]);
+            setTextAiVibe('');
+            setTextAiDrawerClipId(selectedClip.id);
+          }}
           extractingAudio={Boolean(
             selectedClipId && extractingAudioClipId === selectedClipId
           )}
@@ -1708,8 +1964,38 @@ export const VideoEditorV2 = () => {
         onStartExport={handleExport}
         onClose={() => setExportState((current) => ({ ...current, open: false }))}
         onCancel={() => exportAbortRef.current?.abort(new Error('Export cancelled by user.'))}
+        onLoadFolders={loadExportFolders}
+        onFolderChange={(folderId) => setExportState((current) => ({
+          ...current,
+          folderId,
+          error: '',
+        }))}
+        selectedFolderId={exportState.folderId}
+        folders={exportState.folders}
+        foldersLoading={exportState.foldersLoading}
+        folderError={exportState.folderError}
         onSaveToLibrary={saveResultToLibrary}
       />
+
+      {textAiTargetClip?.type === 'text' && (
+        <CaptionDrawer
+          targetRowId={textAiTargetClip.id}
+          token={token}
+          currentCaption={textAiTargetClip.text || ''}
+          suggestions={textAiSuggestions}
+          onSuggestionsChange={setTextAiSuggestions}
+          vibe={textAiVibe}
+          onVibeChange={setTextAiVibe}
+          onApply={(text) => dispatch(editorActions.updateClip(textAiTargetClip.id, { text }))}
+          onClose={() => setTextAiDrawerClipId(null)}
+          title="Generate Text with AI"
+          manualLabel="Type your text"
+          manualPlaceholder="Enter text for this clip"
+          applyLabel="Apply Text"
+          mountToViewport
+          side="left"
+        />
+      )}
 
       <BulkExportDialog
         open={bulkExportDialog.open}

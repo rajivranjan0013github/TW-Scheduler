@@ -1,10 +1,15 @@
+import { useMemo, useState } from 'react';
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Download,
   Film,
+  Folder,
   Loader2,
   Music2,
   Save,
+  Search,
   X,
 } from 'lucide-react';
 
@@ -25,6 +30,10 @@ const FORMAT_OPTIONS = [
   },
 ];
 
+const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
+const getFolderId = (folder) => normalizeFolderId(folder?._id || folder?.id);
+const getFolderParentId = (folder) => normalizeFolderId(folder?.parentFolderId) || 'root';
+
 export const ExportDialog = ({
   open,
   exporting,
@@ -36,18 +45,122 @@ export const ExportDialog = ({
   resultFileName,
   resultMimeType,
   saving,
+  folders = [],
+  foldersLoading = false,
+  folderError = '',
+  selectedFolderId = 'root',
   onFormatChange,
   onStartExport,
   onClose,
   onCancel,
+  onLoadFolders,
+  onFolderChange,
   onSaveToLibrary,
 }) => {
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false);
+  const [folderSearch, setFolderSearch] = useState('');
+  const [expandedFolderIds, setExpandedFolderIds] = useState(() => new Set());
+  const searchedRootFolders = useMemo(() => {
+    const search = folderSearch.trim().toLowerCase();
+    return [...folders]
+      .filter((folder) => (
+        getFolderParentId(folder) === 'root'
+        && String(folder.name || '').toLowerCase().includes(search)
+      ))
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      }));
+  }, [folderSearch, folders]);
+
   if (!open) return null;
 
   const isAudio = format === 'audio';
   const outputLabel = isAudio ? 'audio' : 'video';
   const extension = isAudio ? 'MP3' : 'MP4';
   const downloadName = resultFileName || `timeline-${outputLabel}.${extension.toLowerCase()}`;
+
+  const toggleFolderExpanded = (folderId) => {
+    setExpandedFolderIds((current) => {
+      const next = new Set(current);
+      if (next.has(folderId)) next.delete(folderId);
+      else next.add(folderId);
+      return next;
+    });
+  };
+
+  const openFolderPicker = () => {
+    setFolderSearch('');
+    setExpandedFolderIds(new Set());
+    onFolderChange?.('root');
+    onLoadFolders?.();
+    setFolderPickerOpen(true);
+  };
+
+  const closeFolderPicker = () => {
+    if (saving) return;
+    setFolderPickerOpen(false);
+  };
+
+  const saveToSelectedFolder = async () => {
+    const saved = await onSaveToLibrary?.(selectedFolderId);
+    if (saved) setFolderPickerOpen(false);
+  };
+
+  const renderFolderTree = (parentId = 'root', depth = 0) => {
+    const levelFolders = folders
+      .filter((folder) => getFolderParentId(folder) === parentId)
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      }));
+
+    return levelFolders.map((folder) => {
+      const id = getFolderId(folder);
+      const hasSubfolders = folders.some((candidate) => getFolderParentId(candidate) === id);
+      const expanded = expandedFolderIds.has(id);
+      const selected = String(selectedFolderId) === id;
+      return (
+        <div key={id}>
+          <div
+            style={{ paddingLeft: `${depth * 16 + 8}px` }}
+            className={`flex items-center rounded-xl border py-1.5 pr-2 ${selected
+              ? 'border-[#ff5500]/50 bg-[#ff5500]/10'
+              : 'border-transparent bg-white/[0.035] hover:bg-white/[0.07]'}`}
+          >
+            {hasSubfolders ? (
+              <button
+                type="button"
+                onClick={() => toggleFolderExpanded(id)}
+                className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#777e89] hover:bg-white/10 hover:text-white"
+                aria-label={`${expanded ? 'Collapse' : 'Expand'} ${folder.name || 'folder'}`}
+                aria-expanded={expanded}
+              >
+                {expanded
+                  ? <ChevronDown className="h-3.5 w-3.5" />
+                  : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+            ) : (
+              <span className="mr-1 h-6 w-6 shrink-0" />
+            )}
+            <button
+              type="button"
+              onClick={() => onFolderChange?.(id)}
+              className={`flex min-w-0 flex-1 items-center gap-2 text-left text-[11px] font-bold ${selected
+                ? 'text-[#ff8a61]'
+                : 'text-[#b5bac3] hover:text-white'}`}
+            >
+              <Folder className="h-4 w-4 shrink-0" />
+              <span className="truncate">{folder.name || 'Untitled folder'}</span>
+            </button>
+          </div>
+          {hasSubfolders && expanded && (
+            <div className="mt-1 space-y-1">{renderFolderTree(id, depth + 1)}</div>
+          )}
+        </div>
+      );
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
@@ -191,7 +304,7 @@ export const ExportDialog = ({
                 </a>
                 <button
                   type="button"
-                  onClick={onSaveToLibrary}
+                  onClick={openFolderPicker}
                   disabled={saving}
                   className="mt-2 flex h-10 items-center justify-center gap-2 rounded-xl border border-[#ff7043]/35 bg-[#ff5a1f]/10 text-[11px] font-bold text-[#ff8a61] transition hover:border-[#ff7043]/55 hover:bg-[#ff5a1f]/15 hover:text-[#ffa07d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]/70 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -214,6 +327,115 @@ export const ExportDialog = ({
           )}
         </div>
       </div>
+
+      {folderPickerOpen && resultUrl && !exporting && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="single-export-folder-title"
+            className="flex h-[520px] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#15171c] text-white shadow-2xl"
+          >
+            <header className="flex items-start justify-between border-b border-white/10 px-5 py-4">
+              <div>
+                <h3 id="single-export-folder-title" className="text-sm font-extrabold !text-white">Choose Save Folder</h3>
+                <p className="mt-1 text-[10px] font-semibold !text-[#aeb4bd]">
+                  Select where the exported {outputLabel} should be saved.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeFolderPicker}
+                disabled={saving}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#858c97] hover:bg-white/10 hover:text-white disabled:opacity-40"
+                aria-label="Close folder picker"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+              {(folderError || error) && (
+                <p className="mb-3 rounded-xl border border-red-400/20 bg-red-400/10 p-3 text-[10px] font-bold text-red-300">
+                  {folderError || error}
+                </p>
+              )}
+              <label className="mb-3 flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-[#777e89] focus-within:border-[#ff5500]/50">
+                <Search className="h-3.5 w-3.5" />
+                <input
+                  type="search"
+                  value={folderSearch}
+                  onChange={(event) => setFolderSearch(event.target.value)}
+                  placeholder="Search folders"
+                  className="min-w-0 flex-1 bg-transparent text-[11px] font-semibold text-white outline-none placeholder:text-[#666d78]"
+                />
+              </label>
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => onFolderChange?.('root')}
+                  className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] font-bold ${selectedFolderId === 'root'
+                    ? 'border-[#ff5500]/60 bg-[#ff5500]/10 text-[#ff8a61]'
+                    : 'border-white/10 bg-white/[0.03] text-[#c8ccd3] hover:bg-white/[0.06]'}`}
+                >
+                  <Folder className="h-4 w-4" />
+                  Media Library root
+                </button>
+                {foldersLoading && (
+                  <div className="flex items-center gap-2 p-4 text-[10px] font-semibold text-[#8d949f]">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading folders…
+                  </div>
+                )}
+                {!foldersLoading && (folderSearch.trim() ? (
+                  searchedRootFolders.map((folder) => {
+                    const id = getFolderId(folder);
+                    const selected = String(selectedFolderId) === id;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => onFolderChange?.(id)}
+                        className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] font-bold ${selected
+                          ? 'border-[#ff5500]/50 bg-[#ff5500]/10 text-[#ff8a61]'
+                          : 'border-transparent bg-white/[0.035] text-[#b5bac3] hover:bg-white/[0.07] hover:text-white'}`}
+                      >
+                        <Folder className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{folder.name || 'Untitled folder'}</span>
+                      </button>
+                    );
+                  })
+                ) : renderFolderTree('root'))}
+                {!foldersLoading && folderSearch.trim() && searchedRootFolders.length === 0 && !folderError && (
+                  <p className="p-4 text-center text-[10px] font-semibold text-[#666d78]">No root folders found.</p>
+                )}
+                {!foldersLoading && !folderSearch.trim() && folders.filter((folder) => getFolderParentId(folder) === 'root').length === 0 && !folderError && (
+                  <p className="p-4 text-center text-[10px] font-semibold text-[#666d78]">No folders found.</p>
+                )}
+              </div>
+            </div>
+
+            <footer className="flex justify-end gap-2 border-t border-white/10 bg-black/15 px-5 py-4">
+              <button
+                type="button"
+                onClick={closeFolderPicker}
+                disabled={saving}
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-[11px] font-extrabold text-[#b7bcc5] hover:bg-white/[0.08] disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveToSelectedFolder}
+                disabled={foldersLoading || saving}
+                className="flex items-center gap-2 rounded-xl bg-[#0071e3] px-4 py-2 text-[11px] font-extrabold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {saving ? 'Saving…' : 'Save Here'}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Sparkles, Loader2, Plus, Bookmark, ArrowLeft, Search } from 'lucide-react';
 import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
 
@@ -16,6 +17,12 @@ export const CaptionDrawer = ({
   onVibeChange,
   onApply,
   onClose,
+  title = 'Assign Caption',
+  manualLabel = 'Type your caption',
+  manualPlaceholder = 'POV: You finally found an app made for couples.',
+  applyLabel = 'Apply Caption',
+  mountToViewport = false,
+  side = 'right',
 }) => {
   const [manualText, setManualText] = useState(currentCaption || '');
   const [activeTargetRowId, setActiveTargetRowId] = useState(targetRowId);
@@ -25,6 +32,7 @@ export const CaptionDrawer = ({
   const [savedCaptions, setSavedCaptions] = useState([]);
   const [savedCaptionSearch, setSavedCaptionSearch] = useState('');
   const [viewMode, setViewMode] = useState('main'); // 'main' | 'bookmarks'
+  const opensFromLeft = side === 'left';
 
   if (activeTargetRowId !== targetRowId) {
     setActiveTargetRowId(targetRowId);
@@ -172,10 +180,20 @@ export const CaptionDrawer = ({
     onApply(text);
   }, [onApply]);
 
-  return (
+  const drawer = (
     <>
+      {mountToViewport && (
+        <button
+          type="button"
+          className="fixed inset-0 z-[110] cursor-default bg-black/45 backdrop-blur-[1px]"
+          onClick={onClose}
+          aria-label="Close AI text drawer"
+        />
+      )}
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-[380px] max-w-[90vw] bg-[#18181b] border-l border-[#2d2d30] flex flex-col animate-slide-in-right text-[#e0e0e5] shadow-2xl">
+      <div className={`fixed bottom-0 top-0 flex w-[380px] max-w-[90vw] flex-col bg-[#18181b] text-[#e0e0e5] shadow-2xl ${opensFromLeft
+        ? 'left-0 animate-slide-in-left border-r border-[#2d2d30]'
+        : 'right-0 animate-slide-in-right border-l border-[#2d2d30]'} ${mountToViewport ? 'z-[120]' : 'z-50'}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#2d2d30] bg-[#121214]">
           {viewMode === 'bookmarks' ? (
@@ -193,7 +211,7 @@ export const CaptionDrawer = ({
           ) : (
             <div className="flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5 text-[#ff5500]" />
-              <h3 className="text-sm font-bold text-white" style={{ color: '#ffffff' }}>Assign Caption</h3>
+              <h3 className="text-sm font-bold text-white" style={{ color: '#ffffff' }}>{title}</h3>
             </div>
           )}
 
@@ -280,13 +298,13 @@ export const CaptionDrawer = ({
               {/* Manual Input */}
               <div className="p-5 border-b border-[#2d2d30] space-y-3">
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                  Type your caption
+                  {manualLabel}
                 </label>
                 <textarea
                   value={manualText}
                   onChange={(e) => setManualText(e.target.value)}
                   rows={3}
-                  placeholder="POV: You finally found an app made for couples."
+                  placeholder={manualPlaceholder}
                   className="w-full text-xs border border-[#2d2d30] rounded-xl p-3 bg-[#121214] focus:bg-[#1a1a1e] transition-all outline-none resize-none text-white focus:border-[#ff5500] focus:ring-2 focus:ring-[#ff5500]/20"
                 />
                 <div className="flex gap-2">
@@ -296,7 +314,7 @@ export const CaptionDrawer = ({
                     disabled={!manualText.trim()}
                     className="flex-1 rounded-xl bg-[#27272a] border border-[#3f3f46] px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-[#3f3f46] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Apply Caption
+                    {applyLabel}
                   </button>
                   <button
                     type="button"
@@ -430,10 +448,21 @@ export const CaptionDrawer = ({
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
         }
+        @keyframes slideInLeft {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
         .animate-slide-in-right {
           animation: slideInRight 0.25s ease-out;
+        }
+        .animate-slide-in-left {
+          animation: slideInLeft 0.25s ease-out;
         }
       `}</style>
     </>
   );
+
+  return mountToViewport && typeof document !== 'undefined'
+    ? createPortal(drawer, document.body)
+    : drawer;
 };

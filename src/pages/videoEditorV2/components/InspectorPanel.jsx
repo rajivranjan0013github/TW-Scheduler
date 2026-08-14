@@ -6,6 +6,7 @@ import {
   MoveVertical,
   RotateCcw,
   SlidersHorizontal,
+  Sparkles,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -36,9 +37,12 @@ const formatCompactNumber = (value) => {
   return numericValue.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 };
 
-const Section = ({ title, children }) => (
+const Section = ({ title, action = null, children }) => (
   <section className="border-b border-white/10 px-4 py-4 last:border-b-0">
-    <h3 className="mb-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8b929d]">{title}</h3>
+    <div className="mb-3 flex items-center justify-between gap-2">
+      <h3 className="text-[10px] font-extrabold uppercase tracking-[0.14em] !text-[#c5c9d0]">{title}</h3>
+      {action}
+    </div>
     {children}
   </section>
 );
@@ -56,9 +60,9 @@ const RangeControl = ({
   onInteractionEnd,
 }) => (
   <label className="block space-y-1.5">
-    <span className="flex items-center justify-between text-[10px] font-bold text-[#c5c9d0]">
+    <span className="flex items-center justify-between text-[10px] font-bold !text-[#e1e4e8]">
       {label}
-      <span className="rounded-md bg-white/5 px-1.5 py-0.5 tabular-nums text-[#a1a7b1]">
+      <span className="rounded-md bg-white/5 px-1.5 py-0.5 tabular-nums !text-[#c5c9d0]">
         {formatValue ? formatValue(value) : value}{suffix}
       </span>
     </span>
@@ -82,7 +86,7 @@ const RangeControl = ({
 
 const NumberControl = ({ label, value, min, max, step = 1, suffix = '', onChange }) => (
   <label className="block min-w-0 space-y-1">
-    <span className="text-[9px] font-bold uppercase tracking-wide text-[#727985]">{label}</span>
+    <span className="text-[9px] font-bold uppercase tracking-wide !text-[#aeb4bd]">{label}</span>
     <div className="flex h-9 items-center rounded-xl border border-white/10 bg-[#171a20] px-2.5 focus-within:border-[#ff5500]/60 focus-within:bg-[#1b1f27]">
       <input
         type="number"
@@ -91,9 +95,9 @@ const NumberControl = ({ label, value, min, max, step = 1, suffix = '', onChange
         max={max}
         step={step}
         onChange={(event) => onChange(clamp(Number(event.target.value), min, max))}
-        className="min-w-0 flex-1 bg-transparent text-[11px] font-bold text-[#e6e8ec] outline-none"
+        className="min-w-0 flex-1 bg-transparent text-[11px] font-bold !text-[#f5f7fa] outline-none [color-scheme:dark]"
       />
-      {suffix && <span className="text-[9px] font-bold text-[#727985]">{suffix}</span>}
+      {suffix && <span className="text-[9px] font-bold !text-[#aeb4bd]">{suffix}</span>}
     </div>
   </label>
 );
@@ -184,7 +188,7 @@ const VideoInspector = ({
             onInteractionEnd={endPlaybackRateInteraction}
           />
           {playbackRangeLimited && (
-            <p className="mt-2 text-[9px] font-medium leading-relaxed text-[#727985]">
+            <p className="mt-2 text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
               Range limited to keep the complete clip inside the project timeline.
             </p>
           )}
@@ -243,7 +247,7 @@ const VideoInspector = ({
           <RotateCcw className="h-3 w-3" />
           Reset crop
         </button>
-        <p className="mt-2 text-[9px] font-medium leading-relaxed text-[#727985]">
+        <p className="mt-2 text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
           Crop keeps an area from the original media. Fill can trim that area further to cover the canvas.
         </p>
       </Section>
@@ -274,7 +278,7 @@ const VideoInspector = ({
                     {extractingAudio ? 'Extracting MP3…' : 'Extract MP3'}
                   </span>
                 </button>
-                <p className="text-[9px] font-medium leading-relaxed text-[#727985]">
+                <p className="text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
                   Creates an editable MP3 clip and mutes the original audio.
                 </p>
               </div>
@@ -286,7 +290,7 @@ const VideoInspector = ({
   );
 };
 
-const TextInspector = ({ clip, onUpdate }) => {
+const TextInspector = ({ clip, onUpdate, onGenerateText }) => {
   const style = clip.style || {};
   const transform = clip.transform || {};
   const positionX = Number(transform.x ?? 0.5);
@@ -328,12 +332,25 @@ const TextInspector = ({ clip, onUpdate }) => {
 
   return (
     <>
-      <Section title="Text">
+      <Section
+        title="Text"
+        action={(
+          <button
+            type="button"
+            onClick={onGenerateText}
+            className="flex h-7 items-center gap-1.5 rounded-lg border border-[#ff5500]/35 bg-[#ff5500]/10 px-2.5 text-[9px] font-extrabold !text-[#ff8a4d] transition hover:border-[#ff5500]/60 hover:bg-[#ff5500]/20 hover:!text-[#ffa074] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70"
+            title="Generate text with AI"
+          >
+            <Sparkles className="h-3 w-3" />
+            Generate with AI
+          </button>
+        )}
+      >
         <textarea
           value={clip.text || ''}
           onChange={(event) => onUpdate({ text: event.target.value })}
           rows={4}
-          className="w-full resize-none rounded-xl border border-white/10 bg-[#171a20] p-3 text-xs font-semibold leading-relaxed text-[#e6e8ec] outline-none placeholder:text-[#666d78] focus:border-[#ff5500]/60 focus:bg-[#1b1f27]"
+          className="w-full resize-none rounded-xl border border-white/10 bg-[#171a20] p-3 text-xs font-semibold leading-relaxed !text-[#f5f7fa] outline-none placeholder:!text-[#8b929d] focus:border-[#ff5500]/60 focus:bg-[#1b1f27] [color-scheme:dark]"
           placeholder="Enter text"
         />
         <div className="mt-2 flex items-center gap-2">
@@ -365,8 +382,8 @@ const TextInspector = ({ clip, onUpdate }) => {
       </Section>
       <Section title="Typography">
         <label className="block space-y-1">
-          <span className="text-[9px] font-bold uppercase tracking-wide text-[#727985]">Font</span>
-          <select value={style.fontFamily || 'Outfit'} onChange={(event) => updateStyle({ fontFamily: event.target.value })} className="h-9 w-full rounded-xl border border-white/10 bg-[#171a20] px-2.5 text-[11px] font-bold text-[#e6e8ec] outline-none">
+          <span className="text-[9px] font-bold uppercase tracking-wide !text-[#aeb4bd]">Font</span>
+          <select value={style.fontFamily || 'Outfit'} onChange={(event) => updateStyle({ fontFamily: event.target.value })} className="h-9 w-full rounded-xl border border-white/10 bg-[#171a20] px-2.5 text-[11px] font-bold !text-[#f5f7fa] outline-none [color-scheme:dark]">
             <option value="Outfit">TikTok Sans</option>
             <option value="Roboto">Roboto</option>
             <option value="Anton">Impact</option>
@@ -376,8 +393,8 @@ const TextInspector = ({ clip, onUpdate }) => {
         <div className="mt-2 grid grid-cols-2 gap-2">
           <NumberControl label="Size" value={fontSize} min={12} max={240} suffix="px" onChange={(nextFontSize) => updateStyle({ fontSize: nextFontSize })} />
           <label className="block space-y-1">
-            <span className="text-[9px] font-bold uppercase tracking-wide text-[#727985]">Weight</span>
-            <select value={fontWeightValue} onChange={(event) => updateStyle({ fontWeight: event.target.value })} className="h-9 w-full rounded-xl border border-white/10 bg-[#171a20] px-2.5 text-[11px] font-bold text-[#e6e8ec] outline-none">
+            <span className="text-[9px] font-bold uppercase tracking-wide !text-[#aeb4bd]">Weight</span>
+            <select value={fontWeightValue} onChange={(event) => updateStyle({ fontWeight: event.target.value })} className="h-9 w-full rounded-xl border border-white/10 bg-[#171a20] px-2.5 text-[11px] font-bold !text-[#f5f7fa] outline-none [color-scheme:dark]">
               <option value="400">Regular</option><option value="500">Medium</option><option value="600">SemiBold</option><option value="700">Bold</option><option value="900">Black</option>
             </select>
           </label>
@@ -389,7 +406,7 @@ const TextInspector = ({ clip, onUpdate }) => {
             ['Background', style.backgroundColor === 'transparent' ? '#000000' : (style.backgroundColor || '#000000'), 'backgroundColor'],
           ].map(([label, value, key]) => (
             <label key={key} className="space-y-1 text-center">
-              <span className="block text-[8px] font-bold uppercase text-[#727985]">{label}</span>
+              <span className="block text-[8px] font-bold uppercase !text-[#aeb4bd]">{label}</span>
               <input
                 type="color"
                 value={value}
@@ -419,7 +436,7 @@ const TextInspector = ({ clip, onUpdate }) => {
           />
           <div className="mt-3 grid grid-cols-[minmax(0,1fr)_88px] items-end gap-2">
             <div className="min-w-0 space-y-1">
-              <span className="block text-[9px] font-bold uppercase tracking-wide text-[#727985]">Quick widths</span>
+              <span className="block text-[9px] font-bold uppercase tracking-wide !text-[#aeb4bd]">Quick widths</span>
               <div className="grid grid-cols-4 gap-1">
                 {TEXT_STROKE_PRESETS.map((preset) => {
                   const active = Math.abs(strokeWidth - preset.value) < 0.001;
@@ -435,7 +452,7 @@ const TextInspector = ({ clip, onUpdate }) => {
                         : 'border-white/10 bg-[#171a20] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
                     >
                       {preset.label}
-                      {preset.value > 0 && <span className="font-medium text-[#727985]"> px</span>}
+                      {preset.value > 0 && <span className="font-medium !text-[#9da4ae]"> px</span>}
                     </button>
                   );
                 })}
@@ -451,7 +468,7 @@ const TextInspector = ({ clip, onUpdate }) => {
               onChange={updateStrokeWidth}
             />
           </div>
-          <p className="mt-2 text-[9px] font-medium leading-relaxed text-[#727985]">
+          <p className="mt-2 text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
             Width uses output pixels; the editor preview scales it to the canvas.
           </p>
         </div>
@@ -494,6 +511,7 @@ export const InspectorPanel = ({
   onUpdateClip,
   onSetPlaybackRate,
   onExtractAudio,
+  onGenerateText,
   extractingAudio = false,
   extractAudioDisabled = false,
 }) => {
@@ -520,11 +538,11 @@ export const InspectorPanel = ({
   }
 
   return (
-    <aside className="min-h-0 overflow-y-auto border-l border-white/10 bg-[#111318]">
+    <aside className="min-h-0 overflow-y-auto border-l border-white/10 bg-[#111318] text-[#e6e8ec] [color-scheme:dark]">
       <div className="sticky top-0 z-10 flex h-12 items-center justify-between border-b border-white/10 bg-[#111318] px-4">
         <div className="min-w-0">
-          <p className="text-[9px] font-bold uppercase tracking-wider text-[#727985]">{selectedClip.type} properties</p>
-          <h2 className="truncate text-xs font-bold text-[#f5f7fa]">{selectedClip.name || selectedClip.text || 'Selected clip'}</h2>
+          <p className="text-[9px] font-bold uppercase tracking-wider !text-[#aeb4bd]">{selectedClip.type} properties</p>
+          <h2 className="truncate text-xs font-bold !text-[#f5f7fa]">{selectedClip.name || selectedClip.text || 'Selected clip'}</h2>
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -550,7 +568,13 @@ export const InspectorPanel = ({
           extractAudioDisabled={extractAudioDisabled}
         />
       )}
-      {selectedClip.type === 'text' && <TextInspector clip={selectedClip} onUpdate={onUpdateClip} />}
+      {selectedClip.type === 'text' && (
+        <TextInspector
+          clip={selectedClip}
+          onUpdate={onUpdateClip}
+          onGenerateText={onGenerateText}
+        />
+      )}
       {selectedClip.type === 'audio' && <AudioInspector clip={selectedClip} onUpdate={onUpdateClip} />}
     </aside>
   );
