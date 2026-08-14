@@ -3,9 +3,7 @@ import { formatTimelineTime } from './timelineUtils';
 
 const getTickIntervals = (pixelsPerSecond) => {
   if (pixelsPerSecond >= 100) return { minor: 0.5, major: 1 };
-  if (pixelsPerSecond >= 52) return { minor: 1, major: 5 };
-  if (pixelsPerSecond >= 28) return { minor: 2.5, major: 5 };
-  return { minor: 5, major: 10 };
+  return { minor: 1, major: 1 };
 };
 
 export const TimelineRuler = ({
@@ -51,13 +49,19 @@ export const TimelineRuler = ({
       {ticks.map(({ time, isMajor }) => (
         <div
           key={time}
-          className="absolute bottom-0"
+          className="absolute inset-y-0"
           style={{ left: time * pixelsPerSecond }}
           aria-hidden="true"
         >
           {isMajor && (
-            <span className="absolute left-1 top-1 whitespace-nowrap text-[9px] font-semibold tabular-nums text-zinc-400">
-              {formatTimelineTime(time)}
+            <span className={`absolute bottom-3.5 whitespace-nowrap text-[9px] font-semibold tabular-nums text-zinc-400 ${
+              time === 0
+                ? 'left-0'
+                : time >= duration
+                  ? 'right-0'
+                  : 'left-1/2 -translate-x-1/2'
+            }`}>
+              {Math.round(time)}s
             </span>
           )}
           <span

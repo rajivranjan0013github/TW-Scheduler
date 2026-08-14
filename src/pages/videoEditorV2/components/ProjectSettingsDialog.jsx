@@ -122,7 +122,7 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
               <SlidersHorizontal className="h-4.5 w-4.5" />
             </span>
             <div className="min-w-0">
-              <h2 id={titleId} className="text-sm font-bold text-[#f5f7fa]">Project settings</h2>
+              <h2 id={titleId} className="text-sm font-bold !text-[#f5f7fa]">Project settings</h2>
               <p id={descriptionId} className="mt-0.5 text-[10px] font-semibold text-[#8b929d]">
                 Configure the canvas and playback settings used by preview and export.
               </p>
@@ -144,7 +144,7 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
             <section aria-labelledby={`${titleId}-resolution`}>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <h3 id={`${titleId}-resolution`} className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#d7dbe2]">
+                  <h3 id={`${titleId}-resolution`} className="text-[10px] font-extrabold uppercase tracking-[0.14em] !text-[#d7dbe2]">
                     Canvas resolution
                   </h3>
                   <p className="mt-0.5 text-[9px] font-medium text-[#727985]">Choose a vertical preset or enter a custom size.</p>
@@ -236,7 +236,7 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
 
             <div className="grid gap-5 sm:grid-cols-2">
               <section aria-labelledby={`${titleId}-fps`}>
-                <h3 id={`${titleId}-fps`} className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#d7dbe2]">
+                <h3 id={`${titleId}-fps`} className="text-[10px] font-extrabold uppercase tracking-[0.14em] !text-[#d7dbe2]">
                   Frame rate
                 </h3>
                 <p className="mt-0.5 text-[9px] font-medium text-[#727985]">Higher FPS creates smoother motion and larger exports.</p>
@@ -260,7 +260,7 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
               </section>
 
               <section aria-labelledby={`${titleId}-background`}>
-                <h3 id={`${titleId}-background`} className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#d7dbe2]">
+                <h3 id={`${titleId}-background`} className="text-[10px] font-extrabold uppercase tracking-[0.14em] !text-[#d7dbe2]">
                   Canvas background
                 </h3>
                 <p className="mt-0.5 text-[9px] font-medium text-[#727985]">Visible wherever a video or image does not cover the canvas.</p>
@@ -285,7 +285,7 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
             <section aria-labelledby={`${titleId}-duration`}>
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <h3 id={`${titleId}-duration`} className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#d7dbe2]">
+                  <h3 id={`${titleId}-duration`} className="text-[10px] font-extrabold uppercase tracking-[0.14em] !text-[#d7dbe2]">
                     Maximum duration
                   </h3>
                   <p className="mt-0.5 text-[9px] font-medium text-[#727985]">Set the editable timeline length from 1 to 30 seconds.</p>
