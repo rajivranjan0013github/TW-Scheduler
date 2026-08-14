@@ -257,16 +257,16 @@ export const BulkExportDialog = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] bg-[#0b0d11]">
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="bulk-export-title"
-        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#111318] text-white shadow-2xl"
+        className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#111318] text-white"
       >
         <header className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
           <div className="min-w-0">
-            <h2 id="bulk-export-title" className="text-sm font-extrabold !text-white">Export all videos</h2>
+            <h2 id="bulk-export-title" className="text-sm font-extrabold !text-white">Export videos</h2>
             <p className="mt-1 text-[11px] font-medium !text-[#aeb4bd]">
               Render {rows.length} {rows.length === 1 ? 'video' : 'videos'} and save them to Media Library.
             </p>
@@ -331,7 +331,7 @@ export const BulkExportDialog = ({
             </div>
           )}
 
-          <div className={`${choosingDestination ? '' : 'mt-4'} grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6`}>
+          <div className={`${choosingDestination ? '' : 'mt-4'} grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10`}>
             {rows.map((row, index) => (
               <RenderedVideoCard
                 key={row.id || index}
