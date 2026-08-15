@@ -63,6 +63,7 @@ export const Timeline = ({
   selectedClipId = null,
   zoom,
   defaultZoom = 1,
+  magneticSnapping,
   defaultMagneticSnapping = true,
   rippleDeleteEnabled = false,
   minZoom = MIN_ZOOM,
@@ -76,6 +77,7 @@ export const Timeline = ({
   className = '',
   onSeek,
   onZoomChange,
+  onMagneticSnappingChange,
   onSelectClip,
   onMoveClip,
   onTrimClip,
@@ -90,7 +92,9 @@ export const Timeline = ({
     minZoom,
     maxZoom,
   ));
-  const [magneticSnapping, setMagneticSnapping] = useState(defaultMagneticSnapping !== false);
+  const [internalMagneticSnapping, setInternalMagneticSnapping] = useState(
+    defaultMagneticSnapping !== false,
+  );
   const [activeSnapTime, setActiveSnapTime] = useState(null);
   const rulerRef = useRef(null);
   const scrubPointerIdRef = useRef(null);
@@ -116,6 +120,9 @@ export const Timeline = ({
     .sort((left, right) => left.priority - right.priority || left.index - right.index)
     .map(({ track }) => track);
   const effectiveZoom = clamp(Number.isFinite(zoom) ? zoom : internalZoom, minZoom, maxZoom);
+  const effectiveMagneticSnapping = typeof magneticSnapping === 'boolean'
+    ? magneticSnapping
+    : internalMagneticSnapping;
   const pixelsPerSecond = DEFAULT_PIXELS_PER_SECOND * effectiveZoom;
   const contentWidth = effectiveDuration * pixelsPerSecond;
   const magneticSnapTargets = [
@@ -234,8 +241,9 @@ export const Timeline = ({
   };
 
   const toggleMagneticSnapping = () => {
-    const nextEnabled = !magneticSnapping;
-    setMagneticSnapping(nextEnabled);
+    const nextEnabled = !effectiveMagneticSnapping;
+    if (typeof magneticSnapping !== 'boolean') setInternalMagneticSnapping(nextEnabled);
+    onMagneticSnappingChange?.(nextEnabled);
     if (!nextEnabled) setActiveSnapTime(null);
   };
 
@@ -274,8 +282,8 @@ export const Timeline = ({
             Ripple
           </ToolButton>
           <ToolButton
-            label={magneticSnapping ? 'Disable magnetic snapping' : 'Enable magnetic snapping'}
-            pressed={magneticSnapping}
+            label={effectiveMagneticSnapping ? 'Disable magnetic snapping' : 'Enable magnetic snapping'}
+            pressed={effectiveMagneticSnapping}
             onClick={toggleMagneticSnapping}
           >
             <Magnet className="h-3.5 w-3.5" />
@@ -350,7 +358,7 @@ export const Timeline = ({
               selectedClipId={selectedClipId}
               minClipDuration={minClipDuration}
               snapInterval={snapInterval}
-              magneticSnapEnabled={magneticSnapping}
+              magneticSnapEnabled={effectiveMagneticSnapping}
               magneticSnapTargets={magneticSnapTargets}
               magneticSnapThresholdPx={magneticSnapThresholdPx}
               onLanePointerDown={handleLaneSeek}

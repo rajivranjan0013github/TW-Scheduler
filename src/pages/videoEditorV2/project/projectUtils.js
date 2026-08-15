@@ -291,9 +291,25 @@ export const retimeClipPlaybackRate = (
     MIN_CLIP_DURATION,
     Number(project?.output?.maxDuration) || PROJECT_HARD_MAX_DURATION,
   );
-  const availableTimelineDuration = Math.max(
+  const currentClipEnd = getClipEnd(clip);
+  const shouldRippleFollowingClips = options.rippleFollowingClips === true;
+  const followingClips = shouldRippleFollowingClips
+    ? location.track.clips.filter((candidate) => (
+        candidate.id !== clipId
+        && Number(candidate.timelineStart || 0) >= currentClipEnd - 0.000001
+      ))
+    : [];
+  const latestFollowingEnd = followingClips.reduce(
+    (latestEnd, candidate) => Math.max(latestEnd, getClipEnd(candidate)),
+    currentClipEnd,
+  );
+  const rippleLimitedDuration = currentDuration + Math.max(
     0,
-    projectDuration - Number(clip.timelineStart || 0),
+    projectDuration - latestFollowingEnd,
+  );
+  const availableTimelineDuration = Math.min(
+    shouldRippleFollowingClips ? rippleLimitedDuration : Number.POSITIVE_INFINITY,
+    Math.max(0, projectDuration - Number(clip.timelineStart || 0)),
   );
   const minimumDuration = Math.min(MIN_CLIP_DURATION, currentDuration);
 
@@ -325,7 +341,32 @@ export const retimeClipPlaybackRate = (
     return project;
   }
 
-  return updateClipById(project, clipId, { playbackRate, duration });
+  const retimedProject = updateClipById(project, clipId, { playbackRate, duration });
+  const durationDelta = roundTimelineTime(duration - currentDuration);
+  if (!shouldRippleFollowingClips || followingClips.length === 0 || Math.abs(durationDelta) < 0.000001) {
+    return retimedProject;
+  }
+
+  const followingClipIds = new Set(followingClips.map((candidate) => candidate.id));
+  return {
+    ...retimedProject,
+    tracks: retimedProject.tracks.map((track) => {
+      if (track.id !== location.track.id) return track;
+      return {
+        ...track,
+        clips: track.clips.map((candidate) => (
+          followingClipIds.has(candidate.id)
+            ? createClip(track.type, {
+                ...candidate,
+                timelineStart: roundTimelineTime(
+                  Math.max(0, Number(candidate.timelineStart || 0) + durationDelta),
+                ),
+              })
+            : candidate
+        )),
+      };
+    }),
+  };
 };
 
 export const removeClipById = (project, clipId) => {

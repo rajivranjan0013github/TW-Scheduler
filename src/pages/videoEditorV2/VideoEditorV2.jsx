@@ -289,6 +289,7 @@ export const VideoEditorV2 = () => {
   const [textAiSuggestions, setTextAiSuggestions] = useState([]);
   const [textAiVibe, setTextAiVibe] = useState('');
   const [rippleDeleteEnabled, setRippleDeleteEnabled] = useState(true);
+  const [magneticSnappingEnabled, setMagneticSnappingEnabled] = useState(true);
   const [extractingAudioClipId, setExtractingAudioClipId] = useState(null);
   const [status, setStatus] = useState(() => (
     initialContext.warning
@@ -1137,9 +1138,12 @@ export const VideoEditorV2 = () => {
 
   const setSelectedClipPlaybackRate = useCallback((playbackRate, options) => {
     if (selectedClipId) {
-      dispatch(editorActions.setClipPlaybackRate(selectedClipId, playbackRate, options));
+      dispatch(editorActions.setClipPlaybackRate(selectedClipId, playbackRate, {
+        ...options,
+        rippleFollowingClips: magneticSnappingEnabled,
+      }));
     }
-  }, [selectedClipId]);
+  }, [magneticSnappingEnabled, selectedClipId]);
 
   const extractSelectedVideoAudio = useCallback(async (clipId) => {
     if (extractingAudioClipId) return;
@@ -1921,6 +1925,7 @@ export const VideoEditorV2 = () => {
             currentTime={currentTime}
             selectedClipId={selectedClipId}
             rippleDeleteEnabled={rippleDeleteEnabled}
+            magneticSnapping={magneticSnappingEnabled}
             className="h-full"
             onSeek={seek}
             onSelectClip={({ clipId }) => dispatch(editorActions.selectClip(clipId))}
@@ -1930,6 +1935,7 @@ export const VideoEditorV2 = () => {
             onDeleteClip={({ clipId }) => dispatch(editorActions.deleteClip(clipId))}
             onRippleDeleteClip={({ clipId }) => dispatch(editorActions.rippleDeleteClip(clipId))}
             onRippleDeleteEnabledChange={setRippleDeleteEnabled}
+            onMagneticSnappingChange={setMagneticSnappingEnabled}
             onUpdateTrack={({ trackId, changes }) => dispatch(editorActions.updateTrack(trackId, changes))}
           />
         </div>

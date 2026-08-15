@@ -253,7 +253,10 @@ export function editorReducer(state, action) {
         state.project,
         payload.clipId,
         payload.playbackRate,
-        { sourceSpan: payload.sourceSpan },
+        {
+          sourceSpan: payload.sourceSpan,
+          rippleFollowingClips: payload.rippleFollowingClips,
+        },
       );
       return commitProject(state, nextProject, {
         currentTime: Math.min(state.currentTime, calculateProjectDuration(nextProject)),

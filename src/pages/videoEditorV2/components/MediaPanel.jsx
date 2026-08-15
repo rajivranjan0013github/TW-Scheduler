@@ -363,7 +363,7 @@ export const MediaPanel = ({
             )}
 
             {!promoLoading && !promoError && filteredAssets.length > 0 && (
-              <div className="mt-3 grid grid-cols-4 gap-2">
+              <div className="mt-3 grid grid-cols-5 gap-2">
                 {filteredAssets.map((asset) => (
                   <AssetCard key={asset.id} asset={asset} onAdd={onAddPromoAsset} />
                 ))}
