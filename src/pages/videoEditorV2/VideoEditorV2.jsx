@@ -288,7 +288,7 @@ export const VideoEditorV2 = () => {
   const [textAiDrawerClipId, setTextAiDrawerClipId] = useState(null);
   const [textAiSuggestions, setTextAiSuggestions] = useState([]);
   const [textAiVibe, setTextAiVibe] = useState('');
-  const [rippleDeleteEnabled, setRippleDeleteEnabled] = useState(false);
+  const [rippleDeleteEnabled, setRippleDeleteEnabled] = useState(true);
   const [extractingAudioClipId, setExtractingAudioClipId] = useState(null);
   const [status, setStatus] = useState(() => (
     initialContext.warning
@@ -1067,6 +1067,23 @@ export const VideoEditorV2 = () => {
     });
   }, [libraryMode]);
 
+  const removeAssetFromMediaPool = useCallback((asset) => {
+    const isUsedOnTimeline = projectRef.current.tracks.some((track) => (
+      track.clips.some((clip) => (
+        clip.mediaId === asset.id
+        || (asset.mediaId && clip.mediaId === asset.mediaId)
+        || clip.sourceUrl === asset.url
+      ))
+    ));
+
+    setAssets((current) => current.filter((candidate) => candidate.id !== asset.id));
+    if (!isUsedOnTimeline) revokeAssetUrl(asset);
+    setStatus({
+      type: 'success',
+      text: `${asset.name || 'Video'} removed from the media pool.`,
+    });
+  }, []);
+
   const addPromoAssetToTimeline = useCallback(async (asset) => {
     try {
       const hydratedAsset = Number(asset.duration || 0) > 0
@@ -1818,6 +1835,7 @@ export const VideoEditorV2 = () => {
             setLibraryOpen(true);
           }}
           onAddAsset={addAssetToTimeline}
+          onRemoveAsset={removeAssetFromMediaPool}
           onAddPromoAsset={addPromoAssetToTimeline}
           onAddText={addText}
           bulkQueue={isBulkProject ? {

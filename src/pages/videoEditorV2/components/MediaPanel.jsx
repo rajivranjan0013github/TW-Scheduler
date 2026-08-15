@@ -2,13 +2,13 @@ import { useMemo, useRef, useState } from 'react';
 import {
   Film,
   FolderOpen,
-  Image as ImageIcon,
   ListVideo,
   Loader2,
   Megaphone,
   Music2,
   Plus,
   Search,
+  Trash2,
   Type,
   UploadCloud,
 } from 'lucide-react';
@@ -27,7 +27,7 @@ const formatDuration = (seconds = 0) => {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 };
 
-const AssetCard = ({ asset, onAdd }) => {
+const AssetCard = ({ asset, onAdd, onRemove }) => {
   const isVideo = asset.type === 'video';
   const isAudio = asset.type === 'audio';
   const [detectedDuration, setDetectedDuration] = useState(() => Number(asset.duration || 0));
@@ -98,9 +98,6 @@ const AssetCard = ({ asset, onAdd }) => {
             )}
           </span>
         </span>
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[#8b929d] transition group-hover:border-emerald-400/30 group-hover:bg-emerald-400/10 group-hover:text-emerald-300">
-          <Plus className="h-3.5 w-3.5" />
-        </span>
         {asset.url && (
           <audio
             ref={audioPreviewRef}
@@ -123,59 +120,70 @@ const AssetCard = ({ asset, onAdd }) => {
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => onAdd(asset)}
+    <div
       onMouseEnter={isVideo ? startVideoPreview : undefined}
       onMouseLeave={isVideo ? stopVideoPreview : undefined}
-      className="group relative overflow-hidden rounded-xl border border-white/10 bg-[#171a20] text-left transition hover:border-[#ff5500]/60 hover:bg-[#1b1f27] hover:shadow-lg hover:shadow-black/20"
-      title={isVideo
-        ? `Preview ${asset.name}; click to add it to the timeline`
-        : `Add ${asset.name} to timeline`}
+      className="group relative overflow-hidden rounded-xl border border-white/10 bg-[#171a20] transition hover:border-[#ff5500]/60 hover:bg-[#1b1f27] hover:shadow-lg hover:shadow-black/20"
     >
-      <div className="relative aspect-[9/16] overflow-hidden bg-gray-950">
-        {isVideo ? (
-          <video
-            ref={videoPreviewRef}
-            src={asset.url}
-            muted
-            playsInline
-            preload="metadata"
-            crossOrigin="anonymous"
-            poster={asset.thumbnailUrl || undefined}
-            className="h-full w-full object-cover opacity-90 transition group-hover:scale-[1.03] group-hover:opacity-100"
-            onLoadedMetadata={(event) => {
-              const duration = Number(event.currentTarget.duration);
-              if (Number.isFinite(duration) && duration > 0) setDetectedDuration(duration);
-            }}
-            onEnded={() => {
-              if (videoPreviewRef.current) videoPreviewRef.current.currentTime = 0;
-              setIsPreviewing(false);
-            }}
-          />
-        ) : (
-          <img src={asset.url} alt="" className="h-full w-full object-cover" />
-        )}
+      <button
+        type="button"
+        onClick={() => onAdd(asset)}
+        className="block w-full text-left"
+        title={isVideo
+          ? `Preview ${asset.name}; click to add it to the timeline`
+          : `Add ${asset.name} to timeline`}
+      >
+        <div className="relative aspect-[9/16] overflow-hidden bg-gray-950">
+          {isVideo ? (
+            <video
+              ref={videoPreviewRef}
+              src={asset.url}
+              muted
+              playsInline
+              preload="metadata"
+              crossOrigin="anonymous"
+              poster={asset.thumbnailUrl || undefined}
+              className="h-full w-full object-cover opacity-90 transition group-hover:scale-[1.03] group-hover:opacity-100"
+              onLoadedMetadata={(event) => {
+                const duration = Number(event.currentTarget.duration);
+                if (Number.isFinite(duration) && duration > 0) setDetectedDuration(duration);
+              }}
+              onEnded={() => {
+                if (videoPreviewRef.current) videoPreviewRef.current.currentTime = 0;
+                setIsPreviewing(false);
+              }}
+            />
+          ) : (
+            <img src={asset.url} alt="" className="h-full w-full object-cover" />
+          )}
 
-        {detectedDuration > 0 && (
-          <span className="absolute bottom-1.5 right-1.5 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[8px] font-bold text-white">
-            {formatDuration(detectedDuration)}
+          {detectedDuration > 0 && (
+            <span className="absolute bottom-1.5 right-1.5 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[8px] font-bold text-white">
+              {formatDuration(detectedDuration)}
+            </span>
+          )}
+          {isVideo && !isPreviewing && (
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition group-hover:opacity-100">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-[8px] font-bold text-white">▶</span>
+            </span>
+          )}
+          <span className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-lg bg-white/95 text-[#ff5500] opacity-0 shadow-sm transition group-hover:opacity-100">
+            <Plus className="h-3.5 w-3.5" />
           </span>
-        )}
-        {isVideo && !isPreviewing && (
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition group-hover:opacity-100">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-[8px] font-bold text-white">▶</span>
-          </span>
-        )}
-        <span className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-lg bg-white/95 text-[#ff5500] opacity-0 shadow-sm transition group-hover:opacity-100">
-          <Plus className="h-3.5 w-3.5" />
-        </span>
-      </div>
-      <div className="flex items-center gap-2 px-2 py-2">
-        {isVideo ? <Film className="h-3 w-3 text-[#ff5500]" /> : <ImageIcon className="h-3 w-3 text-blue-600" />}
-        <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-[#d7dbe2]">{asset.name}</span>
-      </div>
-    </button>
+        </div>
+      </button>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={() => onRemove(asset)}
+          className="absolute left-1.5 top-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-lg bg-black/75 text-white/80 opacity-0 shadow-sm transition hover:bg-red-500 hover:text-white focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-red-300 group-hover:opacity-100"
+          aria-label={`Remove ${asset.name} from media pool`}
+          title="Remove from media pool"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -190,6 +198,7 @@ export const MediaPanel = ({
   onFilesSelected,
   onOpenLibrary,
   onAddAsset,
+  onRemoveAsset,
   onAddPromoAsset = onAddAsset,
   onAddText,
   bulkQueue = null,
@@ -286,9 +295,14 @@ export const MediaPanel = ({
               </label>
             </div>
 
-            <div className={`mt-3 grid gap-2 ${activeTab === 'audio' ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-4'}`}>
+            <div className={`mt-3 grid gap-2 ${activeTab === 'audio' ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-5'}`}>
               {filteredAssets.map((asset) => (
-                <AssetCard key={asset.id} asset={asset} onAdd={onAddAsset} />
+                <AssetCard
+                  key={asset.id}
+                  asset={asset}
+                  onAdd={onAddAsset}
+                  onRemove={asset.type === 'video' ? onRemoveAsset : undefined}
+                />
               ))}
             </div>
 

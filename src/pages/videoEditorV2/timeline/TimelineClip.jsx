@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Film, GripVertical, Image, Music2, Type } from 'lucide-react';
+import { AudioWaveform } from './AudioWaveform';
 import {
   clamp,
   DEFAULT_MIN_CLIP_DURATION,
@@ -10,8 +11,6 @@ import {
   roundTime,
   snapTime,
 } from './timelineUtils';
-
-const AUDIO_BAR_HEIGHTS = [7, 12, 18, 10, 15, 21, 13, 8, 17, 23, 12, 19, 9, 15, 22, 11, 18, 7, 14, 20, 10, 16, 22, 12];
 
 const TYPE_STYLES = {
   video: {
@@ -261,11 +260,7 @@ export const TimelineClip = ({
       )}
 
       {clipType === 'audio' && (
-        <div className="absolute inset-0 flex items-center gap-px px-1 opacity-35" aria-hidden="true">
-          {AUDIO_BAR_HEIGHTS.map((height, index) => (
-            <span key={`${height}-${index}`} className="w-px flex-none rounded-full bg-white" style={{ height }} />
-          ))}
-        </div>
+        <AudioWaveform clip={{ ...clip, ...values }} selected={selected} />
       )}
 
       <div className="relative flex h-full min-w-0 items-center gap-1.5 px-2.5">
