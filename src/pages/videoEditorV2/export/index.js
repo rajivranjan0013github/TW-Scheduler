@@ -1,4 +1,9 @@
 export { exportProjectInBrowser } from './browserExporter.js';
+export {
+  canUseHardwareAcceleratedExport,
+  exportProjectWithBestAvailableEngine,
+  exportProjectWithHardwareAcceleration,
+} from './hardwareExporter.js';
 export { extractAudioToMp3InBrowser } from './audioExtractor.js';
 export { exportProjectAudioToMp3InBrowser } from './projectAudioExporter.js';
 export { buildFFmpegArguments } from './buildFFmpegArguments.js';

@@ -12,7 +12,6 @@ import {
   subscribeToBulkRows,
   writeBulkRowsSnapshot,
 } from '../../bulkBuilder/bulkProjectStore.js';
-import { exportProjectInBrowser } from '../export/browserExporter.js';
 import { loadBrowserFFmpeg } from '../export/loadFFmpeg.js';
 import {
   BULK_EXPORT_ITEM_STATUS,
@@ -22,6 +21,11 @@ import {
   isCanonicalBulkRowExportable,
   runSequentialBulkExport,
 } from '../bulkQueue/bulkExportQueue.js';
+
+const exportProjectWithPreferredEngine = async (options) => {
+  const { exportProjectWithBestAvailableEngine } = await import('../export/hardwareExporter.js');
+  return exportProjectWithBestAvailableEngine(options);
+};
 
 const QUEUE_SOURCE = 'editor-v2-bulk-queue';
 const EMPTY_ROWS_SNAPSHOT = '[]';
@@ -135,7 +139,7 @@ export const useBulkExportQueue = ({
   ffmpeg,
   ffmpegRef,
   loadFFmpeg = loadBrowserFFmpeg,
-  exportProject = exportProjectInBrowser,
+  exportProject = exportProjectWithPreferredEngine,
   uploadResult,
   mediaRegistry,
   resolveMedia,

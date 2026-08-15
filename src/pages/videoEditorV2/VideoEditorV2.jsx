@@ -1476,14 +1476,14 @@ export const VideoEditorV2 = () => {
     try {
       const {
         exportProjectAudioToMp3InBrowser,
-        exportProjectInBrowser,
+        exportProjectWithBestAvailableEngine,
         loadBrowserFFmpeg,
       } = await import('./export/index.js');
       const ffmpeg = ffmpegRef.current || await loadBrowserFFmpeg({ signal: controller.signal });
       ffmpegRef.current = ffmpeg;
       const exportProject = format === 'audio'
         ? exportProjectAudioToMp3InBrowser
-        : exportProjectInBrowser;
+        : exportProjectWithBestAvailableEngine;
       const result = await exportProject({
         project,
         ffmpeg,
@@ -1504,7 +1504,9 @@ export const VideoEditorV2 = () => {
         open: true,
         format,
         progress: 100,
-        message: 'Export complete.',
+        message: result.engine === 'webcodecs'
+          ? 'Hardware-accelerated export complete.'
+          : 'Export complete.',
         resultUrl,
         resultFileName: result.fileName,
         resultMimeType: result.mimeType || (format === 'audio' ? 'audio/mpeg' : 'video/mp4'),

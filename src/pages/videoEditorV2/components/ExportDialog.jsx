@@ -18,7 +18,7 @@ const FORMAT_OPTIONS = [
     id: 'video',
     label: 'Video',
     extension: 'MP4',
-    detail: 'H.264 video with AAC audio',
+    detail: 'Hardware acceleration when supported',
     icon: Film,
   },
   {
@@ -176,7 +176,7 @@ export const ExportDialog = ({
             <p className="mt-0.5 text-[10px] font-semibold text-zinc-400">
               {isAudio
                 ? 'MP3 · full timeline audio mix · browser rendering'
-                : 'H.264 MP4 · AAC audio · browser rendering'}
+                : 'H.264 MP4 · AAC audio · hardware accelerated when supported'}
             </p>
           </div>
           <button
