@@ -80,5 +80,4 @@ export const DEFAULT_TRACK_DEFINITIONS = Object.freeze([
   Object.freeze({ type: TRACK_TYPES.VIDEO, name: 'Video' }),
   Object.freeze({ type: TRACK_TYPES.TEXT, name: 'Text' }),
   Object.freeze({ type: TRACK_TYPES.AUDIO, name: 'Audio' }),
-  Object.freeze({ type: TRACK_TYPES.IMAGE, name: 'Images' }),
 ]);

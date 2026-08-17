@@ -285,7 +285,7 @@ export const AdminFolderDetails = () => {
                     className="bg-white border border-[#e5e5ea] rounded-xl overflow-hidden shadow-sm flex flex-col hover:border-gray-400 transition-all duration-150 group"
                   >
                     {/* Media Preview */}
-                    <div className="aspect-video bg-[#f5f5f7] relative overflow-hidden flex items-center justify-center border-b border-[#e5e5ea]">
+                    <div className="aspect-[9/16] bg-[#f5f5f7] relative overflow-hidden flex items-center justify-center border-b border-[#e5e5ea]">
                       {item.type === 'video' ? (
                         <video src={getAssetUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" controls preload="none" />
                       ) : item.type === 'audio' ? (
@@ -294,7 +294,7 @@ export const AdminFolderDetails = () => {
                           <audio src={getAssetUrl(item.url)} crossOrigin="anonymous" className="w-full max-w-[95%] scale-90" controls preload="metadata" />
                         </div>
                       ) : (
-                        <img src={getAssetUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                        <img src={getAssetUrl(item.url)} crossOrigin="anonymous" className="h-full w-full object-cover object-[center_40%]" alt="" />
                       )}
                       <span className="absolute top-2 left-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea]">
                         {item.type}

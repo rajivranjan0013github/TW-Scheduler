@@ -12,10 +12,8 @@ import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScop
 import { getMediaUrl } from '../../utils/mediaUrls';
 import {
   API_BASE_URL,
-  PLATFORM_AUDIO_FOLDER_ID,
   PREVIEW_FRAME_WIDTH,
 } from '../videoEditor/videoEditorConstants';
-import { VideoLibraryPickerDialog } from '../videoEditor/VideoLibraryPickerDialog';
 import { CaptionDrawer } from '../bulkBuilder/CaptionDrawer';
 import {
   DEFAULT_TEXT_SETTINGS,
@@ -40,7 +38,6 @@ import {
   useBulkExportQueue,
 } from './hooks/useBulkExportQueue';
 import {
-  createAssetFromFile,
   createGeneratedAudioAsset,
   createLibraryAsset,
   revokeAssetUrl,
@@ -276,13 +273,11 @@ export const VideoEditorV2 = () => {
     createInitialEditorState,
   );
   const [assets, setAssets] = useState(() => projectAssets(initialContext.project));
-  const [audioPoolLoading, setAudioPoolLoading] = useState(true);
-  const [audioPoolError, setAudioPoolError] = useState('');
   const [promoAssets, setPromoAssets] = useState([]);
   const [promoFolderName, setPromoFolderName] = useState('');
   const [promoLoading, setPromoLoading] = useState(true);
   const [promoError, setPromoError] = useState('');
-  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(() => !isBulkProject);
   const [libraryMode, setLibraryMode] = useState('video');
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   const [textAiDrawerClipId, setTextAiDrawerClipId] = useState(null);
@@ -671,7 +666,7 @@ export const VideoEditorV2 = () => {
     savedProjectRef.current = initialContext.projectPersisted
       ? serializeProject(initialContext.project)
       : '';
-    setLibraryOpen(false);
+    setLibraryOpen(!isBulkProject);
     setProjectSettingsOpen(false);
     setExtractingAudioClipId(null);
     setExportState(createEmptyExportState());
@@ -682,58 +677,7 @@ export const VideoEditorV2 = () => {
     setStatus(initialContext.warning
       ? { type: 'warning', text: initialContext.warning }
       : null);
-  }, [initialContext]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const loadPlatformAudio = async () => {
-      setAudioPoolLoading(true);
-      setAudioPoolError('');
-      try {
-        const params = new URLSearchParams();
-        const campaignId = getActiveCampaignId();
-        if (campaignId) params.set('campaignId', campaignId);
-        params.set('folderId', PLATFORM_AUDIO_FOLDER_ID);
-        const response = await fetch(`${API_BASE_URL}/api/media?${params.toString()}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error('Unable to load audio from the Bulk Queue folder.');
-
-        const payload = await response.json();
-        const tracks = (Array.isArray(payload) ? payload : [])
-          .filter((item) => item?.url)
-          .map((item) => ({
-            id: String(item._id || item.id || item.mediaId),
-            mediaId: String(item._id || item.id || item.mediaId),
-            sourceType: 'library',
-            type: 'audio',
-            name: item.name || item.filename || 'Platform audio',
-            url: getMediaUrl(item.url, { apiBaseUrl: API_BASE_URL }),
-            originalUrl: item.url,
-            mimeType: item.mimeType || item.mimetype || '',
-            duration: Number(item.duration || 0),
-            width: 0,
-            height: 0,
-          }));
-
-        setAssets((current) => {
-          const existingIds = new Set(current.map((asset) => String(asset.id)));
-          return [...current, ...tracks.filter((track) => !existingIds.has(track.id))];
-        });
-      } catch (error) {
-        if (error.name !== 'AbortError') {
-          setAudioPoolError(error.message || 'Unable to load audio from the Bulk Queue folder.');
-        }
-      } finally {
-        if (!controller.signal.aborted) setAudioPoolLoading(false);
-      }
-    };
-
-    void loadPlatformAudio();
-    return () => controller.abort();
-  }, [initialContext.contextKey, token]);
+  }, [initialContext, isBulkProject]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1028,31 +972,12 @@ export const VideoEditorV2 = () => {
       }
       dispatch(editorActions.addClip(clip));
       seek(timelineStart);
+      return true;
     } catch (error) {
       setStatus({ type: 'error', text: error.message || 'The media could not be added to the timeline.' });
+      return false;
     }
   }, [currentTime, project, seek]);
-
-  const handleFilesSelected = useCallback(async (files) => {
-    if (!files.length) return;
-    if (isBulkProject) {
-      setStatus({
-        type: 'error',
-        text: 'For Bulk Planning Board rows, choose reusable assets from Media Library so they remain available to the export queue.',
-      });
-      return;
-    }
-    const results = await Promise.allSettled(files.map(createAssetFromFile));
-    const imported = results.filter((result) => result.status === 'fulfilled').map((result) => result.value);
-    const failed = results.filter((result) => result.status === 'rejected');
-    if (imported.length) {
-      setAssets((current) => [...imported, ...current]);
-      setStatus({ type: 'success', text: `${imported.length} media file${imported.length === 1 ? '' : 's'} imported.` });
-    }
-    if (failed.length) {
-      setStatus({ type: 'error', text: failed[0].reason?.message || 'One or more files could not be imported.' });
-    }
-  }, [isBulkProject]);
 
   const handleLibrarySelection = useCallback(async (item) => {
     const asset = await createLibraryAsset({ ...item, type: item.type || libraryMode });
@@ -1061,29 +986,14 @@ export const VideoEditorV2 = () => {
         ? current
         : [asset, ...current]
     ));
-    setLibraryOpen(false);
-    setStatus({
-      type: 'success',
-      text: `${asset.name || 'Media'} added to the media pool. Click it when you want to add it to the timeline.`,
-    });
-  }, [libraryMode]);
-
-  const removeAssetFromMediaPool = useCallback((asset) => {
-    const isUsedOnTimeline = projectRef.current.tracks.some((track) => (
-      track.clips.some((clip) => (
-        clip.mediaId === asset.id
-        || (asset.mediaId && clip.mediaId === asset.mediaId)
-        || clip.sourceUrl === asset.url
-      ))
-    ));
-
-    setAssets((current) => current.filter((candidate) => candidate.id !== asset.id));
-    if (!isUsedOnTimeline) revokeAssetUrl(asset);
-    setStatus({
-      type: 'success',
-      text: `${asset.name || 'Video'} removed from the media pool.`,
-    });
-  }, []);
+    const added = await addAssetToTimeline(asset);
+    if (added) {
+      setStatus({
+        type: 'success',
+        text: `${asset.name || 'Media'} added to the timeline.`,
+      });
+    }
+  }, [addAssetToTimeline, libraryMode]);
 
   const addPromoAssetToTimeline = useCallback(async (asset) => {
     try {
@@ -1800,7 +1710,7 @@ export const VideoEditorV2 = () => {
   }, [bulkExportQueue]);
 
   return (
-    <div className="flex h-[100dvh] min-w-[1080px] flex-col overflow-hidden bg-[#090a0d] text-[#f5f7fa] [color-scheme:dark]">
+    <div className="video-editor-v2 flex h-[100dvh] min-w-[1080px] flex-col overflow-hidden bg-[#090a0d] text-[#f5f7fa] [color-scheme:dark]">
       <EditorToolbar
         projectName={project.name}
         output={project.output}
@@ -1821,27 +1731,27 @@ export const VideoEditorV2 = () => {
 
       <div
         ref={editorLayoutRef}
-        className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_clamp(340px,26vw,420px)] overflow-hidden"
+        className="grid min-h-0 flex-1 grid-cols-[clamp(330px,25vw,400px)_minmax(0,1fr)_clamp(340px,26vw,420px)] overflow-hidden"
         style={{
           gridTemplateRows: `minmax(${WORKSPACE_MIN_HEIGHT}px, 1fr) ${timelineHeight}px`,
         }}
       >
         <MediaPanel
           key={isBulkProject ? 'bulk-editor-media' : 'single-editor-media'}
-          assets={assets}
-          audioPoolLoading={audioPoolLoading}
-          audioPoolError={audioPoolError}
+          className="col-start-1 row-span-2 row-start-1"
+          token={token}
           promoAssets={promoAssets}
           promoFolderName={promoFolderName}
           promoLoading={promoLoading}
           promoError={promoError}
-          onFilesSelected={handleFilesSelected}
           onOpenLibrary={(mode) => {
             setLibraryMode(mode);
             setLibraryOpen(true);
           }}
-          onAddAsset={addAssetToTimeline}
-          onRemoveAsset={removeAssetFromMediaPool}
+          libraryOpen={libraryOpen}
+          libraryMode={libraryMode}
+          onCloseLibrary={() => setLibraryOpen(false)}
+          onSelectLibrary={handleLibrarySelection}
           onAddPromoAsset={addPromoAssetToTimeline}
           onAddText={addText}
           bulkQueue={isBulkProject ? {
@@ -1866,6 +1776,7 @@ export const VideoEditorV2 = () => {
           } : null}
         />
         <InspectorPanel
+          className="col-start-2 row-start-1"
           selectedClip={selectedClip}
           maxDuration={project.output.maxDuration}
           onUpdateClip={updateSelectedClip}
@@ -1896,7 +1807,7 @@ export const VideoEditorV2 = () => {
 
         <div
           id="video-editor-timeline"
-          className="relative col-span-2 col-start-1 row-start-2 h-full min-h-0"
+          className="relative col-span-1 col-start-2 row-start-2 h-full min-h-0"
         >
           <div
             role="separator"
@@ -1953,18 +1864,6 @@ export const VideoEditorV2 = () => {
         >
           {status.text}
         </button>
-      )}
-
-      {libraryOpen && (
-        <VideoLibraryPickerDialog
-          slotLabel="First Video"
-          token={token}
-          mediaType={libraryMode}
-          theme="dark"
-          onClose={() => setLibraryOpen(false)}
-          onSelectVideo={handleLibrarySelection}
-          onSelectAudio={handleLibrarySelection}
-        />
       )}
 
       {projectSettingsOpen && (

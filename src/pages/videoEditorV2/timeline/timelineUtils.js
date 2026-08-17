@@ -1,6 +1,6 @@
 export const DEFAULT_TIMELINE_DURATION = 30;
 export const DEFAULT_PIXELS_PER_SECOND = 64;
-export const DEFAULT_LABEL_WIDTH = 168;
+export const DEFAULT_LABEL_WIDTH = 132;
 export const DEFAULT_RULER_HEIGHT = 36;
 export const DEFAULT_TRACK_HEIGHT = 62;
 export const DEFAULT_MIN_CLIP_DURATION = 0.1;

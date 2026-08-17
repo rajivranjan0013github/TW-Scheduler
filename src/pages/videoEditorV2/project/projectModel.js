@@ -382,7 +382,8 @@ export const normalizeProject = (project = {}) => {
   const output = normalizeOutputSettings(project.output);
   const providedTracks = asTrackArray(project.tracks)
     .filter((track) => TRACK_TYPE_VALUES.includes(track?.type))
-    .map((track) => createTrack(track.type, track));
+    .map((track) => createTrack(track.type, track))
+    .filter((track) => track.type !== TRACK_TYPES.IMAGE || track.clips.length > 0);
 
   const tracks = [...providedTracks];
   DEFAULT_TRACK_DEFINITIONS.forEach((definition) => {

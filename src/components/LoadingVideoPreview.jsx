@@ -6,6 +6,7 @@ const LoadingVideoPreview = forwardRef(({
   className = 'h-full w-full',
   videoClassName = 'h-full w-full object-cover',
   loadingLabel = 'Loading video',
+  waitForLoadedData = false,
   onLoadedMetadata,
   onLoadedData,
   onError,
@@ -38,7 +39,10 @@ const LoadingVideoPreview = forwardRef(({
         {...videoProps}
         src={src}
         className={videoClassName}
-        onLoadedMetadata={(event) => handleLoaded(event, onLoadedMetadata)}
+        onLoadedMetadata={(event) => {
+          onLoadedMetadata?.(event);
+          if (!waitForLoadedData) handleLoaded(event);
+        }}
         onLoadedData={(event) => handleLoaded(event, onLoadedData)}
         onError={handleError}
       />

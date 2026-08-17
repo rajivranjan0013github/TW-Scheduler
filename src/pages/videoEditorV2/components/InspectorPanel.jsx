@@ -1,5 +1,6 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+  ChevronDown,
   FileMusic,
   LoaderCircle,
   MoveHorizontal,
@@ -54,6 +55,7 @@ const RangeControl = ({
   max,
   step = 1,
   suffix = '',
+  resetValue,
   formatValue,
   onChange,
   onInteractionStart,
@@ -79,27 +81,272 @@ const RangeControl = ({
       onKeyDown={onInteractionStart}
       onKeyUp={onInteractionEnd}
       onBlur={onInteractionEnd}
+      onDoubleClick={(event) => {
+        if (!Number.isFinite(resetValue)) return;
+        event.preventDefault();
+        onChange(clamp(resetValue, min, max));
+        onInteractionEnd?.();
+      }}
+      title={Number.isFinite(resetValue) ? `Double-click to reset ${label}` : undefined}
       className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-[#ff5500]"
     />
   </label>
 );
 
-const NumberControl = ({ label, value, min, max, step = 1, suffix = '', onChange }) => (
-  <label className="block min-w-0 space-y-1">
-    <span className="text-[9px] font-bold uppercase tracking-wide !text-[#aeb4bd]">{label}</span>
-    <div className="flex h-9 items-center rounded-xl border border-white/10 bg-[#171a20] px-2.5 focus-within:border-[#ff5500]/60 focus-within:bg-[#1b1f27]">
-      <input
-        type="number"
-        value={Number.isFinite(value) ? value : 0}
+const PropertyCard = ({ title, description, action = null, children }) => (
+  <section className="rounded-2xl border border-white/10 bg-[#171a20] p-3 shadow-[0_10px_30px_rgba(0,0,0,0.14)]">
+    {(title || description || action) && (
+      <div className="-mx-3 -mt-3 mb-3 flex items-start justify-between gap-2 rounded-t-2xl border-b border-white/10 bg-[#11151b] px-3 py-2.5">
+        <div className="min-w-0">
+          {title && <h3 className="text-xs font-extrabold !text-[#f3f5f7]">{title}</h3>}
+          {description && (
+            <p className="mt-1 text-[9px] font-medium leading-relaxed !text-[#8f96a1]">
+              {description}
+            </p>
+          )}
+        </div>
+        {action}
+      </div>
+    )}
+    {children}
+  </section>
+);
+
+const CollapsiblePropertyCard = ({ title, summary, action = null, children }) => (
+  <details className="group rounded-2xl border border-white/10 bg-[#171a20] shadow-[0_10px_30px_rgba(0,0,0,0.14)]">
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-2xl bg-[#11151b] px-3 py-3 transition hover:bg-[#141820] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ff5500]/70 group-open:rounded-b-none [&::-webkit-details-marker]:hidden">
+      <span className="min-w-0">
+        <span className="block text-xs font-extrabold !text-[#f3f5f7]">{title}</span>
+        {summary && (
+          <span className="mt-0.5 block truncate text-[9px] font-medium !text-[#8f96a1]">{summary}</span>
+        )}
+      </span>
+      <span className="flex shrink-0 items-center gap-1">
+        {action}
+        <ChevronDown className="h-4 w-4 text-[#8f96a1] transition-transform group-open:rotate-180" />
+      </span>
+    </summary>
+    <div className="border-t border-white/10 px-3 pb-3 pt-2">
+      {children}
+    </div>
+  </details>
+);
+
+const getStepPrecision = (step) => {
+  const stepText = String(step);
+  return stepText.includes('.') ? stepText.split('.')[1].length : 0;
+};
+
+const ScrubbableNumberControl = ({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  suffix = '',
+  formatValue,
+  onChange,
+  onInteractionStart,
+  onInteractionEnd,
+  compact = false,
+  className = '',
+}) => {
+  const [editing, setEditing] = useState(false);
+  const [draftValue, setDraftValue] = useState('');
+  const inputRef = useRef(null);
+  const dragRef = useRef(null);
+  const editInteractionRef = useRef(false);
+  const numericValue = Number.isFinite(Number(value)) ? Number(value) : 0;
+  const displayValue = formatValue ? formatValue(numericValue) : formatCompactNumber(numericValue);
+
+  useEffect(() => {
+    if (!editing) return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [editing]);
+
+  const emitValue = (nextValue) => {
+    const precision = getStepPrecision(step);
+    const roundedValue = Number(clamp(nextValue, min, max).toFixed(precision));
+    onChange(roundedValue);
+  };
+
+  const beginEditing = () => {
+    if (editing) return;
+    editInteractionRef.current = true;
+    onInteractionStart?.();
+    setDraftValue(String(numericValue));
+    setEditing(true);
+  };
+
+  const finishEditing = () => {
+    const parsedDraft = Number(draftValue);
+    if (draftValue.trim() !== '' && Number.isFinite(parsedDraft)) emitValue(parsedDraft);
+    setEditing(false);
+    if (editInteractionRef.current) {
+      editInteractionRef.current = false;
+      onInteractionEnd?.();
+    }
+  };
+
+  const endScrub = (event, { editOnClick = false } = {}) => {
+    const interaction = dragRef.current;
+    if (!interaction) return;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    onInteractionEnd?.();
+    if (editOnClick && !interaction.dragged) beginEditing();
+  };
+
+  if (editing) {
+    return (
+      <div className={`flex h-9 min-w-0 items-center gap-2 px-2 ${compact ? 'justify-start' : 'justify-between'} ${className}`}>
+        <span className="truncate text-[10px] font-bold !text-[#aeb3bc]">{label}</span>
+        <label className="flex h-8 w-[72px] shrink-0 items-center rounded-md border border-[#ff5500]/60 bg-[#111318] px-1.5 shadow-[0_0_0_1px_rgba(255,85,0,0.08)]">
+          <input
+            ref={inputRef}
+            type="number"
+            value={draftValue}
+            min={min}
+            max={max}
+            step={step}
+            onChange={(event) => {
+              const nextDraft = event.target.value;
+              setDraftValue(nextDraft);
+              if (nextDraft.trim() === '') return;
+              const nextValue = Number(nextDraft);
+              if (Number.isFinite(nextValue)) emitValue(nextValue);
+            }}
+            onBlur={finishEditing}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === 'Escape') event.currentTarget.blur();
+            }}
+            className="min-w-0 flex-1 appearance-none bg-transparent text-right text-[11px] font-extrabold tabular-nums !text-[#4ea1ff] outline-none [color-scheme:dark] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            aria-label={label}
+          />
+          {suffix && <span className="ml-0.5 shrink-0 text-[9px] font-bold !text-[#8f96a1]">{suffix}</span>}
+        </label>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={`group/scrub flex h-9 min-w-0 cursor-ew-resize select-none items-center gap-2 rounded-lg px-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${compact ? 'justify-start' : 'justify-between'} ${className}`}
+      title="Drag left or right to adjust; click to type"
+      aria-label={`${label}: ${displayValue}${suffix}. Drag left or right to adjust, or click to type.`}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        dragRef.current = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startValue: numericValue,
+          dragged: false,
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        onInteractionStart?.();
+      }}
+      onPointerMove={(event) => {
+        const interaction = dragRef.current;
+        if (!interaction || interaction.pointerId !== event.pointerId) return;
+        const deltaX = event.clientX - interaction.startX;
+        if (Math.abs(deltaX) >= 3) interaction.dragged = true;
+        if (!interaction.dragged) return;
+        emitValue(interaction.startValue + ((deltaX / 4) * step));
+      }}
+      onPointerUp={(event) => endScrub(event, { editOnClick: true })}
+      onPointerCancel={(event) => endScrub(event)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          beginEditing();
+        } else if (event.key === 'ArrowUp' || event.key === 'ArrowRight') {
+          event.preventDefault();
+          onInteractionStart?.();
+          emitValue(numericValue + step);
+          onInteractionEnd?.();
+        } else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') {
+          event.preventDefault();
+          onInteractionStart?.();
+          emitValue(numericValue - step);
+          onInteractionEnd?.();
+        }
+      }}
+    >
+      <span className="truncate text-[10px] font-bold !text-[#aeb3bc]">{label}</span>
+      <span className="flex shrink-0 items-baseline gap-1">
+        <span className="text-xs font-extrabold tabular-nums !text-[#4ea1ff] transition group-hover/scrub:!text-[#7bb8ff]">{displayValue}</span>
+        {suffix && <span className="text-[10px] font-bold !text-[#8f96a1]">{suffix}</span>}
+      </span>
+    </button>
+  );
+};
+
+const InspectorRangeControl = ({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  suffix = '',
+  resetValue,
+  formatValue,
+  onChange,
+  onInteractionStart,
+  onInteractionEnd,
+  compact = false,
+}) => {
+  const reset = () => {
+    if (!Number.isFinite(resetValue)) return;
+    onChange(clamp(resetValue, min, max));
+    onInteractionEnd?.();
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <ScrubbableNumberControl
+        className="flex-1"
+        label={label}
+        value={value}
         min={min}
         max={max}
         step={step}
-        onChange={(event) => onChange(clamp(Number(event.target.value), min, max))}
-        className="min-w-0 flex-1 bg-transparent text-[11px] font-bold !text-[#f5f7fa] outline-none [color-scheme:dark]"
+        suffix={suffix}
+        formatValue={formatValue}
+        onChange={onChange}
+        onInteractionStart={onInteractionStart}
+        onInteractionEnd={onInteractionEnd}
+        compact={compact}
       />
-      {suffix && <span className="text-[9px] font-bold !text-[#aeb4bd]">{suffix}</span>}
+      {Number.isFinite(resetValue) && (
+        <button
+          type="button"
+          onClick={reset}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#737b87] transition hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70"
+          title={`Reset ${label}`}
+          aria-label={`Reset ${label}`}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
-  </label>
+  );
+};
+
+const CardResetButton = ({ label, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[9px] font-bold !text-[#858d99] transition hover:bg-white/5 hover:!text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70"
+    title={label}
+  >
+    <RotateCcw className="h-3 w-3" />
+    Reset
+  </button>
 );
 
 const VideoInspector = ({
@@ -170,123 +417,233 @@ const VideoInspector = ({
     if (extractionUnavailable) return;
     onExtractAudio(clip.id);
   };
-
+  const resetLayout = () => {
+    if (clip.type === 'video') changePlaybackRate(clamp(1, minimumPlaybackRate, maximumPlaybackRate));
+    onUpdate({
+      fit: 'fit',
+      transform: {
+        ...clip.transform,
+        x: 0.5,
+        y: 0.5,
+        scale: 1,
+        rotation: 0,
+        flipX: false,
+        flipY: false,
+      },
+    });
+  };
   return (
-    <>
-      {clip.type === 'video' && (
-        <Section title="Playback">
-          <RangeControl
-            label="Playback speed"
-            value={playbackRate}
-            min={minimumPlaybackRate}
-            max={maximumPlaybackRate}
-            step={0.01}
-            suffix="×"
-            formatValue={(value) => Number(value).toFixed(2)}
-            onChange={changePlaybackRate}
-            onInteractionStart={startPlaybackRateInteraction}
-            onInteractionEnd={endPlaybackRateInteraction}
-          />
-          {playbackRangeLimited && (
-            <p className="mt-2 text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
-              Range limited to keep the complete clip inside the project timeline.
-            </p>
-          )}
-        </Section>
-      )}
-
-      <Section title="Transform">
-        <div className="grid grid-cols-2 gap-2">
-          <NumberControl
-            label="Position X"
-            value={Math.round((transform.x - 0.5) * 200)}
-            min={-100}
-            max={100}
-            suffix="%"
-            onChange={(value) => updateTransform({ x: value / 200 + 0.5 })}
-          />
-          <NumberControl
-            label="Position Y"
-            value={Math.round((transform.y - 0.5) * 200)}
-            min={-100}
-            max={100}
-            suffix="%"
-            onChange={(value) => updateTransform({ y: value / 200 + 0.5 })}
-          />
-        </div>
-        <div className="mt-3 space-y-3">
-          <RangeControl label="Scale" value={Math.round(transform.scale * 100)} min={10} max={300} suffix="%" onChange={(value) => updateTransform({ scale: value / 100 })} />
-          <RangeControl label="Rotation" value={Math.round(transform.rotation)} min={-180} max={180} suffix="°" onChange={(rotation) => updateTransform({ rotation })} />
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => updateTransform({ flipX: !transform.flipX })} className={`rounded-xl border px-3 py-2 text-[10px] font-bold transition ${transform.flipX ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]' : 'border-white/10 text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}>
-            Flip horizontal
-          </button>
-          <button type="button" onClick={() => updateTransform({ flipY: !transform.flipY })} className={`rounded-xl border px-3 py-2 text-[10px] font-bold transition ${transform.flipY ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]' : 'border-white/10 text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}>
-            Flip vertical
-          </button>
-        </div>
-      </Section>
-
-      <Section title="Crop">
-        <div className="grid grid-cols-2 gap-2">
-          <NumberControl label="Left" value={Math.round(crop.x * 100)} min={0} max={Math.round((1 - crop.width) * 100)} suffix="%" onChange={(value) => updateCrop({ x: value / 100 })} />
-          <NumberControl label="Top" value={Math.round(crop.y * 100)} min={0} max={Math.round((1 - crop.height) * 100)} suffix="%" onChange={(value) => updateCrop({ y: value / 100 })} />
-          <NumberControl label="Width" value={Math.round(crop.width * 100)} min={MIN_CROP_SIZE * 100} max={Math.round((1 - crop.x) * 100)} suffix="%" onChange={(value) => updateCrop({ width: value / 100 })} />
-          <NumberControl label="Height" value={Math.round(crop.height * 100)} min={MIN_CROP_SIZE * 100} max={Math.round((1 - crop.y) * 100)} suffix="%" onChange={(value) => updateCrop({ height: value / 100 })} />
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => onUpdate({ fit: 'fit' })} className={`rounded-xl border py-2 text-[10px] font-bold transition ${clip.fit === 'fit' ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]' : 'border-white/10 text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}>Fit</button>
-          <button type="button" onClick={() => onUpdate({ fit: 'fill' })} className={`rounded-xl border py-2 text-[10px] font-bold transition ${clip.fit === 'fill' ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]' : 'border-white/10 text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}>Fill</button>
-        </div>
-        <button
-          type="button"
-          onClick={() => onUpdate({ crop: { x: 0, y: 0, width: 1, height: 1 } })}
-          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/10 py-2 text-[10px] font-bold text-[#aeb3bc] transition hover:bg-white/5 hover:text-white"
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-2 p-2">
+      <div className="col-start-2 row-start-1 min-w-0 space-y-2">
+        <PropertyCard
+          title="Layout"
+          action={<CardResetButton label="Reset layout" onClick={resetLayout} />}
         >
-          <RotateCcw className="h-3 w-3" />
-          Reset crop
-        </button>
-        <p className="mt-2 text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
-          Crop keeps an area from the original media. Fill can trim that area further to cover the canvas.
-        </p>
-      </Section>
+        {clip.type === 'video' && (
+          <div className="mb-3 border-b border-white/10 pb-3">
+            <InspectorRangeControl
+              label="Speed"
+              value={playbackRate}
+              min={minimumPlaybackRate}
+              max={maximumPlaybackRate}
+              step={0.01}
+              suffix="×"
+              formatValue={(value) => Number(value).toFixed(2)}
+              onChange={changePlaybackRate}
+              onInteractionStart={startPlaybackRateInteraction}
+              onInteractionEnd={endPlaybackRateInteraction}
+            />
+            {playbackRangeLimited && (
+              <p className="mt-2 text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
+                Range limited by the project timeline.
+              </p>
+            )}
+          </div>
+        )}
 
-      <Section title="Appearance & sound">
-        <div className="space-y-3">
-          <RangeControl label="Opacity" value={Math.round(transform.opacity * 100)} min={0} max={100} suffix="%" onChange={(value) => updateTransform({ opacity: value / 100 })} />
-          {clip.type === 'video' && (
-            <>
-              <RangeControl label="Clip volume" value={Math.round(Number(clip.volume ?? 1) * 100)} min={0} max={100} suffix="%" onChange={(value) => onUpdate({ volume: value / 100 })} />
-              <div className="space-y-1.5 pt-1">
-                <button
-                  type="button"
-                  onClick={extractAudio}
-                  disabled={extractionUnavailable}
-                  aria-busy={extractingAudio}
-                  aria-label={extractingAudio
-                    ? 'Extracting MP3 from selected video'
-                    : 'Extract MP3 from selected video'}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#ff5500]/35 bg-[#ff5500]/10 px-3 py-2.5 text-[10px] font-extrabold text-[#ff7a33] transition hover:border-[#ff5500]/55 hover:bg-[#ff5500]/15 hover:text-[#ff8a4d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.025] disabled:text-[#727985] disabled:opacity-70"
-                >
-                  {extractingAudio ? (
-                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <FileMusic className="h-3.5 w-3.5" aria-hidden="true" />
-                  )}
-                  <span aria-live="polite">
-                    {extractingAudio ? 'Extracting MP3…' : 'Extract MP3'}
-                  </span>
-                </button>
-                <p className="text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
-                  Creates an editable MP3 clip and mutes the original audio.
-                </p>
-              </div>
-            </>
-          )}
+        <div>
+          <InspectorRangeControl
+            label="Scale"
+            value={Math.round(transform.scale * 100)}
+            min={10}
+            max={300}
+            suffix="%"
+            onChange={(value) => updateTransform({ scale: value / 100 })}
+          />
         </div>
-      </Section>
-    </>
+
+        <div className="mt-3 flex min-w-0 items-center gap-2">
+          <p className="shrink-0 text-[11px] font-bold !text-[#dfe2e6]">Position</p>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <ScrubbableNumberControl
+              label="X"
+              compact
+              value={Math.round((transform.x - 0.5) * 200)}
+              min={-100}
+              max={100}
+              suffix="%"
+              onChange={(value) => updateTransform({ x: value / 200 + 0.5 })}
+            />
+            <ScrubbableNumberControl
+              label="Y"
+              compact
+              value={Math.round((transform.y - 0.5) * 200)}
+              min={-100}
+              max={100}
+              suffix="%"
+              onChange={(value) => updateTransform({ y: value / 200 + 0.5 })}
+            />
+          </div>
+        </div>
+
+        <div className="mt-2 grid min-w-0 grid-cols-[minmax(72px,0.8fr)_minmax(0,1.2fr)] items-center gap-1.5">
+          <InspectorRangeControl compact label="Rotation" value={Math.round(transform.rotation)} min={-180} max={180} suffix="°" onChange={(rotation) => updateTransform({ rotation })} />
+          <div className="grid min-w-0 grid-cols-2 gap-1" role="group" aria-label="Flip video">
+            <button
+              type="button"
+              aria-pressed={transform.flipX}
+              aria-label="Flip horizontally"
+              title="Flip horizontally"
+              onClick={() => updateTransform({ flipX: !transform.flipX })}
+              className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-lg border px-1 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${transform.flipX
+                ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
+                : 'border-white/10 bg-[#111318] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
+            >
+              <span aria-hidden="true">↔</span>
+              <span>Horizontal</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={transform.flipY}
+              aria-label="Flip vertically"
+              title="Flip vertically"
+              onClick={() => updateTransform({ flipY: !transform.flipY })}
+              className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-lg border px-1 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${transform.flipY
+                ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
+                : 'border-white/10 bg-[#111318] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
+            >
+              <span aria-hidden="true">↕</span>
+              <span>Vertical</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-2 flex items-center gap-2" role="group" aria-label="Video sizing mode">
+          <button
+            type="button"
+            onClick={() => onUpdate({ fit: 'fill' })}
+            aria-pressed={clip.fit === 'fill'}
+            aria-label="Fill canvas with video"
+            title="Fill canvas with video"
+            className={`flex h-9 items-center gap-2 rounded-lg px-2 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${clip.fit === 'fill'
+              ? 'bg-white/5 text-[#ff7a33]'
+              : 'text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}
+          >
+            <span className="relative h-5 w-6 shrink-0" aria-hidden="true">
+              <span className="absolute inset-x-1 top-1 h-3 border-2 border-current" />
+              <span className="absolute inset-x-0 top-0 h-0.5 bg-current" />
+              <span className="absolute inset-x-0 bottom-0 h-0.5 bg-current" />
+            </span>
+            Fill
+          </button>
+          <button
+            type="button"
+            onClick={() => onUpdate({ fit: 'fit' })}
+            aria-pressed={clip.fit === 'fit'}
+            aria-label="Fit video inside canvas"
+            title="Fit video inside canvas"
+            className={`flex h-9 items-center gap-2 rounded-lg px-2 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${clip.fit === 'fit'
+              ? 'bg-white/5 text-[#ff7a33]'
+              : 'text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}
+          >
+            <span className="relative flex h-5 w-6 shrink-0 items-center justify-center border-2 border-current" aria-hidden="true">
+              <span className="h-3 w-2 border border-current bg-current/20" />
+            </span>
+            Fit
+          </button>
+        </div>
+        </PropertyCard>
+      </div>
+
+      <div className="col-start-1 row-start-1 min-w-0 space-y-2">
+        <CollapsiblePropertyCard
+          title="Crop"
+          action={(
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onUpdate({ crop: { x: 0, y: 0, width: 1, height: 1 } });
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-[#737b87] transition hover:bg-white/5 hover:text-[#ff7a33] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70"
+              title="Reset crop"
+              aria-label="Reset crop"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          )}
+        >
+          <div className="grid grid-cols-2 gap-2">
+            <ScrubbableNumberControl label="Left" value={Math.round(crop.x * 100)} min={0} max={Math.round((1 - crop.width) * 100)} suffix="%" onChange={(value) => updateCrop({ x: value / 100 })} />
+            <ScrubbableNumberControl label="Top" value={Math.round(crop.y * 100)} min={0} max={Math.round((1 - crop.height) * 100)} suffix="%" onChange={(value) => updateCrop({ y: value / 100 })} />
+            <ScrubbableNumberControl label="Width" value={Math.round(crop.width * 100)} min={MIN_CROP_SIZE * 100} max={Math.round((1 - crop.x) * 100)} suffix="%" onChange={(value) => updateCrop({ width: value / 100 })} />
+            <ScrubbableNumberControl label="Height" value={Math.round(crop.height * 100)} min={MIN_CROP_SIZE * 100} max={Math.round((1 - crop.y) * 100)} suffix="%" onChange={(value) => updateCrop({ height: value / 100 })} />
+          </div>
+        </CollapsiblePropertyCard>
+
+        {clip.type === 'video' && (
+          <PropertyCard title="Audio">
+            <InspectorRangeControl label="Volume" value={Math.round(Number(clip.volume ?? 1) * 100)} min={0} max={100} resetValue={100} suffix="%" onChange={(value) => onUpdate({ volume: value / 100 })} />
+            <div className="mt-2">
+              <InspectorRangeControl label="Opacity" value={Math.round(transform.opacity * 100)} min={0} max={100} resetValue={100} suffix="%" onChange={(value) => updateTransform({ opacity: value / 100 })} />
+            </div>
+            <div className="mt-3 grid grid-cols-[42px_minmax(0,1fr)] gap-2">
+            <button
+              type="button"
+              onClick={() => onUpdate({ muted: !clip.muted })}
+              aria-pressed={Boolean(clip.muted)}
+              aria-label={clip.muted ? 'Unmute video clip' : 'Mute video clip'}
+              title={clip.muted ? 'Unmute video clip' : 'Mute video clip'}
+              className={`flex h-10 items-center justify-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${clip.muted
+                ? 'border-[#ff5500]/60 bg-[#ff5500]/10 text-[#ff7a33]'
+                : 'border-white/10 text-[#9da4ae] hover:bg-white/5 hover:text-white'}`}
+            >
+              {clip.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={extractAudio}
+                disabled={extractionUnavailable}
+                aria-busy={extractingAudio}
+                aria-label={extractingAudio
+                  ? 'Extracting MP3 from selected video'
+                  : 'Extract MP3 from selected video'}
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#111318] px-3 text-[10px] font-extrabold text-[#dfe2e6] transition hover:border-[#ff5500]/45 hover:text-[#ff8a4d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-not-allowed disabled:text-[#727985] disabled:opacity-70"
+              >
+                {extractingAudio ? (
+                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <FileMusic className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                <span aria-live="polite">
+                  {extractingAudio ? 'Extracting MP3…' : 'Extract MP3'}
+                </span>
+              </button>
+            </div>
+            </div>
+          </PropertyCard>
+        )}
+
+        {clip.type !== 'video' && (
+          <CollapsiblePropertyCard title="Advanced">
+            <InspectorRangeControl label="Opacity" value={Math.round(transform.opacity * 100)} min={0} max={100} resetValue={100} suffix="%" onChange={(value) => updateTransform({ opacity: value / 100 })} />
+          </CollapsiblePropertyCard>
+        )}
+      </div>
+
+    </div>
   );
 };
 
@@ -301,14 +658,6 @@ const TextInspector = ({ clip, onUpdate, onGenerateText }) => {
     Number.isFinite(rawStrokeWidth) ? rawStrokeWidth : DEFAULT_TEXT_STYLE.strokeWidth,
     0,
     MAX_TEXT_STROKE_WIDTH,
-  );
-  const strokeSliderMax = Math.min(
-    MAX_TEXT_STROKE_WIDTH,
-    Math.max(
-      24,
-      Math.ceil((fontSize * 0.2) / 4) * 4,
-      Math.ceil(strokeWidth / 4) * 4,
-    ),
   );
   const fontWeightValue = ({
     Thin: '100',
@@ -331,160 +680,166 @@ const TextInspector = ({ clip, onUpdate, onGenerateText }) => {
   };
 
   return (
-    <>
-      <Section
-        title="Text"
-        action={(
-          <button
-            type="button"
-            onClick={onGenerateText}
-            className="flex h-7 items-center gap-1.5 rounded-lg border border-[#ff5500]/35 bg-[#ff5500]/10 px-2.5 text-[9px] font-extrabold !text-[#ff8a4d] transition hover:border-[#ff5500]/60 hover:bg-[#ff5500]/20 hover:!text-[#ffa074] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70"
-            title="Generate text with AI"
-          >
-            <Sparkles className="h-3 w-3" />
-            Generate with AI
-          </button>
-        )}
-      >
-        <textarea
-          value={clip.text || ''}
-          onChange={(event) => onUpdate({ text: event.target.value })}
-          rows={4}
-          className="w-full resize-none rounded-xl border border-white/10 bg-[#171a20] p-3 text-xs font-semibold leading-relaxed !text-[#f5f7fa] outline-none placeholder:!text-[#8b929d] focus:border-[#ff5500]/60 focus:bg-[#1b1f27] [color-scheme:dark]"
-          placeholder="Enter text"
-        />
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => updateTransform({ x: 0.5 })}
-            aria-label="Center text horizontally on canvas"
-            aria-pressed={Math.abs(positionX - 0.5) < 0.0001}
-            title="Center text horizontally"
-            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${Math.abs(positionX - 0.5) < 0.0001
-              ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
-              : 'border-white/10 bg-[#171a20] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
-          >
-            <MoveHorizontal className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => updateTransform({ y: 0.5 })}
-            aria-label="Center text vertically on canvas"
-            aria-pressed={Math.abs(positionY - 0.5) < 0.0001}
-            title="Center text vertically"
-            className={`flex h-9 w-9 items-center justify-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${Math.abs(positionY - 0.5) < 0.0001
-              ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
-              : 'border-white/10 bg-[#171a20] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
-          >
-            <MoveVertical className="h-4 w-4" />
-          </button>
-        </div>
-      </Section>
-      <Section title="Typography">
-        <label className="block space-y-1">
-          <span className="text-[9px] font-bold uppercase tracking-wide !text-[#aeb4bd]">Font</span>
-          <select value={style.fontFamily || 'Outfit'} onChange={(event) => updateStyle({ fontFamily: event.target.value })} className="h-9 w-full rounded-xl border border-white/10 bg-[#171a20] px-2.5 text-[11px] font-bold !text-[#f5f7fa] outline-none [color-scheme:dark]">
-            <option value="Outfit">TikTok Sans</option>
-            <option value="Roboto">Roboto</option>
-            <option value="Anton">Impact</option>
-            <option value="Arimo">Arial</option>
-          </select>
-        </label>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <NumberControl label="Size" value={fontSize} min={12} max={240} suffix="px" onChange={(nextFontSize) => updateStyle({ fontSize: nextFontSize })} />
-          <label className="block space-y-1">
-            <span className="text-[9px] font-bold uppercase tracking-wide !text-[#aeb4bd]">Weight</span>
-            <select value={fontWeightValue} onChange={(event) => updateStyle({ fontWeight: event.target.value })} className="h-9 w-full rounded-xl border border-white/10 bg-[#171a20] px-2.5 text-[11px] font-bold !text-[#f5f7fa] outline-none [color-scheme:dark]">
-              <option value="400">Regular</option><option value="500">Medium</option><option value="600">SemiBold</option><option value="700">Bold</option><option value="900">Black</option>
-            </select>
-          </label>
-        </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {[
-            ['Text', style.color || '#ffffff', 'color'],
-            ['Stroke color', style.strokeColor || '#000000', 'strokeColor'],
-            ['Background', style.backgroundColor === 'transparent' ? '#000000' : (style.backgroundColor || '#000000'), 'backgroundColor'],
-          ].map(([label, value, key]) => (
-            <label key={key} className="space-y-1 text-center">
-              <span className="block text-[8px] font-bold uppercase !text-[#aeb4bd]">{label}</span>
-              <input
-                type="color"
-                value={value}
-                onChange={(event) => updateStyle(key === 'backgroundColor'
-                  ? { backgroundColor: event.target.value, backgroundType: 'Solid' }
-                  : { [key]: event.target.value })}
-                className="h-9 w-full cursor-pointer rounded-lg border border-white/10 bg-[#171a20] p-1"
-              />
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-2 p-2">
+      <div className="min-w-0 space-y-2">
+        <PropertyCard
+          title="Text"
+          action={(
+            <button
+              type="button"
+              onClick={onGenerateText}
+              className="flex h-7 items-center gap-1.5 rounded-lg border border-[#ff5500]/35 bg-[#ff5500]/10 px-2 text-[9px] font-extrabold !text-[#ff8a4d] transition hover:border-[#ff5500]/60 hover:bg-[#ff5500]/20 hover:!text-[#ffa074] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70"
+              title="Generate text with AI"
+            >
+              <Sparkles className="h-3 w-3" />
+              Generate with AI
+            </button>
+          )}
+        >
+          <textarea
+            value={clip.text || ''}
+            onChange={(event) => onUpdate({ text: event.target.value })}
+            rows={3}
+            className="w-full resize-none rounded-xl border border-white/10 bg-[#111318] p-3 text-sm font-semibold leading-relaxed !text-[#f5f7fa] outline-none placeholder:!text-[#8b929d] focus:border-[#ff5500]/60 [color-scheme:dark]"
+            placeholder="Enter text"
+          />
+        </PropertyCard>
+
+        <PropertyCard title="Typography">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="min-w-0 space-y-1">
+              <span className="text-[9px] font-bold !text-[#aeb4bd]">Font</span>
+              <select value={style.fontFamily || 'Outfit'} onChange={(event) => updateStyle({ fontFamily: event.target.value })} className="h-9 w-full rounded-lg border border-white/10 bg-[#111318] px-2 text-[10px] font-bold !text-[#f5f7fa] outline-none focus:border-[#ff5500]/60 [color-scheme:dark]">
+                <option value="Outfit">TikTok Sans</option>
+                <option value="Roboto">Roboto</option>
+                <option value="Anton">Impact</option>
+                <option value="Arimo">Arial</option>
+              </select>
             </label>
-          ))}
-        </div>
-        {String(style.backgroundType || 'None').toLowerCase() !== 'none' && (
-          <button type="button" onClick={() => updateStyle({ backgroundType: 'None', backgroundColor: 'transparent' })} className="mt-2 text-[9px] font-bold text-[#8b929d] underline hover:text-white">
-            Remove text background
-          </button>
-        )}
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.025] p-3">
-          <RangeControl
-            label="Stroke width"
+            <label className="min-w-0 space-y-1">
+              <span className="text-[9px] font-bold !text-[#aeb4bd]">Weight</span>
+              <select value={fontWeightValue} onChange={(event) => updateStyle({ fontWeight: event.target.value })} className="h-9 w-full rounded-lg border border-white/10 bg-[#111318] px-2 text-[10px] font-bold !text-[#f5f7fa] outline-none focus:border-[#ff5500]/60 [color-scheme:dark]">
+                <option value="400">Regular</option>
+                <option value="500">Medium</option>
+                <option value="600">SemiBold</option>
+                <option value="700">Bold</option>
+                <option value="900">Black</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-2">
+            <ScrubbableNumberControl label="Font size" value={fontSize} min={12} max={240} suffix="px" onChange={(nextFontSize) => updateStyle({ fontSize: nextFontSize })} />
+          </div>
+
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            {[
+              ['Text', style.color || '#ffffff', 'color'],
+              ['Stroke', style.strokeColor || '#000000', 'strokeColor'],
+              ['Background', style.backgroundColor === 'transparent' ? '#000000' : (style.backgroundColor || '#000000'), 'backgroundColor'],
+            ].map(([label, value, key]) => (
+              <label key={key} className="min-w-0 space-y-1 text-center">
+                <span className="block truncate text-[8px] font-bold !text-[#aeb4bd]">{label}</span>
+                <input
+                  type="color"
+                  value={value}
+                  onChange={(event) => updateStyle(key === 'backgroundColor'
+                    ? { backgroundColor: event.target.value, backgroundType: 'Solid' }
+                    : { [key]: event.target.value })}
+                  className="h-9 w-full cursor-pointer rounded-lg border border-white/10 bg-[#111318] p-1"
+                />
+              </label>
+            ))}
+          </div>
+          {String(style.backgroundType || 'None').toLowerCase() !== 'none' && (
+            <button type="button" onClick={() => updateStyle({ backgroundType: 'None', backgroundColor: 'transparent' })} className="mt-2 text-[9px] font-bold text-[#8b929d] hover:text-white">
+              Remove background
+            </button>
+          )}
+        </PropertyCard>
+
+      </div>
+
+      <div className="min-w-0 space-y-2">
+        <PropertyCard title="Transform">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold !text-[#dfe2e6]">Center</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => updateTransform({ x: 0.5 })}
+                aria-label="Center text horizontally on canvas"
+                aria-pressed={Math.abs(positionX - 0.5) < 0.0001}
+                title="Center horizontally"
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${Math.abs(positionX - 0.5) < 0.0001
+                  ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
+                  : 'border-white/10 bg-[#111318] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
+              >
+                <MoveHorizontal className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => updateTransform({ y: 0.5 })}
+                aria-label="Center text vertically on canvas"
+                aria-pressed={Math.abs(positionY - 0.5) < 0.0001}
+                title="Center vertically"
+                className={`flex h-8 w-8 items-center justify-center rounded-lg border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${Math.abs(positionY - 0.5) < 0.0001
+                  ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
+                  : 'border-white/10 bg-[#111318] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
+              >
+                <MoveVertical className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-2 flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-[10px] font-bold !text-[#dfe2e6]">Position</span>
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <ScrubbableNumberControl compact label="X" value={Math.round(positionX * 100)} min={0} max={100} suffix="%" onChange={(value) => updateTransform({ x: value / 100 })} />
+              <ScrubbableNumberControl compact label="Y" value={Math.round(positionY * 100)} min={0} max={100} suffix="%" onChange={(value) => updateTransform({ y: value / 100 })} />
+            </div>
+          </div>
+
+          <div className="mt-2 space-y-1">
+            <ScrubbableNumberControl label="Scale" value={Math.round(Number(transform.scale || 1) * 100)} min={25} max={300} suffix="%" onChange={(value) => updateTransform({ scale: value / 100 })} />
+            <ScrubbableNumberControl label="Rotation" value={Math.round(Number(transform.rotation || 0))} min={-180} max={180} suffix="°" onChange={(rotation) => updateTransform({ rotation })} />
+            <ScrubbableNumberControl label="Opacity" value={Math.round(Number(transform.opacity ?? 1) * 100)} min={0} max={100} suffix="%" onChange={(value) => updateTransform({ opacity: value / 100 })} />
+          </div>
+        </PropertyCard>
+
+        <PropertyCard title="Stroke">
+          <ScrubbableNumberControl
+            label="Width"
             value={strokeWidth}
             min={0}
-            max={strokeSliderMax}
+            max={MAX_TEXT_STROKE_WIDTH}
             step={TEXT_STROKE_STEP}
-            suffix=" px"
+            suffix="px"
             formatValue={formatCompactNumber}
             onChange={updateStrokeWidth}
           />
-          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_88px] items-end gap-2">
-            <div className="min-w-0 space-y-1">
-              <span className="block text-[9px] font-bold uppercase tracking-wide !text-[#aeb4bd]">Quick widths</span>
-              <div className="grid grid-cols-4 gap-1">
-                {TEXT_STROKE_PRESETS.map((preset) => {
-                  const active = Math.abs(strokeWidth - preset.value) < 0.001;
-                  return (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      aria-pressed={active}
-                      title={preset.value === 0 ? 'Remove stroke' : `Set stroke to ${preset.value} output pixels`}
-                      onClick={() => updateStrokeWidth(preset.value)}
-                      className={`h-9 rounded-lg border text-[9px] font-extrabold tabular-nums transition ${active
-                        ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
-                        : 'border-white/10 bg-[#171a20] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
-                    >
-                      {preset.label}
-                      {preset.value > 0 && <span className="font-medium !text-[#9da4ae]"> px</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <NumberControl
-              label="Exact"
-              value={strokeWidth}
-              min={0}
-              max={MAX_TEXT_STROKE_WIDTH}
-              step={TEXT_STROKE_STEP}
-              suffix="px"
-              onChange={updateStrokeWidth}
-            />
+          <div className="mt-2 grid grid-cols-4 gap-1">
+            {TEXT_STROKE_PRESETS.map((preset) => {
+              const active = Math.abs(strokeWidth - preset.value) < 0.001;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  aria-pressed={active}
+                  title={preset.value === 0 ? 'Remove stroke' : `Set stroke to ${preset.value} output pixels`}
+                  onClick={() => updateStrokeWidth(preset.value)}
+                  className={`h-8 rounded-lg border text-[9px] font-extrabold tabular-nums transition ${active
+                    ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
+                    : 'border-white/10 bg-[#111318] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
           </div>
-          <p className="mt-2 text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
-            Width uses output pixels; the editor preview scales it to the canvas.
-          </p>
-        </div>
-      </Section>
-      <Section title="Position">
-        <div className="grid grid-cols-2 gap-2">
-          <NumberControl label="X" value={Math.round(positionX * 100)} min={0} max={100} suffix="%" onChange={(value) => updateTransform({ x: value / 100 })} />
-          <NumberControl label="Y" value={Math.round(positionY * 100)} min={0} max={100} suffix="%" onChange={(value) => updateTransform({ y: value / 100 })} />
-        </div>
-        <div className="mt-3 space-y-3">
-          <RangeControl label="Scale" value={Math.round(Number(transform.scale || 1) * 100)} min={25} max={300} suffix="%" onChange={(value) => updateTransform({ scale: value / 100 })} />
-          <RangeControl label="Rotation" value={Math.round(Number(transform.rotation || 0))} min={-180} max={180} suffix="°" onChange={(rotation) => updateTransform({ rotation })} />
-          <RangeControl label="Opacity" value={Math.round(Number(transform.opacity ?? 1) * 100)} min={0} max={100} suffix="%" onChange={(value) => updateTransform({ opacity: value / 100 })} />
-        </div>
-      </Section>
-    </>
+        </PropertyCard>
+      </div>
+    </div>
   );
 };
 
@@ -493,9 +848,9 @@ const AudioInspector = ({ clip, onUpdate }) => (
     <Section title="Audio">
       <p className="truncate text-xs font-bold text-[#e6e8ec]">{clip.name || 'Audio clip'}</p>
       <div className="mt-4 space-y-3">
-        <RangeControl label="Volume" value={Math.round(Number(clip.volume ?? 1) * 100)} min={0} max={100} suffix="%" onChange={(value) => onUpdate({ volume: value / 100 })} />
-        <RangeControl label="Fade in" value={Number(clip.fadeIn || 0)} min={0} max={Math.min(5, clip.duration / 2)} step={0.1} suffix="s" onChange={(fadeIn) => onUpdate({ fadeIn })} />
-        <RangeControl label="Fade out" value={Number(clip.fadeOut || 0)} min={0} max={Math.min(5, clip.duration / 2)} step={0.1} suffix="s" onChange={(fadeOut) => onUpdate({ fadeOut })} />
+        <RangeControl label="Volume" value={Math.round(Number(clip.volume ?? 1) * 100)} min={0} max={100} resetValue={100} suffix="%" onChange={(value) => onUpdate({ volume: value / 100 })} />
+        <RangeControl label="Fade in" value={Number(clip.fadeIn || 0)} min={0} max={Math.min(5, clip.duration / 2)} step={0.1} resetValue={0} suffix="s" onChange={(fadeIn) => onUpdate({ fadeIn })} />
+        <RangeControl label="Fade out" value={Number(clip.fadeOut || 0)} min={0} max={Math.min(5, clip.duration / 2)} step={0.1} resetValue={0} suffix="s" onChange={(fadeOut) => onUpdate({ fadeOut })} />
       </div>
       <button type="button" onClick={() => onUpdate({ muted: !clip.muted })} className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-bold ${clip.muted ? 'border-red-500/30 bg-red-500/10 text-red-300' : 'border-white/10 text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}>
         {clip.muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
@@ -506,6 +861,7 @@ const AudioInspector = ({ clip, onUpdate }) => (
 );
 
 export const InspectorPanel = ({
+  className = '',
   selectedClip,
   maxDuration,
   onUpdateClip,
@@ -517,7 +873,7 @@ export const InspectorPanel = ({
 }) => {
   if (!selectedClip) {
     return (
-      <aside className="flex min-h-0 flex-col overflow-hidden border-l border-white/10 bg-[#111318]">
+      <aside className={`flex min-h-0 flex-col overflow-hidden border-l border-white/10 bg-[#111318] ${className}`}>
         <div className="flex h-12 items-center gap-2 border-b border-white/10 px-4">
           <SlidersHorizontal className="h-4 w-4 text-[#ff5500]" />
           <h2 className="text-xs font-bold text-[#f5f7fa]">Clip properties</h2>
@@ -537,8 +893,32 @@ export const InspectorPanel = ({
     );
   }
 
+  const resetSelectedClipProperties = () => {
+    if (selectedClip.type === 'video' && typeof onSetPlaybackRate === 'function') {
+      onSetPlaybackRate(1);
+    }
+    onUpdateClip({
+      ...(selectedClip.type === 'video' || selectedClip.type === 'image'
+        ? { fit: 'fit' }
+        : {}),
+      ...(selectedClip.type === 'video'
+        ? { volume: 1, muted: false }
+        : {}),
+      transform: {
+        x: 0.5,
+        y: selectedClip.type === 'text' ? 0.25 : 0.5,
+        scale: 1,
+        rotation: 0,
+        opacity: 1,
+        flipX: false,
+        flipY: false,
+      },
+      crop: { x: 0, y: 0, width: 1, height: 1 },
+    });
+  };
+
   return (
-    <aside className="min-h-0 overflow-y-auto border-l border-white/10 bg-[#111318] text-[#e6e8ec] [color-scheme:dark]">
+    <aside className={`min-h-0 overflow-y-auto border-l border-white/10 bg-[#111318] text-[#e6e8ec] [color-scheme:dark] ${className}`}>
       <div className="sticky top-0 z-10 flex h-12 items-center justify-between border-b border-white/10 bg-[#111318] px-4">
         <div className="min-w-0">
           <p className="text-[9px] font-bold uppercase tracking-wider !text-[#aeb4bd]">{selectedClip.type} properties</p>
@@ -547,10 +927,10 @@ export const InspectorPanel = ({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => onUpdateClip({ transform: { x: 0.5, y: 0.5, scale: 1, rotation: 0, opacity: 1, flipX: false, flipY: false }, crop: { x: 0, y: 0, width: 1, height: 1 } })}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#727985] transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70"
-            title="Reset properties"
-            aria-label="Reset properties"
+            onClick={resetSelectedClipProperties}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#727985] transition hover:bg-white/10 hover:text-[#ff7a33] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70"
+            title="Reset all properties"
+            aria-label="Reset all properties"
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </button>

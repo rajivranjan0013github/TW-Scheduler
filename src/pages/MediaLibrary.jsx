@@ -6,9 +6,11 @@ import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
 import { getMediaUrl } from '../utils/mediaUrls';
+import { generateVideoThumbnailBlob } from '../utils/videoThumbnail';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
+const getProxiedAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL, proxy: true });
 
 const getErrorMessage = async (response, fallback) => {
   try {
@@ -221,6 +223,64 @@ const formatFileSize = (size) => {
   return `${size} B`;
 };
 
+const MediaFolderPreview = ({ folder }) => {
+  const preview = folder.coverMedia || folder.previewMedia;
+  const previewSource = preview?.thumbnailUrl || preview?.url;
+  const [useProxy, setUseProxy] = useState(false);
+  const imageSource = useProxy ? getProxiedAssetUrl(previewSource) : getAssetUrl(previewSource);
+
+  return (
+    <span className="relative block h-[72px] w-[90px] flex-shrink-0" aria-hidden="true">
+      <span className="absolute left-1 top-0 h-4 w-10 rounded-t-lg bg-[#d7d9de]" />
+      <span className="absolute inset-x-0 bottom-0 top-2 overflow-hidden rounded-xl border border-[#dfe1e6] bg-[#e9eaed] shadow-sm">
+        <span className="absolute inset-x-1.5 bottom-0 top-3 overflow-hidden rounded-t-lg bg-[#e9eaed]">
+          {previewSource && preview?.type === 'image' && (
+            <img
+              src={imageSource}
+              alt=""
+              loading="lazy"
+              className="relative z-[1] mx-auto h-full w-3/4 rounded-t-lg object-cover object-[center_40%]"
+              onError={() => setUseProxy(true)}
+            />
+          )}
+          {previewSource && preview?.type === 'video' && (
+            preview.thumbnailUrl ? (
+              <img
+                src={imageSource}
+                alt=""
+                loading="lazy"
+                className="relative z-[1] mx-auto h-full w-3/4 rounded-t-lg object-cover object-[center_40%]"
+                onError={() => setUseProxy(true)}
+              />
+            ) : (
+              <LoadingVideoPreview
+                src={getAssetUrl(preview.url)}
+                className="relative z-[1] mx-auto h-full w-3/4 overflow-hidden rounded-t-lg"
+                videoClassName="h-full w-full object-cover"
+                loadingLabel=""
+                waitForLoadedData
+                muted
+                playsInline
+                preload="metadata"
+              />
+            )
+          )}
+          {preview?.type === 'audio' && (
+            <span className="flex h-full w-full items-center justify-center text-[#8e8e93]">
+              <Music className="h-6 w-6" />
+            </span>
+          )}
+          {!previewSource && preview?.type !== 'audio' && (
+            <span className="flex h-full w-full items-center justify-center text-[#a1a1a6]">
+              <Folder className="h-6 w-6" />
+            </span>
+          )}
+        </span>
+      </span>
+    </span>
+  );
+};
+
 const createUploadBatchId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -274,6 +334,7 @@ export const MediaLibrary = () => {
   const [folderTagInput, setFolderTagInput] = useState('');
   const [savingFolderTagsId, setSavingFolderTagsId] = useState(null);
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null);
+  const [settingFolderCoverId, setSettingFolderCoverId] = useState(null);
   const [folderPendingDelete, setFolderPendingDelete] = useState(null);
   const [deletingFolderId, setDeletingFolderId] = useState(null);
   const [deleteStatusMessage, setDeleteStatusMessage] = useState('');
@@ -303,6 +364,8 @@ export const MediaLibrary = () => {
   const [uploadFolderScope, setUploadFolderScope] = useState('campaign');
   const [draggingSlide, setDraggingSlide] = useState(null);
   const fileUploadDraftsRef = useRef([]);
+  const folderCoverInputRef = useRef(null);
+  const folderCoverTargetRef = useRef(null);
   // Per-set save progress: { [setId]: 'pending' | 'uploading' | 'done' | 'error' }
   const [setProgress, setSetProgress] = useState({});
 
@@ -330,6 +393,16 @@ export const MediaLibrary = () => {
     queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
     queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
   ]);
+  const updateEditorFolderCache = (folderId, updates) => {
+    queryClient.setQueriesData(
+      { queryKey: ['media-library', 'editor', 'folders'] },
+      (current) => (Array.isArray(current)
+        ? current.map((folder) => (
+            String(folder._id) === String(folderId) ? { ...folder, ...updates } : folder
+          ))
+        : current),
+    );
+  };
 
   const clearCarouselDrafts = () => {
     carouselDrafts.forEach((set) => {
@@ -426,34 +499,59 @@ export const MediaLibrary = () => {
     const uploadDirectToR2 = async (file, caption, uploadOrder) => {
       const campaignId = getActiveCampaignId();
       const contentType = file.type || 'application/octet-stream';
-      const initResponse = await fetch(`${API_BASE_URL}/api/media/direct-upload/init`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          campaignId,
-          scope: normalizeScope(scope),
-          folderId,
-          name: file.name,
-          contentType,
-          size: file.size,
+      const isVideo = typeof contentType === 'string' && contentType.startsWith('video/');
+
+      const [initResponse, thumbBlob] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/media/direct-upload/init`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            campaignId,
+            scope: normalizeScope(scope),
+            folderId,
+            name: file.name,
+            contentType,
+            size: file.size,
+          }),
         }),
-      });
+        isVideo ? generateVideoThumbnailBlob(file).catch(() => null) : Promise.resolve(null),
+      ]);
 
       if (!initResponse.ok) {
         throw new Error(await getErrorMessage(initResponse, 'Direct upload is not available.'));
       }
 
       const upload = await initResponse.json();
-      const r2Response = await fetch(upload.uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': contentType,
-        },
-        body: file,
-      });
+
+      const uploadPromises = [
+        fetch(upload.uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': contentType,
+          },
+          body: file,
+        }),
+      ];
+
+      let hasUploadedThumbnail = false;
+      if (thumbBlob && upload.thumbnailUploadUrl) {
+        uploadPromises.push(
+          fetch(upload.thumbnailUploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'image/jpeg',
+            },
+            body: thumbBlob,
+          }).then((res) => {
+            if (res.ok) hasUploadedThumbnail = true;
+          }).catch(() => {})
+        );
+      }
+
+      const [r2Response] = await Promise.all(uploadPromises);
 
       if (!r2Response.ok) {
         throw new Error('Direct upload to R2 failed.');
@@ -474,6 +572,12 @@ export const MediaLibrary = () => {
           contentType,
           size: file.size,
           storageKey: upload.storageKey,
+          ...(hasUploadedThumbnail && upload.thumbnailStorageKey
+            ? {
+                thumbnailStorageKey: upload.thumbnailStorageKey,
+                thumbnailUrl: upload.thumbnailUrl,
+              }
+            : {}),
           caption,
           ...(uploadBatchId ? { uploadBatchId } : {}),
           ...(uploadBatchCreatedAt ? { uploadBatchCreatedAt } : {}),
@@ -543,7 +647,12 @@ export const MediaLibrary = () => {
         },
         staleTime: 2 * 60 * 1000,
       });
-      setFolders(Array.isArray(data) ? data : []);
+      const nextFolders = Array.isArray(data) ? data : [];
+      setFolders(nextFolders);
+      queryClient.setQueriesData(
+        { queryKey: ['media-library', 'editor', 'folders'] },
+        (current) => (Array.isArray(current) ? nextFolders : current),
+      );
     } catch (error) {
       console.error('Failed to load folders:', error);
       setFolders([]);
@@ -552,6 +661,132 @@ export const MediaLibrary = () => {
       setLoadingFolders(false);
     }
   }, [authToken, queryClient]);
+
+  const openFolderCoverPicker = (folder, event) => {
+    event.stopPropagation();
+    setOpenFolderMenuId(null);
+    folderCoverTargetRef.current = folder;
+    folderCoverInputRef.current?.click();
+  };
+
+  const handleFolderCoverSelect = async (event) => {
+    const file = event.target.files?.[0];
+    const folder = folderCoverTargetRef.current;
+    event.target.value = '';
+    if (!file || !folder) return;
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Choose an image file for the folder cover.');
+      return;
+    }
+
+    setSettingFolderCoverId(folder._id);
+    setErrorMessage('');
+    try {
+      const { failedFiles, uploadedMedia } = await uploadMediaFiles({
+        files: [file],
+        folderId: folder._id,
+        scope: normalizeScope(folder.scope),
+        progressLabel: 'Uploading folder cover',
+      });
+      const coverMedia = uploadedMedia[0]?.media;
+      if (failedFiles.length > 0 || !coverMedia?._id) {
+        throw new Error(failedFiles[0] || 'The cover image could not be uploaded.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/media/folders/${folder._id}${withCampaignScope()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ coverMediaId: coverMedia._id }),
+      });
+      if (!response.ok) {
+        throw new Error(await getErrorMessage(response, 'Could not set the folder cover.'));
+      }
+
+      const updatedFolder = await response.json();
+      setFolders((current) => current.map((currentFolder) => (
+        currentFolder._id === folder._id
+          ? {
+              ...currentFolder,
+              ...updatedFolder,
+              coverMediaId: coverMedia._id,
+              coverMedia: {
+                _id: coverMedia._id,
+                name: coverMedia.name || file.name,
+                type: 'image',
+                url: coverMedia.url,
+                thumbnailUrl: coverMedia.thumbnailUrl || '',
+              },
+              itemCount: Number(currentFolder.itemCount || 0) + 1,
+            }
+          : currentFolder
+      )));
+      updateEditorFolderCache(folder._id, {
+        ...updatedFolder,
+        coverMediaId: coverMedia._id,
+        coverMedia: {
+          _id: coverMedia._id,
+          name: coverMedia.name || file.name,
+          type: 'image',
+          url: coverMedia.url,
+          thumbnailUrl: coverMedia.thumbnailUrl || '',
+        },
+      });
+      await invalidateMediaCaches();
+    } catch (error) {
+      console.error('Failed setting folder cover:', error);
+      setErrorMessage(error.message || 'Could not set the folder cover.');
+    } finally {
+      folderCoverTargetRef.current = null;
+      setSettingFolderCoverId(null);
+      resetUploadProgress();
+    }
+  };
+
+  const handleRemoveFolderCover = async (folder, event) => {
+    event.stopPropagation();
+    setOpenFolderMenuId(null);
+    setSettingFolderCoverId(folder._id);
+    setErrorMessage('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/media/folders/${folder._id}${withCampaignScope()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ coverMediaId: null }),
+      });
+      if (!response.ok) {
+        throw new Error(await getErrorMessage(response, 'Could not remove the folder cover.'));
+      }
+
+      const updatedFolder = await response.json();
+      setFolders((current) => current.map((currentFolder) => (
+        currentFolder._id === folder._id
+          ? {
+              ...currentFolder,
+              ...updatedFolder,
+              coverMediaId: null,
+              coverMedia: null,
+            }
+          : currentFolder
+      )));
+      updateEditorFolderCache(folder._id, {
+        ...updatedFolder,
+        coverMediaId: null,
+        coverMedia: null,
+      });
+      await invalidateMediaCaches();
+    } catch (error) {
+      console.error('Failed removing folder cover:', error);
+      setErrorMessage(error.message || 'Could not remove the folder cover.');
+    } finally {
+      setSettingFolderCoverId(null);
+    }
+  };
 
   const PAGE_SIZE = 18;
 
@@ -1980,69 +2215,83 @@ export const MediaLibrary = () => {
 
   return (
     <div className="p-4 space-y-3 bg-[#f5f5f7] min-h-screen text-[#1d1d1f]">
+      <input
+        ref={folderCoverInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFolderCoverSelect}
+      />
 
-      {/* Single compact header row: title · breadcrumbs · actions */}
-      <div className="flex items-center gap-3 border-b border-[#e5e5ea] pb-2.5">
-        {/* Title */}
-        <h2 className="m-0 text-sm font-bold text-black tracking-tight flex-shrink-0">Media Library</h2>
-
-        {/* Breadcrumb divider */}
-        <ChevronRight className="w-3 h-3 text-gray-300 flex-shrink-0" />
-
-        {/* Breadcrumbs */}
-        <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] flex-1 min-w-0 overflow-hidden">
-          <span
-            onClick={() => { setActiveFolderId('root'); setSearchQuery(''); }}
-            className={`cursor-pointer hover:text-black flex-shrink-0 ${activeFolderId === 'root' ? 'text-black font-semibold' : ''}`}
+      <header className="flex flex-col gap-4 border-b border-[#dedee3] pb-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="m-0 text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f]">
+            Media Library
+          </h1>
+          <nav
+            className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-x-auto text-xs font-medium text-[#7b7b80]"
+            aria-label="Media folder breadcrumb"
           >
-            All
-          </span>
-          {breadcrumbFolders.map((folder) => (
-            <React.Fragment key={folder._id}>
-              <ChevronRight className="w-3 h-3 text-gray-300 flex-shrink-0" />
-              <span
-                onClick={() => setActiveFolderId(folder._id)}
-                title={folder.name}
-                className={`cursor-pointer hover:text-black truncate max-w-[120px] ${folder._id === activeFolderId ? 'text-black font-semibold' : ''}`}
-              >
-                {folder.name || 'Folder'}
-              </span>
-            </React.Fragment>
-          ))}
+            <button
+              type="button"
+              onClick={() => { setActiveFolderId('root'); setSearchQuery(''); }}
+              className={`flex-shrink-0 rounded px-1 py-0.5 transition-colors hover:text-[#1d1d1f] ${
+                activeFolderId === 'root' ? 'font-semibold text-[#1d1d1f]' : ''
+              }`}
+            >
+              All media
+            </button>
+            {breadcrumbFolders.map((folder) => (
+              <React.Fragment key={folder._id}>
+                <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-[#b4b4b9]" />
+                <button
+                  type="button"
+                  onClick={() => setActiveFolderId(folder._id)}
+                  title={folder.name}
+                  className={`max-w-[180px] flex-shrink-0 truncate rounded px-1 py-0.5 transition-colors hover:text-[#1d1d1f] ${
+                    folder._id === activeFolderId ? 'font-semibold text-[#1d1d1f]' : ''
+                  }`}
+                >
+                  {folder.name || 'Folder'}
+                </button>
+              </React.Fragment>
+            ))}
+          </nav>
         </div>
 
-        {/* Right: search + actions */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+        <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-shrink-0">
+          <label className="relative min-w-[220px] flex-1 lg:w-64 lg:flex-none">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e8e93]" />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder="Search files and folders"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-white border border-[#e5e5ea] pl-6 pr-2.5 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-[#0071e3] text-[11px] text-black placeholder:text-gray-400 w-36"
+              className="h-9 w-full rounded-lg border border-[#d8d8dd] bg-white pl-9 pr-3 text-sm text-[#1d1d1f] outline-none transition focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/10 placeholder:text-[#9a9aa0]"
             />
-          </div>
+          </label>
           {canManageFolders && canManageActiveLocation && (
             <>
               <button
+                type="button"
                 onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-1 bg-[#0071e3] hover:bg-[#147ce5] text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#0071e3] px-3.5 text-xs font-semibold text-white transition-colors hover:bg-[#147ce5]"
               >
-                <Upload className="w-3 h-3" />
+                <Upload className="h-3.5 w-3.5" />
                 <span>Upload Assets</span>
               </button>
               <button
+                type="button"
                 onClick={() => setShowNewFolderModal(true)}
-                className="flex items-center gap-1 bg-white border border-[#e5e5ea] hover:bg-[#f5f5f7] text-[#1d1d1f] px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#d8d8dd] bg-white px-3.5 text-xs font-semibold text-[#1d1d1f] transition-colors hover:bg-[#ededf0]"
               >
-                <Plus className="w-3 h-3" />
-                <span>Folder</span>
+                <Plus className="h-3.5 w-3.5" />
+                <span>New folder</span>
               </button>
             </>
           )}
         </div>
-      </div>
+      </header>
 
       {errorMessage && (
         <div className="flex items-start gap-2 rounded-lg border border-[#ff9500]/30 bg-[#fff7ed] px-3 py-2 text-xs font-medium text-[#9a3412]">
@@ -2066,53 +2315,54 @@ export const MediaLibrary = () => {
         </div>
       )}
 
-      {/* Folders List Grid */}
+      {/* Folders */}
       {(!searchQuery || visibleFolders.length > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {visibleFolders.map(folder => {
             const isDeletingThisFolder = deletingFolderId === folder._id;
+            const isSettingThisFolderCover = settingFolderCoverId === folder._id;
+            const isFolderBusy = isDeletingThisFolder || isSettingThisFolderCover;
             const canManageThisFolder = normalizeScope(folder.scope) !== 'global' || canManageGlobalMedia;
+            const itemCount = Number(folder.itemCount ?? (folder.carouselOrder || []).length);
             return (
             <div
               key={folder._id}
               onClick={() => {
-                if (isDeletingThisFolder) return;
+                if (isFolderBusy) return;
                 setActiveFolderId(folder._id);
               }}
-              className={`relative bg-white border border-[#e5e5ea] p-3 rounded-lg flex items-center gap-2.5 group transition-all min-w-0 ${
-                isDeletingThisFolder
+              className={`relative flex min-w-0 items-center gap-4 rounded-xl px-2 py-2.5 group transition-colors ${
+                isFolderBusy
                   ? 'cursor-wait opacity-70'
-                  : 'cursor-pointer hover:border-[#c7c7cc] hover:shadow-sm'
+                  : 'cursor-pointer hover:bg-black/[0.035]'
               }`}
             >
-              {/* Icon */}
-              <span className="flex-shrink-0">
-                {folder.kind === 'carousel_set' ? (
-                  <Images className="w-4 h-4 text-[#4f46e5]" />
-                ) : (
-                  <Folder className="w-4 h-4 text-gray-400 group-hover:text-gray-500" />
-                )}
-              </span>
-              {/* Name + subtitle — takes all remaining width */}
+              <MediaFolderPreview folder={folder} />
+
               <div className="flex-1 min-w-0 overflow-hidden">
                 <span
-                  className="block truncate text-[11px] font-semibold text-[#1d1d1f] leading-tight"
+                  className="block truncate text-sm font-bold leading-tight text-[#1d1d1f]"
                   title={folder.name}
                 >
                   {folder.name}
                 </span>
-                {folder.kind === 'carousel_set' && (
-                  <span className="block truncate text-[9px] font-semibold uppercase tracking-wide text-[#4f46e5] opacity-80 leading-tight mt-0.5">
-                    {(folder.carouselOrder || []).length || '—'} slides
-                  </span>
-                )}
-                {normalizeScope(folder.scope) === 'global' && (
-                  <span className="mt-1 inline-flex rounded bg-[#eef2ff] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#4f46e5]">
-                    Global
-                  </span>
-                )}
-                {(folder.tags || []).length > 0 && (
-                  <div className="mt-1 flex items-center gap-1 overflow-hidden">
+                <span className="mt-1 block text-xs font-medium text-[#6e6e73]">
+                  {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                </span>
+                <div className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-hidden">
+                  {folder.kind === 'carousel_set' && (
+                    <span className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-[#eef2ff] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#4f46e5]">
+                      <Images className="h-2.5 w-2.5" />
+                      Carousel
+                    </span>
+                  )}
+                  {normalizeScope(folder.scope) === 'global' && (
+                    <span className="inline-flex flex-shrink-0 rounded bg-[#eef2ff] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#4f46e5]">
+                      Global
+                    </span>
+                  )}
+                  {(folder.tags || []).length > 0 && (
+                    <>
                     {(folder.tags || []).slice(0, 2).map((tag) => (
                       <span
                         key={tag}
@@ -2127,8 +2377,9 @@ export const MediaLibrary = () => {
                         +{folder.tags.length - 2}
                       </span>
                     )}
-                  </div>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
               {/* Actions kebab — only visible on hover to save space */}
               {((canManageFolders && canManageThisFolder) || (canDelete && canManageThisFolder)) && (
@@ -2137,10 +2388,10 @@ export const MediaLibrary = () => {
 	                    type="button"
 	                    onClick={(e) => {
 	                      e.stopPropagation();
-                      if (isDeletingThisFolder) return;
+                      if (isFolderBusy) return;
 	                      setOpenFolderMenuId((current) => (current === folder._id ? null : folder._id));
 	                    }}
-	                    disabled={isDeletingThisFolder}
+	                    disabled={isFolderBusy}
 	                    className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[#f5f5f7] text-gray-400 hover:text-black transition-all disabled:cursor-wait disabled:opacity-40"
 	                    title="Folder actions"
 	                    aria-label="Folder actions"
@@ -2183,6 +2434,26 @@ export const MediaLibrary = () => {
                             <Tags className="h-3 w-3" />
                             <span>Add tags</span>
                           </button>
+	                          <button
+	                            type="button"
+	                            onClick={(e) => openFolderCoverPicker(folder, e)}
+	                            disabled={isFolderBusy}
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
+	                          >
+                            <Images className="h-3 w-3" />
+                            <span>{folder.coverMediaId ? 'Change cover' : 'Set cover image'}</span>
+                          </button>
+                          {folder.coverMediaId && (
+	                          <button
+	                            type="button"
+	                            onClick={(e) => handleRemoveFolderCover(folder, e)}
+	                            disabled={isFolderBusy}
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#6e6e73] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
+	                          >
+                              <X className="h-3 w-3" />
+                              <span>Remove cover</span>
+                            </button>
+                          )}
                           {canManageGlobalMedia && normalizeScope(folder.scope) !== 'global' && (
 	                          <button
 	                            type="button"
@@ -2230,6 +2501,14 @@ export const MediaLibrary = () => {
                   </div>
                 </div>
               )}
+	              {isSettingThisFolderCover && (
+	                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/75 backdrop-blur-[1px]">
+	                  <div className="inline-flex items-center gap-2 rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-2.5 py-1.5 text-[11px] font-bold text-[#1d4ed8] shadow-sm">
+	                    <span className="h-3 w-3 rounded-full border-2 border-[#0071e3] border-t-transparent animate-spin" />
+	                    <span>Updating cover...</span>
+	                  </div>
+	                </div>
+	              )}
 	            </div>
             );
           })}
@@ -2429,7 +2708,7 @@ export const MediaLibrary = () => {
                             />
                           </div>
                         ) : (
-                          <img src={getAssetUrl(item.url)} crossOrigin="anonymous" className="w-full h-full object-cover" alt="" />
+                          <img src={getAssetUrl(item.url)} crossOrigin="anonymous" className="h-full w-full object-cover object-[center_40%]" alt="" />
                         )}
                         <div className={`${canSchedule ? 'left-10' : 'left-2'} absolute top-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm`}>
                           {item.type}

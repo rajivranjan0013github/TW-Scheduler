@@ -22,12 +22,12 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.25;
 
-const ToolButton = ({ disabled = false, label, danger = false, pressed, onClick, children }) => (
+const ToolButton = ({ disabled = false, label, danger = false, iconOnly = false, pressed, onClick, children }) => (
   <button
     type="button"
     disabled={disabled}
     onClick={onClick}
-    className={`inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-[10px] font-bold outline-none transition-colors focus-visible:ring-1 focus-visible:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-40 ${
+    className={`inline-flex h-7 items-center rounded-lg border text-[10px] font-bold outline-none transition-colors focus-visible:ring-1 focus-visible:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-40 ${iconOnly ? 'w-7 justify-center px-0' : 'gap-1.5 px-2.5'} ${
       danger
         ? 'border-red-900/60 bg-red-950/25 text-red-400 hover:border-red-800 hover:bg-red-950/45 hover:text-red-300'
         : pressed
@@ -256,11 +256,11 @@ export const Timeline = ({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <ToolButton label="Split selected clip at playhead (S)" disabled={!canSplit} onClick={splitSelectedClip}>
+          <ToolButton iconOnly label="Split selected clip at playhead (S)" disabled={!canSplit} onClick={splitSelectedClip}>
             <Scissors className="h-3.5 w-3.5" />
-            Split
           </ToolButton>
           <ToolButton
+            iconOnly
             label={rippleDeleteEnabled
               ? 'Ripple delete selected clip and close gap'
               : 'Delete selected clip'}
@@ -269,9 +269,9 @@ export const Timeline = ({
             onClick={deleteSelectedClip}
           >
             <Trash2 className="h-3.5 w-3.5" />
-            {rippleDeleteEnabled ? 'Ripple delete' : 'Delete'}
           </ToolButton>
           <ToolButton
+            iconOnly
             label={rippleDeleteEnabled
               ? 'Disable ripple delete mode'
               : 'Enable ripple delete mode'}
@@ -279,15 +279,14 @@ export const Timeline = ({
             onClick={() => onRippleDeleteEnabledChange?.(!rippleDeleteEnabled)}
           >
             <ListCollapse className="h-3.5 w-3.5" />
-            Ripple
           </ToolButton>
           <ToolButton
+            iconOnly
             label={effectiveMagneticSnapping ? 'Disable magnetic snapping' : 'Enable magnetic snapping'}
             pressed={effectiveMagneticSnapping}
             onClick={toggleMagneticSnapping}
           >
             <Magnet className="h-3.5 w-3.5" />
-            Snap
           </ToolButton>
 
           <div className="ml-1 flex h-7 items-center rounded-lg border border-[#35353a] bg-[#232326] p-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.3)]">

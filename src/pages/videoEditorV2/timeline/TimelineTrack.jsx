@@ -4,10 +4,8 @@ import {
   Film,
   Image,
   Layers3,
-  Lock,
   Music2,
   Type,
-  Unlock,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -69,7 +67,6 @@ export const TimelineTrack = ({
   const supportsMute = type === 'video' || type === 'audio';
   const hidden = Boolean(track.hidden);
   const muted = Boolean(track.muted);
-  const locked = Boolean(track.locked);
   const clips = Array.isArray(track.clips) ? track.clips : [];
 
   const updateTrack = (changes) => onUpdateTrack?.({ trackId: track.id, changes });
@@ -82,33 +79,28 @@ export const TimelineTrack = ({
       >
         <span className={`h-7 w-1 shrink-0 rounded-full ${TRACK_ACCENTS[type] || 'bg-slate-400'}`} />
         <TrackIcon className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-        <span className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase tracking-wide text-zinc-300">
-          {track.name || `${type} track`}
-        </span>
-        <div className="flex shrink-0 items-center">
-          {supportsMute && (
+        <div className="min-w-0 flex-1">
+          <span className="block truncate text-[10px] font-bold uppercase tracking-wide text-zinc-300">
+            {track.name || `${type} track`}
+          </span>
+          <div className="mt-0.5 flex items-center gap-0.5">
+            {supportsMute && (
+              <TrackControlButton
+                active={muted}
+                label={muted ? `Unmute ${track.name || type} track` : `Mute ${track.name || type} track`}
+                onClick={() => updateTrack({ muted: !muted })}
+              >
+                {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+              </TrackControlButton>
+            )}
             <TrackControlButton
-              active={muted}
-              label={muted ? `Unmute ${track.name || type} track` : `Mute ${track.name || type} track`}
-              onClick={() => updateTrack({ muted: !muted })}
+              active={hidden}
+              label={hidden ? `Show ${track.name || type} track` : `Hide ${track.name || type} track`}
+              onClick={() => updateTrack({ hidden: !hidden })}
             >
-              {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+              {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             </TrackControlButton>
-          )}
-          <TrackControlButton
-            active={hidden}
-            label={hidden ? `Show ${track.name || type} track` : `Hide ${track.name || type} track`}
-            onClick={() => updateTrack({ hidden: !hidden })}
-          >
-            {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-          </TrackControlButton>
-          <TrackControlButton
-            active={locked}
-            label={locked ? `Unlock ${track.name || type} track` : `Lock ${track.name || type} track`}
-            onClick={() => updateTrack({ locked: !locked })}
-          >
-            {locked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
-          </TrackControlButton>
+          </div>
         </div>
       </div>
 
@@ -143,7 +135,6 @@ export const TimelineTrack = ({
             pixelsPerSecond={pixelsPerSecond}
             timelineDuration={duration}
             selected={clip.id === selectedClipId}
-            locked={locked}
             minDuration={minClipDuration}
             snapInterval={snapInterval}
             magneticSnapEnabled={magneticSnapEnabled}
