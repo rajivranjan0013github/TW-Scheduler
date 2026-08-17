@@ -30,6 +30,7 @@ import {
   readLastMediaFolder,
   saveLastMediaFolder,
 } from '../media/mediaLibraryCache';
+import { setEditorDragData } from '../media/editorDragData';
 
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
 const getFolderParentId = (folder) => normalizeFolderId(folder.parentFolderId) || 'root';
@@ -37,6 +38,21 @@ const mediaUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 const proxiedMediaUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL, proxy: true });
 const AUDIO_PROGRESS_RADIUS = 22;
 const AUDIO_PROGRESS_CIRCUMFERENCE = 2 * Math.PI * AUDIO_PROGRESS_RADIUS;
+
+const mediaItemToEditorAsset = (item) => ({
+  id: item._id || item.id,
+  mediaId: item._id || item.id,
+  name: item.name || `Library ${item.type || 'media'}`,
+  sourceType: 'library',
+  type: item.type || 'video',
+  url: mediaUrl(item.url),
+  originalUrl: item.url,
+  thumbnailUrl: item.thumbnailUrl ? mediaUrl(item.thumbnailUrl) : '',
+  duration: item.duration || item.metadata?.duration || 0,
+  width: item.width || item.metadata?.width || 0,
+  height: item.height || item.metadata?.height || 0,
+  mimeType: item.mimeType || item.mimetype || '',
+});
 
 const naturalFileCollator = new Intl.Collator(undefined, {
   numeric: true,
@@ -123,6 +139,7 @@ const AudioLibraryRow = ({
   item,
   disabled,
   onAdd,
+  onDragStart,
   onPreviewStart,
   onPreviewStop,
 }) => {
@@ -184,7 +201,15 @@ const AudioLibraryRow = ({
   }, [itemId, onPreviewStop]);
 
   return (
-    <div className="group flex min-w-0 items-center gap-3 rounded-xl px-1.5 py-2.5 transition hover:bg-white/[0.05]">
+    <div
+      draggable={!disabled}
+      onDragStart={(event) => {
+        stopPreview();
+        onDragStart(event, item);
+      }}
+      className="group flex min-w-0 cursor-grab items-center gap-3 rounded-xl px-1.5 py-2.5 transition hover:bg-white/[0.05] active:cursor-grabbing"
+      title={`Drag ${item.name || 'audio'} to the audio track, or click its name to add it`}
+    >
       <button
         type="button"
         onClick={togglePreview}
@@ -456,23 +481,17 @@ export const MediaLibraryPanel = ({
     const itemId = String(item._id || item.id || item.url);
     setSelectingId(itemId);
     try {
-      await onSelect({
-        id: item._id || item.id,
-        mediaId: item._id || item.id,
-        name: item.name || `Library ${item.type || 'media'}`,
-        sourceType: 'library',
-        type: item.type || 'video',
-        url: mediaUrl(item.url),
-        originalUrl: item.url,
-        thumbnailUrl: item.thumbnailUrl ? mediaUrl(item.thumbnailUrl) : '',
-        duration: item.duration || item.metadata?.duration || 0,
-        width: item.width || item.metadata?.width || 0,
-        height: item.height || item.metadata?.height || 0,
-        mimeType: item.mimeType || item.mimetype || '',
-      });
+      await onSelect(mediaItemToEditorAsset(item));
     } finally {
       setSelectingId('');
     }
+  };
+
+  const handleDragStart = (event, item) => {
+    setEditorDragData(event, {
+      kind: 'asset',
+      asset: mediaItemToEditorAsset(item),
+    });
   };
 
   return (
@@ -582,10 +601,12 @@ export const MediaLibraryPanel = ({
                         <button
                           key={itemId}
                           type="button"
+                          draggable={!selectingId}
+                          onDragStart={(event) => handleDragStart(event, item)}
                           onClick={() => handleSelect(item)}
                           disabled={Boolean(selectingId)}
-                          className="group min-w-0 overflow-hidden rounded-xl border border-white/10 bg-[#171a20] text-left transition hover:border-[#ff5500]/60 hover:bg-[#1d2027] disabled:cursor-wait disabled:opacity-60"
-                          title={`Add ${item.name || item.type || 'media'} to the timeline`}
+                          className="group min-w-0 cursor-grab overflow-hidden rounded-xl border border-white/10 bg-[#171a20] text-left transition hover:border-[#ff5500]/60 hover:bg-[#1d2027] active:cursor-grabbing disabled:cursor-wait disabled:opacity-60"
+                          title={`Drag ${item.name || item.type || 'media'} to the timeline, or click to add it`}
                         >
                           <span className="relative block aspect-[9/16] overflow-hidden bg-[#0b0c0f]">
                             <MediaThumbnail item={item} />
@@ -604,6 +625,7 @@ export const MediaLibraryPanel = ({
                         item={item}
                         disabled={Boolean(selectingId)}
                         onAdd={handleSelect}
+                        onDragStart={handleDragStart}
                         onPreviewStart={handleAudioPreviewStart}
                         onPreviewStop={handleAudioPreviewStop}
                       />

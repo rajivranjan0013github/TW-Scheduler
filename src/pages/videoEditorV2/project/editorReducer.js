@@ -13,6 +13,7 @@ import {
 import {
   addTrackToProject,
   attachExtractedAudioClip,
+  compactOverlayClips,
   finalizeProjectChange,
   findClipById,
   getAvailableOverlayTrack,
@@ -25,6 +26,7 @@ import {
   replaceClipWithSplit,
   retimeClipPlaybackRate,
   rippleDeleteClipById,
+  settleOverlayClip,
   trimClip,
   updateClipById,
   updateTrackById,
@@ -207,10 +209,10 @@ export function editorReducer(state, action) {
           && (mainVideoTrack?.clips.length || 0) > 0
         );
       let projectWithTarget = state.project;
-      let targetTrack = payload.trackId
-        ? getTrackById(state.project, payload.trackId)
-        : shouldUseOverlay
-          ? getAvailableOverlayTrack(state.project, draftClip)
+      let targetTrack = shouldUseOverlay
+        ? getAvailableOverlayTrack(state.project, draftClip, { preferLast: true })
+        : payload.trackId
+          ? getTrackById(state.project, payload.trackId)
           : getPrimaryTrackByType(state.project, requestedType);
 
       if (!targetTrack && shouldUseOverlay) {
@@ -237,9 +239,11 @@ export function editorReducer(state, action) {
         clip,
         index: payload.index,
       });
-      return commitProject(state, nextProject, {
+      const compactedProject = compactOverlayClips(nextProject);
+      const compactedLocation = getClipLocation(compactedProject, clip.id);
+      return commitProject(state, compactedProject, {
         selectedClipId: payload.select === false ? state.selectedClipId : clip.id,
-        selectedTrackId: targetTrack.id,
+        selectedTrackId: compactedLocation?.track.id || targetTrack.id,
       });
     }
 
@@ -300,9 +304,13 @@ export function editorReducer(state, action) {
       const clipId = payload.clipId || state.selectedClipId;
       const location = getClipLocation(state.project, clipId);
       if (!location || location.track.locked) return state;
-      return commitProject(state, removeClipById(state.project, clipId), {
-        selectedClipId: state.selectedClipId === clipId ? null : state.selectedClipId,
-        selectedTrackId: location.track.id,
+      const nextProject = compactOverlayClips(removeClipById(state.project, clipId));
+      const selectedClipId = state.selectedClipId === clipId ? null : state.selectedClipId;
+      return commitProject(state, nextProject, {
+        selectedClipId,
+        selectedTrackId: selectedClipId
+          ? getClipLocation(nextProject, selectedClipId)?.track.id
+          : location.track.id,
       });
     }
 
@@ -310,9 +318,13 @@ export function editorReducer(state, action) {
       const clipId = payload.clipId || state.selectedClipId;
       const location = getClipLocation(state.project, clipId);
       if (!location || location.track.locked) return state;
-      return commitProject(state, rippleDeleteClipById(state.project, clipId), {
-        selectedClipId: state.selectedClipId === clipId ? null : state.selectedClipId,
-        selectedTrackId: location.track.id,
+      const nextProject = compactOverlayClips(rippleDeleteClipById(state.project, clipId));
+      const selectedClipId = state.selectedClipId === clipId ? null : state.selectedClipId;
+      return commitProject(state, nextProject, {
+        selectedClipId,
+        selectedTrackId: selectedClipId
+          ? getClipLocation(nextProject, selectedClipId)?.track.id
+          : location.track.id,
       });
     }
 
@@ -322,9 +334,13 @@ export function editorReducer(state, action) {
         ? getTrackById(state.project, payload.toTrackId)
         : location?.track;
       if (!location || location.track.locked || targetTrack?.locked) return state;
-      return commitProject(state, moveClip(state.project, payload), {
+      const nextProject = settleOverlayClip(
+        moveClip(state.project, payload),
+        payload.clipId,
+      );
+      return commitProject(state, nextProject, {
         selectedClipId: payload.clipId,
-        selectedTrackId: targetTrack?.id,
+        selectedTrackId: getClipLocation(nextProject, payload.clipId)?.track.id || targetTrack?.id,
       });
     }
 
@@ -336,10 +352,17 @@ export function editorReducer(state, action) {
         maxDuration: state.project.output.maxDuration,
       });
       if (!nextClip) return state;
+      const nextProject = settleOverlayClip(
+        updateClipById(state.project, payload.clipId, nextClip),
+        payload.clipId,
+      );
       return commitProject(
         state,
-        updateClipById(state.project, payload.clipId, nextClip),
-        { selectedClipId: payload.clipId, selectedTrackId: location.track.id },
+        nextProject,
+        {
+          selectedClipId: payload.clipId,
+          selectedTrackId: getClipLocation(nextProject, payload.clipId)?.track.id || location.track.id,
+        },
       );
     }
 

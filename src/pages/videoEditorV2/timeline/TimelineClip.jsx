@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Film, GripVertical, Image, Music2, Type } from 'lucide-react';
+import { Film, Image, Music2, Type } from 'lucide-react';
 import { AudioWaveform } from './AudioWaveform';
 import { VideoFrameStrip } from './VideoFrameStrip';
 import {
@@ -16,23 +16,19 @@ import {
 const TYPE_STYLES = {
   video: {
     Icon: Film,
-    className: 'border-sky-400 bg-gradient-to-r from-sky-700 to-blue-700 text-white',
-    handleClassName: 'bg-sky-950/95 text-sky-200',
+    className: 'border-[#34363b] bg-[#0b0c0f] text-white',
   },
   text: {
     Icon: Type,
-    className: 'border-violet-400 bg-gradient-to-r from-violet-700 to-fuchsia-700 text-white',
-    handleClassName: 'bg-violet-950/95 text-violet-200',
+    className: 'border-[#188f94] bg-[#0d7479] text-white',
   },
   audio: {
     Icon: Music2,
-    className: 'border-emerald-400 bg-gradient-to-r from-emerald-700 to-teal-700 text-white',
-    handleClassName: 'bg-emerald-950/95 text-emerald-200',
+    className: 'border-[#2f817b] bg-[#185f5a] text-white',
   },
   image: {
     Icon: Image,
-    className: 'border-amber-400 bg-gradient-to-r from-amber-600 to-orange-700 text-white',
-    handleClassName: 'bg-amber-950/95 text-amber-200',
+    className: 'border-[#59616d] bg-[#343a43] text-white',
   },
 };
 
@@ -61,6 +57,7 @@ export const TimelineClip = ({
   onMoveClip,
   onTrimClip,
   onDeleteClip,
+  onSeekFromPointer,
   onSnapGuideChange,
 }) => {
   const [interaction, setInteraction] = useState(null);
@@ -81,7 +78,8 @@ export const TimelineClip = ({
   ));
   const magneticThresholdSeconds = Math.max(0, Number(magneticSnapThresholdPx) || 0)
     / Math.max(1, pixelsPerSecond);
-  const showFrameStrip = trackType === 'video' && clipType === 'video' && Boolean(clip.sourceUrl);
+  const showFrameStrip = clipType === 'video' && Boolean(clip.sourceUrl);
+  const clipBorderRadius = Math.min(20, Math.max(8, Number(height || 0) * 0.4));
 
   useEffect(() => () => onSnapGuideChange?.(null), [onSnapGuideChange]);
 
@@ -99,6 +97,7 @@ export const TimelineClip = ({
     event.preventDefault();
     event.stopPropagation();
     onSelectClip?.({ trackId, clipId: clip.id });
+    if (mode === 'move') onSeekFromPointer?.(event);
     onSnapGuideChange?.(null);
     if (locked || event.button !== 0) return;
 
@@ -241,15 +240,17 @@ export const TimelineClip = ({
 
   return (
     <div
-      className={`group absolute top-1.5 bottom-1.5 overflow-hidden rounded-md border shadow-[0_2px_7px_rgba(0,0,0,0.35)] outline-none transition-[box-shadow,filter] focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#141416] ${visual.className} ${
+      className={`group absolute inset-y-0 overflow-hidden border shadow-[inset_0_1px_0_rgba(255,255,255,0.10),inset_0_-8px_14px_rgba(0,0,0,0.20),0_2px_7px_rgba(0,0,0,0.35)] outline-none transition-[box-shadow,filter] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#9b6cff] ${visual.className} ${
         selected
-          ? 'z-20 ring-2 ring-orange-400 ring-offset-2 ring-offset-[#141416]'
-          : `z-10 ${showFrameStrip ? 'hover:border-sky-300' : 'hover:brightness-110'}`
+          ? 'z-20'
+          : `z-10 ${showFrameStrip ? 'hover:border-[#656870]' : 'hover:brightness-110'}`
       } ${locked ? 'cursor-not-allowed opacity-75' : interaction ? 'cursor-grabbing' : 'cursor-grab'}`}
       style={{
         left: values.timelineStart * pixelsPerSecond,
         width: clipWidth,
         touchAction: 'none',
+        borderRadius: clipBorderRadius,
+        border: selected ? '3px solid #9b6cff' : undefined,
       }}
       role="button"
       tabIndex={0}
@@ -285,36 +286,38 @@ export const TimelineClip = ({
 
       <div className="relative flex h-full min-w-0 items-center gap-1.5 px-2.5">
         {clipType !== 'video' && <Icon className="h-3.5 w-3.5 shrink-0" />}
-        {clipWidth >= 90 && (
-          <span className={`ml-auto shrink-0 text-[9px] font-semibold tabular-nums text-white ${
-            showFrameStrip ? 'rounded bg-black/55 px-1.5 py-1 shadow-sm' : 'text-white/80'
-          }`}>
-            {values.duration.toFixed(1)}s
-          </span>
-        )}
       </div>
+
+      {selected && (
+        <div
+          className="pointer-events-none absolute inset-0 z-20"
+          style={{
+            borderRadius: 'inherit',
+            boxShadow: 'inset 0 0 0 1px #121318',
+          }}
+          aria-hidden="true"
+        />
+      )}
 
       {selected && !locked && (
         <>
           <button
             type="button"
-            className={`absolute inset-y-0 left-0 flex w-2.5 cursor-ew-resize items-center justify-center border-r border-black/10 shadow-sm ${visual.handleClassName}`}
+            className="absolute inset-y-0 left-0 z-30 w-3 cursor-ew-resize bg-transparent"
             style={{ touchAction: 'none' }}
             onPointerDown={(event) => startInteraction(event, 'trim-start')}
             aria-label={`Trim start of ${getClipLabel(clip)}`}
             title="Trim start"
           >
-            <GripVertical className="h-3 w-3" />
           </button>
           <button
             type="button"
-            className={`absolute inset-y-0 right-0 flex w-2.5 cursor-ew-resize items-center justify-center border-l border-black/10 shadow-sm ${visual.handleClassName}`}
+            className="absolute inset-y-0 right-0 z-30 w-3 cursor-ew-resize bg-transparent"
             style={{ touchAction: 'none' }}
             onPointerDown={(event) => startInteraction(event, 'trim-end')}
             aria-label={`Trim end of ${getClipLabel(clip)}`}
             title="Trim end"
           >
-            <GripVertical className="h-3 w-3" />
           </button>
         </>
       )}

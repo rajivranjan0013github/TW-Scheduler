@@ -23,6 +23,13 @@ const compareVisualLayers = (left, right) => (
   || Number(left.clipIndex || 0) - Number(right.clipIndex || 0)
 );
 const NOOP = () => {};
+const formatPreviewTime = (seconds, showTenths = false) => {
+  const safeSeconds = Math.max(0, Number(seconds) || 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const wholeSeconds = Math.floor(safeSeconds % 60);
+  const base = `${minutes}:${String(wholeSeconds).padStart(2, '0')}`;
+  return showTenths ? `${base}.${Math.floor((safeSeconds % 1) * 10)}` : base;
+};
 const MIN_TEXT_BOX_WIDTH = 0.08;
 const MAX_TEXT_BOX_WIDTH = 0.92;
 const MIN_TEXT_SCALE = 0.25;
@@ -30,6 +37,18 @@ const MAX_TEXT_SCALE = 3;
 const COMPACT_TEXT_BOX_WIDTH = 96;
 const COMPACT_TEXT_BOX_HEIGHT = 44;
 const COMPACT_TEXT_HANDLE_MODES = new Set(['nw', 'right']);
+const MIN_MEDIA_SCALE = 0.05;
+const MAX_MEDIA_SCALE = 10;
+const MEDIA_RESIZE_HANDLES = [
+  { mode: 'nw', label: 'Resize media from top left', className: '-left-3 -top-3 cursor-nwse-resize', markerClassName: 'h-3.5 w-3.5 rounded-full' },
+  { mode: 'n', label: 'Resize media from top', className: 'left-1/2 -top-2.5 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-2 w-8 rounded-full' },
+  { mode: 'ne', label: 'Resize media from top right', className: '-right-3 -top-3 cursor-nesw-resize', markerClassName: 'h-3.5 w-3.5 rounded-full' },
+  { mode: 'e', label: 'Resize media from right', className: '-right-2.5 top-1/2 -translate-y-1/2 cursor-ew-resize', markerClassName: 'h-8 w-2 rounded-full' },
+  { mode: 'se', label: 'Resize media from bottom right', className: '-bottom-3 -right-3 cursor-nwse-resize', markerClassName: 'h-3.5 w-3.5 rounded-full' },
+  { mode: 's', label: 'Resize media from bottom', className: '-bottom-2.5 left-1/2 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-2 w-8 rounded-full' },
+  { mode: 'sw', label: 'Resize media from bottom left', className: '-bottom-3 -left-3 cursor-nesw-resize', markerClassName: 'h-3.5 w-3.5 rounded-full' },
+  { mode: 'w', label: 'Resize media from left', className: '-left-2.5 top-1/2 -translate-y-1/2 cursor-ew-resize', markerClassName: 'h-8 w-2 rounded-full' },
+];
 const TEXT_RESIZE_HANDLES = [
   { mode: 'left', label: 'Resize text box from left', className: '-left-2 top-1/2 h-7 w-4 -translate-y-1/2 cursor-ew-resize', indicatorClassName: 'h-4 w-1 rounded-full' },
   { mode: 'right', label: 'Resize text box from right', className: '-right-2 top-1/2 h-7 w-4 -translate-y-1/2 cursor-ew-resize', indicatorClassName: 'h-4 w-1 rounded-full' },
@@ -82,6 +101,7 @@ const getVisualGeometry = ({ clip, crop, transform, mediaSize, stageSize }) => {
     1,
     mediaSize.height || Number(clip.metadata?.height || clip.height) || stageHeight,
   );
+  const sourceAspect = Math.max(0.001, sourceWidth / sourceHeight);
   const croppedAspect = Math.max(
     0.001,
     (sourceWidth * crop.width) / (sourceHeight * crop.height),
@@ -96,12 +116,14 @@ const getVisualGeometry = ({ clip, crop, transform, mediaSize, stageSize }) => {
       : 'contain';
 
   if (fit === 'contain') {
-    const width = croppedAspect >= targetAspect
+    const fittedWidth = sourceAspect >= targetAspect
       ? targetWidth
-      : targetHeight * croppedAspect;
-    const height = croppedAspect >= targetAspect
-      ? targetWidth / croppedAspect
+      : targetHeight * sourceAspect;
+    const fittedHeight = sourceAspect >= targetAspect
+      ? targetWidth / sourceAspect
       : targetHeight;
+    const width = fittedWidth * crop.width;
+    const height = fittedHeight * crop.height;
     return {
       layerWidth: width,
       layerHeight: height,
@@ -177,6 +199,268 @@ const getLoopedSourceTime = (clip, currentTime, mediaDuration) => {
   return (absoluteTime - duration) % duration;
 };
 
+const useMediaResize = ({ clip, mediaSize, stageSize, onSelect, onUpdate }) => {
+  const [draftTransform, setDraftTransform] = useState(null);
+  const [draftCrop, setDraftCrop] = useState(null);
+  const draftTransformRef = useRef(null);
+  const draftCropRef = useRef(null);
+  const cleanupRef = useRef(null);
+  const crop = draftCrop || getClipCrop(clip);
+  const transform = draftTransform || getClipTransform(clip);
+  const geometry = getVisualGeometry({ clip, crop, transform, mediaSize, stageSize });
+
+  useEffect(() => () => cleanupRef.current?.(), []);
+
+  const startMove = (event) => {
+    if (event.button !== 0 || event.isPrimary === false) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(clip.id);
+    cleanupRef.current?.();
+
+    const startPoint = { x: event.clientX, y: event.clientY };
+    const startTransform = getClipTransform(clip);
+    let dragging = false;
+
+    const cleanup = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', end);
+      document.removeEventListener('pointercancel', cancel);
+      cleanupRef.current = null;
+    };
+    const finish = (commit) => {
+      const finalTransform = draftTransformRef.current;
+      cleanup();
+      if (commit && dragging && finalTransform) {
+        onUpdate(clip.id, { transform: finalTransform });
+      }
+      draftTransformRef.current = null;
+      setDraftTransform(null);
+    };
+    const move = (moveEvent) => {
+      const deltaX = moveEvent.clientX - startPoint.x;
+      const deltaY = moveEvent.clientY - startPoint.y;
+      if (!dragging && Math.hypot(deltaX, deltaY) < 3) return;
+      dragging = true;
+      moveEvent.preventDefault();
+      const nextTransform = {
+        ...clip.transform,
+        x: clamp(
+          startTransform.x + deltaX / Math.max(1, stageSize.width),
+          0,
+          1,
+        ),
+        y: clamp(
+          startTransform.y + deltaY / Math.max(1, stageSize.height),
+          0,
+          1,
+        ),
+      };
+      draftTransformRef.current = nextTransform;
+      setDraftTransform(nextTransform);
+    };
+    const end = () => finish(true);
+    const cancel = () => finish(false);
+
+    cleanupRef.current = cleanup;
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', cancel);
+  };
+
+  const startCrop = (event, mode) => {
+    if (event.button !== 0 || event.isPrimary === false) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(clip.id);
+    cleanupRef.current?.();
+
+    const startPoint = { x: event.clientX, y: event.clientY };
+    const startCropValue = getClipCrop(clip);
+    const startTransform = getClipTransform(clip);
+    const startGeometry = getVisualGeometry({
+      clip,
+      crop: startCropValue,
+      transform: startTransform,
+      mediaSize,
+      stageSize,
+    });
+    const rotation = (startTransform.rotation * Math.PI) / 180;
+    const cosine = Math.cos(rotation);
+    const sine = Math.sin(rotation);
+    const horizontalDirection = mode === 'e' ? 1 : mode === 'w' ? -1 : 0;
+    const verticalDirection = mode === 's' ? 1 : mode === 'n' ? -1 : 0;
+
+    const cleanup = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', end);
+      document.removeEventListener('pointercancel', cancel);
+      cleanupRef.current = null;
+    };
+    const finish = (commit) => {
+      const finalCrop = draftCropRef.current;
+      const finalTransform = draftTransformRef.current;
+      cleanup();
+      if (commit && finalCrop && finalTransform) {
+        onUpdate(clip.id, { crop: finalCrop, transform: finalTransform });
+      }
+      draftCropRef.current = null;
+      draftTransformRef.current = null;
+      setDraftCrop(null);
+      setDraftTransform(null);
+    };
+    const move = (moveEvent) => {
+      moveEvent.preventDefault();
+      const worldDeltaX = moveEvent.clientX - startPoint.x;
+      const worldDeltaY = moveEvent.clientY - startPoint.y;
+      const localDeltaX = worldDeltaX * cosine + worldDeltaY * sine;
+      const localDeltaY = -worldDeltaX * sine + worldDeltaY * cosine;
+      const nextCrop = updateCropFromDelta(
+        startCropValue,
+        mode,
+        (localDeltaX / Math.max(1, startGeometry.layerWidth)) * startCropValue.width,
+        (localDeltaY / Math.max(1, startGeometry.layerHeight)) * startCropValue.height,
+      );
+      const nextGeometry = getVisualGeometry({
+        clip,
+        crop: nextCrop,
+        transform: startTransform,
+        mediaSize,
+        stageSize,
+      });
+      const localCenterShiftX = horizontalDirection
+        * (nextGeometry.layerWidth - startGeometry.layerWidth) / 2;
+      const localCenterShiftY = verticalDirection
+        * (nextGeometry.layerHeight - startGeometry.layerHeight) / 2;
+      const worldCenterShiftX = localCenterShiftX * cosine - localCenterShiftY * sine;
+      const worldCenterShiftY = localCenterShiftX * sine + localCenterShiftY * cosine;
+      const nextTransform = {
+        ...clip.transform,
+        x: clamp(
+          startTransform.x + worldCenterShiftX / Math.max(1, stageSize.width),
+          0,
+          1,
+        ),
+        y: clamp(
+          startTransform.y + worldCenterShiftY / Math.max(1, stageSize.height),
+          0,
+          1,
+        ),
+      };
+      draftCropRef.current = nextCrop;
+      draftTransformRef.current = nextTransform;
+      setDraftCrop(nextCrop);
+      setDraftTransform(nextTransform);
+    };
+    const end = () => finish(true);
+    const cancel = () => finish(false);
+
+    cleanupRef.current = cleanup;
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', cancel);
+  };
+
+  const startResize = (event, mode) => {
+    if (mode.length === 1) {
+      startCrop(event, mode);
+      return;
+    }
+    if (event.button !== 0 || event.isPrimary === false) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(clip.id);
+    cleanupRef.current?.();
+
+    const startPoint = { x: event.clientX, y: event.clientY };
+    const startTransform = getClipTransform(clip);
+    const startGeometry = getVisualGeometry({
+      clip,
+      crop,
+      transform: startTransform,
+      mediaSize,
+      stageSize,
+    });
+    const startScale = Math.max(MIN_MEDIA_SCALE, startTransform.scale);
+    const baseWidth = startGeometry.layerWidth / startScale;
+    const baseHeight = startGeometry.layerHeight / startScale;
+    const horizontalDirection = mode.includes('e') ? 1 : mode.includes('w') ? -1 : 0;
+    const verticalDirection = mode.includes('s') ? 1 : mode.includes('n') ? -1 : 0;
+    const rotation = (startTransform.rotation * Math.PI) / 180;
+    const cosine = Math.cos(rotation);
+    const sine = Math.sin(rotation);
+    const localDiagonalX = horizontalDirection * startGeometry.layerWidth;
+    const localDiagonalY = verticalDirection * startGeometry.layerHeight;
+    const worldDiagonalX = localDiagonalX * cosine - localDiagonalY * sine;
+    const worldDiagonalY = localDiagonalX * sine + localDiagonalY * cosine;
+    const diagonalLengthSquared = Math.max(
+      1,
+      worldDiagonalX ** 2 + worldDiagonalY ** 2,
+    );
+
+    const cleanup = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', end);
+      document.removeEventListener('pointercancel', cancel);
+      cleanupRef.current = null;
+    };
+    const finish = (commit) => {
+      const finalTransform = draftTransformRef.current;
+      cleanup();
+      if (commit && finalTransform) onUpdate(clip.id, { transform: finalTransform });
+      draftTransformRef.current = null;
+      setDraftTransform(null);
+    };
+    const move = (moveEvent) => {
+      moveEvent.preventDefault();
+      const deltaX = moveEvent.clientX - startPoint.x;
+      const deltaY = moveEvent.clientY - startPoint.y;
+      const scaleFactor = horizontalDirection === 0
+        ? 1 + (verticalDirection * deltaY) / Math.max(1, startGeometry.layerHeight)
+        : verticalDirection === 0
+          ? 1 + (horizontalDirection * deltaX) / Math.max(1, startGeometry.layerWidth)
+          : 1 + (
+              deltaX * worldDiagonalX + deltaY * worldDiagonalY
+            ) / diagonalLengthSquared;
+      const nextScale = clamp(
+        startScale * scaleFactor,
+        MIN_MEDIA_SCALE,
+        MAX_MEDIA_SCALE,
+      );
+      const scaleDelta = nextScale - startScale;
+      const localCenterShiftX = horizontalDirection * baseWidth * scaleDelta / 2;
+      const localCenterShiftY = verticalDirection * baseHeight * scaleDelta / 2;
+      const worldCenterShiftX = localCenterShiftX * cosine - localCenterShiftY * sine;
+      const worldCenterShiftY = localCenterShiftX * sine + localCenterShiftY * cosine;
+      const nextTransform = {
+        ...clip.transform,
+        x: clamp(
+          startTransform.x + worldCenterShiftX / Math.max(1, stageSize.width),
+          0,
+          1,
+        ),
+        y: clamp(
+          startTransform.y + worldCenterShiftY / Math.max(1, stageSize.height),
+          0,
+          1,
+        ),
+        scale: nextScale,
+      };
+      draftTransformRef.current = nextTransform;
+      setDraftTransform(nextTransform);
+    };
+    const end = () => finish(true);
+    const cancel = () => finish(false);
+
+    cleanupRef.current = cleanup;
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', cancel);
+  };
+
+  return { crop, geometry, transform, startMove, startResize };
+};
+
 const PreviewVideoLayer = ({
   clip,
   currentTime,
@@ -184,12 +468,17 @@ const PreviewVideoLayer = ({
   selected,
   stageSize,
   onSelect,
+  onUpdate,
 }) => {
   const videoRef = useRef(null);
   const [mediaSize, setMediaSize] = useState({ width: 0, height: 0 });
-  const crop = getClipCrop(clip);
-  const transform = getClipTransform(clip);
-  const geometry = getVisualGeometry({ clip, crop, transform, mediaSize, stageSize });
+  const { crop, geometry, transform, startMove, startResize } = useMediaResize({
+    clip,
+    mediaSize,
+    stageSize,
+    onSelect,
+    onUpdate,
+  });
 
   useEffect(() => {
     const video = videoRef.current;
@@ -226,33 +515,50 @@ const PreviewVideoLayer = ({
         event.stopPropagation();
         onSelect(clip.id);
       }}
-      className={`absolute overflow-hidden ${selected ? 'ring-2 ring-inset ring-[#ff5500]' : ''}`}
+      onPointerDown={startMove}
+      className={`absolute cursor-move overflow-visible ${selected ? 'outline outline-2 outline-[#8b5cf6]' : ''}`}
       style={getMediaLayerStyle(geometry, transform)}
       aria-label={`Select ${clip.name || 'video clip'}`}
     >
-      <video
-        ref={videoRef}
-        src={clip.sourceUrl || clip.url}
-        onLoadedMetadata={(event) => setMediaSize({
-          width: event.currentTarget.videoWidth,
-          height: event.currentTarget.videoHeight,
-        })}
-        crossOrigin="anonymous"
-        playsInline
-        preload="auto"
-        muted={Boolean(clip.muted || clip.trackMuted)}
-        className="pointer-events-none absolute max-w-none"
-        style={getCroppedMediaStyle(geometry, crop)}
-      />
+      <span className="absolute inset-0 overflow-hidden">
+        <video
+          ref={videoRef}
+          src={clip.sourceUrl || clip.url}
+          onLoadedMetadata={(event) => setMediaSize({
+            width: event.currentTarget.videoWidth,
+            height: event.currentTarget.videoHeight,
+          })}
+          crossOrigin="anonymous"
+          playsInline
+          preload="auto"
+          muted={Boolean(clip.muted || clip.trackMuted)}
+          className="pointer-events-none absolute max-w-none"
+          style={getCroppedMediaStyle(geometry, crop)}
+        />
+      </span>
+      {selected && MEDIA_RESIZE_HANDLES.map((handle) => (
+        <span
+          key={handle.mode}
+          className={`absolute z-[70] grid h-5 w-5 touch-none place-items-center ${handle.className}`}
+          onPointerDown={(event) => startResize(event, handle.mode)}
+          title={handle.label}
+        >
+          <span className={`pointer-events-none border border-zinc-400 bg-white shadow-[0_1px_5px_rgba(0,0,0,0.55)] ${handle.markerClassName}`} />
+        </span>
+      ))}
     </button>
   );
 };
 
-const PreviewImageLayer = ({ clip, selected, stageSize, onSelect }) => {
+const PreviewImageLayer = ({ clip, selected, stageSize, onSelect, onUpdate }) => {
   const [mediaSize, setMediaSize] = useState({ width: 0, height: 0 });
-  const crop = getClipCrop(clip);
-  const transform = getClipTransform(clip);
-  const geometry = getVisualGeometry({ clip, crop, transform, mediaSize, stageSize });
+  const { crop, geometry, transform, startMove, startResize } = useMediaResize({
+    clip,
+    mediaSize,
+    stageSize,
+    onSelect,
+    onUpdate,
+  });
 
   return (
     <button
@@ -261,20 +567,33 @@ const PreviewImageLayer = ({ clip, selected, stageSize, onSelect }) => {
         event.stopPropagation();
         onSelect(clip.id);
       }}
-      className={`absolute overflow-hidden ${selected ? 'ring-2 ring-inset ring-[#ff5500]' : ''}`}
+      onPointerDown={startMove}
+      className={`absolute cursor-move overflow-visible ${selected ? 'outline outline-2 outline-[#8b5cf6]' : ''}`}
       style={getMediaLayerStyle(geometry, transform)}
       aria-label={`Select ${clip.name || 'image clip'}`}
     >
-      <img
-        src={clip.sourceUrl || clip.url}
-        onLoad={(event) => setMediaSize({
-          width: event.currentTarget.naturalWidth,
-          height: event.currentTarget.naturalHeight,
-        })}
-        alt=""
-        className="pointer-events-none absolute max-w-none"
-        style={getCroppedMediaStyle(geometry, crop)}
-      />
+      <span className="absolute inset-0 overflow-hidden">
+        <img
+          src={clip.sourceUrl || clip.url}
+          onLoad={(event) => setMediaSize({
+            width: event.currentTarget.naturalWidth,
+            height: event.currentTarget.naturalHeight,
+          })}
+          alt=""
+          className="pointer-events-none absolute max-w-none"
+          style={getCroppedMediaStyle(geometry, crop)}
+        />
+      </span>
+      {selected && MEDIA_RESIZE_HANDLES.map((handle) => (
+        <span
+          key={handle.mode}
+          className={`absolute z-[70] grid h-5 w-5 touch-none place-items-center ${handle.className}`}
+          onPointerDown={(event) => startResize(event, handle.mode)}
+          title={handle.label}
+        >
+          <span className={`pointer-events-none border border-zinc-400 bg-white shadow-[0_1px_5px_rgba(0,0,0,0.55)] ${handle.markerClassName}`} />
+        </span>
+      ))}
     </button>
   );
 };
@@ -1260,6 +1579,7 @@ export const ProjectPreviewCanvas = ({
 export const PreviewStage = ({
   project,
   currentTime,
+  duration = 0,
   isPlaying,
   selectedClipId,
   onSelectClip,
@@ -1438,6 +1758,7 @@ export const PreviewStage = ({
                   selected={selectedClipId === clip.id}
                   stageSize={stageSize}
                   onSelect={onSelectClip}
+                  onUpdate={onUpdateClip}
                 />
               );
             }
@@ -1449,6 +1770,7 @@ export const PreviewStage = ({
                   selected={selectedClipId === clip.id}
                   stageSize={stageSize}
                   onSelect={onSelectClip}
+                  onUpdate={onUpdateClip}
                 />
               );
             }
@@ -1533,6 +1855,12 @@ export const PreviewStage = ({
           </>
         ) : (
           <>
+            <span className="px-1.5 text-[10px] font-bold tabular-nums text-zinc-200">
+              {formatPreviewTime(currentTime, true)}
+              <span className="mx-1 text-zinc-500">/</span>
+              {formatPreviewTime(duration)}
+            </span>
+            <span className="h-5 w-px bg-white/10" aria-hidden="true" />
             <button
               type="button"
               onClick={onTogglePlay}

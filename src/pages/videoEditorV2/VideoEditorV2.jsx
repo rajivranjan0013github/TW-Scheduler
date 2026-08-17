@@ -60,6 +60,7 @@ import {
   hydrateBulkProjectDurations,
   projectToBulkRow,
   serializeProject,
+  trackAcceptsClipType,
 } from './project';
 import { Timeline } from './timeline';
 
@@ -228,6 +229,14 @@ const getNextTrackStart = (track, preferredTime, durationLimit) => {
   const preferred = Number(preferredTime || 0);
   return Math.min(durationLimit, track.type === 'video' ? latestEnd : preferred);
 };
+
+const trackHasOverlap = (track, timelineStart, duration) => (
+  Boolean(track) && (track.clips || []).some((clip) => {
+    const clipStart = Number(clip.timelineStart || 0);
+    const clipEnd = clipStart + Number(clip.duration || 0);
+    return timelineStart < clipEnd && clipStart < timelineStart + duration;
+  })
+);
 
 const hasExtractedAudioClip = (project, sourceClipId) => project.tracks.some((track) => (
   track.clips.some((clip) => clip.metadata?.extractedFromClipId === sourceClipId)
@@ -927,9 +936,12 @@ export const VideoEditorV2 = () => {
     setPlaying,
   ]);
 
-  const addAssetToTimeline = useCallback(async (asset) => {
+  const addAssetToTimeline = useCallback(async (asset, options = {}) => {
     try {
       const type = asset.type;
+      if (!['video', 'image', 'audio'].includes(type)) {
+        throw new Error('This item cannot be added to the timeline.');
+      }
       const needsDuration = ['audio', 'video'].includes(type)
         && Number(asset.duration || 0) <= 0;
       const resolvedAsset = needsDuration
@@ -943,19 +955,43 @@ export const VideoEditorV2 = () => {
 
       const mainVideoTrack = getPrimaryTrackByType(project, 'video');
       const mainAudioTrack = getPrimaryTrackByType(project, 'audio');
-      const placement = type === 'audio'
-        ? 'main'
-        : type === 'video' && (mainVideoTrack?.clips.length || 0) === 0
+      const requestedTrack = options.trackId
+        ? project.tracks.find((track) => track.id === options.trackId)
+        : null;
+      if (options.trackId && (
+        !requestedTrack
+        || requestedTrack.locked
+        || !trackAcceptsClipType(requestedTrack.type, type)
+      )) {
+        throw new Error(`This ${type} cannot be dropped on that track.`);
+      }
+      const placement = options.trackType === 'overlay'
+        ? 'overlay'
+        : options.trackType === 'video' || options.trackType === 'audio'
           ? 'main'
-          : 'overlay';
-      const mainTrack = type === 'audio' ? mainAudioTrack : mainVideoTrack;
+          : type === 'audio'
+            ? 'main'
+            : type === 'video' && (mainVideoTrack?.clips.length || 0) === 0
+              ? 'main'
+              : 'overlay';
+      const mainTrack = requestedTrack || (type === 'audio' ? mainAudioTrack : mainVideoTrack);
       if (placement === 'main' && !mainTrack) {
         throw new Error(`The project has no main ${type} track.`);
       }
 
-      const timelineStart = placement === 'overlay'
-        ? Math.min(currentTime, Math.max(0, project.output.maxDuration - 0.1))
-        : getNextTrackStart(mainTrack, currentTime, project.output.maxDuration);
+      const requestedTimelineStart = Number(options.timelineStart);
+      const hasRequestedTimelineStart = Number.isFinite(requestedTimelineStart);
+      const appendToMainVideo = options.trackType === 'video' && placement === 'main';
+      const timelineStart = appendToMainVideo
+        ? getNextTrackStart(mainTrack, 0, project.output.maxDuration)
+        : hasRequestedTimelineStart
+        ? Math.min(
+            Math.max(0, requestedTimelineStart),
+            Math.max(0, project.output.maxDuration - 0.1),
+          )
+        : placement === 'overlay'
+          ? Math.min(currentTime, Math.max(0, project.output.maxDuration - 0.1))
+          : getNextTrackStart(mainTrack, currentTime, project.output.maxDuration);
       const remaining = project.output.maxDuration - timelineStart;
       if (remaining < 0.1) throw new Error('The 30-second timeline is full.');
 
@@ -973,6 +1009,9 @@ export const VideoEditorV2 = () => {
         sourceDuration: type === 'image' ? 0 : (sourceDuration || duration),
         timelineStart,
         duration,
+        ...(type === 'video' && placement === 'overlay'
+          ? { transform: { x: 0.5, y: 0.5, scale: 0.5, rotation: 0, opacity: 1 } }
+          : {}),
       };
       const clip = type === 'audio'
         ? createAudioClip(input)
@@ -980,12 +1019,20 @@ export const VideoEditorV2 = () => {
           ? createImageClip(input)
           : createVideoClip(input);
 
-      if (resolvedAsset !== asset) {
-        setAssets((current) => current.map((candidate) => (
-          candidate.id === asset.id ? resolvedAsset : candidate
-        )));
-      }
-      dispatch(editorActions.addClip(clip, { placement }));
+      setAssets((current) => (
+        current.some((candidate) => candidate.id === resolvedAsset.id)
+          ? current.map((candidate) => (
+              candidate.id === resolvedAsset.id ? resolvedAsset : candidate
+            ))
+          : [resolvedAsset, ...current]
+      ));
+      const useRequestedTrack = requestedTrack && (
+        placement !== 'overlay' || !trackHasOverlap(requestedTrack, timelineStart, duration)
+      );
+      dispatch(editorActions.addClip(clip, {
+        placement,
+        ...(useRequestedTrack ? { trackId: requestedTrack.id } : {}),
+      }));
       seek(timelineStart);
       return true;
     } catch (error) {
@@ -1024,13 +1071,19 @@ export const VideoEditorV2 = () => {
     }
   }, [addAssetToTimeline]);
 
-  const addText = useCallback((text) => {
-    const timelineStart = Math.min(currentTime, Math.max(0, project.output.maxDuration - 0.1));
+  const addText = useCallback((text, options = {}) => {
+    const requestedTimelineStart = Number(options.timelineStart);
+    const timelineStart = Number.isFinite(requestedTimelineStart)
+      ? Math.min(
+          Math.max(0, requestedTimelineStart),
+          Math.max(0, project.output.maxDuration - 0.1),
+        )
+      : Math.min(currentTime, Math.max(0, project.output.maxDuration - 0.1));
     const availableDuration = Math.max(0.1, project.output.maxDuration - timelineStart);
     const duration = Math.min(3, availableDuration);
     if (duration < 0.1) return;
     const bulkTextScale = project.output.width / PREVIEW_FRAME_WIDTH;
-    dispatch(editorActions.addClip(createTextClip({
+    const clip = createTextClip({
       name: text,
       text,
       timelineStart,
@@ -1048,8 +1101,71 @@ export const VideoEditorV2 = () => {
         lineHeight: 1.3,
       },
       transform: { x: 0.5, y: 0.25, scale: 1, rotation: 0, opacity: 1 },
-    }), { placement: 'overlay' }));
-  }, [currentTime, project]);
+    });
+    const requestedTrack = options.trackId
+      ? project.tracks.find((track) => track.id === options.trackId)
+      : null;
+    const useRequestedTrack = requestedTrack
+      && trackAcceptsClipType(requestedTrack.type, 'text')
+      && !requestedTrack.locked
+      && !trackHasOverlap(requestedTrack, timelineStart, duration);
+    dispatch(editorActions.addClip(clip, {
+      placement: 'overlay',
+      ...(useRequestedTrack ? { trackId: requestedTrack.id } : {}),
+    }));
+    seek(timelineStart);
+  }, [currentTime, project, seek]);
+
+  const handleTimelineItemDrop = useCallback(async ({
+    item,
+    trackId,
+    trackType,
+    timelineStart,
+  }) => {
+    if (item?.kind === 'text') {
+      addText(item.text || 'Text', { trackId, timelineStart });
+      setStatus({ type: 'success', text: 'Text added to the timeline.' });
+      return;
+    }
+
+    if (item?.kind !== 'asset' || !item.asset) return;
+    const added = await addAssetToTimeline(item.asset, {
+      trackId,
+      trackType,
+      timelineStart,
+    });
+    if (added) {
+      setStatus({
+        type: 'success',
+        text: `${item.asset.name || 'Media'} added to the timeline.`,
+      });
+    }
+  }, [addAssetToTimeline, addText]);
+
+  useEffect(() => {
+    const handleAddTextShortcut = (event) => {
+      if (
+        event.code !== 'KeyT'
+        || event.repeat
+        || event.metaKey
+        || event.ctrlKey
+        || event.altKey
+        || projectSettingsOpen
+      ) return;
+
+      const target = event.target;
+      const isTyping = target instanceof HTMLElement && (
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable
+      );
+      if (isTyping) return;
+
+      event.preventDefault();
+      addText('Add text');
+    };
+
+    window.addEventListener('keydown', handleAddTextShortcut);
+    return () => window.removeEventListener('keydown', handleAddTextShortcut);
+  }, [addText, projectSettingsOpen]);
 
   const updateSelectedClip = useCallback((changes) => {
     if (selectedClipId) dispatch(editorActions.updateClip(selectedClipId, changes));
@@ -1808,6 +1924,7 @@ export const VideoEditorV2 = () => {
           <PreviewStage
             project={project}
             currentTime={currentTime}
+            duration={contentDuration}
             isPlaying={isPlaying}
             selectedClipId={selectedClipId}
             onSelectClip={(clipId) => dispatch(editorActions.selectClip(clipId))}
@@ -1844,7 +1961,6 @@ export const VideoEditorV2 = () => {
             tracks={project.tracks}
             duration={project.output.maxDuration}
             fps={project.output.fps}
-            contentDuration={contentDuration}
             currentTime={currentTime}
             selectedClipId={selectedClipId}
             rippleDeleteEnabled={rippleDeleteEnabled}
@@ -1859,6 +1975,7 @@ export const VideoEditorV2 = () => {
             onRippleDeleteClip={({ clipId }) => dispatch(editorActions.rippleDeleteClip(clipId))}
             onRippleDeleteEnabledChange={setRippleDeleteEnabled}
             onMagneticSnappingChange={setMagneticSnappingEnabled}
+            onDropItem={handleTimelineItemDrop}
             onRequestAudio={() => {
               setMediaPanelTab('audio');
               setLibraryMode('audio');

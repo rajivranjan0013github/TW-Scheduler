@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ListCollapse, Magnet, Minus, Plus, Scissors, Trash2, ZoomIn } from 'lucide-react';
 import { Playhead } from './Playhead';
 import { TimelineRuler } from './TimelineRuler';
@@ -12,7 +12,6 @@ import {
   DEFAULT_SNAP_INTERVAL,
   DEFAULT_TIMELINE_DURATION,
   DEFAULT_TRACK_HEIGHT,
-  formatTimelineTime,
   roundTime,
   snapTime,
 } from './timelineUtils';
@@ -52,12 +51,12 @@ const ToolButton = ({ disabled = false, label, danger = false, iconOnly = false,
  * - onSplitClip({ trackId, clipId, time })
  * - onDeleteClip({ trackId, clipId })
  * - onRippleDeleteClip({ trackId, clipId })
+ * - onDropItem({ item, trackId, trackType, timelineStart })
  * - onRippleDeleteEnabledChange(enabled)
  */
 export const Timeline = ({
   tracks = [],
   duration = DEFAULT_TIMELINE_DURATION,
-  contentDuration,
   currentTime = 0,
   fps = 30,
   selectedClipId = null,
@@ -85,6 +84,7 @@ export const Timeline = ({
   onRippleDeleteClip,
   onRippleDeleteEnabledChange,
   onRequestAudio,
+  onDropItem,
 }) => {
   const [internalZoom, setInternalZoom] = useState(() => clamp(
     Number.isFinite(defaultZoom) ? defaultZoom : 1,
@@ -96,15 +96,14 @@ export const Timeline = ({
   );
   const [activeSnapTime, setActiveSnapTime] = useState(null);
   const rulerRef = useRef(null);
+  const scrollViewportRef = useRef(null);
   const scrubPointerIdRef = useRef(null);
+  const pendingZoomAnchorRef = useRef(null);
+  const zoomValueRef = useRef(1);
   const requestedDuration = Number(duration);
   const effectiveDuration = Number.isFinite(requestedDuration) && requestedDuration > 0
     ? Math.max(minClipDuration, requestedDuration)
     : DEFAULT_TIMELINE_DURATION;
-  const requestedContentDuration = Number(contentDuration);
-  const effectiveContentDuration = Number.isFinite(requestedContentDuration)
-    ? clamp(requestedContentDuration, 0, effectiveDuration)
-    : effectiveDuration;
   const requestedCurrentTime = Number(currentTime);
   const effectiveCurrentTime = Number.isFinite(requestedCurrentTime)
     ? clamp(requestedCurrentTime, 0, effectiveDuration)
@@ -118,7 +117,7 @@ export const Timeline = ({
     }))
     .sort((left, right) => (
       left.priority - right.priority
-      || (left.priority === 0 ? right.index - left.index : left.index - right.index)
+      || left.index - right.index
     ))
     .map(({ track }) => track);
   const effectiveZoom = clamp(Number.isFinite(zoom) ? zoom : internalZoom, minZoom, maxZoom);
@@ -165,11 +164,58 @@ export const Timeline = ({
       - minClipDuration;
   const canDelete = Boolean(selectedEntry) && !selectedEntry.track.locked;
 
-  const setZoom = (nextZoom) => {
+  const setZoom = useCallback((nextZoom) => {
     const next = clamp(nextZoom, minZoom, maxZoom);
     if (!Number.isFinite(zoom)) setInternalZoom(next);
     onZoomChange?.(next);
-  };
+  }, [maxZoom, minZoom, onZoomChange, zoom]);
+
+  useEffect(() => {
+    zoomValueRef.current = effectiveZoom;
+  }, [effectiveZoom]);
+
+  useEffect(() => {
+    const viewport = scrollViewportRef.current;
+    if (!viewport) return undefined;
+
+    const handleWheelZoom = (event) => {
+      if ((!event.metaKey && !event.ctrlKey) || event.deltaY === 0) return;
+      event.preventDefault();
+
+      const currentZoom = zoomValueRef.current;
+      const normalizedDelta = clamp(event.deltaY, -80, 80);
+      const nextZoom = clamp(
+        currentZoom * Math.exp(-normalizedDelta * 0.006),
+        minZoom,
+        maxZoom,
+      );
+      if (Math.abs(nextZoom - currentZoom) < 0.0001) return;
+
+      const rect = viewport.getBoundingClientRect();
+      const cursorOffset = clamp(event.clientX - rect.left, 0, viewport.clientWidth);
+      const anchorTime = clamp(
+        (viewport.scrollLeft + cursorOffset - TIMELINE_LANE_INSET) / pixelsPerSecond,
+        0,
+        effectiveDuration,
+      );
+      pendingZoomAnchorRef.current = { anchorTime, cursorOffset };
+      zoomValueRef.current = nextZoom;
+      setZoom(nextZoom);
+    };
+
+    viewport.addEventListener('wheel', handleWheelZoom, { passive: false });
+    return () => viewport.removeEventListener('wheel', handleWheelZoom);
+  }, [effectiveDuration, maxZoom, minZoom, pixelsPerSecond, setZoom]);
+
+  useLayoutEffect(() => {
+    const viewport = scrollViewportRef.current;
+    const anchor = pendingZoomAnchorRef.current;
+    if (!viewport || !anchor) return;
+    viewport.scrollLeft = TIMELINE_LANE_INSET
+      + (anchor.anchorTime * pixelsPerSecond)
+      - anchor.cursorOffset;
+    pendingZoomAnchorRef.current = null;
+  }, [pixelsPerSecond]);
 
   const seekFromPointer = (event) => {
     const rect = rulerRef.current?.getBoundingClientRect();
@@ -251,17 +297,91 @@ export const Timeline = ({
 
   return (
     <section className={`flex min-h-[220px] flex-col overflow-hidden border-t border-[#303034] bg-[#151517] text-zinc-200 [color-scheme:dark] ${className}`} aria-label="Video timeline">
-      <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-[#303034] bg-[#1c1c1f] px-3 shadow-[0_1px_0_rgba(255,255,255,0.02)]">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="min-w-0">
-            <h2 className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-zinc-100">Timeline</h2>
-            <p className="text-[9px] font-medium text-zinc-500">Drag clips, trim edges, and click to seek</p>
+      <div
+        ref={scrollViewportRef}
+        className="relative flex-1 overflow-auto bg-[#141416] [scrollbar-color:#45454b_#18181b]"
+      >
+        <div
+          className="relative flex min-h-full flex-col"
+          style={{
+            minWidth: contentWidth + (TIMELINE_LANE_INSET * 2),
+            width: contentWidth + (TIMELINE_LANE_INSET * 2),
+          }}
+        >
+          <div
+            className="sticky top-0 z-20 flex shrink-0 bg-[#1a1a1d] px-2"
+            style={{ height: rulerHeight }}
+          >
+            <TimelineRuler
+              rulerRef={rulerRef}
+              duration={effectiveDuration}
+              currentTime={effectiveCurrentTime}
+              pixelsPerSecond={pixelsPerSecond}
+              height={rulerHeight}
+              onPointerDown={handleScrubStart}
+              onPointerMove={handleScrubMove}
+              onPointerUp={handleScrubEnd}
+              onPointerCancel={handleScrubCancel}
+              onKeyDown={handleRulerKeyDown}
+            />
           </div>
-          <span className="shrink-0 rounded-md border border-[#ff5500]/20 bg-[#101012] px-2 py-1 text-[10px] font-bold tabular-nums text-orange-300 shadow-inner">
-            {formatTimelineTime(effectiveCurrentTime, true)} / {formatTimelineTime(effectiveContentDuration)}
-          </span>
-        </div>
 
+          <div className="flex min-h-0 flex-1 flex-col justify-center">
+            {displayTracks.length ? displayTracks.map((track) => (
+              <TimelineTrack
+                key={track.id}
+                track={track}
+                height={track.type === 'video'
+                  ? trackHeight + 24
+                  : track.type === 'overlay'
+                    ? Math.max(34, trackHeight - 10)
+                    : trackHeight}
+                duration={effectiveDuration}
+                pixelsPerSecond={pixelsPerSecond}
+                fps={fps}
+                selectedClipId={selectedClipId}
+                minClipDuration={minClipDuration}
+                snapInterval={snapInterval}
+                magneticSnapEnabled={effectiveMagneticSnapping}
+                magneticSnapTargets={magneticSnapTargets}
+                magneticSnapThresholdPx={magneticSnapThresholdPx}
+                onLanePointerDown={handleLaneSeek}
+                onSelectClip={onSelectClip}
+                onMoveClip={onMoveClip}
+                onTrimClip={onTrimClip}
+                onDeleteClip={onDeleteClip}
+                onRequestAudio={onRequestAudio}
+                onDropItem={onDropItem}
+                onSnapGuideChange={setActiveSnapTime}
+              />
+            )) : (
+              <div className="flex h-24 items-center justify-center text-xs font-medium text-zinc-600">
+                Add a track to begin editing
+              </div>
+            )}
+          </div>
+
+          {Number.isFinite(activeSnapTime) && (
+            <div
+              className="pointer-events-none absolute inset-y-0 z-[35] w-px bg-[#ff6a1a] shadow-[0_0_7px_rgba(255,85,0,0.9)]"
+              style={{ left: TIMELINE_LANE_INSET + (activeSnapTime * pixelsPerSecond) }}
+              aria-hidden="true"
+            />
+          )}
+
+          <Playhead
+            currentTime={effectiveCurrentTime}
+            left={TIMELINE_LANE_INSET + (effectiveCurrentTime * pixelsPerSecond)}
+            top={rulerHeight}
+            onPointerDown={handleScrubStart}
+            onPointerMove={handleScrubMove}
+            onPointerUp={handleScrubEnd}
+            onPointerCancel={handleScrubCancel}
+          />
+        </div>
+      </div>
+
+      <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-t border-[#303034] bg-[#1c1c1f] px-3">
         <div className="flex shrink-0 items-center gap-2">
           <ToolButton iconOnly label="Split selected clip at playhead (S)" disabled={!canSplit} onClick={splitSelectedClip}>
             <Scissors className="h-3.5 w-3.5" />
@@ -295,104 +415,44 @@ export const Timeline = ({
           >
             <Magnet className="h-3.5 w-3.5" />
           </ToolButton>
-
-          <div className="ml-1 flex h-7 items-center rounded-lg border border-[#35353a] bg-[#232326] p-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-            <button
-              type="button"
-              className="grid h-6 w-6 place-items-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-[#343438] hover:text-white focus-visible:ring-1 focus-visible:ring-orange-400 disabled:opacity-35"
-              onClick={() => setZoom(effectiveZoom - ZOOM_STEP)}
-              disabled={effectiveZoom <= minZoom}
-              aria-label="Zoom timeline out"
-              title="Zoom out"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </button>
-            <span className="flex w-14 items-center justify-center gap-1 text-[9px] font-bold tabular-nums text-zinc-400">
-              <ZoomIn className="h-3 w-3" />
-              {Math.round(effectiveZoom * 100)}%
-            </span>
-            <button
-              type="button"
-              className="grid h-6 w-6 place-items-center rounded-md text-zinc-400 outline-none transition-colors hover:bg-[#343438] hover:text-white focus-visible:ring-1 focus-visible:ring-orange-400 disabled:opacity-35"
-              onClick={() => setZoom(effectiveZoom + ZOOM_STEP)}
-              disabled={effectiveZoom >= maxZoom}
-              aria-label="Zoom timeline in"
-              title="Zoom in"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
         </div>
-      </div>
 
-      <div className="relative flex-1 overflow-auto bg-[#141416] [scrollbar-color:#45454b_#18181b]">
-        <div
-          className="relative"
-          style={{
-            minWidth: contentWidth + (TIMELINE_LANE_INSET * 2),
-            width: contentWidth + (TIMELINE_LANE_INSET * 2),
-          }}
-        >
-          <div className="flex px-2" style={{ height: rulerHeight }}>
-            <TimelineRuler
-              rulerRef={rulerRef}
-              duration={effectiveDuration}
-              currentTime={effectiveCurrentTime}
-              pixelsPerSecond={pixelsPerSecond}
-              height={rulerHeight}
-              onPointerDown={handleScrubStart}
-              onPointerMove={handleScrubMove}
-              onPointerUp={handleScrubEnd}
-              onPointerCancel={handleScrubCancel}
-              onKeyDown={handleRulerKeyDown}
-            />
-          </div>
-
-          {displayTracks.length ? displayTracks.map((track) => (
-            <TimelineTrack
-              key={track.id}
-              track={track}
-              height={track.type === 'video' ? trackHeight + 32 : trackHeight}
-              duration={effectiveDuration}
-              pixelsPerSecond={pixelsPerSecond}
-              fps={fps}
-              selectedClipId={selectedClipId}
-              minClipDuration={minClipDuration}
-              snapInterval={snapInterval}
-              magneticSnapEnabled={effectiveMagneticSnapping}
-              magneticSnapTargets={magneticSnapTargets}
-              magneticSnapThresholdPx={magneticSnapThresholdPx}
-              onLanePointerDown={handleLaneSeek}
-              onSelectClip={onSelectClip}
-              onMoveClip={onMoveClip}
-              onTrimClip={onTrimClip}
-              onDeleteClip={onDeleteClip}
-              onRequestAudio={onRequestAudio}
-              onSnapGuideChange={setActiveSnapTime}
-            />
-          )) : (
-            <div className="flex h-24 items-center justify-center text-xs font-medium text-zinc-600">
-              Add a track to begin editing
-            </div>
-          )}
-
-          {Number.isFinite(activeSnapTime) && (
-            <div
-              className="pointer-events-none absolute inset-y-0 z-[35] w-px bg-[#ff6a1a] shadow-[0_0_7px_rgba(255,85,0,0.9)]"
-              style={{ left: TIMELINE_LANE_INSET + (activeSnapTime * pixelsPerSecond) }}
-              aria-hidden="true"
-            />
-          )}
-
-          <Playhead
-            currentTime={effectiveCurrentTime}
-            left={TIMELINE_LANE_INSET + (effectiveCurrentTime * pixelsPerSecond)}
-            top={rulerHeight}
-            onPointerDown={handleScrubStart}
-            onPointerMove={handleScrubMove}
-            onPointerUp={handleScrubEnd}
-            onPointerCancel={handleScrubCancel}
+        <div className="flex items-center gap-2" aria-label="Timeline zoom controls">
+          <ZoomIn className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
+          <button
+            type="button"
+            className="grid h-6 w-6 place-items-center rounded-md text-zinc-400 outline-none transition hover:bg-white/[0.06] hover:text-white focus-visible:ring-1 focus-visible:ring-orange-400 disabled:opacity-35"
+            onClick={() => setZoom(effectiveZoom - ZOOM_STEP)}
+            disabled={effectiveZoom <= minZoom}
+            aria-label="Zoom timeline out"
+            title="Zoom out"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <input
+            type="range"
+            min={minZoom}
+            max={maxZoom}
+            step="0.05"
+            value={effectiveZoom}
+            onChange={(event) => setZoom(Number(event.target.value))}
+            className="h-1.5 w-36 cursor-pointer accent-[#ff5500]"
+            aria-label="Timeline zoom"
+            aria-valuetext={`${Math.round(effectiveZoom * 100)} percent`}
           />
+          <button
+            type="button"
+            className="grid h-6 w-6 place-items-center rounded-md text-zinc-400 outline-none transition hover:bg-white/[0.06] hover:text-white focus-visible:ring-1 focus-visible:ring-orange-400 disabled:opacity-35"
+            onClick={() => setZoom(effectiveZoom + ZOOM_STEP)}
+            disabled={effectiveZoom >= maxZoom}
+            aria-label="Zoom timeline in"
+            title="Zoom in"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+          <span className="w-10 text-right text-[9px] font-bold tabular-nums text-zinc-400">
+            {Math.round(effectiveZoom * 100)}%
+          </span>
         </div>
       </div>
     </section>

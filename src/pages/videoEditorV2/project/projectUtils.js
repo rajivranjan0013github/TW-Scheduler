@@ -53,13 +53,51 @@ const clipsOverlap = (left, right) => (
 export const getAvailableOverlayTrack = (project, clip, options = {}) => {
   if (!clip || !trackAcceptsClipType(TRACK_TYPES.OVERLAY, clip.type)) return null;
   const excludedClipId = options.excludeClipId || clip.id;
-  return getTracksByType(project, TRACK_TYPES.OVERLAY).find((track) => (
+  const overlayTracks = getTracksByType(project, TRACK_TYPES.OVERLAY);
+  const candidates = options.preferLast ? [...overlayTracks].reverse() : overlayTracks;
+  return candidates.find((track) => (
     !track.hidden
     && !track.locked
     && !(track.clips || []).some((currentClip) => (
       currentClip.id !== excludedClipId && clipsOverlap(currentClip, clip)
     ))
   )) || null;
+};
+
+export const compactOverlayClips = (project) => {
+  const overlayTracks = getTracksByType(project, TRACK_TYPES.OVERLAY);
+  if (overlayTracks.length < 2) return project;
+
+  const tracks = project.tracks.map((track) => (
+    track.type === TRACK_TYPES.OVERLAY
+      ? { ...track, clips: [...(track.clips || [])] }
+      : track
+  ));
+  const mutableOverlays = tracks.filter((track) => track.type === TRACK_TYPES.OVERLAY);
+  let changed = false;
+
+  for (let sourceIndex = 0; sourceIndex < mutableOverlays.length - 1; sourceIndex += 1) {
+    const sourceTrack = mutableOverlays[sourceIndex];
+    if (sourceTrack.hidden || sourceTrack.locked) continue;
+
+    for (const clip of sortClipsByTimeline(sourceTrack.clips)) {
+      for (let targetIndex = mutableOverlays.length - 1; targetIndex > sourceIndex; targetIndex -= 1) {
+        const targetTrack = mutableOverlays[targetIndex];
+        if (
+          targetTrack.hidden
+          || targetTrack.locked
+          || targetTrack.clips.some((currentClip) => clipsOverlap(currentClip, clip))
+        ) continue;
+
+        sourceTrack.clips = sourceTrack.clips.filter((currentClip) => currentClip.id !== clip.id);
+        targetTrack.clips = sortClipsByTimeline([...targetTrack.clips, clip]);
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return changed ? { ...project, tracks } : project;
 };
 
 const canPlaceExtractedAudioOnTrack = (track, clip) => (
@@ -505,6 +543,50 @@ export const moveClip = (project, {
       return { ...track, clips };
     }),
   };
+};
+
+export const settleOverlayClip = (project, clipId) => {
+  const location = getClipLocation(project, clipId);
+  if (!location || location.track.type !== TRACK_TYPES.OVERLAY || location.track.locked) {
+    return project;
+  }
+
+  const overlayTracks = getTracksByType(project, TRACK_TYPES.OVERLAY);
+  const currentIndex = overlayTracks.findIndex((track) => track.id === location.track.id);
+  if (currentIndex < 0) return project;
+
+  const overlapsCurrentTrack = location.track.clips.some((clip) => (
+    clip.id !== clipId && clipsOverlap(clip, location.clip)
+  ));
+  const candidates = overlapsCurrentTrack
+    ? overlayTracks.slice(0, currentIndex).reverse()
+    : overlayTracks.slice(currentIndex + 1).reverse();
+  const targetTrack = candidates.find((track) => (
+    !track.hidden
+    && !track.locked
+    && !track.clips.some((clip) => clipsOverlap(clip, location.clip))
+  ));
+
+  if (targetTrack) {
+    return moveClip(project, {
+      clipId,
+      toTrackId: targetTrack.id,
+      timelineStart: location.clip.timelineStart,
+    });
+  }
+  if (!overlapsCurrentTrack) return project;
+
+  const currentProjectIndex = project.tracks.findIndex((track) => track.id === location.track.id);
+  const projectWithUpperTrack = addTrackToProject(project, TRACK_TYPES.OVERLAY, {
+    name: `Overlay ${overlayTracks.length + 1}`,
+    index: Math.max(0, currentProjectIndex),
+  });
+  const upperTrack = projectWithUpperTrack.tracks[currentProjectIndex];
+  return moveClip(projectWithUpperTrack, {
+    clipId,
+    toTrackId: upperTrack.id,
+    timelineStart: location.clip.timelineStart,
+  });
 };
 
 export const trimClip = (clip, {

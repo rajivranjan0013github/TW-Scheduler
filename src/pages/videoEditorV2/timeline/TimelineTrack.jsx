@@ -1,6 +1,28 @@
+import { useState } from 'react';
 import { Layers3, Music2, Plus } from 'lucide-react';
+import {
+  canDropEditorTypeOnTrack,
+  clearActiveEditorDragItem,
+  getActiveEditorDragItem,
+  getEditorDragClipType,
+  getEditorDragTransferType,
+  readEditorDragData,
+} from '../media/editorDragData';
 import { TimelineClip } from './TimelineClip';
-import { getTrackType } from './timelineUtils';
+import {
+  clamp,
+  getTrackType,
+  roundTime,
+  snapTime,
+} from './timelineUtils';
+
+const getDragPreviewDuration = (clipType, item, availableDuration = Number.POSITIVE_INFINITY) => {
+  const fallbackDuration = clipType === 'image' || clipType === 'text' ? 3 : 5;
+  return Math.min(
+    Math.max(0.1, Number(item?.asset?.duration) || fallbackDuration),
+    Math.max(0.1, availableDuration),
+  );
+};
 
 export const TimelineTrack = ({
   track,
@@ -20,21 +42,95 @@ export const TimelineTrack = ({
   onTrimClip,
   onDeleteClip,
   onRequestAudio,
+  onDropItem,
   onSnapGuideChange,
 }) => {
   const type = getTrackType(track);
   const hidden = Boolean(track.hidden);
   const clips = Array.isArray(track.clips) ? track.clips : [];
+  const [dropPreview, setDropPreview] = useState(null);
+  const trackBorderRadius = Math.min(20, Math.max(8, Number(height || 0) * 0.4));
+
+  const getDropTime = (event, clipType, item) => {
+    if (type === 'video') {
+      const trackEnd = clips.reduce((latestEnd, clip) => Math.max(
+        latestEnd,
+        Number(clip.timelineStart || 0) + Number(clip.duration || 0),
+      ), 0);
+      return roundTime(clamp(trackEnd, 0, duration));
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const cursorTime = (event.clientX - rect.left) / pixelsPerSecond;
+    const previewDuration = getDragPreviewDuration(clipType, item, duration);
+    const rawTime = cursorTime - (previewDuration / 2);
+    return roundTime(clamp(
+      snapTime(rawTime, snapInterval),
+      0,
+      Math.max(0, duration - previewDuration),
+    ));
+  };
+
+  const handleDragOver = (event) => {
+    const clipType = getEditorDragTransferType(event.dataTransfer);
+    if (!canDropEditorTypeOnTrack(type, clipType) || hidden || track.locked) {
+      event.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    const item = getActiveEditorDragItem();
+    setDropPreview({
+      clipType,
+      item,
+      timelineStart: getDropTime(event, clipType, item),
+    });
+  };
+
+  const handleDragLeave = (event) => {
+    if (event.relatedTarget && event.currentTarget.contains(event.relatedTarget)) return;
+    setDropPreview(null);
+  };
+
+  const handleDrop = (event) => {
+    const item = readEditorDragData(event.dataTransfer);
+    const clipType = getEditorDragClipType(item);
+    if (!item || !canDropEditorTypeOnTrack(type, clipType) || hidden || track.locked) {
+      setDropPreview(null);
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const timelineStart = getDropTime(event, clipType, item);
+    setDropPreview(null);
+    clearActiveEditorDragItem();
+    onDropItem?.({
+      item,
+      trackId: track.id,
+      trackType: type,
+      timelineStart,
+    });
+  };
 
   return (
     <div
-      className="mx-2 mt-2 overflow-hidden rounded-xl border border-white/[0.06] bg-[#1d1e22] shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
-      style={{ height, minWidth: duration * pixelsPerSecond, width: duration * pixelsPerSecond }}
+      className="mx-2 mt-2 overflow-visible border border-white/[0.06] bg-[#1d1e22] shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
+      style={{
+        height,
+        minWidth: duration * pixelsPerSecond,
+        width: duration * pixelsPerSecond,
+        borderRadius: trackBorderRadius,
+      }}
     >
       <div
-        className={`relative h-full ${hidden ? 'bg-[#1b1b1e] opacity-45' : 'bg-[#202126]'}`}
+        className={`relative h-full overflow-visible transition-shadow ${hidden ? 'bg-[#1b1b1e] opacity-45' : 'bg-[#202126]'} ${dropPreview ? 'shadow-[inset_0_0_0_2px_rgba(139,92,246,0.75)]' : ''}`}
         aria-label={track.name || `${type} track`}
-        style={{ width: duration * pixelsPerSecond }}
+        style={{
+          width: duration * pixelsPerSecond,
+          borderRadius: Math.max(0, trackBorderRadius - 1),
+        }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) onLanePointerDown?.(event);
         }}
@@ -72,6 +168,41 @@ export const TimelineTrack = ({
           </div>
         )}
 
+        {dropPreview && (() => {
+          const asset = dropPreview.item?.asset || {};
+          const previewDuration = getDragPreviewDuration(
+            dropPreview.clipType,
+            dropPreview.item,
+            duration - dropPreview.timelineStart,
+          );
+          const thumbnailUrl = asset.thumbnailUrl
+            || (dropPreview.clipType === 'image' ? asset.url : '');
+          const previewColor = dropPreview.clipType === 'text'
+            ? 'bg-[#0d7479]'
+            : dropPreview.clipType === 'audio'
+              ? 'bg-[#185f5a]'
+              : dropPreview.clipType === 'image'
+                ? 'bg-[#343a43]'
+                : 'bg-[#0b0c0f]';
+          return (
+          <div
+            className={`pointer-events-none absolute inset-y-0 z-30 overflow-hidden border-2 border-dashed border-[#a78bfa] opacity-85 shadow-[0_5px_16px_rgba(0,0,0,0.38)] ${previewColor}`}
+            style={{
+              left: dropPreview.timelineStart * pixelsPerSecond,
+              width: Math.max(12, previewDuration * pixelsPerSecond),
+              borderRadius: trackBorderRadius,
+              ...(thumbnailUrl ? {
+                backgroundImage: `url(${thumbnailUrl})`,
+                backgroundPosition: 'center',
+                backgroundRepeat: dropPreview.clipType === 'video' ? 'repeat-x' : 'no-repeat',
+                backgroundSize: dropPreview.clipType === 'video' ? 'auto 100%' : 'cover',
+              } : {}),
+            }}
+            aria-hidden="true"
+          />
+          );
+        })()}
+
         {clips.map((clip) => (
           <TimelineClip
             key={clip.id}
@@ -79,7 +210,7 @@ export const TimelineTrack = ({
             trackId={track.id}
             trackType={type}
             pixelsPerSecond={pixelsPerSecond}
-            height={Math.max(24, height - 12)}
+            height={Math.max(24, height)}
             fps={fps}
             timelineDuration={duration}
             selected={clip.id === selectedClipId}
@@ -92,6 +223,7 @@ export const TimelineTrack = ({
             onMoveClip={onMoveClip}
             onTrimClip={onTrimClip}
             onDeleteClip={onDeleteClip}
+            onSeekFromPointer={onLanePointerDown}
             onSnapGuideChange={onSnapGuideChange}
           />
         ))}

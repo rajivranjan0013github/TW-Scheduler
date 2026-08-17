@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { BulkQueuePanel } from './BulkQueuePanel';
 import { MediaLibraryPanel } from './MediaLibraryPanel';
+import { setEditorDragData } from '../media/editorDragData';
 
 const TABS = [
   { id: 'media', label: 'Media', icon: Film },
@@ -68,15 +69,23 @@ const AssetCard = ({ asset, onAdd }) => {
     setIsPreviewing(false);
   };
 
+  const handleDragStart = (event) => {
+    stopAudioPreview();
+    stopVideoPreview();
+    setEditorDragData(event, { kind: 'asset', asset });
+  };
+
   if (isAudio) {
     return (
       <button
         type="button"
+        draggable
+        onDragStart={handleDragStart}
         onClick={() => onAdd(asset)}
         onMouseEnter={startAudioPreview}
         onMouseLeave={stopAudioPreview}
-        className="group flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-[#171a20] p-2.5 text-left transition hover:border-emerald-400/50 hover:bg-[#1b1f27] hover:shadow-lg hover:shadow-black/20"
-        title={`Preview ${asset.name}; click to add it to the timeline`}
+        className="group flex min-w-0 cursor-grab items-center gap-3 rounded-xl border border-white/10 bg-[#171a20] p-2.5 text-left transition hover:border-emerald-400/50 hover:bg-[#1b1f27] hover:shadow-lg hover:shadow-black/20 active:cursor-grabbing"
+        title={`Drag ${asset.name} to the audio track, or click to add it`}
       >
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/25 to-teal-500/10 text-emerald-400 ring-1 ring-emerald-400/20 ${
           isPreviewing ? 'animate-pulse' : ''
@@ -120,17 +129,19 @@ const AssetCard = ({ asset, onAdd }) => {
 
   return (
     <div
+      draggable
+      onDragStart={handleDragStart}
       onMouseEnter={isVideo ? startVideoPreview : undefined}
       onMouseLeave={isVideo ? stopVideoPreview : undefined}
-      className="group relative overflow-hidden rounded-xl border border-white/10 bg-[#171a20] transition hover:border-[#ff5500]/60 hover:bg-[#1b1f27] hover:shadow-lg hover:shadow-black/20"
+      className="group relative cursor-grab overflow-hidden rounded-xl border border-white/10 bg-[#171a20] transition hover:border-[#ff5500]/60 hover:bg-[#1b1f27] hover:shadow-lg hover:shadow-black/20 active:cursor-grabbing"
     >
       <button
         type="button"
         onClick={() => onAdd(asset)}
         className="block w-full text-left"
         title={isVideo
-          ? `Preview ${asset.name}; click to add it to the timeline`
-          : `Add ${asset.name} to timeline`}
+          ? `Drag ${asset.name} to the timeline, or click to add it`
+          : `Drag ${asset.name} to the timeline, or click to add it`}
       >
         <div className="relative aspect-[9/16] overflow-hidden bg-gray-950">
           {isVideo ? (
@@ -330,8 +341,10 @@ export const MediaPanel = ({
             </div>
             <button
               type="button"
+              draggable
+              onDragStart={(event) => setEditorDragData(event, { kind: 'text', text: 'Add text' })}
               onClick={() => onAddText('Add text')}
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-[#ff5500] px-3 text-[11px] font-bold text-white transition hover:bg-[#ff6a1a]"
+              className="flex h-10 w-full cursor-grab items-center justify-center gap-2 rounded-xl bg-[#ff5500] px-3 text-[11px] font-bold text-white transition hover:bg-[#ff6a1a] active:cursor-grabbing"
             >
               <Plus className="h-3.5 w-3.5" />
               Add text
@@ -345,8 +358,10 @@ export const MediaPanel = ({
                 <button
                   key={preset.label}
                   type="button"
+                  draggable
+                  onDragStart={(event) => setEditorDragData(event, { kind: 'text', text: preset.label })}
                   onClick={() => onAddText(preset.label)}
-                  className={`group flex h-11 w-full items-center gap-3 px-3 text-left text-[#e6e8ec] transition hover:bg-[#201914] ${
+                  className={`group flex h-11 w-full cursor-grab items-center gap-3 px-3 text-left text-[#e6e8ec] transition hover:bg-[#201914] active:cursor-grabbing ${
                     index > 0 ? 'border-t border-white/10' : ''
                   }`}
                 >

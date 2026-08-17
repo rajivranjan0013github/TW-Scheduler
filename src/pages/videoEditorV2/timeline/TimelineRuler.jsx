@@ -65,7 +65,7 @@ export const TimelineRuler = ({
             </span>
           )}
           <span
-            className={`absolute bottom-0 block w-px ${isMajor ? 'h-3 bg-zinc-500' : 'h-1.5 bg-zinc-700'}`}
+            className={`absolute bottom-0 block w-px ${isMajor ? 'h-2 bg-zinc-500' : 'h-1 bg-zinc-700'}`}
           />
         </div>
       ))}
