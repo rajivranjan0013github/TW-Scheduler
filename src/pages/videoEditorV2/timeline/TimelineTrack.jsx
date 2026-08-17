@@ -113,7 +113,7 @@ export const TimelineTrack = ({
 
   return (
     <div
-      className="mx-2 mt-2 overflow-visible border border-white/[0.06] bg-[#1d1e22] shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
+      className="mx-2 mt-1 overflow-visible border border-white/[0.06] bg-[#1d1e22] shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
       style={{
         height,
         minWidth: duration * pixelsPerSecond,
@@ -132,7 +132,9 @@ export const TimelineTrack = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onPointerDown={(event) => {
-          if (event.target === event.currentTarget) onLanePointerDown?.(event);
+          if (event.target !== event.currentTarget) return;
+          onSelectClip?.({ trackId: track.id, clipId: null });
+          onLanePointerDown?.(event);
         }}
       >
         {!clips.length && (

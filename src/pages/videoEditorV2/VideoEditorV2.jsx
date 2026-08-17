@@ -309,6 +309,7 @@ export const VideoEditorV2 = () => {
     isBulkProject && bulkRowId ? [bulkRowId] : []
   ));
   const [timelineHeight, setTimelineHeight] = useState(getInitialTimelineHeight);
+  const [timelineExpandedToLeft, setTimelineExpandedToLeft] = useState(false);
   const [timelineMaximum, setTimelineMaximum] = useState(getInitialTimelineMaximum);
   const assetsRef = useRef(assets);
   const editorLayoutRef = useRef(null);
@@ -1935,7 +1936,9 @@ export const VideoEditorV2 = () => {
 
         <div
           id="video-editor-timeline"
-          className="relative col-span-1 col-start-2 row-start-2 h-full min-h-0"
+          className={`relative row-start-2 h-full min-h-0 ${timelineExpandedToLeft
+            ? 'z-40 col-span-2 col-start-1 ml-16'
+            : 'col-span-1 col-start-2'}`}
         >
           <div
             role="separator"
@@ -1965,6 +1968,7 @@ export const VideoEditorV2 = () => {
             selectedClipId={selectedClipId}
             rippleDeleteEnabled={rippleDeleteEnabled}
             magneticSnapping={magneticSnappingEnabled}
+            expandedToLeft={timelineExpandedToLeft}
             className="h-full"
             onSeek={seek}
             onSelectClip={({ clipId }) => dispatch(editorActions.selectClip(clipId))}
@@ -1975,6 +1979,7 @@ export const VideoEditorV2 = () => {
             onRippleDeleteClip={({ clipId }) => dispatch(editorActions.rippleDeleteClip(clipId))}
             onRippleDeleteEnabledChange={setRippleDeleteEnabled}
             onMagneticSnappingChange={setMagneticSnappingEnabled}
+            onExpandedToLeftChange={setTimelineExpandedToLeft}
             onDropItem={handleTimelineItemDrop}
             onRequestAudio={() => {
               setMediaPanelTab('audio');

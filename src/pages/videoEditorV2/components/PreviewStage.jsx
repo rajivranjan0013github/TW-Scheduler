@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
-  Crop as CropIcon,
   Grid3X3,
   Maximize2,
   Minimize2,
@@ -39,6 +38,8 @@ const COMPACT_TEXT_BOX_HEIGHT = 44;
 const COMPACT_TEXT_HANDLE_MODES = new Set(['nw', 'right']);
 const MIN_MEDIA_SCALE = 0.05;
 const MAX_MEDIA_SCALE = 10;
+const MIN_PREVIEW_ZOOM = 0.5;
+const MAX_PREVIEW_ZOOM = 2;
 const MEDIA_RESIZE_HANDLES = [
   { mode: 'nw', label: 'Resize media from top left', className: '-left-3 -top-3 cursor-nwse-resize', markerClassName: 'h-3.5 w-3.5 rounded-full' },
   { mode: 'n', label: 'Resize media from top', className: 'left-1/2 -top-2.5 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-2 w-8 rounded-full' },
@@ -1593,6 +1594,48 @@ export const PreviewStage = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showGuides, setShowGuides] = useState(false);
   const [cropSession, setCropSession] = useState(null);
+  const [previewZoom, setPreviewZoom] = useState(1);
+
+  useEffect(() => {
+    const previewArea = previewAreaRef.current;
+    if (!previewArea) return undefined;
+
+    const handleWheelZoom = (event) => {
+      if ((!event.ctrlKey && !event.metaKey) || event.deltaY === 0) return;
+      event.preventDefault();
+      const normalizedDelta = clamp(event.deltaY, -80, 80);
+      setPreviewZoom((current) => clamp(
+        current * Math.exp(-normalizedDelta * 0.006),
+        MIN_PREVIEW_ZOOM,
+        MAX_PREVIEW_ZOOM,
+      ));
+    };
+
+    previewArea.addEventListener('wheel', handleWheelZoom, { passive: false });
+    return () => previewArea.removeEventListener('wheel', handleWheelZoom);
+  }, []);
+
+  useEffect(() => {
+    const handleResetZoomShortcut = (event) => {
+      if (
+        event.code !== 'KeyZ'
+        || event.repeat
+        || event.metaKey
+        || event.ctrlKey
+        || event.altKey
+      ) return;
+      const target = event.target;
+      const isTyping = target instanceof HTMLElement && (
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable
+      );
+      if (isTyping) return;
+      event.preventDefault();
+      setPreviewZoom(1);
+    };
+
+    window.addEventListener('keydown', handleResetZoomShortcut);
+    return () => window.removeEventListener('keydown', handleResetZoomShortcut);
+  }, []);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -1619,7 +1662,10 @@ export const PreviewStage = ({
       const height = availableRatio > outputRatio
         ? availableHeight
         : availableWidth / outputRatio;
-      setStageSize({ width: Math.floor(width), height: Math.floor(height) });
+      setStageSize({
+        width: Math.floor(width * previewZoom),
+        height: Math.floor(height * previewZoom),
+      });
     };
     update();
     if (typeof ResizeObserver === 'undefined') {
@@ -1629,7 +1675,17 @@ export const PreviewStage = ({
     const observer = new ResizeObserver(update);
     observer.observe(previewArea);
     return () => observer.disconnect();
-  }, [project.output.height, project.output.width]);
+  }, [previewZoom, project.output.height, project.output.width]);
+
+  useEffect(() => {
+    const previewArea = previewAreaRef.current;
+    if (!previewArea) return undefined;
+    const frame = requestAnimationFrame(() => {
+      previewArea.scrollLeft = Math.max(0, (previewArea.scrollWidth - previewArea.clientWidth) / 2);
+      previewArea.scrollTop = Math.max(0, (previewArea.scrollHeight - previewArea.clientHeight) / 2);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [stageSize.height, stageSize.width]);
 
   const allClips = useMemo(() => project.tracks.flatMap((track, trackIndex) => (
     track.hidden ? [] : track.clips.map((clip, clipIndex) => ({
@@ -1677,15 +1733,6 @@ export const PreviewStage = ({
     return () => cancelAnimationFrame(frame);
   }, [cropSession, selectedClipId]);
 
-  const beginCropping = () => {
-    if (!selectedVisualClip) return;
-    if (isPlaying) onTogglePlay();
-    setShowGuides(false);
-    setCropSession({
-      clipId: selectedVisualClip.id,
-      crop: getClipCrop(selectedVisualClip),
-    });
-  };
   const cancelCropping = () => {
     setCropSession(null);
   };
@@ -1721,13 +1768,16 @@ export const PreviewStage = ({
       <div className={`relative flex min-h-0 flex-1 overflow-hidden ${isFullscreen ? 'p-0' : 'p-3'}`}>
         <div className="absolute inset-0 opacity-45" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.12) 0.7px, transparent 0.7px)', backgroundSize: '18px 18px' }} />
 
-        <div ref={previewAreaRef} className="relative z-10 flex h-full w-full items-center justify-center">
+        <div
+          ref={previewAreaRef}
+          className="relative z-10 flex h-full w-full overflow-auto [scrollbar-color:#45454b_#18181b]"
+        >
           <div
             ref={stageRef}
             onClick={(event) => {
               if (event.target === event.currentTarget) onSelectClip(null);
             }}
-            className={`relative shrink-0 overflow-hidden bg-black ${isFullscreen
+            className={`relative m-auto shrink-0 overflow-hidden bg-black ${isFullscreen
               ? ''
               : 'shadow-[0_24px_70px_rgba(0,0,0,0.58)] ring-1 ring-white/15'}`}
             style={{
@@ -1871,16 +1921,6 @@ export const PreviewStage = ({
             </button>
             <button
               type="button"
-              onClick={beginCropping}
-              disabled={!selectedVisualClip}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]/70 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
-              aria-label="Crop selected media"
-              title={selectedVisualClip ? 'Crop selected media' : 'Select a video or image to crop'}
-            >
-              <CropIcon className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
               onClick={() => setShowGuides((visible) => !visible)}
               className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${showGuides
                 ? 'bg-[#ff5a1f]/15 text-[#ff7043] ring-1 ring-[#ff7043]/40'
@@ -1890,6 +1930,16 @@ export const PreviewStage = ({
               title={showGuides ? 'Hide guides' : 'Show guides'}
             >
               <Grid3X3 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewZoom(1)}
+              disabled={Math.abs(previewZoom - 1) < 0.001}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]/70 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
+              aria-label="Reset preview zoom to 100 percent"
+              title="Reset preview zoom (Z)"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"

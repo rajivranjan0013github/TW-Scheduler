@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ListCollapse, Magnet, Minus, Plus, Scissors, Trash2, ZoomIn } from 'lucide-react';
+import {
+  ListCollapse,
+  Magnet,
+  Minus,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Scissors,
+  Trash2,
+  ZoomIn,
+} from 'lucide-react';
 import { Playhead } from './Playhead';
 import { TimelineRuler } from './TimelineRuler';
 import { TimelineTrack } from './TimelineTrack';
@@ -26,7 +36,7 @@ const ToolButton = ({ disabled = false, label, danger = false, iconOnly = false,
     type="button"
     disabled={disabled}
     onClick={onClick}
-    className={`inline-flex h-7 items-center rounded-lg border text-[10px] font-bold outline-none transition-colors focus-visible:ring-1 focus-visible:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-40 ${iconOnly ? 'w-7 justify-center px-0' : 'gap-1.5 px-2.5'} ${
+    className={`inline-flex h-6 items-center rounded-md border text-[9px] font-bold outline-none transition-colors focus-visible:ring-1 focus-visible:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-40 ${iconOnly ? 'w-6 justify-center px-0' : 'gap-1 px-2'} ${
       danger
         ? 'border-red-900/60 bg-red-950/25 text-red-400 hover:border-red-800 hover:bg-red-950/45 hover:text-red-300'
         : pressed
@@ -83,6 +93,8 @@ export const Timeline = ({
   onDeleteClip,
   onRippleDeleteClip,
   onRippleDeleteEnabledChange,
+  expandedToLeft = false,
+  onExpandedToLeftChange,
   onRequestAudio,
   onDropItem,
 }) => {
@@ -382,9 +394,20 @@ export const Timeline = ({
       </div>
 
       <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-t border-[#303034] bg-[#1c1c1f] px-3">
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
+          <ToolButton
+            iconOnly
+            label={expandedToLeft ? 'Restore timeline width' : 'Extend timeline into left panel'}
+            pressed={expandedToLeft}
+            onClick={() => onExpandedToLeftChange?.(!expandedToLeft)}
+          >
+            {expandedToLeft
+              ? <PanelLeftOpen className="h-3 w-3" />
+              : <PanelLeftClose className="h-3 w-3" />}
+          </ToolButton>
+          <span className="mx-0.5 h-4 w-px bg-white/10" aria-hidden="true" />
           <ToolButton iconOnly label="Split selected clip at playhead (S)" disabled={!canSplit} onClick={splitSelectedClip}>
-            <Scissors className="h-3.5 w-3.5" />
+            <Scissors className="h-3 w-3" />
           </ToolButton>
           <ToolButton
             iconOnly
@@ -395,7 +418,7 @@ export const Timeline = ({
             disabled={!canDelete}
             onClick={deleteSelectedClip}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3 w-3" />
           </ToolButton>
           <ToolButton
             iconOnly
@@ -405,7 +428,7 @@ export const Timeline = ({
             pressed={rippleDeleteEnabled}
             onClick={() => onRippleDeleteEnabledChange?.(!rippleDeleteEnabled)}
           >
-            <ListCollapse className="h-3.5 w-3.5" />
+            <ListCollapse className="h-3 w-3" />
           </ToolButton>
           <ToolButton
             iconOnly
@@ -413,7 +436,7 @@ export const Timeline = ({
             pressed={effectiveMagneticSnapping}
             onClick={toggleMagneticSnapping}
           >
-            <Magnet className="h-3.5 w-3.5" />
+            <Magnet className="h-3 w-3" />
           </ToolButton>
         </div>
 
