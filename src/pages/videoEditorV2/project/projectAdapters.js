@@ -780,9 +780,10 @@ const getLegacyVideoRepresentatives = (videoClips) => {
 
 const normalizeBulkRepresentativeBindings = (projectInput) => {
   const project = normalizeProject(projectInput);
+  const mainVideoTrack = getPrimaryTrackByType(project, TRACK_TYPES.VIDEO);
   const visibleClipsByType = {
     [TRACK_TYPES.VIDEO]: sortClipsByTimeline(
-      getAllClips(project).filter((clip) => (
+      (mainVideoTrack?.clips || []).filter((clip) => (
         clip.type === TRACK_TYPES.VIDEO && clip.enabled !== false
       )),
     ),
@@ -877,16 +878,27 @@ const removeProjectClips = (project, predicate) => ({
 });
 
 const appendProjectClip = (project, type, clip) => {
-  const primaryTrack = getPrimaryTrackByType(project, type);
+  const trackType = [TRACK_TYPES.TEXT, TRACK_TYPES.IMAGE].includes(type)
+    ? TRACK_TYPES.OVERLAY
+    : type;
+  const primaryTrack = getPrimaryTrackByType(project, trackType);
   if (!primaryTrack) {
-    const track = createTrack(type, {
-      name: type === TRACK_TYPES.TEXT
-        ? 'Text'
-        : type === TRACK_TYPES.AUDIO ? 'Audio' : 'Video',
+    const track = createTrack(trackType, {
+      name: trackType === TRACK_TYPES.OVERLAY
+        ? 'Overlay 1'
+        : type === TRACK_TYPES.AUDIO ? 'Main Audio' : 'Main Video',
       clips: [clip],
       muted: type === TRACK_TYPES.VIDEO,
     });
-    return { ...project, tracks: [...project.tracks, track] };
+    const audioTrackIndex = project.tracks.findIndex(
+      (candidate) => candidate.type === TRACK_TYPES.AUDIO,
+    );
+    const index = trackType === TRACK_TYPES.OVERLAY && audioTrackIndex >= 0
+      ? audioTrackIndex
+      : project.tracks.length;
+    const tracks = [...project.tracks];
+    tracks.splice(index, 0, track);
+    return { ...project, tracks };
   }
   return {
     ...project,
@@ -1318,8 +1330,11 @@ export function mergeBulkRowPatchIntoProject(
 
 export const projectToBulkRow = (projectInput, existingRow = {}, options = {}) => {
   const project = normalizeBulkRepresentativeBindings(projectInput);
+  const mainVideoTrack = getPrimaryTrackByType(project, TRACK_TYPES.VIDEO);
   const videoClips = sortClipsByTimeline(
-    getAllClips(project).filter((clip) => clip.type === TRACK_TYPES.VIDEO && clip.enabled !== false),
+    (mainVideoTrack?.clips || []).filter((clip) => (
+      clip.type === TRACK_TYPES.VIDEO && clip.enabled !== false
+    )),
   );
   const textClips = sortClipsByTimeline(
     getAllClips(project).filter((clip) => clip.type === TRACK_TYPES.TEXT && clip.enabled !== false),
@@ -1417,4 +1432,12 @@ export const syncBulkRowContent = (existingRow = {}, patch = {}, options = {}) =
   });
 };
 
-export const getBulkProjectTrack = (project, type) => getPrimaryTrackByType(project, type);
+export const getBulkProjectTrack = (project, type) => {
+  if (![TRACK_TYPES.TEXT, TRACK_TYPES.IMAGE].includes(type)) {
+    return getPrimaryTrackByType(project, type);
+  }
+  return project?.tracks?.find((track) => (
+    track.type === TRACK_TYPES.OVERLAY
+    && track.clips.some((clip) => clip.type === type)
+  )) || null;
+};

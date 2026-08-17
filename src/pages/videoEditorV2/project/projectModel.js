@@ -1,4 +1,5 @@
 import {
+  CLIP_TYPE_VALUES,
   DEFAULT_CLIP_DURATION,
   DEFAULT_CROP,
   DEFAULT_OUTPUT_SETTINGS,
@@ -14,6 +15,7 @@ import {
   PROJECT_SCHEMA_VERSION,
   TRACK_TYPES,
   TRACK_TYPE_VALUES,
+  trackAcceptsClipType,
 } from './projectConstants.js';
 
 let fallbackIdCounter = 0;
@@ -318,8 +320,12 @@ export const createTrack = (type, input = {}) => {
     hidden: Boolean(input.hidden),
     clips: Array.isArray(input.clips)
       ? input.clips
-        .filter((clip) => isPlainObject(clip) && (!clip.type || clip.type === type))
-        .map((clip) => createClip(type, clip))
+        .filter((clip) => {
+          if (!isPlainObject(clip)) return false;
+          const clipType = clip.type || (type === TRACK_TYPES.OVERLAY ? '' : type);
+          return CLIP_TYPE_VALUES.includes(clipType) && trackAcceptsClipType(type, clipType);
+        })
+        .map((clip) => createClip(clip.type || type, clip))
       : [],
   };
 };
@@ -380,10 +386,58 @@ export const calculateProjectDuration = (project) => {
 
 export const normalizeProject = (project = {}) => {
   const output = normalizeOutputSettings(project.output);
-  const providedTracks = asTrackArray(project.tracks)
-    .filter((track) => TRACK_TYPE_VALUES.includes(track?.type))
-    .map((track) => createTrack(track.type, track))
-    .filter((track) => track.type !== TRACK_TYPES.IMAGE || track.clips.length > 0);
+  let hasMainVideoTrack = false;
+  const migratedTracks = asTrackArray(project.tracks).flatMap((track) => {
+    const sourceType = track?.type;
+    if (!sourceType) return [];
+
+    if (sourceType === TRACK_TYPES.TEXT || sourceType === TRACK_TYPES.IMAGE) {
+      const overlayTrack = createTrack(TRACK_TYPES.OVERLAY, {
+        ...track,
+        clips: (track.clips || []).map((clip) => ({ ...clip, type: clip.type || sourceType })),
+      });
+      return overlayTrack.clips.length > 0 ? [overlayTrack] : [];
+    }
+
+    if (sourceType === TRACK_TYPES.VIDEO) {
+      if (!hasMainVideoTrack) {
+        hasMainVideoTrack = true;
+        return [createTrack(TRACK_TYPES.VIDEO, track)];
+      }
+      const overlayTrack = createTrack(TRACK_TYPES.OVERLAY, {
+        ...track,
+        clips: (track.clips || []).map((clip) => ({
+          ...clip,
+          type: clip.type || TRACK_TYPES.VIDEO,
+        })),
+      });
+      return overlayTrack.clips.length > 0 ? [overlayTrack] : [];
+    }
+
+    if (!TRACK_TYPE_VALUES.includes(sourceType)) return [];
+    const normalizedTrack = createTrack(sourceType, track);
+    if (sourceType === TRACK_TYPES.OVERLAY && normalizedTrack.clips.length === 0) return [];
+    return [normalizedTrack];
+  });
+  const providedTracks = migratedTracks.flatMap((track) => {
+    if (track.type !== TRACK_TYPES.OVERLAY) return [track];
+
+    const lanes = [];
+    track.clips.forEach((clip) => {
+      const availableLane = lanes.find((lane) => lane.every((currentClip) => (
+        Number(clip.timelineStart) >= Number(currentClip.timelineStart) + Number(currentClip.duration)
+        || Number(currentClip.timelineStart) >= Number(clip.timelineStart) + Number(clip.duration)
+      )));
+      if (availableLane) availableLane.push(clip);
+      else lanes.push([clip]);
+    });
+
+    return lanes.map((clips, index) => createTrack(TRACK_TYPES.OVERLAY, {
+      ...track,
+      id: index === 0 ? track.id : '',
+      clips,
+    }));
+  });
 
   const tracks = [...providedTracks];
   DEFAULT_TRACK_DEFINITIONS.forEach((definition) => {
@@ -392,7 +446,19 @@ export const normalizeProject = (project = {}) => {
     }
   });
 
-  const constrainedTracks = tracks.map((track) => ({
+  const orderedTracks = [
+    ...tracks
+      .filter((track) => track.type === TRACK_TYPES.VIDEO)
+      .slice(0, 1)
+      .map((track) => ({ ...track, name: 'Main Video' })),
+    ...tracks
+      .filter((track) => track.type === TRACK_TYPES.OVERLAY)
+      .map((track, index) => ({ ...track, name: `Overlay ${index + 1}` })),
+    ...tracks
+      .filter((track) => track.type === TRACK_TYPES.AUDIO)
+      .map((track, index) => (index === 0 ? { ...track, name: 'Main Audio' } : track)),
+  ];
+  const constrainedTracks = orderedTracks.map((track) => ({
     ...track,
     clips: track.clips.map((clip) => constrainClipToProject(clip, output.maxDuration)),
   }));

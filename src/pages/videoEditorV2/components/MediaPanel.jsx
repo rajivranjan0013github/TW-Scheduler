@@ -177,6 +177,8 @@ const AssetCard = ({ asset, onAdd }) => {
 
 export const MediaPanel = ({
   className = '',
+  activeTab: controlledActiveTab,
+  onActiveTabChange,
   token,
   promoAssets = [],
   promoFolderName = '',
@@ -191,10 +193,16 @@ export const MediaPanel = ({
   onAddText,
   bulkQueue = null,
 }) => {
-  const [activeTab, setActiveTab] = useState(() => (
+  const [internalActiveTab, setInternalActiveTab] = useState(() => (
     bulkQueue?.initiallyOpen ? 'bulk' : 'media'
   ));
+  const activeTab = controlledActiveTab ?? internalActiveTab;
   const [search, setSearch] = useState('');
+
+  const selectTab = (tab) => {
+    setInternalActiveTab(tab);
+    onActiveTabChange?.(tab);
+  };
 
   const filteredAssets = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -215,7 +223,7 @@ export const MediaPanel = ({
               key={tab.id}
               type="button"
               onClick={() => {
-                setActiveTab(tab.id);
+                selectTab(tab.id);
                 if (tab.id === 'media' || tab.id === 'audio') {
                   onOpenLibrary(tab.id === 'audio' ? 'audio' : 'video');
                 } else if (libraryOpen) {

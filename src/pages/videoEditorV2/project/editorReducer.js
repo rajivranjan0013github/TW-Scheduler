@@ -1,5 +1,7 @@
 import {
+  CLIP_TYPE_VALUES,
   DEFAULT_HISTORY_LIMIT,
+  TRACK_TYPES,
   TRACK_TYPE_VALUES,
 } from './projectConstants.js';
 import {
@@ -13,6 +15,7 @@ import {
   attachExtractedAudioClip,
   finalizeProjectChange,
   findClipById,
+  getAvailableOverlayTrack,
   getClipLocation,
   getPrimaryTrackByType,
   getTrackById,
@@ -189,17 +192,47 @@ export function editorReducer(state, action) {
 
     case EDITOR_ACTIONS.ADD_CLIP: {
       const requestedType = payload.clip?.type || payload.trackType || payload.type;
-      const targetTrack = payload.trackId
+      if (!CLIP_TYPE_VALUES.includes(requestedType)) return state;
+      const draftClip = createClip(requestedType, {
+        ...payload.clip,
+        type: requestedType,
+      });
+      const mainVideoTrack = getPrimaryTrackByType(state.project, TRACK_TYPES.VIDEO);
+      const shouldUseOverlay = payload.placement === TRACK_TYPES.OVERLAY
+        || requestedType === TRACK_TYPES.TEXT
+        || requestedType === TRACK_TYPES.IMAGE
+        || (
+          requestedType === TRACK_TYPES.VIDEO
+          && payload.placement !== 'main'
+          && (mainVideoTrack?.clips.length || 0) > 0
+        );
+      let projectWithTarget = state.project;
+      let targetTrack = payload.trackId
         ? getTrackById(state.project, payload.trackId)
-        : getPrimaryTrackByType(state.project, requestedType);
+        : shouldUseOverlay
+          ? getAvailableOverlayTrack(state.project, draftClip)
+          : getPrimaryTrackByType(state.project, requestedType);
+
+      if (!targetTrack && shouldUseOverlay) {
+        const overlayCount = state.project.tracks.filter(
+          (track) => track.type === TRACK_TYPES.OVERLAY,
+        ).length;
+        const audioTrackIndex = state.project.tracks.findIndex(
+          (track) => track.type === TRACK_TYPES.AUDIO,
+        );
+        projectWithTarget = addTrackToProject(state.project, TRACK_TYPES.OVERLAY, {
+          name: `Overlay ${overlayCount + 1}`,
+          index: audioTrackIndex >= 0 ? audioTrackIndex : state.project.tracks.length,
+        });
+        targetTrack = projectWithTarget.tracks.find((track) => (
+          !state.project.tracks.some((currentTrack) => currentTrack.id === track.id)
+        ));
+      }
       if (!targetTrack || targetTrack.locked) return state;
 
-      const clip = createClip(targetTrack.type, {
-        ...payload.clip,
-        type: targetTrack.type,
-      });
-      if (findClipById(state.project, clip.id)) return state;
-      const nextProject = insertClip(state.project, {
+      const clip = draftClip;
+      if (findClipById(projectWithTarget, clip.id)) return state;
+      const nextProject = insertClip(projectWithTarget, {
         trackId: targetTrack.id,
         clip,
         index: payload.index,

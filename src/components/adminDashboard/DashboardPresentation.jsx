@@ -32,12 +32,46 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
     };
   });
 
+  const renderCustomAxisTick = ({ x, y, payload, index }) => {
+    const item = chartData[index];
+    const postCount = item?.posts || 0;
+    const isSelected = item?.isSelected;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={0}
+          dy={7}
+          textAnchor="middle"
+          fill={isSelected ? '#10b981' : '#6e6e73'}
+          fontSize={9}
+          fontWeight={isSelected ? 700 : 500}
+        >
+          {payload.value}
+        </text>
+        <text
+          x={0}
+          y={0}
+          dy={18}
+          textAnchor="middle"
+          fill={postCount > 0 ? (isSelected ? '#10b981' : '#3478f6') : '#b0b0b5'}
+          fontSize={8}
+          fontWeight={postCount > 0 ? 700 : 400}
+        >
+          {postCount > 0 ? `${postCount}p` : '0'}
+        </text>
+      </g>
+    );
+  };
+
   return (
     <div className="mt-3 rounded-xl border border-[#d2d2d7] bg-white px-3 py-2.5">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Last 30 days</p>
-          <p className="m-0 mt-0.5 text-sm font-semibold text-[#1d1d1f]">Views by publish day</p>
+          <p className="m-0 mt-0.5 text-sm font-semibold text-[#1d1d1f]">
+            Views by publish day <span className="text-[10px] font-normal text-[#8e8e93]">(Date / Posts)</span>
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {selectedDate && (
@@ -52,10 +86,17 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
           <p className="m-0 text-[10px] font-medium text-[#8e8e93]">Click any bar to inspect date activity</p>
         </div>
       </div>
-      <div className="h-36 w-full cursor-pointer outline-none focus:outline-none focus-visible:outline-none [&_*]:outline-none [&_*]:focus:outline-none [&_*]:focus-visible:outline-none select-none">
+      <div className="h-40 w-full cursor-pointer outline-none focus:outline-none focus-visible:outline-none [&_*]:outline-none [&_*]:focus:outline-none [&_*]:focus-visible:outline-none select-none">
         <ResponsiveContainer width="100%" height="100%" style={{ outline: 'none' }}>
-          <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} style={{ outline: 'none' }}>
-            <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#6e6e73' }} tickLine={false} axisLine={false} interval={0} />
+          <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 2, left: 0 }} style={{ outline: 'none' }}>
+            <XAxis
+              dataKey="label"
+              tick={renderCustomAxisTick}
+              tickLine={false}
+              axisLine={false}
+              interval={0}
+              height={26}
+            />
             <YAxis
               tick={{ fontSize: 9, fill: '#6e6e73' }}
               tickLine={false}
@@ -66,7 +107,10 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
             <Tooltip
               cursor={{ fill: 'rgba(52, 120, 246, 0.08)' }}
               formatter={(value, name) => [name === 'views' ? numberFormat.format(value) : value, name === 'views' ? 'Views' : 'Posts']}
-              labelFormatter={(_, payload) => payload?.[0]?.payload?.dateStr || ''}
+              labelFormatter={(_, payload) => {
+                const p = payload?.[0]?.payload;
+                return p?.dateStr ? `${p.dateStr} (${p.posts || 0} posts)` : '';
+              }}
               contentStyle={{ borderRadius: 8, border: '1px solid #d2d2d7', fontSize: 11 }}
             />
             <Bar

@@ -18,7 +18,10 @@ import {
 } from '../project';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-const VISUAL_LAYER_PRIORITY = { video: 0, image: 1, text: 2 };
+const compareVisualLayers = (left, right) => (
+  Number(left.trackIndex || 0) - Number(right.trackIndex || 0)
+  || Number(left.clipIndex || 0) - Number(right.clipIndex || 0)
+);
 const NOOP = () => {};
 const MIN_TEXT_BOX_WIDTH = 0.08;
 const MAX_TEXT_BOX_WIDTH = 0.92;
@@ -1165,13 +1168,15 @@ export const ProjectPreviewCanvas = ({
   }, [project?.output?.height, project?.output?.width]);
 
   const hiddenIds = useMemo(() => new Set(hiddenClipIds), [hiddenClipIds]);
-  const allClips = useMemo(() => (project?.tracks || []).flatMap((track) => (
+  const allClips = useMemo(() => (project?.tracks || []).flatMap((track, trackIndex) => (
     track.hidden
       ? []
-      : (track.clips || []).map((clip) => ({
+      : (track.clips || []).map((clip, clipIndex) => ({
         ...clip,
         trackType: track.type,
         trackMuted: track.muted,
+        trackIndex,
+        clipIndex,
       }))
   )), [project?.tracks]);
   const activeVisualClips = allClips.filter((clip) => (
@@ -1179,9 +1184,7 @@ export const ProjectPreviewCanvas = ({
     && !hiddenIds.has(clip.id)
     && ['video', 'image', 'text'].includes(clip.type)
     && isClipActive(clip, currentTime)
-  )).sort((left, right) => (
-    VISUAL_LAYER_PRIORITY[left.type] - VISUAL_LAYER_PRIORITY[right.type]
-  ));
+  )).sort(compareVisualLayers);
   const activeAudio = includeAudio ? allClips.filter((clip) => (
     clip.enabled !== false
     && !clip.trackMuted
@@ -1308,16 +1311,20 @@ export const PreviewStage = ({
     return () => observer.disconnect();
   }, [project.output.height, project.output.width]);
 
-  const allClips = useMemo(() => project.tracks.flatMap((track) => (
-    track.hidden ? [] : track.clips.map((clip) => ({ ...clip, trackType: track.type, trackMuted: track.muted }))
+  const allClips = useMemo(() => project.tracks.flatMap((track, trackIndex) => (
+    track.hidden ? [] : track.clips.map((clip, clipIndex) => ({
+      ...clip,
+      trackType: track.type,
+      trackMuted: track.muted,
+      trackIndex,
+      clipIndex,
+    }))
   )), [project.tracks]);
   const activeVisualClips = allClips.filter((clip) => (
     clip.enabled !== false &&
     ['video', 'image', 'text'].includes(clip.type) &&
     isClipActive(clip, currentTime)
-  )).sort((left, right) => (
-    VISUAL_LAYER_PRIORITY[left.type] - VISUAL_LAYER_PRIORITY[right.type]
-  ));
+  )).sort(compareVisualLayers);
   const activeAudio = allClips.filter((clip) => (
     clip.enabled !== false
     && !clip.trackHidden

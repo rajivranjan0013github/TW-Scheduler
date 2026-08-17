@@ -1,10 +1,12 @@
 import {
+  CLIP_TYPE_VALUES,
   MAX_PLAYBACK_RATE,
   MIN_CLIP_DURATION,
   MIN_PLAYBACK_RATE,
   PROJECT_HARD_MAX_DURATION,
   TRACK_TYPES,
   TRACK_TYPE_VALUES,
+  trackAcceptsClipType,
 } from './projectConstants.js';
 import {
   clampNumber,
@@ -47,6 +49,18 @@ const clipsOverlap = (left, right) => (
   Number(left.timelineStart) < getClipEnd(right)
   && Number(right.timelineStart) < getClipEnd(left)
 );
+
+export const getAvailableOverlayTrack = (project, clip, options = {}) => {
+  if (!clip || !trackAcceptsClipType(TRACK_TYPES.OVERLAY, clip.type)) return null;
+  const excludedClipId = options.excludeClipId || clip.id;
+  return getTracksByType(project, TRACK_TYPES.OVERLAY).find((track) => (
+    !track.hidden
+    && !track.locked
+    && !(track.clips || []).some((currentClip) => (
+      currentClip.id !== excludedClipId && clipsOverlap(currentClip, clip)
+    ))
+  )) || null;
+};
 
 const canPlaceExtractedAudioOnTrack = (track, clip) => (
   track?.type === TRACK_TYPES.AUDIO
@@ -207,14 +221,15 @@ export const findClipById = (project, clipId) => (
   getClipLocation(project, clipId)?.clip || null
 );
 
-export const getActiveClipsAtTime = (project, time, types = TRACK_TYPE_VALUES) => {
+export const getActiveClipsAtTime = (project, time, types = CLIP_TYPE_VALUES) => {
   const currentTime = Math.max(0, Number(time) || 0);
   const allowedTypes = new Set(Array.isArray(types) ? types : [types]);
 
   return (project?.tracks || []).flatMap((track) => {
-    if (track.hidden || !allowedTypes.has(track.type)) return [];
+    if (track.hidden) return [];
     return (track.clips || []).filter((clip) => (
       clip.enabled !== false
+      && allowedTypes.has(clip.type)
       && currentTime >= clip.timelineStart
       && currentTime < getClipEnd(clip)
     ));
@@ -356,7 +371,7 @@ export const retimeClipPlaybackRate = (
         ...track,
         clips: track.clips.map((candidate) => (
           followingClipIds.has(candidate.id)
-            ? createClip(track.type, {
+            ? createClip(candidate.type, {
                 ...candidate,
                 timelineStart: roundTimelineTime(
                   Math.max(0, Number(candidate.timelineStart || 0) + durationDelta),
@@ -403,7 +418,7 @@ export const rippleDeleteClipById = (project, clipId) => {
             const clipStart = Number(clip.timelineStart) || 0;
             if (clipStart < removedClipEnd) return clip;
 
-            return createClip(track.type, {
+            return createClip(clip.type, {
               ...clip,
               timelineStart: roundTimelineTime(Math.max(0, clipStart - removedDuration)),
             });
@@ -417,9 +432,9 @@ export const insertClip = (project, { trackId, trackType, clip, index }) => {
   const targetTrack = trackId
     ? getTrackById(project, trackId)
     : getPrimaryTrackByType(project, trackType || clip?.type);
-  if (!targetTrack || !clip || targetTrack.type !== clip.type) return project;
+  if (!targetTrack || !clip || !trackAcceptsClipType(targetTrack.type, clip.type)) return project;
 
-  const nextClip = createClip(targetTrack.type, clip);
+  const nextClip = createClip(clip.type, clip);
   const insertionIndex = Number.isInteger(index)
     ? clampNumber(index, 0, targetTrack.clips.length, targetTrack.clips.length)
     : targetTrack.clips.length;
@@ -455,7 +470,11 @@ export const moveClip = (project, {
   const location = getClipLocation(project, clipId);
   if (!location) return project;
   const targetTrack = toTrackId ? getTrackById(project, toTrackId) : location.track;
-  if (!targetTrack || targetTrack.type !== location.clip.type || targetTrack.locked) return project;
+  if (
+    !targetTrack
+    || !trackAcceptsClipType(targetTrack.type, location.clip.type)
+    || targetTrack.locked
+  ) return project;
 
   const maximumStart = Math.max(0, project.output.maxDuration - MIN_CLIP_DURATION);
   const nextClip = createClip(location.clip.type, {

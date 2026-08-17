@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Film, GripVertical, Image, Music2, Type } from 'lucide-react';
 import { AudioWaveform } from './AudioWaveform';
+import { VideoFrameStrip } from './VideoFrameStrip';
 import {
   clamp,
   DEFAULT_MIN_CLIP_DURATION,
@@ -46,6 +47,8 @@ export const TimelineClip = ({
   trackId,
   trackType,
   pixelsPerSecond,
+  height,
+  fps = 30,
   timelineDuration,
   selected = false,
   locked = false,
@@ -66,6 +69,10 @@ export const TimelineClip = ({
   const { Icon } = visual;
   const values = getInteractionValues({ interaction, clip });
   const clipWidth = Math.max(8, values.duration * pixelsPerSecond);
+  const committedClipWidth = Math.max(
+    8,
+    (Number(clip.duration) || DEFAULT_MIN_CLIP_DURATION) * pixelsPerSecond,
+  );
   const sourceDuration = Number(clip.sourceDuration);
   const playbackRate = Number(clip.playbackRate) > 0 ? Number(clip.playbackRate) : 1;
   const hasSourceDurationLimit = sourceDuration > 0 && !(clipType === 'audio' && clip.loop);
@@ -74,6 +81,7 @@ export const TimelineClip = ({
   ));
   const magneticThresholdSeconds = Math.max(0, Number(magneticSnapThresholdPx) || 0)
     / Math.max(1, pixelsPerSecond);
+  const showFrameStrip = trackType === 'video' && clipType === 'video' && Boolean(clip.sourceUrl);
 
   useEffect(() => () => onSnapGuideChange?.(null), [onSnapGuideChange]);
 
@@ -234,7 +242,9 @@ export const TimelineClip = ({
   return (
     <div
       className={`group absolute top-1.5 bottom-1.5 overflow-hidden rounded-md border shadow-[0_2px_7px_rgba(0,0,0,0.35)] outline-none transition-[box-shadow,filter] focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#141416] ${visual.className} ${
-        selected ? 'z-20 ring-2 ring-orange-400 ring-offset-2 ring-offset-[#141416]' : 'z-10 hover:brightness-110'
+        selected
+          ? 'z-20 ring-2 ring-orange-400 ring-offset-2 ring-offset-[#141416]'
+          : `z-10 ${showFrameStrip ? 'hover:border-sky-300' : 'hover:brightness-110'}`
       } ${locked ? 'cursor-not-allowed opacity-75' : interaction ? 'cursor-grabbing' : 'cursor-grab'}`}
       style={{
         left: values.timelineStart * pixelsPerSecond,
@@ -259,17 +269,26 @@ export const TimelineClip = ({
         />
       )}
 
+      {showFrameStrip && (
+        <VideoFrameStrip
+          clip={clip}
+          width={committedClipWidth}
+          height={height}
+          fps={fps}
+          pixelsPerSecond={pixelsPerSecond}
+        />
+      )}
+
       {clipType === 'audio' && (
         <AudioWaveform clip={{ ...clip, ...values }} selected={selected} />
       )}
 
       <div className="relative flex h-full min-w-0 items-center gap-1.5 px-2.5">
-        <Icon className="h-3.5 w-3.5 shrink-0" />
-        <span className="min-w-0 truncate text-[10px] font-bold leading-none drop-shadow-sm">
-          {getClipLabel(clip)}
-        </span>
+        {clipType !== 'video' && <Icon className="h-3.5 w-3.5 shrink-0" />}
         {clipWidth >= 90 && (
-          <span className="ml-auto shrink-0 text-[9px] font-semibold tabular-nums text-white/80">
+          <span className={`ml-auto shrink-0 text-[9px] font-semibold tabular-nums text-white ${
+            showFrameStrip ? 'rounded bg-black/55 px-1.5 py-1 shadow-sm' : 'text-white/80'
+          }`}>
             {values.duration.toFixed(1)}s
           </span>
         )}

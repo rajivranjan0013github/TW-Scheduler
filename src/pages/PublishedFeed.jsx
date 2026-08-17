@@ -8,6 +8,7 @@ import PlatformIcon from '../components/PlatformIcon';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
 import { useAuth } from '../context/AuthContext';
+import { DailyViewsChart } from '../components/adminDashboard/DashboardPresentation';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 const cancellableStatuses = new Set(['scheduled', 'manual_ready', 'downloaded', 'paused']);
@@ -66,6 +67,11 @@ const MediaPreview = ({ item, className = 'h-full w-full object-cover block' }) 
   return <img src={url} className={className} alt="" />;
 };
 
+const getAccountLabel = (account) => {
+  const label = account?.username || account?.requestedHandle || account?.handle || account?.name || account?.displayName || 'Account';
+  return String(label).replace(/^@/, '');
+};
+
 const getAccountAvatarUrl = (account) => (
   account?.avatarUrl
   || account?.profilePictureUrl
@@ -74,39 +80,41 @@ const getAccountAvatarUrl = (account) => (
   || ''
 );
 
-const AccountAvatar = ({ account, sizeClass = 'h-10 w-10', textClass = 'text-xs' }) => {
-  const avatarUrl = getAssetUrl(getAccountAvatarUrl(account));
-  const label = account?.username || account?.handle || account?.name || 'Account';
-  const initials = (label || 'A')
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+const getChannelAvatarSrc = (account) => {
+  const avatarUrl = getAccountAvatarUrl(account).trim();
+  if (!avatarUrl) return '';
+  if (avatarUrl.startsWith('/')) return `${API_BASE_URL}${avatarUrl}`;
 
-  if (avatarUrl) {
-    return (
-      <div className={`${sizeClass} rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 relative`}>
+  try {
+    const parsedUrl = new URL(avatarUrl);
+    if (parsedUrl.hostname === 'media.theeasypost.com') {
+      return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(avatarUrl)}`;
+    }
+  } catch {
+    return `${API_BASE_URL}/${avatarUrl.replace(/^\/+/, '')}`;
+  }
+  return avatarUrl;
+};
+
+const AccountAvatar = ({ account, sizeClass = 'h-10 w-10', textClass = 'text-xs' }) => {
+  const label = getAccountLabel(account);
+  const avatarUrl = getChannelAvatarSrc(account);
+  return (
+    <span className={`${sizeClass} relative inline-flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-black/10 bg-[#eef2ff] ${textClass} font-bold uppercase text-[#4f46e5]`}>
+      <span>{label.charAt(0) || 'C'}</span>
+      {avatarUrl && (
         <img
           src={avatarUrl}
-          alt={label}
-          onError={(e) => {
-            e.target.style.display = 'none';
-            e.target.nextSibling.style.display = 'flex';
+          alt={`${label} channel`}
+          crossOrigin="anonymous"
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
           }}
-          className="h-full w-full object-cover"
         />
-        <div className="hidden h-full w-full items-center justify-center">
-          <span className={`${textClass} font-bold text-slate-500`}>{initials}</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`${sizeClass} rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200`}>
-      <span className={`${textClass} font-bold text-slate-500`}>{initials}</span>
-    </div>
+      )}
+    </span>
   );
 };
 
@@ -123,6 +131,7 @@ export const PublishedFeed = () => {
   const [renderNow, setRenderNow] = useState(() => new Date());
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState('');
+  const [selectedGraphDate, setSelectedGraphDate] = useState(null);
   const canDeleteQueuePost = ['owner', 'admin', 'editor'].includes(user?.role);
 
   useEffect(() => {
@@ -401,6 +410,53 @@ export const PublishedFeed = () => {
     return { today, yesterday, last7Days, thisMonth, allTime };
   }, [publishedPosts, renderNow]);
 
+  const last30DaysPostedViews = useMemo(() => {
+    const now = renderNow;
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = [];
+    const dateMap = new Map();
+
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(todayStart);
+      d.setDate(d.getDate() - i);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const entry = {
+        dateStr,
+        views: 0,
+        posts: 0,
+      };
+      days.push(entry);
+      dateMap.set(dateStr, entry);
+    }
+
+    publishedPosts.forEach((post) => {
+      const publishedAt = getPublishedDate(post);
+      if (!publishedAt) return;
+      const pubDate = new Date(publishedAt);
+      if (Number.isNaN(pubDate.getTime())) return;
+      const dateStr = `${pubDate.getFullYear()}-${String(pubDate.getMonth() + 1).padStart(2, '0')}-${String(pubDate.getDate()).padStart(2, '0')}`;
+      const entry = dateMap.get(dateStr);
+      if (entry) {
+        entry.posts += 1;
+        entry.views += Number(post.views || 0);
+      }
+    });
+
+    return days;
+  }, [publishedPosts, renderNow]);
+
+  const displayedPublishedPosts = useMemo(() => {
+    if (!selectedGraphDate) return publishedPosts;
+    return publishedPosts.filter((post) => {
+      const publishedAt = getPublishedDate(post);
+      if (!publishedAt) return false;
+      const pubDate = new Date(publishedAt);
+      if (Number.isNaN(pubDate.getTime())) return false;
+      const dateStr = `${pubDate.getFullYear()}-${String(pubDate.getMonth() + 1).padStart(2, '0')}-${String(pubDate.getDate()).padStart(2, '0')}`;
+      return dateStr === selectedGraphDate;
+    });
+  }, [publishedPosts, selectedGraphDate]);
+
   const upcomingQueuedCount = useMemo(() => {
     return queuedPosts.filter((post) => {
       const isManualPosted = post.status === 'posted_manual' || Boolean(post.manualPostedAt);
@@ -494,6 +550,17 @@ export const PublishedFeed = () => {
         </div>
       )}
 
+      {/* 30-Day Daily Views Chart */}
+      {!loading && channel && publishedPosts.length > 0 && (
+        <div className="mb-3">
+          <DailyViewsChart
+            data={last30DaysPostedViews}
+            selectedDate={selectedGraphDate}
+            onSelectDate={setSelectedGraphDate}
+          />
+        </div>
+      )}
+
       {/* Tabs Selector */}
       {!loading && channel && (
         <div className="mb-3 flex border-b border-[#e5e5ea] gap-4">
@@ -505,7 +572,7 @@ export const PublishedFeed = () => {
                 : 'border-transparent text-gray-500 hover:text-black'
             }`}
           >
-            Published Feed ({publishedPosts.length})
+            Published Feed ({selectedGraphDate ? `${displayedPublishedPosts.length} of ${publishedPosts.length}` : publishedPosts.length})
           </button>
           <button
             onClick={() => setActiveTab('queued')}
@@ -535,61 +602,83 @@ export const PublishedFeed = () => {
             </div>
           ) : publishedPosts.length === 0 ? (
             <div className="bg-white border border-[#e5e5ea] rounded-xl p-16 text-center text-sm text-gray-400 font-medium shadow-sm">
-              No cached published posts from the last 14 days. Refresh to sync this channel.
+              No cached published posts from the last 30 days. Refresh to sync this channel.
             </div>
           ) : (
-            <div className="w-full overflow-x-auto rounded-xl border border-[#d2d2d7] bg-white">
-              <div className="min-w-[620px]">
-              <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
-                <span>Published</span>
-                <span>Views</span>
-                <span>Likes</span>
-                <span>Comments</span>
-                <span>Actions</span>
-              </div>
-              <div>
-                {publishedPosts.map((post) => {
-                  const publishedDate = getPublishedDate(post);
-                  const publishedDisplay = formatPublishedDate(publishedDate);
-                  return (
-                    <div key={post.id} className="border-b border-[#e5e5ea] last:border-b-0">
-                      <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] items-center gap-3 px-3 py-2 text-xs transition hover:bg-[#f5f5f7]">
-                        <div className="min-w-0">
-                          <p className="m-0 truncate font-semibold text-[#1d1d1f]">{publishedDisplay.date}</p>
-                          {publishedDisplay.time && (
-                            <p className="m-0 mt-0.5 text-[10px] font-semibold text-[#6e6e73]">{publishedDisplay.time}</p>
-                          )}
-                        </div>
-                        <span className="font-semibold text-[#515154]">
-                          {post.views === null || post.views === undefined ? '—' : compactNumber(post.views)}
-                        </span>
-                        <span className="font-semibold text-[#515154]">{compactNumber(post.likes)}</span>
-                        <span className="font-semibold text-[#515154]">{compactNumber(post.comments)}</span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => openLivePost(post)}
-                            disabled={!post.permalink}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#d2d2d7] bg-white text-[#515154] transition hover:border-[#0071e3] hover:text-[#0071e3] disabled:cursor-not-allowed disabled:opacity-40"
-                            title={post.permalink ? 'Open live post' : 'Live-post link unavailable'}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openInsights(post)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#0071e3] text-white transition hover:bg-[#147ce5]"
-                            title="Open insights"
-                          >
-                            <BarChart3 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
+            <div className="w-full">
+              {selectedGraphDate && (
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-[#3478f6]/30 bg-[#f0f7ff] px-3 py-2 text-xs text-[#1d1d1f]">
+                  <span>
+                    Showing <strong>{displayedPublishedPosts.length}</strong> post{displayedPublishedPosts.length === 1 ? '' : 's'} published on <strong>{selectedGraphDate}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGraphDate(null)}
+                    className="font-semibold text-[#3478f6] hover:underline"
+                  >
+                    Show all 30 days
+                  </button>
+                </div>
+              )}
+              <div className="w-full overflow-x-auto rounded-xl border border-[#d2d2d7] bg-white">
+                <div className="min-w-[620px]">
+                <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+                  <span>Published</span>
+                  <span>Views</span>
+                  <span>Likes</span>
+                  <span>Comments</span>
+                  <span>Actions</span>
+                </div>
+                <div>
+                  {displayedPublishedPosts.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-gray-400">
+                      No posts found for {selectedGraphDate}.
                     </div>
-                  );
-                })}
+                  ) : (
+                    displayedPublishedPosts.map((post) => {
+                      const publishedDate = getPublishedDate(post);
+                      const publishedDisplay = formatPublishedDate(publishedDate);
+                      return (
+                        <div key={post.id} className="border-b border-[#e5e5ea] last:border-b-0">
+                          <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] items-center gap-3 px-3 py-2 text-xs transition hover:bg-[#f5f5f7]">
+                            <div className="min-w-0">
+                              <p className="m-0 truncate font-semibold text-[#1d1d1f]">{publishedDisplay.date}</p>
+                              {publishedDisplay.time && (
+                                <p className="m-0 mt-0.5 text-[10px] font-semibold text-[#6e6e73]">{publishedDisplay.time}</p>
+                              )}
+                            </div>
+                            <span className="font-semibold text-[#515154]">
+                              {post.views === null || post.views === undefined ? '—' : compactNumber(post.views)}
+                            </span>
+                            <span className="font-semibold text-[#515154]">{compactNumber(post.likes)}</span>
+                            <span className="font-semibold text-[#515154]">{compactNumber(post.comments)}</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => openLivePost(post)}
+                                disabled={!post.permalink}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#d2d2d7] bg-white text-[#515154] transition hover:border-[#0071e3] hover:text-[#0071e3] disabled:cursor-not-allowed disabled:opacity-40"
+                                title={post.permalink ? 'Open live post' : 'Live-post link unavailable'}
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openInsights(post)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#0071e3] text-white transition hover:bg-[#147ce5]"
+                                title="View performance insights"
+                              >
+                                <BarChart3 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-              </div>
+            </div>
             </div>
           )
         ) : (

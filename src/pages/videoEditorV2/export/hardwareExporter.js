@@ -28,8 +28,6 @@ import {
 import { normalizeProject } from './normalizeProject.js';
 import { renderTextClipToPng } from './textOverlayRenderer.js';
 
-const VISUAL_PRIORITY = Object.freeze({ video: 0, image: 1, text: 2 });
-
 const clamp = (value, minimum, maximum) => (
   Math.min(maximum, Math.max(minimum, value))
 );
@@ -251,7 +249,9 @@ const buildFrameTimestamps = ({ clip, frameCount, fps, firstTimestamp }) => {
 const prepareVisualResources = async ({ project, media, frameCount, signal, onProgress }) => {
   const visualClips = project.clips
     .filter(isVisualClip)
-    .sort((left, right) => VISUAL_PRIORITY[left.type] - VISUAL_PRIORITY[right.type]);
+    .sort((left, right) => (
+      left.trackIndex - right.trackIndex || left.clipIndex - right.clipIndex
+    ));
   const resources = [];
 
   try {

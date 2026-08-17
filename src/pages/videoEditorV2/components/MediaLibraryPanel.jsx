@@ -17,7 +17,10 @@ import {
 import { getActiveCampaignId } from '../../../utils/campaignScope';
 import { getMediaUrl } from '../../../utils/mediaUrls';
 import LoadingVideoPreview from '../../../components/LoadingVideoPreview';
-import { API_BASE_URL } from '../../videoEditor/videoEditorConstants';
+import {
+  API_BASE_URL,
+  PLATFORM_AUDIO_FOLDER_ID,
+} from '../../videoEditor/videoEditorConstants';
 import {
   fetchMediaLibraryFolder,
   fetchMediaLibraryFolders,
@@ -326,8 +329,11 @@ export const MediaLibraryPanel = ({
 }) => {
   const campaignId = getActiveCampaignId();
   const queryClient = useQueryClient();
-  const [activeFolderId, setActiveFolderId] = useState(() => readLastMediaFolder(campaignId));
-  const mediaType = initialMediaType === 'audio' ? 'audio' : 'all';
+  const isAudioLibrary = initialMediaType === 'audio';
+  const [activeFolderId, setActiveFolderId] = useState(() => (
+    isAudioLibrary ? PLATFORM_AUDIO_FOLDER_ID : readLastMediaFolder(campaignId)
+  ));
+  const mediaType = isAudioLibrary ? 'audio' : 'all';
   const [search, setSearch] = useState('');
   const [selectingId, setSelectingId] = useState('');
   const activeAudioPreviewRef = useRef(null);
@@ -351,7 +357,7 @@ export const MediaLibraryPanel = ({
     queryFn: ({ signal }) => fetchMediaLibraryFolders({ token, campaignId, signal }),
     staleTime: MEDIA_LIBRARY_STALE_TIME,
     gcTime: MEDIA_LIBRARY_GC_TIME,
-    enabled: Boolean(token),
+    enabled: Boolean(token) && !isAudioLibrary,
   });
 
   const mediaQuery = useQuery({
@@ -369,17 +375,22 @@ export const MediaLibraryPanel = ({
 
   const folders = useMemo(() => foldersQuery.data || [], [foldersQuery.data]);
   const media = useMemo(() => mediaQuery.data || [], [mediaQuery.data]);
-  const loadingFolders = foldersQuery.isPending && !foldersQuery.data;
+  const loadingFolders = !isAudioLibrary && foldersQuery.isPending && !foldersQuery.data;
   const loadingMedia = mediaQuery.isPending && !mediaQuery.data;
   const error = foldersQuery.error?.message || mediaQuery.error?.message || '';
 
   const openFolder = useCallback((folderId) => {
+    if (isAudioLibrary) {
+      setActiveFolderId(PLATFORM_AUDIO_FOLDER_ID);
+      return;
+    }
     const normalizedFolderId = normalizeFolderId(folderId) || 'root';
     setActiveFolderId(normalizedFolderId);
     saveLastMediaFolder(campaignId, normalizedFolderId);
-  }, [campaignId]);
+  }, [campaignId, isAudioLibrary]);
 
   const prefetchFolder = useCallback((folderId) => {
+    if (isAudioLibrary) return;
     const normalizedFolderId = normalizeFolderId(folderId) || 'root';
     void queryClient.prefetchQuery({
       queryKey: mediaLibraryKeys.media(campaignId, normalizedFolderId),
@@ -392,7 +403,7 @@ export const MediaLibraryPanel = ({
       staleTime: MEDIA_LIBRARY_STALE_TIME,
       gcTime: MEDIA_LIBRARY_GC_TIME,
     });
-  }, [campaignId, queryClient, token]);
+  }, [campaignId, isAudioLibrary, queryClient, token]);
 
   const childFolders = useMemo(() => folders
     .filter((folder) => getFolderParentId(folder) === activeFolderId)
@@ -604,7 +615,11 @@ export const MediaLibraryPanel = ({
               <div className="flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 px-4 text-center">
                 <p className="text-[10px] font-bold text-[#a6abb4]">No matching files</p>
                 <p className="mt-1 text-[9px] font-medium text-[#666d78]">
-                  {search ? 'Try another search or file type.' : 'Open another folder or change the file type.'}
+                  {search
+                    ? 'Try another search.'
+                    : isAudioLibrary
+                      ? 'No global audio tracks are available.'
+                      : 'Open another folder or change the file type.'}
                 </p>
               </div>
             )}

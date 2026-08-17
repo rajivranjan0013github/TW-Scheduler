@@ -60,15 +60,14 @@ import {
   hydrateBulkProjectDurations,
   projectToBulkRow,
   serializeProject,
-  sortClipsByTimeline,
 } from './project';
 import { Timeline } from './timeline';
 
 const DRAFT_STORAGE_KEY = 'tw_video_editor_v2_draft';
 const TIMELINE_MIN_HEIGHT = 220;
 const TIMELINE_MAX_HEIGHT = 480;
-// 40px toolbar + 36px ruler + three 62px tracks + scrollbar/borders.
-const TIMELINE_DEFAULT_HEIGHT = 268;
+// Toolbar, ruler, compact element/audio lanes, and the taller main-media lane.
+const TIMELINE_DEFAULT_HEIGHT = 292;
 const WORKSPACE_MIN_HEIGHT = 260;
 const EDITOR_TOOLBAR_HEIGHT = 58;
 
@@ -279,6 +278,9 @@ export const VideoEditorV2 = () => {
   const [promoError, setPromoError] = useState('');
   const [libraryOpen, setLibraryOpen] = useState(() => !isBulkProject);
   const [libraryMode, setLibraryMode] = useState('video');
+  const [mediaPanelTab, setMediaPanelTab] = useState(() => (
+    isBulkProject && searchParams.get('panel') === 'bulk' ? 'bulk' : 'media'
+  ));
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   const [textAiDrawerClipId, setTextAiDrawerClipId] = useState(null);
   const [textAiSuggestions, setTextAiSuggestions] = useState([]);
@@ -667,6 +669,8 @@ export const VideoEditorV2 = () => {
       ? serializeProject(initialContext.project)
       : '';
     setLibraryOpen(!isBulkProject);
+    setLibraryMode('video');
+    setMediaPanelTab(isBulkProject && searchParams.get('panel') === 'bulk' ? 'bulk' : 'media');
     setProjectSettingsOpen(false);
     setExtractingAudioClipId(null);
     setExportState(createEmptyExportState());
@@ -677,7 +681,7 @@ export const VideoEditorV2 = () => {
     setStatus(initialContext.warning
       ? { type: 'warning', text: initialContext.warning }
       : null);
-  }, [initialContext, isBulkProject]);
+  }, [initialContext, isBulkProject, searchParams]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -937,10 +941,21 @@ export const VideoEditorV2 = () => {
         throw new Error('The full audio duration could not be read. Try the track again after it finishes loading.');
       }
 
-      const track = getPrimaryTrackByType(project, type);
-      if (!track) throw new Error(`The project has no ${type} track.`);
+      const mainVideoTrack = getPrimaryTrackByType(project, 'video');
+      const mainAudioTrack = getPrimaryTrackByType(project, 'audio');
+      const placement = type === 'audio'
+        ? 'main'
+        : type === 'video' && (mainVideoTrack?.clips.length || 0) === 0
+          ? 'main'
+          : 'overlay';
+      const mainTrack = type === 'audio' ? mainAudioTrack : mainVideoTrack;
+      if (placement === 'main' && !mainTrack) {
+        throw new Error(`The project has no main ${type} track.`);
+      }
 
-      const timelineStart = getNextTrackStart(track, currentTime, project.output.maxDuration);
+      const timelineStart = placement === 'overlay'
+        ? Math.min(currentTime, Math.max(0, project.output.maxDuration - 0.1))
+        : getNextTrackStart(mainTrack, currentTime, project.output.maxDuration);
       const remaining = project.output.maxDuration - timelineStart;
       if (remaining < 0.1) throw new Error('The 30-second timeline is full.');
 
@@ -970,7 +985,7 @@ export const VideoEditorV2 = () => {
           candidate.id === asset.id ? resolvedAsset : candidate
         )));
       }
-      dispatch(editorActions.addClip(clip));
+      dispatch(editorActions.addClip(clip, { placement }));
       seek(timelineStart);
       return true;
     } catch (error) {
@@ -1010,15 +1025,9 @@ export const VideoEditorV2 = () => {
   }, [addAssetToTimeline]);
 
   const addText = useCallback((text) => {
-    const videoTrack = getPrimaryTrackByType(project, 'video');
-    const firstVideoClip = sortClipsByTimeline(videoTrack?.clips || [])[0] || null;
-    const timelineStart = firstVideoClip
-      ? Number(firstVideoClip.timelineStart || 0)
-      : currentTime;
+    const timelineStart = Math.min(currentTime, Math.max(0, project.output.maxDuration - 0.1));
     const availableDuration = Math.max(0.1, project.output.maxDuration - timelineStart);
-    const duration = firstVideoClip
-      ? Math.min(Number(firstVideoClip.duration || 0), availableDuration)
-      : Math.min(3, availableDuration);
+    const duration = Math.min(3, availableDuration);
     if (duration < 0.1) return;
     const bulkTextScale = project.output.width / PREVIEW_FRAME_WIDTH;
     dispatch(editorActions.addClip(createTextClip({
@@ -1039,7 +1048,7 @@ export const VideoEditorV2 = () => {
         lineHeight: 1.3,
       },
       transform: { x: 0.5, y: 0.25, scale: 1, rotation: 0, opacity: 1 },
-    })));
+    }), { placement: 'overlay' }));
   }, [currentTime, project]);
 
   const updateSelectedClip = useCallback((changes) => {
@@ -1740,6 +1749,8 @@ export const VideoEditorV2 = () => {
           key={isBulkProject ? 'bulk-editor-media' : 'single-editor-media'}
           className="col-start-1 row-span-2 row-start-1"
           token={token}
+          activeTab={mediaPanelTab}
+          onActiveTabChange={setMediaPanelTab}
           promoAssets={promoAssets}
           promoFolderName={promoFolderName}
           promoLoading={promoLoading}
@@ -1832,6 +1843,7 @@ export const VideoEditorV2 = () => {
           <Timeline
             tracks={project.tracks}
             duration={project.output.maxDuration}
+            fps={project.output.fps}
             contentDuration={contentDuration}
             currentTime={currentTime}
             selectedClipId={selectedClipId}
@@ -1847,7 +1859,11 @@ export const VideoEditorV2 = () => {
             onRippleDeleteClip={({ clipId }) => dispatch(editorActions.rippleDeleteClip(clipId))}
             onRippleDeleteEnabledChange={setRippleDeleteEnabled}
             onMagneticSnappingChange={setMagneticSnappingEnabled}
-            onUpdateTrack={({ trackId, changes }) => dispatch(editorActions.updateTrack(trackId, changes))}
+            onRequestAudio={() => {
+              setMediaPanelTab('audio');
+              setLibraryMode('audio');
+              setLibraryOpen(true);
+            }}
           />
         </div>
       </div>

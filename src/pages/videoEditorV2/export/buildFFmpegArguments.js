@@ -176,7 +176,6 @@ export const buildFFmpegArguments = ({
       `d=${number(duration)},format=rgba[canvas0]`,
   );
 
-  const visualPriority = { video: 0, image: 1, text: 2 };
   const visualClips = clips
     .filter(
       (clip) =>
@@ -184,7 +183,9 @@ export const buildFFmpegArguments = ({
         (clip.type === 'video' || clip.type === 'image' || clip.type === 'text') &&
         !(clip.type === 'text' && !clip.text.trim()),
     )
-    .sort((left, right) => visualPriority[left.type] - visualPriority[right.type]);
+    .sort((left, right) => (
+      left.trackIndex - right.trackIndex || left.clipIndex - right.clipIndex
+    ));
 
   let canvasInput = 'canvas0';
   visualClips.forEach((clip, layerNumber) => {

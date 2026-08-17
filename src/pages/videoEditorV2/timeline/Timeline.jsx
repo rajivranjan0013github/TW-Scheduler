@@ -5,7 +5,6 @@ import { TimelineRuler } from './TimelineRuler';
 import { TimelineTrack } from './TimelineTrack';
 import {
   clamp,
-  DEFAULT_LABEL_WIDTH,
   DEFAULT_MAGNETIC_SNAP_THRESHOLD_PX,
   DEFAULT_MIN_CLIP_DURATION,
   DEFAULT_PIXELS_PER_SECOND,
@@ -21,6 +20,7 @@ import {
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.25;
+const TIMELINE_LANE_INSET = 8;
 
 const ToolButton = ({ disabled = false, label, danger = false, iconOnly = false, pressed, onClick, children }) => (
   <button
@@ -53,13 +53,13 @@ const ToolButton = ({ disabled = false, label, danger = false, iconOnly = false,
  * - onDeleteClip({ trackId, clipId })
  * - onRippleDeleteClip({ trackId, clipId })
  * - onRippleDeleteEnabledChange(enabled)
- * - onUpdateTrack({ trackId, changes })
  */
 export const Timeline = ({
   tracks = [],
   duration = DEFAULT_TIMELINE_DURATION,
   contentDuration,
   currentTime = 0,
+  fps = 30,
   selectedClipId = null,
   zoom,
   defaultZoom = 1,
@@ -68,7 +68,6 @@ export const Timeline = ({
   rippleDeleteEnabled = false,
   minZoom = MIN_ZOOM,
   maxZoom = MAX_ZOOM,
-  labelWidth = DEFAULT_LABEL_WIDTH,
   rulerHeight = DEFAULT_RULER_HEIGHT,
   trackHeight = DEFAULT_TRACK_HEIGHT,
   minClipDuration = DEFAULT_MIN_CLIP_DURATION,
@@ -85,7 +84,7 @@ export const Timeline = ({
   onDeleteClip,
   onRippleDeleteClip,
   onRippleDeleteEnabledChange,
-  onUpdateTrack,
+  onRequestAudio,
 }) => {
   const [internalZoom, setInternalZoom] = useState(() => clamp(
     Number.isFinite(defaultZoom) ? defaultZoom : 1,
@@ -115,9 +114,12 @@ export const Timeline = ({
     .map((track, index) => ({
       track,
       index,
-      priority: track.type === 'text' ? 0 : track.type === 'video' ? 1 : 2,
+      priority: track.type === 'overlay' ? 0 : track.type === 'video' ? 1 : 2,
     }))
-    .sort((left, right) => left.priority - right.priority || left.index - right.index)
+    .sort((left, right) => (
+      left.priority - right.priority
+      || (left.priority === 0 ? right.index - left.index : left.index - right.index)
+    ))
     .map(({ track }) => track);
   const effectiveZoom = clamp(Number.isFinite(zoom) ? zoom : internalZoom, minZoom, maxZoom);
   const effectiveMagneticSnapping = typeof magneticSnapping === 'boolean'
@@ -250,9 +252,14 @@ export const Timeline = ({
   return (
     <section className={`flex min-h-[220px] flex-col overflow-hidden border-t border-[#303034] bg-[#151517] text-zinc-200 [color-scheme:dark] ${className}`} aria-label="Video timeline">
       <div className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-[#303034] bg-[#1c1c1f] px-3 shadow-[0_1px_0_rgba(255,255,255,0.02)]">
-        <div className="min-w-0">
-          <h2 className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-zinc-100">Timeline</h2>
-          <p className="text-[9px] font-medium text-zinc-500">Drag clips, trim edges, and click to seek</p>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="min-w-0">
+            <h2 className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-zinc-100">Timeline</h2>
+            <p className="text-[9px] font-medium text-zinc-500">Drag clips, trim edges, and click to seek</p>
+          </div>
+          <span className="shrink-0 rounded-md border border-[#ff5500]/20 bg-[#101012] px-2 py-1 text-[10px] font-bold tabular-nums text-orange-300 shadow-inner">
+            {formatTimelineTime(effectiveCurrentTime, true)} / {formatTimelineTime(effectiveContentDuration)}
+          </span>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -321,17 +328,12 @@ export const Timeline = ({
       <div className="relative flex-1 overflow-auto bg-[#141416] [scrollbar-color:#45454b_#18181b]">
         <div
           className="relative"
-          style={{ minWidth: labelWidth + contentWidth, width: labelWidth + contentWidth }}
+          style={{
+            minWidth: contentWidth + (TIMELINE_LANE_INSET * 2),
+            width: contentWidth + (TIMELINE_LANE_INSET * 2),
+          }}
         >
-          <div className="flex" style={{ height: rulerHeight }}>
-            <div
-              className="sticky left-0 z-50 flex shrink-0 items-center border-r border-b border-[#303034] bg-[#1a1a1d] px-3 shadow-[4px_0_10px_rgba(0,0,0,0.25)]"
-              style={{ width: labelWidth }}
-            >
-              <span className="rounded-md border border-[#ff5500]/20 bg-[#101012] px-2 py-1 text-[10px] font-bold tabular-nums text-orange-300 shadow-inner">
-                {formatTimelineTime(effectiveCurrentTime, true)} / {formatTimelineTime(effectiveContentDuration)}
-              </span>
-            </div>
+          <div className="flex px-2" style={{ height: rulerHeight }}>
             <TimelineRuler
               rulerRef={rulerRef}
               duration={effectiveDuration}
@@ -350,10 +352,10 @@ export const Timeline = ({
             <TimelineTrack
               key={track.id}
               track={track}
-              labelWidth={labelWidth}
-              height={trackHeight}
+              height={track.type === 'video' ? trackHeight + 32 : trackHeight}
               duration={effectiveDuration}
               pixelsPerSecond={pixelsPerSecond}
+              fps={fps}
               selectedClipId={selectedClipId}
               minClipDuration={minClipDuration}
               snapInterval={snapInterval}
@@ -365,7 +367,7 @@ export const Timeline = ({
               onMoveClip={onMoveClip}
               onTrimClip={onTrimClip}
               onDeleteClip={onDeleteClip}
-              onUpdateTrack={onUpdateTrack}
+              onRequestAudio={onRequestAudio}
               onSnapGuideChange={setActiveSnapTime}
             />
           )) : (
@@ -377,14 +379,14 @@ export const Timeline = ({
           {Number.isFinite(activeSnapTime) && (
             <div
               className="pointer-events-none absolute inset-y-0 z-[35] w-px bg-[#ff6a1a] shadow-[0_0_7px_rgba(255,85,0,0.9)]"
-              style={{ left: labelWidth + (activeSnapTime * pixelsPerSecond) }}
+              style={{ left: TIMELINE_LANE_INSET + (activeSnapTime * pixelsPerSecond) }}
               aria-hidden="true"
             />
           )}
 
           <Playhead
             currentTime={effectiveCurrentTime}
-            left={labelWidth + (effectiveCurrentTime * pixelsPerSecond)}
+            left={TIMELINE_LANE_INSET + (effectiveCurrentTime * pixelsPerSecond)}
             top={rulerHeight}
             onPointerDown={handleScrubStart}
             onPointerMove={handleScrubMove}

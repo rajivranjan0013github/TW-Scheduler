@@ -10,12 +10,36 @@ export const DEFAULT_HISTORY_LIMIT = 100;
 
 export const TRACK_TYPES = Object.freeze({
   VIDEO: 'video',
-  TEXT: 'text',
+  OVERLAY: 'overlay',
   AUDIO: 'audio',
+  TEXT: 'text',
   IMAGE: 'image',
 });
 
-export const TRACK_TYPE_VALUES = Object.freeze(Object.values(TRACK_TYPES));
+export const TRACK_TYPE_VALUES = Object.freeze([
+  TRACK_TYPES.VIDEO,
+  TRACK_TYPES.OVERLAY,
+  TRACK_TYPES.AUDIO,
+]);
+
+export const CLIP_TYPE_VALUES = Object.freeze([
+  TRACK_TYPES.VIDEO,
+  TRACK_TYPES.TEXT,
+  TRACK_TYPES.IMAGE,
+  TRACK_TYPES.AUDIO,
+]);
+
+export const OVERLAY_CLIP_TYPE_VALUES = Object.freeze([
+  TRACK_TYPES.VIDEO,
+  TRACK_TYPES.TEXT,
+  TRACK_TYPES.IMAGE,
+]);
+
+export const trackAcceptsClipType = (trackType, clipType) => (
+  trackType === TRACK_TYPES.OVERLAY
+    ? OVERLAY_CLIP_TYPE_VALUES.includes(clipType)
+    : trackType === clipType
+);
 
 export const DEFAULT_OUTPUT_SETTINGS = Object.freeze({
   width: 1080,
@@ -77,7 +101,7 @@ export const DEFAULT_TEXT_ANIMATION = Object.freeze({
 });
 
 export const DEFAULT_TRACK_DEFINITIONS = Object.freeze([
-  Object.freeze({ type: TRACK_TYPES.VIDEO, name: 'Video' }),
-  Object.freeze({ type: TRACK_TYPES.TEXT, name: 'Text' }),
-  Object.freeze({ type: TRACK_TYPES.AUDIO, name: 'Audio' }),
+  Object.freeze({ type: TRACK_TYPES.VIDEO, name: 'Main Video' }),
+  Object.freeze({ type: TRACK_TYPES.OVERLAY, name: 'Overlay 1' }),
+  Object.freeze({ type: TRACK_TYPES.AUDIO, name: 'Main Audio' }),
 ]);

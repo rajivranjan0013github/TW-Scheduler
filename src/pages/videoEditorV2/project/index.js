@@ -1,4 +1,5 @@
 export {
+  CLIP_TYPE_VALUES,
   DEFAULT_CLIP_DURATION,
   DEFAULT_CROP,
   DEFAULT_HISTORY_LIMIT,
@@ -15,6 +16,8 @@ export {
   PROJECT_SCHEMA_VERSION,
   TRACK_TYPES,
   TRACK_TYPE_VALUES,
+  OVERLAY_CLIP_TYPE_VALUES,
+  trackAcceptsClipType,
 } from './projectConstants.js';
 
 export {
@@ -46,6 +49,7 @@ export {
   finalizeProjectChange,
   findClipById,
   getActiveClipsAtTime,
+  getAvailableOverlayTrack,
   getAllClips,
   getClipEnd,
   getClipLocation,
