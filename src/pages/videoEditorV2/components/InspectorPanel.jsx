@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Diamond,
   Eraser,
   FileMusic,
   LoaderCircle,
@@ -18,12 +21,17 @@ import {
 import {
   DEFAULT_PATCH_REMOVAL,
   DEFAULT_TEXT_STYLE,
+  findPatchKeyframeIndex,
+  getClipSourceTime,
   MAX_PLAYBACK_RATE,
   MIN_CLIP_DURATION,
   MIN_CROP_SIZE,
   MIN_PLAYBACK_RATE,
   normalizeCrop,
   normalizePatchRemoval,
+  removePatchRemovalKeyframe,
+  resolvePatchRemovalAtSourceTime,
+  upsertPatchRemovalKeyframe,
 } from '../project';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -362,8 +370,11 @@ const CardResetButton = ({ label, onClick }) => (
 
 const VideoInspector = ({
   clip,
+  currentTime,
+  fps,
   maxDuration,
   onUpdate,
+  onSeek,
   onPlaybackRateChange,
   onExtractAudio,
   extractingAudio = false,
@@ -381,11 +392,66 @@ const VideoInspector = ({
   };
   const crop = normalizeCrop(clip.crop);
   const patchRemoval = normalizePatchRemoval(clip.patchRemoval);
+  const patchSourceTime = getClipSourceTime(clip, currentTime);
+  const resolvedPatchRemoval = resolvePatchRemovalAtSourceTime(
+    patchRemoval,
+    patchSourceTime,
+  );
+  const currentPatchKeyframeIndex = findPatchKeyframeIndex(
+    patchRemoval,
+    patchSourceTime,
+    0.5 / Math.max(1, Number(fps) || 30),
+  );
+  const previousPatchKeyframe = [...patchRemoval.keyframes]
+    .reverse()
+    .find((keyframe) => keyframe.sourceTime < patchSourceTime - 0.0005);
+  const nextPatchKeyframe = patchRemoval.keyframes
+    .find((keyframe) => keyframe.sourceTime > patchSourceTime + 0.0005);
   const updateTransform = (changes) => onUpdate({ transform: { ...clip.transform, ...changes } });
   const updateCrop = (changes) => onUpdate({ crop: normalizeCrop({ ...crop, ...changes }) });
   const updatePatchRemoval = (changes) => onUpdate({
     patchRemoval: normalizePatchRemoval({ ...patchRemoval, ...changes }),
   });
+  const updateAnimatedPatchValues = (changes) => {
+    if (patchRemoval.autoKeyframe || patchRemoval.keyframes.length > 0) {
+      const keyedPatch = upsertPatchRemovalKeyframe(
+        patchRemoval,
+        patchSourceTime,
+        { ...resolvedPatchRemoval, ...changes },
+      );
+      onUpdate({
+        patchRemoval: normalizePatchRemoval({
+          ...keyedPatch,
+          ...(changes.editing === undefined ? {} : { editing: changes.editing }),
+        }),
+      });
+      return;
+    }
+    updatePatchRemoval(changes);
+  };
+  const seekToPatchSourceTime = (sourceTime) => {
+    if (typeof onSeek !== 'function') return;
+    const timelineTime = Number(clip.timelineStart || 0)
+      + (sourceTime - Number(clip.sourceStart || 0))
+        / Math.max(0.01, Number(clip.playbackRate) || 1);
+    onSeek(timelineTime);
+  };
+  const togglePatchKeyframe = () => {
+    if (currentPatchKeyframeIndex >= 0) {
+      onUpdate({
+        patchRemoval: removePatchRemovalKeyframe(patchRemoval, patchSourceTime),
+      });
+      return;
+    }
+    if (resolvedPatchRemoval.targetPath.length < 3) return;
+    onUpdate({
+      patchRemoval: upsertPatchRemovalKeyframe(
+        patchRemoval,
+        patchSourceTime,
+        resolvedPatchRemoval,
+      ),
+    });
+  };
   const playbackRate = clamp(
     Number(clip.playbackRate) || 1,
     MIN_PLAYBACK_RATE,
@@ -630,6 +696,8 @@ const VideoInspector = ({
                   editing: true,
                   targetPath: [],
                   sourceOffset: DEFAULT_PATCH_REMOVAL.sourceOffset,
+                  autoKeyframe: false,
+                  keyframes: [],
                 })}
                 className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#111318] px-3 text-[10px] font-extrabold text-[#dfe2e6] transition hover:border-violet-400/50 hover:text-violet-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70"
               >
@@ -662,6 +730,7 @@ const VideoInspector = ({
                       targetPath: [],
                       pathClosed: patchRemoval.maskTool !== 'points',
                       sourceOffset: DEFAULT_PATCH_REMOVAL.sourceOffset,
+                      keyframes: [],
                     })}
                     className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-[#111318] px-2 text-[9px] font-bold text-[#b8bec8] transition hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70"
                   >
@@ -685,6 +754,7 @@ const VideoInspector = ({
                           editing: true,
                           targetPath: [],
                           sourceOffset: DEFAULT_PATCH_REMOVAL.sourceOffset,
+                          keyframes: [],
                         })}
                         aria-pressed={patchRemoval.maskTool === id}
                         title={`Draw ${label.toLowerCase()} mask`}
@@ -699,26 +769,86 @@ const VideoInspector = ({
                   </div>
                 </div>
 
+                <div className="rounded-xl border border-white/10 bg-[#111318] p-1.5">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={!previousPatchKeyframe}
+                      onClick={() => seekToPatchSourceTime(previousPatchKeyframe.sourceTime)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#aab0ba] transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                      title="Previous patch keyframe"
+                      aria-label="Previous patch keyframe"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={togglePatchKeyframe}
+                      disabled={resolvedPatchRemoval.targetPath.length < 3}
+                      aria-pressed={currentPatchKeyframeIndex >= 0}
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition disabled:cursor-not-allowed disabled:opacity-30 ${currentPatchKeyframeIndex >= 0
+                        ? 'border-violet-400/70 bg-violet-400/15 text-violet-300'
+                        : 'border-white/10 text-[#aab0ba] hover:border-violet-400/50 hover:text-violet-200'}`}
+                      title={currentPatchKeyframeIndex >= 0
+                        ? 'Remove keyframe at current frame'
+                        : 'Add keyframe at current frame'}
+                      aria-label={currentPatchKeyframeIndex >= 0
+                        ? 'Remove patch keyframe at current frame'
+                        : 'Add patch keyframe at current frame'}
+                    >
+                      <Diamond className={`h-3.5 w-3.5 ${currentPatchKeyframeIndex >= 0 ? 'fill-current' : ''}`} />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!nextPatchKeyframe}
+                      onClick={() => seekToPatchSourceTime(nextPatchKeyframe.sourceTime)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#aab0ba] transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                      title="Next patch keyframe"
+                      aria-label="Next patch keyframe"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updatePatchRemoval({
+                        autoKeyframe: !patchRemoval.autoKeyframe,
+                      })}
+                      aria-pressed={patchRemoval.autoKeyframe}
+                      className={`ml-auto flex h-8 items-center gap-1 rounded-lg border px-2 text-[8px] font-extrabold transition ${patchRemoval.autoKeyframe
+                        ? 'border-violet-400/70 bg-violet-400/15 text-violet-200'
+                        : 'border-white/10 text-[#9299a4] hover:border-white/20 hover:text-white'}`}
+                      title="Automatically create a keyframe when the patch changes"
+                    >
+                      <Diamond className="h-2.5 w-2.5" />
+                      Auto
+                    </button>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between px-1 text-[8px] font-bold tabular-nums !text-[#7f8792]">
+                    <span>{patchRemoval.keyframes.length} keyframe{patchRemoval.keyframes.length === 1 ? '' : 's'}</span>
+                    <span>{patchSourceTime.toFixed(2)}s source</span>
+                  </div>
+                </div>
+
                 <InspectorRangeControl
                   label="Edge softness"
-                  value={Math.round(patchRemoval.feather * 1000) / 10}
+                  value={Math.round(resolvedPatchRemoval.feather * 1000) / 10}
                   min={0}
                   max={15}
                   step={0.1}
                   suffix="%"
-                  onChange={(value) => updatePatchRemoval({ feather: value / 100 })}
+                  onChange={(value) => updateAnimatedPatchValues({ feather: value / 100 })}
                 />
                 <InspectorRangeControl
                   label="Patch opacity"
-                  value={Math.round(patchRemoval.opacity * 100)}
+                  value={Math.round(resolvedPatchRemoval.opacity * 100)}
                   min={0}
                   max={100}
                   suffix="%"
-                  onChange={(value) => updatePatchRemoval({ opacity: value / 100 })}
+                  onChange={(value) => updateAnimatedPatchValues({ opacity: value / 100 })}
                 />
                 <button
                   type="button"
-                  onClick={() => updatePatchRemoval({
+                  onClick={() => updateAnimatedPatchValues({
                     sourceOffset: DEFAULT_PATCH_REMOVAL.sourceOffset,
                     editing: true,
                   })}
@@ -1006,8 +1136,11 @@ const AudioInspector = ({ clip, onUpdate }) => (
 export const InspectorPanel = ({
   className = '',
   selectedClip,
+  currentTime = 0,
+  fps = 30,
   maxDuration,
   onUpdateClip,
+  onSeek,
   onSetPlaybackRate,
   onExtractAudio,
   onGenerateText,
@@ -1086,8 +1219,11 @@ export const InspectorPanel = ({
       {(selectedClip.type === 'video' || selectedClip.type === 'image') && (
         <VideoInspector
           clip={selectedClip}
+          currentTime={currentTime}
+          fps={fps}
           maxDuration={maxDuration}
           onUpdate={onUpdateClip}
+          onSeek={onSeek}
           onPlaybackRateChange={onSetPlaybackRate}
           onExtractAudio={onExtractAudio}
           extractingAudio={extractingAudio}

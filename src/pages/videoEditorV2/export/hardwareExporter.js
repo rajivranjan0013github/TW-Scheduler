@@ -31,7 +31,11 @@ import {
   createPatchRemovalBuffers,
   drawPatchedMediaFrame,
 } from './patchRemovalRenderer.js';
-import { hasPatchRemovalMask } from '../project/patchRemoval.js';
+import {
+  getClipSourceTime,
+  hasPatchRemovalMask,
+  resolvePatchRemovalAtSourceTime,
+} from '../project/patchRemoval.js';
 
 const clamp = (value, minimum, maximum) => (
   Math.min(maximum, Math.max(minimum, value))
@@ -133,7 +137,14 @@ const getTextFadeOpacity = (clip, timelineTime) => {
   return Math.min(fadeInOpacity, fadeOutOpacity);
 };
 
-const drawMediaLayer = ({ context, source, clip, output, patchSurfaces }) => {
+const drawMediaLayer = ({
+  context,
+  source,
+  clip,
+  output,
+  patchSurfaces,
+  timelineTime,
+}) => {
   let mediaSource = source;
   const sourceWidth = Math.max(1, Number(source.width || source.videoWidth) || output.width);
   const sourceHeight = Math.max(1, Number(source.height || source.videoHeight) || output.height);
@@ -152,7 +163,13 @@ const drawMediaLayer = ({ context, source, clip, output, patchSurfaces }) => {
   let croppedWidth = Math.max(1, crop.width * sourceWidth);
   let croppedHeight = Math.max(1, crop.height * sourceHeight);
 
-  if (clip.type === 'video' && hasPatchRemovalMask(clip.patchRemoval)) {
+  const resolvedPatchRemoval = clip.type === 'video'
+    ? resolvePatchRemovalAtSourceTime(
+        clip.patchRemoval,
+        getClipSourceTime(clip, timelineTime),
+      )
+    : null;
+  if (clip.type === 'video' && hasPatchRemovalMask(resolvedPatchRemoval)) {
     const maximumPatchEdge = Math.max(output.width, output.height, 1280);
     const patchScale = Math.min(1, maximumPatchEdge / Math.max(croppedWidth, croppedHeight));
     const patchWidth = Math.max(1, Math.round(croppedWidth * patchScale));
@@ -169,7 +186,7 @@ const drawMediaLayer = ({ context, source, clip, output, patchSurfaces }) => {
       destination: surface.canvas,
       source,
       crop,
-      patchRemoval: clip.patchRemoval,
+      patchRemoval: resolvedPatchRemoval,
       width: patchWidth,
       height: patchHeight,
       buffers: surface.buffers,
@@ -477,6 +494,7 @@ const renderHardwareVideo = async ({ project, media, signal, onProgress }) => {
           clip: resource.clip,
           output,
           patchSurfaces,
+          timelineTime,
         });
       });
 

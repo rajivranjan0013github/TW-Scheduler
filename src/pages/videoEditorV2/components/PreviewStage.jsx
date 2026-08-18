@@ -11,12 +11,15 @@ import {
 } from 'lucide-react';
 import {
   DEFAULT_TEXT_STYLE,
+  getClipSourceTime,
   getPatchSourcePath,
   hasPatchRemovalMask,
   MAX_PLAYBACK_RATE,
   MIN_CROP_SIZE,
   MIN_PLAYBACK_RATE,
   normalizePatchRemoval,
+  resolvePatchRemovalAtSourceTime,
+  upsertPatchRemovalKeyframe,
 } from '../project';
 import {
   createPatchRemovalBuffers,
@@ -905,9 +908,35 @@ const PreviewVideoLayer = ({
     onUpdate,
   });
   const patchRemoval = normalizePatchRemoval(clip.patchRemoval);
+  const patchSourceTime = getClipSourceTime(clip, currentTime);
+  const resolvedPatchRemoval = resolvePatchRemovalAtSourceTime(
+    patchRemoval,
+    patchSourceTime,
+  );
   const patchEditing = selected && patchRemoval.enabled && patchRemoval.editing;
-  const renderedPatchRemoval = patchPreview || patchRemoval;
+  const renderedPatchRemoval = patchPreview || resolvedPatchRemoval;
   const patchActive = hasPatchRemovalMask(renderedPatchRemoval);
+  const commitPatchRemoval = (nextPatchValue) => {
+    const nextPatch = normalizePatchRemoval(nextPatchValue);
+    if (patchRemoval.autoKeyframe || patchRemoval.keyframes.length > 0) {
+      const keyedPatch = upsertPatchRemovalKeyframe(
+        patchRemoval,
+        patchSourceTime,
+        nextPatch,
+      );
+      onUpdate(clip.id, {
+        patchRemoval: normalizePatchRemoval({
+          ...keyedPatch,
+          enabled: nextPatch.enabled,
+          editing: nextPatch.editing,
+          maskTool: nextPatch.maskTool,
+          pathClosed: nextPatch.pathClosed,
+        }),
+      });
+      return;
+    }
+    onUpdate(clip.id, { patchRemoval: nextPatch });
+  };
 
   useEffect(() => {
     const video = videoRef.current;
@@ -980,12 +1009,12 @@ const PreviewVideoLayer = ({
         )}
         {patchEditing && (
           <PatchMaskEditor
-            patchRemoval={patchRemoval}
+            patchRemoval={resolvedPatchRemoval}
             geometry={geometry}
             onPreviewChange={setPatchPreview}
             onChange={(nextPatch) => {
               setPatchPreview(null);
-              onUpdate(clip.id, { patchRemoval: nextPatch });
+              commitPatchRemoval(nextPatch);
             }}
           />
         )}
@@ -2178,6 +2207,12 @@ export const PreviewStage = ({
   const selectedPatchRemoval = selectedVisualClip?.type === 'video'
     ? normalizePatchRemoval(selectedVisualClip.patchRemoval)
     : null;
+  const selectedResolvedPatchRemoval = selectedVisualClip?.type === 'video'
+    ? resolvePatchRemovalAtSourceTime(
+        selectedPatchRemoval,
+        getClipSourceTime(selectedVisualClip, currentTime),
+      )
+    : null;
   const isPatchEditing = Boolean(
     selectedVisualClip
     && selectedPatchRemoval?.enabled
@@ -2337,7 +2372,7 @@ export const PreviewStage = ({
         {isPatchEditing ? (
           <>
             <span className="px-1 text-[10px] font-bold text-zinc-300">
-              {hasPatchRemovalMask(selectedPatchRemoval)
+              {hasPatchRemovalMask(selectedResolvedPatchRemoval)
                 ? 'Drag purple target or green source'
                 : selectedPatchRemoval.maskTool === 'points'
                   ? 'Place dots, then click the first dot'
@@ -2350,6 +2385,7 @@ export const PreviewStage = ({
                   ...selectedPatchRemoval,
                   targetPath: [],
                   pathClosed: selectedPatchRemoval.maskTool !== 'points',
+                  keyframes: [],
                 },
               })}
               className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[10px] font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
@@ -2364,7 +2400,7 @@ export const PreviewStage = ({
                   ...selectedPatchRemoval,
                   editing: false,
                   pathClosed: selectedPatchRemoval.maskTool === 'points'
-                    && selectedPatchRemoval.targetPath.length >= 3
+                    && selectedResolvedPatchRemoval.targetPath.length >= 3
                     ? true
                     : selectedPatchRemoval.pathClosed,
                 },

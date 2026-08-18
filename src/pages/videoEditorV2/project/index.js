@@ -22,9 +22,14 @@ export {
 
 export {
   DEFAULT_PATCH_REMOVAL,
+  findPatchKeyframeIndex,
+  getClipSourceTime,
   getPatchSourcePath,
   hasPatchRemovalMask,
   normalizePatchRemoval,
+  removePatchRemovalKeyframe,
+  resolvePatchRemovalAtSourceTime,
+  upsertPatchRemovalKeyframe,
 } from './patchRemoval.js';
 
 export {

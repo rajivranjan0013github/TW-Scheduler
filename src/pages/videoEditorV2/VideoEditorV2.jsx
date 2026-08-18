@@ -1906,8 +1906,11 @@ export const VideoEditorV2 = () => {
         <InspectorPanel
           className="col-start-2 row-start-1"
           selectedClip={selectedClip}
+          currentTime={currentTime}
+          fps={project.output.fps}
           maxDuration={project.output.maxDuration}
           onUpdateClip={updateSelectedClip}
+          onSeek={seek}
           onSetPlaybackRate={setSelectedClipPlaybackRate}
           onExtractAudio={extractSelectedVideoAudio}
           onGenerateText={() => {
