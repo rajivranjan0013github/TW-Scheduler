@@ -78,17 +78,19 @@ export const EditorToolbar = ({
     </div>
 
     <div className="flex items-center gap-1.5">
-      <button
-        type="button"
-        onClick={onOpenBulkBuilder}
-        className="flex h-8 items-center gap-1.5 rounded-lg bg-[#7831d6] px-2.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#6825bc] active:scale-[0.98]"
-        aria-label="Open Bulk Video Builder"
-        title="Open Bulk Video Builder"
-      >
-        <Layers3 className="h-3.5 w-3.5" />
-        <span className="hidden lg:inline">Bulk Video Builder</span>
-        <span className="lg:hidden">Bulk Builder</span>
-      </button>
+      {isBulkProject && (
+        <button
+          type="button"
+          onClick={onOpenBulkBuilder}
+          className="flex h-8 items-center gap-1.5 rounded-lg bg-[#7831d6] px-2.5 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#6825bc] active:scale-[0.98]"
+          aria-label="Open Bulk Video Builder"
+          title="Open Bulk Video Builder"
+        >
+          <Layers3 className="h-3.5 w-3.5" />
+          <span className="hidden lg:inline">Bulk Video Builder</span>
+          <span className="lg:hidden">Bulk Builder</span>
+        </button>
+      )}
 
       <button
         type="button"

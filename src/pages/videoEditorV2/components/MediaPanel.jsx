@@ -87,9 +87,8 @@ const AssetCard = ({ asset, onAdd }) => {
         className="group flex min-w-0 cursor-grab items-center gap-3 rounded-xl border border-white/10 bg-[#171a20] p-2.5 text-left transition hover:border-emerald-400/50 hover:bg-[#1b1f27] hover:shadow-lg hover:shadow-black/20 active:cursor-grabbing"
         title={`Drag ${asset.name} to the audio track, or click to add it`}
       >
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/25 to-teal-500/10 text-emerald-400 ring-1 ring-emerald-400/20 ${
-          isPreviewing ? 'animate-pulse' : ''
-        }`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/25 to-teal-500/10 text-emerald-400 ring-1 ring-emerald-400/20 ${isPreviewing ? 'animate-pulse' : ''
+          }`}>
           <Music2 className="h-4 w-4" />
         </span>
         <span className="min-w-0 flex-1">
@@ -361,9 +360,8 @@ export const MediaPanel = ({
                   draggable
                   onDragStart={(event) => setEditorDragData(event, { kind: 'text', text: preset.label })}
                   onClick={() => onAddText(preset.label)}
-                  className={`group flex h-11 w-full cursor-grab items-center gap-3 px-3 text-left text-[#e6e8ec] transition hover:bg-[#201914] active:cursor-grabbing ${
-                    index > 0 ? 'border-t border-white/10' : ''
-                  }`}
+                  className={`group flex h-11 w-full cursor-grab items-center gap-3 px-3 text-left text-[#e6e8ec] transition hover:bg-[#201914] active:cursor-grabbing ${index > 0 ? 'border-t border-white/10' : ''
+                    }`}
                 >
                   <Type className="h-3.5 w-3.5 shrink-0 text-[#727985] transition group-hover:text-[#ff6a1a]" />
                   <span className={`min-w-0 flex-1 ${preset.previewClass}`}>{preset.label}</span>

@@ -122,7 +122,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   
   // Creators always see their sidebar since they aren't restricted by campaign selection state
   const hideSidebar = isTimelineEditorPage
-    || (isCreator ? false : (isBulkBuilderPage || (isOnCampaignPage && !hasActiveCampaign)));
+    || (isCreator ? false : (isOnCampaignPage && !hasActiveCampaign));
 
   return (
     <div className="flex bg-black h-[100dvh] text-white antialiased overflow-x-visible overflow-y-hidden font-sans">
