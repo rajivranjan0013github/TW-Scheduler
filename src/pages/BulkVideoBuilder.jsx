@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layers, Minus, Plus, Play, RotateCcw, Trash2, Folder, Sliders, Layout, Crosshair, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Layers, Minus, Plus, Play, RotateCcw, Trash2, Folder, Sliders, Layout, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { DEFAULT_TEXT_SETTINGS, useBulkRows } from './bulkBuilder/useBulkRows';
 import { BulkVideoRow } from './bulkBuilder/BulkVideoRow';
@@ -8,8 +8,6 @@ import { CaptionDrawer } from './bulkBuilder/CaptionDrawer';
 import { MediaLibraryPanel } from './videoEditorV2/components/MediaLibraryPanel';
 import { AudioDialog } from './videoEditor/AudioDialog';
 import { usePreviewAudio } from './videoEditor/usePreviewAudio';
-import { BulkAssetPickerDialog } from './bulkBuilder/BulkAssetPickerDialog';
-import { TempAssetQuickPickerDialog, TempMediaLibraryDialog } from './bulkBuilder/TempAssetQuickPickerDialog';
 import { getOverlayTextHeight, getOverlayTextWidth } from './videoEditor/videoEditorUtils';
 import { PREVIEW_FRAME_HEIGHT, PREVIEW_FRAME_WIDTH } from './videoEditor/videoEditorConstants';
 
@@ -88,41 +86,10 @@ export const BulkVideoBuilder = () => {
   const [pickerSlot, setPickerSlot] = useState(null); // 'video1' | 'video2'
   const [showAudioPickerRowId, setShowAudioPickerRowId] = useState(null);
   const [captionDrawerRowId, setCaptionDrawerRowId] = useState(null);
-  const [showBulkAssetPicker, setShowBulkAssetPicker] = useState(false);
-  const [showTempMediaLibrary, setShowTempMediaLibrary] = useState(false);
-
-  // Temporary local library state
-  const [tempLibrary, setTempLibrary] = useState(() => {
-    try {
-      const saved = localStorage.getItem('tw_bulk_builder_temp_library');
-      const parsed = saved ? JSON.parse(saved) : {};
-      return {
-        video1: Array.isArray(parsed.video1) ? parsed.video1 : [],
-        video2: Array.isArray(parsed.video2) ? parsed.video2 : [],
-        audio: Array.isArray(parsed.audio) ? parsed.audio : [],
-      };
-    } catch {
-      return { video1: [], video2: [], audio: [] };
-    }
-  });
-  const [quickPickerType, setQuickPickerType] = useState(null); // 'video1' | 'video2' | 'audio'
-  const [quickPickerRowId, setQuickPickerRowId] = useState(null);
-  const [tempLibraryPersistenceError, setTempLibraryPersistenceError] = useState('');
 
   // AI captions suggestion state
   const [generatedSuggestions, setGeneratedSuggestions] = useState([]);
   const [suggestionsVibe, setSuggestionsVibe] = useState('');
-
-  // Auto-save tempLibrary to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('tw_bulk_builder_temp_library', JSON.stringify(tempLibrary));
-      queueMicrotask(() => setTempLibraryPersistenceError(''));
-    } catch (error) {
-      console.error('Unable to save the temporary asset library:', error);
-      queueMicrotask(() => setTempLibraryPersistenceError('Temporary assets could not be saved in this browser. Remove unused assets or keep this page open.'));
-    }
-  }, [tempLibrary]);
 
   // Handle clicking outside caption text and controls to close controls
   useEffect(() => {
@@ -296,11 +263,11 @@ export const BulkVideoBuilder = () => {
   // Fit all nodes inside viewport bounds
   const fitView = useCallback(() => {
     if (bulk.rows.length === 0) return;
-    
+
     // Calculate bounding rect of all nodes
     let minX = Infinity, minY = Infinity;
     let maxX = -Infinity, maxY = -Infinity;
-    
+
     bulk.rows.forEach(r => {
       const pos = r.canvasPos || { x: 100, y: 100 };
       if (pos.x < minX) minX = pos.x;
@@ -344,30 +311,20 @@ export const BulkVideoBuilder = () => {
     setTimeout(fitView, 100);
   }, [bulk, fitView]);
 
-  // Video picker callbacks
+  // Video picker callbacks (Directly opens MediaLibraryPanel in sidebar)
   const handlePickVideo1 = useCallback((rowId) => {
-    if (tempLibrary.video1 && tempLibrary.video1.length > 0) {
-      setQuickPickerRowId(rowId);
-      setQuickPickerType('video1');
-    } else {
-      setActivePickerRowId(rowId);
-      setPickerSlot('video1');
-      setIsSidebarOpen(true);
-      setSidebarTab('media');
-    }
-  }, [tempLibrary.video1]);
+    setActivePickerRowId(rowId);
+    setPickerSlot('video1');
+    setIsSidebarOpen(true);
+    setSidebarTab('media');
+  }, []);
 
   const handlePickVideo2 = useCallback((rowId) => {
-    if (tempLibrary.video2 && tempLibrary.video2.length > 0) {
-      setQuickPickerRowId(rowId);
-      setQuickPickerType('video2');
-    } else {
-      setActivePickerRowId(rowId);
-      setPickerSlot('video2');
-      setIsSidebarOpen(true);
-      setSidebarTab('media');
-    }
-  }, [tempLibrary.video2]);
+    setActivePickerRowId(rowId);
+    setPickerSlot('video2');
+    setIsSidebarOpen(true);
+    setSidebarTab('media');
+  }, []);
 
   const handleSelectLibraryVideo = useCallback((selectedVideo) => {
     const targetRowId = activePickerRowId || selectedRowId;
@@ -385,15 +342,6 @@ export const BulkVideoBuilder = () => {
       ? { video1: selectedVideo, video1Url: selectedVideo.url || selectedVideo.originalUrl }
       : { video2: selectedVideo, video2Url: selectedVideo.url || selectedVideo.originalUrl };
     bulk.updateRow(targetRowId, field);
-    setTempLibrary((prev) => {
-      const key = targetSlot === 'video1' ? 'video1' : 'video2';
-      const current = Array.isArray(prev[key]) ? prev[key] : [];
-      if (current.some((item) => item.id === selectedVideo.id)) return prev;
-      return {
-        ...prev,
-        [key]: [...current, selectedVideo],
-      };
-    });
     setActivePickerRowId(null);
     setPickerSlot(null);
   }, [activePickerRowId, pickerSlot, selectedRowId, bulk]);
@@ -404,11 +352,6 @@ export const BulkVideoBuilder = () => {
       video1: asset,
       video1Url: asset.url || asset.originalUrl,
     });
-    setTempLibrary((prev) => {
-      const current = Array.isArray(prev.video1) ? prev.video1 : [];
-      if (current.some((item) => item.id === asset.id)) return prev;
-      return { ...prev, video1: [...current, asset] };
-    });
   }, [bulk]);
 
   const handleDropVideo2 = useCallback((rowId, asset) => {
@@ -416,21 +359,11 @@ export const BulkVideoBuilder = () => {
       video2: asset,
       video2Url: asset.url || asset.originalUrl,
     });
-    setTempLibrary((prev) => {
-      const current = Array.isArray(prev.video2) ? prev.video2 : [];
-      if (current.some((item) => item.id === asset.id)) return prev;
-      return { ...prev, video2: [...current, asset] };
-    });
   }, [bulk]);
 
   const handleDropAudio = useCallback((rowId, asset) => {
     bulk.updateRow(rowId, {
       audio: asset,
-    });
-    setTempLibrary((prev) => {
-      const current = Array.isArray(prev.audio) ? prev.audio : [];
-      if (current.some((item) => item.id === asset.id)) return prev;
-      return { ...prev, audio: [...current, asset] };
     });
   }, [bulk]);
 
@@ -444,26 +377,13 @@ export const BulkVideoBuilder = () => {
   }, [audio]);
 
   const handlePickAudio = useCallback((rowId) => {
-    if (tempLibrary.audio && tempLibrary.audio.length > 0) {
-      setQuickPickerRowId(rowId);
-      setQuickPickerType('audio');
-    } else {
-      handleOpenAudioPicker(rowId);
-    }
-  }, [tempLibrary.audio, handleOpenAudioPicker]);
+    handleOpenAudioPicker(rowId);
+  }, [handleOpenAudioPicker]);
 
   const handleSelectAudioTrack = useCallback((track) => {
     const rowId = showAudioPickerRowId || selectedRowId;
     if (!rowId) return;
     bulk.updateRow(rowId, { audio: track });
-    setTempLibrary((prev) => {
-      const current = Array.isArray(prev.audio) ? prev.audio : [];
-      if (current.some((item) => item.id === track.id)) return prev;
-      return {
-        ...prev,
-        audio: [...current, track],
-      };
-    });
     setShowAudioPickerRowId(null);
   }, [showAudioPickerRowId, selectedRowId, bulk]);
 
@@ -480,97 +400,14 @@ export const BulkVideoBuilder = () => {
     alert('Uploaded audio is only supported in the single video editor. For bulk exports, choose platform audio or upload the track to the media library first.');
   }, []);
 
-  // Quick pick confirm callbacks
-  const handleSelectQuickVideo = useCallback((selectedVideo) => {
-    const isFirstVideo = quickPickerType === 'video1';
-    bulk.updateRow(quickPickerRowId, isFirstVideo
-      ? { video1: selectedVideo, video1Url: selectedVideo.url }
-      : { video2: selectedVideo, video2Url: selectedVideo.url });
-    setQuickPickerRowId(null);
-    setQuickPickerType(null);
-  }, [quickPickerRowId, quickPickerType, bulk]);
-
-  const handleSelectQuickAudio = useCallback((selectedAudio) => {
-    bulk.updateRow(quickPickerRowId, { audio: selectedAudio });
-    setQuickPickerRowId(null);
-    setQuickPickerType(null);
-  }, [quickPickerRowId, bulk]);
-
-  const handleBrowseGlobalVideo = useCallback(() => {
-    const rowId = quickPickerRowId;
-    const slot = quickPickerType === 'video1' ? 'video1' : 'video2';
-    setQuickPickerRowId(null);
-    setQuickPickerType(null);
-    setActivePickerRowId(rowId);
-    setPickerSlot(slot);
-    setIsSidebarOpen(true);
-    setSidebarTab('media');
-  }, [quickPickerRowId, quickPickerType]);
-
-  const handleBrowseGlobalAudio = useCallback(() => {
-    const rowId = quickPickerRowId;
-    setQuickPickerRowId(null);
-    setQuickPickerType(null);
-    handleOpenAudioPicker(rowId);
-  }, [quickPickerRowId, handleOpenAudioPicker]);
-
-  // Bulk dialog asset confirm callback
-  const handleConfirmBulkAssets = useCallback(({ video1List, video2List, musicList }) => {
-    if (video1List.length > 0) {
-      bulk.addRowsWithFirstVideos(video1List);
-    }
-
-    setTempLibrary((prev) => {
-      const mergedVideo1 = [...(prev.video1 || [])];
-      video1List.forEach((item) => {
-        if (!mergedVideo1.some((v) => v.id === item.id)) {
-          mergedVideo1.push(item);
-        }
-      });
-
-      const mergedVideo2 = [...(prev.video2 || [])];
-      video2List.forEach((item) => {
-        if (!mergedVideo2.some((v) => v.id === item.id)) {
-          mergedVideo2.push(item);
-        }
-      });
-
-      const mergedAudio = [...(prev.audio || [])];
-      musicList.forEach((item) => {
-        if (!mergedAudio.some((a) => a.id === item.id)) {
-          mergedAudio.push(item);
-        }
-      });
-
-      return {
-        video1: mergedVideo1,
-        video2: mergedVideo2,
-        audio: mergedAudio,
-      };
-    });
-
-    setShowBulkAssetPicker(false);
-  }, [bulk]);
-
   const handleClearAll = useCallback(() => {
     const populatedRows = bulk.rows.filter((row) => row.video1 || row.video2 || row.audio || row.caption).length;
-    if (populatedRows > 0 && !window.confirm(`Clear all ${populatedRows} planned frame${populatedRows === 1 ? '' : 's'} and temporary assets? This cannot be undone.`)) {
+    if (populatedRows > 0 && !window.confirm(`Clear all ${populatedRows} planned frame${populatedRows === 1 ? '' : 's'}? This cannot be undone.`)) {
       return;
     }
     bulk.clearAllRows();
-    setTempLibrary({ video1: [], video2: [], audio: [] });
     setSelectedRowId(null);
   }, [bulk]);
-
-  const handleRemoveTempAsset = useCallback((section, item) => {
-    const itemKey = item?.id || item?.url;
-    setTempLibrary((prev) => ({
-      ...prev,
-      [section]: (Array.isArray(prev[section]) ? prev[section] : []).filter((asset) => (
-        (asset.id || asset.url) !== itemKey
-      )),
-    }));
-  }, []);
 
   // Caption apply callback
   const handleApplyCaption = useCallback((text) => {
@@ -586,13 +423,6 @@ export const BulkVideoBuilder = () => {
   const handleExportAll = useCallback(() => {
     const readyRows = bulk.getReadyRows();
     if (readyRows.length === 0) return;
-    const incompleteCount = bulk.rows.filter((row) => !row.video1 || (bulk.isDualVideo && !row.video2)).length;
-    if (incompleteCount > 0) {
-      const shouldContinue = window.confirm(
-        `${readyRows.length} frame${readyRows.length === 1 ? '' : 's'} are ready. ${incompleteCount} incomplete frame${incompleteCount === 1 ? '' : 's'} will be skipped. Continue to export?`
-      );
-      if (!shouldContinue) return;
-    }
     navigate(`/media/editor?mode=bulk&rowId=${encodeURIComponent(readyRows[0].id)}&panel=bulk`);
   }, [bulk, navigate]);
 
@@ -611,13 +441,13 @@ export const BulkVideoBuilder = () => {
   const readyCount = bulk.getReadyRows().length;
 
   return (
-    <div className="h-screen w-screen relative bg-[#0e0e10] text-[#e0e0e5] overflow-hidden select-none font-sans">
-      {(bulk.persistenceError || tempLibraryPersistenceError) && (
+    <div className="h-full w-full relative bg-[#0e0e10] text-[#e0e0e5] overflow-hidden select-none font-sans">
+      {bulk.persistenceError && (
         <div className="absolute left-1/2 top-20 z-50 w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-xl border border-red-800/60 bg-red-950/95 px-4 py-3 text-xs font-semibold text-red-200 shadow-2xl">
-          {bulk.persistenceError || tempLibraryPersistenceError}
+          {bulk.persistenceError}
         </div>
       )}
-      
+
       {/* Figma 2D Infinite Canvas Viewport */}
       <div
         ref={canvasViewportRef}
@@ -626,9 +456,8 @@ export const BulkVideoBuilder = () => {
         onPointerUp={handleCanvasPointerUp}
         onPointerCancel={handleCanvasPointerUp}
         onClick={() => setSelectedRowId(null)}
-        className={`absolute inset-0 z-0 overflow-hidden bg-[#0d0d0e] outline-none select-none transition-colors duration-150 ${
-          isSpacePressed ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
-        }`}
+        className={`absolute inset-0 z-0 overflow-hidden bg-[#0d0d0e] outline-none select-none transition-colors duration-150 ${isSpacePressed ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
+          }`}
         style={{
           backgroundImage: 'radial-gradient(circle, #27272a 1px, transparent 1px)',
           backgroundSize: '24px 24px',
@@ -752,20 +581,10 @@ export const BulkVideoBuilder = () => {
         </div>
       </div>
 
-      {/* Floating Top Figma Header */}
-      <header className="absolute top-4 left-4 right-4 h-14 flex items-center justify-between px-5 z-30">
-        <div className="flex items-center gap-3">
-          <div className="bg-[#ff5500] p-1.5 rounded-lg shadow-inner">
-            <Layers className="h-4 w-4 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xs font-bold uppercase tracking-widest text-white" style={{ color: '#ffffff' }}>Bulk Video Builder</h1>
-            <p className="text-[10px] text-gray-400 font-semibold uppercase mt-0.5">Canvas Workspace</p>
-          </div>
-        </div>
-
+      {/* Floating Top Toolbar */}
+      <header className="absolute top-4 left-4 right-4 h-14 flex items-center justify-end px-5 z-30 pointer-events-none">
         {/* Global Toolbar buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pointer-events-auto">
           <label className="flex items-center gap-1.5 cursor-pointer bg-[#27272a] border border-[#3f3f46] hover:bg-[#3f3f46] px-2.5 py-1.5 rounded-lg text-white select-none transition-all">
             <input
               type="checkbox"
@@ -793,37 +612,13 @@ export const BulkVideoBuilder = () => {
 
           <button
             type="button"
-            onClick={() => setShowTempMediaLibrary(true)}
-            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
-            title="Temporary Media Library"
-          >
-            <Folder className="h-3.5 w-3.5 text-[#c4b5fd] shrink-0" />
-            <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
-              Temp Library
-            </span>
-          </button>
-          
-          <button
-            type="button"
             onClick={alignAllCards}
             className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
-            title="Align Frames"
+            title="Align & Fit Frames"
           >
             <Layout className="h-3.5 w-3.5 text-[#c4b5fd] shrink-0" />
             <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
               Align
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={fitView}
-            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
-            title="Fit View"
-          >
-            <Crosshair className="h-3.5 w-3.5 text-[#c4b5fd] shrink-0" />
-            <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
-              Fit
             </span>
           </button>
 
@@ -850,23 +645,24 @@ export const BulkVideoBuilder = () => {
             <Play className="h-4 w-4 fill-white text-white" />
             EXPORT ({readyCount})
           </button>
+
+
         </div>
       </header>
 
-      {/* Floating Left Layers & Media Library Panel Sidebar */}
+      {/* Docked Left Layers & Media Library Panel Sidebar */}
       {isSidebarOpen && (
-        <aside className="absolute top-20 left-4 bottom-4 w-80 bg-black/95 border border-white/10 rounded-xl flex flex-col z-20 shadow-2xl backdrop-blur-md overflow-hidden text-white">
+        <aside className="absolute inset-y-0 left-0 w-80 bg-[#0d0d0f] border-r border-white/10 flex flex-col z-20 shadow-2xl text-white">
           {/* Header Tab Switcher */}
           <div className="p-2.5 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#0a0a0a]">
             <div className="grid grid-cols-2 gap-1 p-0.5 bg-white/5 rounded-lg w-full">
               <button
                 type="button"
                 onClick={() => setSidebarTab('frames')}
-                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[10px] font-extrabold uppercase tracking-wider transition-all ${
-                  sidebarTab === 'frames'
+                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[10px] font-extrabold uppercase tracking-wider transition-all ${sidebarTab === 'frames'
                     ? 'bg-[#7831d6] text-white shadow-sm'
                     : 'text-zinc-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <Sliders className="w-3 h-3" />
                 Frames ({bulk.rows.length})
@@ -874,11 +670,10 @@ export const BulkVideoBuilder = () => {
               <button
                 type="button"
                 onClick={() => setSidebarTab('media')}
-                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[10px] font-extrabold uppercase tracking-wider transition-all ${
-                  sidebarTab === 'media'
+                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[10px] font-extrabold uppercase tracking-wider transition-all ${sidebarTab === 'media'
                     ? 'bg-[#7831d6] text-white shadow-sm'
                     : 'text-zinc-400 hover:text-white'
-                }`}
+                  }`}
               >
                 <Folder className="w-3 h-3" />
                 Media Library
@@ -893,7 +688,6 @@ export const BulkVideoBuilder = () => {
                 <span className="text-[10px] font-bold text-blue-300 block truncate">
                   Picking {pickerSlot === 'video1' ? 'First Video' : 'Second Video'} for Frame #{bulk.rows.findIndex((r) => r.id === activePickerRowId) + 1}
                 </span>
-                <span className="text-[8px] text-blue-400/80">Click any video below to select</span>
               </div>
               <button
                 type="button"
@@ -901,9 +695,10 @@ export const BulkVideoBuilder = () => {
                   setActivePickerRowId(null);
                   setPickerSlot(null);
                 }}
-                className="text-[9px] font-bold uppercase text-blue-400 hover:text-white px-1.5 py-0.5 rounded bg-blue-900/40 hover:bg-blue-900/70 shrink-0"
+                className="flex h-5 w-5 items-center justify-center rounded text-blue-400 hover:bg-blue-900/50 hover:text-white transition-all shrink-0"
+                title="Cancel selection"
               >
-                Cancel
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
           )}
@@ -925,18 +720,16 @@ export const BulkVideoBuilder = () => {
                   <div
                     key={row.id}
                     onClick={() => centerOnRow(row)}
-                    className={`group w-full flex items-center justify-between gap-2 p-2 rounded-lg text-left text-xs font-semibold cursor-pointer border transition-all duration-150 ${
-                      isSelected
+                    className={`group w-full flex items-center justify-between gap-2 p-2 rounded-lg text-left text-xs font-semibold cursor-pointer border transition-all duration-150 ${isSelected
                         ? 'bg-[#27272a] text-white border-[#ff5500]/60 shadow-md'
                         : 'bg-transparent text-gray-400 border-transparent hover:bg-[#1e1e24] hover:text-gray-200'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2 truncate min-w-0">
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                        row.status === 'done' ? 'bg-green-500' :
-                        row.status === 'error' ? 'bg-red-500' :
-                        hasVideo ? 'bg-blue-500' : 'bg-gray-600'
-                      }`} />
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.status === 'done' ? 'bg-green-500' :
+                          row.status === 'error' ? 'bg-red-500' :
+                            hasVideo ? 'bg-blue-500' : 'bg-gray-600'
+                        }`} />
                       <span className="text-[10px] font-mono text-gray-500">#{idx + 1}</span>
                       <span className="truncate" title={row.caption}>
                         {row.caption || '(Blank Caption)'}
@@ -971,23 +764,22 @@ export const BulkVideoBuilder = () => {
               </button>
             </div>
           )}
-          
+
           <div className="p-2.5 bg-[#1e1e24]/40 border-t border-[#27272a] shrink-0 text-[10px] text-gray-500 leading-normal font-medium">
             💡 <strong className="text-gray-400">Space + Drag</strong> to pan canvas. <strong className="text-gray-400">Pinch trackpad</strong> to zoom.
           </div>
         </aside>
       )}
 
-      {/* Sidebar toggle button (floating in top left) */}
+      {/* Sidebar toggle button (docked on sidebar right edge or top left) */}
       <button
         type="button"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className={`absolute top-20 z-30 p-2.5 bg-[#18181b]/95 hover:bg-[#27272a] text-gray-400 hover:text-white rounded-xl border border-[#27272a] shadow-lg backdrop-blur-md transition-all duration-200 active:scale-95 flex items-center justify-center ${
-          isSidebarOpen ? 'left-[340px]' : 'left-4'
-        }`}
+        className={`absolute top-3.5 z-30 p-2 bg-[#18181b] hover:bg-[#27272a] text-gray-400 hover:text-white border border-white/10 shadow-lg transition-all duration-200 active:scale-95 flex items-center justify-center ${isSidebarOpen ? 'left-[320px] rounded-r-lg border-l-0' : 'left-3 rounded-lg'
+          }`}
         title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
       >
-        {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 text-[#ff5500]" />}
+        {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 text-[#c4b5fd]" />}
       </button>
 
       {/* Audio Picker Dialog */}
@@ -1029,54 +821,6 @@ export const BulkVideoBuilder = () => {
           onVibeChange={setSuggestionsVibe}
           onApply={handleApplyCaption}
           onClose={() => setCaptionDrawerRowId(null)}
-        />
-      )}
-
-      {/* Multi asset batch imports */}
-      {showBulkAssetPicker && (
-        <BulkAssetPickerDialog
-          token={token}
-          onClose={() => setShowBulkAssetPicker(false)}
-          onConfirm={handleConfirmBulkAssets}
-        />
-      )}
-
-      {showTempMediaLibrary && (
-        <TempMediaLibraryDialog
-          library={tempLibrary}
-          onAddMore={() => {
-            setShowTempMediaLibrary(false);
-            setShowBulkAssetPicker(true);
-          }}
-          onRemove={handleRemoveTempAsset}
-          onClose={() => setShowTempMediaLibrary(false)}
-        />
-      )}
-
-      {/* Quick single select picking dialog */}
-      {quickPickerRowId && quickPickerType && (
-        <TempAssetQuickPickerDialog
-          type={quickPickerType === 'audio' ? 'audio' : 'video'}
-          slotLabel={
-            quickPickerType === 'video1'
-              ? 'First Video'
-              : quickPickerType === 'video2'
-                ? 'Second Video'
-                : 'Audio Track'
-          }
-          items={
-            quickPickerType === 'video1'
-              ? tempLibrary.video1
-              : quickPickerType === 'video2'
-                ? tempLibrary.video2
-                : tempLibrary.audio
-          }
-          onSelect={quickPickerType === 'audio' ? handleSelectQuickAudio : handleSelectQuickVideo}
-          onBrowseGlobal={quickPickerType === 'audio' ? handleBrowseGlobalAudio : handleBrowseGlobalVideo}
-          onClose={() => {
-            setQuickPickerRowId(null);
-            setQuickPickerType(null);
-          }}
         />
       )}
 

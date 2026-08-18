@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 import { getMediaUrl } from '../../utils/mediaUrls';
@@ -304,6 +305,7 @@ export const VideoEditorV2 = () => {
   ));
   const [exportState, setExportState] = useState(createEmptyExportState);
   const [bulkExportDialog, setBulkExportDialog] = useState(createEmptyBulkExportDialog);
+  const [showExitDialog, setShowExitDialog] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
   const [selectedBulkRowIds, setSelectedBulkRowIds] = useState(() => (
     isBulkProject && bulkRowId ? [bulkRowId] : []
@@ -1358,10 +1360,16 @@ export const VideoEditorV2 = () => {
       });
       return;
     }
-    const destination = isBulkProject ? 'Bulk Video Builder' : 'Media Library';
-    if (!window.confirm(`Leave the video editor and go back to ${destination}? Your current changes will be saved.`)) {
-      return;
-    }
+    setShowExitDialog(true);
+  }, [
+    bulkQueueState.running,
+    exportState.exporting,
+    extractingAudioClipId,
+    savingResult,
+  ]);
+
+  const handleConfirmExit = useCallback(() => {
+    setShowExitDialog(false);
     if (isBulkProject && bulkRowId) {
       const currentProject = projectRef.current;
       const snapshot = serializeProject(currentProject);
@@ -1395,13 +1403,9 @@ export const VideoEditorV2 = () => {
     }
     navigate(isBulkProject ? '/media/bulk-builder' : '/media', { replace: true });
   }, [
-    bulkQueueState.running,
     bulkRowId,
-    exportState.exporting,
-    extractingAudioClipId,
     isBulkProject,
     navigate,
-    savingResult,
   ]);
 
   const openBulkVideoBuilder = useCallback(() => {
@@ -2082,6 +2086,49 @@ export const VideoEditorV2 = () => {
         onCancel={bulkExportQueue.cancel}
         onClose={closeBulkExportDialog}
       />
+
+      {/* Exit Confirmation Dialog Modal */}
+      {showExitDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#121214] p-6 shadow-2xl text-white">
+            <div className="flex items-center gap-3 text-[#c4b5fd] mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#7831d6]/10 border border-[#7831d6]/20 shrink-0">
+                <LogOut className="h-5 w-5 text-[#c4b5fd]" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                  Exit Video Editor
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Return to {isBulkProject ? 'Bulk Video Builder' : 'Media Library'}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-zinc-300 mb-6 leading-relaxed">
+              Your current project changes will be automatically saved before exiting. Are you sure you want to leave?
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowExitDialog(false)}
+                className="px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white rounded-lg hover:bg-white/10 transition"
+              >
+                Keep Editing
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmExit}
+                className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-[#7831d6] hover:bg-[#6825bc] rounded-lg shadow-md transition active:scale-95"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                Save & Exit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

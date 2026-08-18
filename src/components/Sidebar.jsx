@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
-import { Clock, FolderHeart, Film, Link2, Settings as SettingsIcon, X, Megaphone, Users, BarChart3, ChevronDown, Check } from 'lucide-react';
+import { Clock, FolderHeart, Film, Layers, Link2, Settings as SettingsIcon, X, Megaphone, Users, BarChart3, ChevronDown, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PwaInstallButton } from './PwaInstallButton';
 import { withCampaignScope } from '../utils/campaignScope';
@@ -190,6 +190,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     { name: 'Scheduled Queue', label: 'Queue', path: '/scheduler', icon: Clock },
     { name: 'Media Library', label: 'Media', path: '/media', icon: FolderHeart },
     { name: 'Timeline Editor', label: 'Editor', path: '/media/editor', icon: Film },
+    { name: 'Bulk Builder', label: 'Bulk', path: '/media/bulk-builder', icon: Layers },
     { name: 'Publishing Channels', label: 'Channels', path: '/channels', icon: Link2 },
     { name: 'Settings', label: 'Settings', path: '/settings', icon: SettingsIcon },
   ];

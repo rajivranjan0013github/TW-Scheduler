@@ -433,7 +433,7 @@ const VideoInspector = ({
     if (typeof onSeek !== 'function') return;
     const timelineTime = Number(clip.timelineStart || 0)
       + (sourceTime - Number(clip.sourceStart || 0))
-        / Math.max(0.01, Number(clip.playbackRate) || 1);
+      / Math.max(0.01, Number(clip.playbackRate) || 1);
     onSeek(timelineTime);
   };
   const togglePatchKeyframe = () => {
@@ -520,129 +520,129 @@ const VideoInspector = ({
           title="Layout"
           action={<CardResetButton label="Reset layout" onClick={resetLayout} />}
         >
-        {clip.type === 'video' && (
-          <div className="mb-3 border-b border-white/10 pb-3">
+          {clip.type === 'video' && (
+            <div className="mb-3 border-b border-white/10 pb-3">
+              <InspectorRangeControl
+                label="Speed"
+                value={playbackRate}
+                min={minimumPlaybackRate}
+                max={maximumPlaybackRate}
+                step={0.01}
+                suffix="×"
+                formatValue={(value) => Number(value).toFixed(2)}
+                onChange={changePlaybackRate}
+                onInteractionStart={startPlaybackRateInteraction}
+                onInteractionEnd={endPlaybackRateInteraction}
+              />
+              {playbackRangeLimited && (
+                <p className="mt-2 text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
+                  Range limited by the project timeline.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div>
             <InspectorRangeControl
-              label="Speed"
-              value={playbackRate}
-              min={minimumPlaybackRate}
-              max={maximumPlaybackRate}
-              step={0.01}
-              suffix="×"
-              formatValue={(value) => Number(value).toFixed(2)}
-              onChange={changePlaybackRate}
-              onInteractionStart={startPlaybackRateInteraction}
-              onInteractionEnd={endPlaybackRateInteraction}
-            />
-            {playbackRangeLimited && (
-              <p className="mt-2 text-[9px] font-medium leading-relaxed !text-[#9da4ae]">
-                Range limited by the project timeline.
-              </p>
-            )}
-          </div>
-        )}
-
-        <div>
-          <InspectorRangeControl
-            label="Scale"
-            value={Math.round(transform.scale * 100)}
-            min={10}
-            max={300}
-            suffix="%"
-            onChange={(value) => updateTransform({ scale: value / 100 })}
-          />
-        </div>
-
-        <div className="mt-3 flex min-w-0 items-center gap-2">
-          <p className="shrink-0 text-[11px] font-bold !text-[#dfe2e6]">Position</p>
-          <div className="ml-auto flex shrink-0 items-center gap-1">
-            <ScrubbableNumberControl
-              label="X"
-              compact
-              value={Math.round((transform.x - 0.5) * 200)}
-              min={-100}
-              max={100}
+              label="Scale"
+              value={Math.round(transform.scale * 100)}
+              min={10}
+              max={300}
               suffix="%"
-              onChange={(value) => updateTransform({ x: value / 200 + 0.5 })}
-            />
-            <ScrubbableNumberControl
-              label="Y"
-              compact
-              value={Math.round((transform.y - 0.5) * 200)}
-              min={-100}
-              max={100}
-              suffix="%"
-              onChange={(value) => updateTransform({ y: value / 200 + 0.5 })}
+              onChange={(value) => updateTransform({ scale: value / 100 })}
             />
           </div>
-        </div>
 
-        <div className="mt-2 grid min-w-0 grid-cols-[minmax(72px,0.8fr)_minmax(0,1.2fr)] items-center gap-1.5">
-          <InspectorRangeControl compact label="Rotation" value={Math.round(transform.rotation)} min={-180} max={180} suffix="°" onChange={(rotation) => updateTransform({ rotation })} />
-          <div className="grid min-w-0 grid-cols-2 gap-1" role="group" aria-label="Flip video">
+          <div className="mt-3 flex min-w-0 items-center gap-2">
+            <p className="shrink-0 text-[11px] font-bold !text-[#dfe2e6]">Position</p>
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <ScrubbableNumberControl
+                label="X"
+                compact
+                value={Math.round((transform.x - 0.5) * 200)}
+                min={-100}
+                max={100}
+                suffix="%"
+                onChange={(value) => updateTransform({ x: value / 200 + 0.5 })}
+              />
+              <ScrubbableNumberControl
+                label="Y"
+                compact
+                value={Math.round((transform.y - 0.5) * 200)}
+                min={-100}
+                max={100}
+                suffix="%"
+                onChange={(value) => updateTransform({ y: value / 200 + 0.5 })}
+              />
+            </div>
+          </div>
+
+          <div className="mt-2 grid min-w-0 grid-cols-[minmax(72px,0.8fr)_minmax(0,1.2fr)] items-center gap-1.5">
+            <InspectorRangeControl compact label="Rotation" value={Math.round(transform.rotation)} min={-180} max={180} suffix="°" onChange={(rotation) => updateTransform({ rotation })} />
+            <div className="grid min-w-0 grid-cols-2 gap-1" role="group" aria-label="Flip video">
+              <button
+                type="button"
+                aria-pressed={transform.flipX}
+                aria-label="Flip horizontally"
+                title="Flip horizontally"
+                onClick={() => updateTransform({ flipX: !transform.flipX })}
+                className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-lg border px-1 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${transform.flipX
+                  ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
+                  : 'border-white/10 bg-[#111318] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
+              >
+                <span aria-hidden="true">↔</span>
+                <span>Horizontal</span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={transform.flipY}
+                aria-label="Flip vertically"
+                title="Flip vertically"
+                onClick={() => updateTransform({ flipY: !transform.flipY })}
+                className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-lg border px-1 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${transform.flipY
+                  ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
+                  : 'border-white/10 bg-[#111318] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
+              >
+                <span aria-hidden="true">↕</span>
+                <span>Vertical</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-2 flex items-center gap-2" role="group" aria-label="Video sizing mode">
             <button
               type="button"
-              aria-pressed={transform.flipX}
-              aria-label="Flip horizontally"
-              title="Flip horizontally"
-              onClick={() => updateTransform({ flipX: !transform.flipX })}
-              className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-lg border px-1 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${transform.flipX
-                ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
-                : 'border-white/10 bg-[#111318] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
+              onClick={() => onUpdate({ fit: 'fill' })}
+              aria-pressed={clip.fit === 'fill'}
+              aria-label="Fill canvas with video"
+              title="Fill canvas with video"
+              className={`flex h-9 items-center gap-2 rounded-lg px-2 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${clip.fit === 'fill'
+                ? 'bg-white/5 text-[#ff7a33]'
+                : 'text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}
             >
-              <span aria-hidden="true">↔</span>
-              <span>Horizontal</span>
+              <span className="relative h-5 w-6 shrink-0" aria-hidden="true">
+                <span className="absolute inset-x-1 top-1 h-3 border-2 border-current" />
+                <span className="absolute inset-x-0 top-0 h-0.5 bg-current" />
+                <span className="absolute inset-x-0 bottom-0 h-0.5 bg-current" />
+              </span>
+              Fill
             </button>
             <button
               type="button"
-              aria-pressed={transform.flipY}
-              aria-label="Flip vertically"
-              title="Flip vertically"
-              onClick={() => updateTransform({ flipY: !transform.flipY })}
-              className={`flex h-9 min-w-0 items-center justify-center gap-0.5 rounded-lg border px-1 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${transform.flipY
-                ? 'border-[#ff5500]/70 bg-[#ff5500]/10 text-[#ff7a33]'
-                : 'border-white/10 bg-[#111318] text-[#aeb3bc] hover:border-white/20 hover:text-white'}`}
+              onClick={() => onUpdate({ fit: 'fit' })}
+              aria-pressed={clip.fit === 'fit'}
+              aria-label="Fit video inside canvas"
+              title="Fit video inside canvas"
+              className={`flex h-9 items-center gap-2 rounded-lg px-2 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${clip.fit === 'fit'
+                ? 'bg-white/5 text-[#ff7a33]'
+                : 'text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}
             >
-              <span aria-hidden="true">↕</span>
-              <span>Vertical</span>
+              <span className="relative flex h-5 w-6 shrink-0 items-center justify-center border-2 border-current" aria-hidden="true">
+                <span className="h-3 w-2 border border-current bg-current/20" />
+              </span>
+              Fit
             </button>
           </div>
-        </div>
-
-        <div className="mt-2 flex items-center gap-2" role="group" aria-label="Video sizing mode">
-          <button
-            type="button"
-            onClick={() => onUpdate({ fit: 'fill' })}
-            aria-pressed={clip.fit === 'fill'}
-            aria-label="Fill canvas with video"
-            title="Fill canvas with video"
-            className={`flex h-9 items-center gap-2 rounded-lg px-2 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${clip.fit === 'fill'
-              ? 'bg-white/5 text-[#ff7a33]'
-              : 'text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}
-          >
-            <span className="relative h-5 w-6 shrink-0" aria-hidden="true">
-              <span className="absolute inset-x-1 top-1 h-3 border-2 border-current" />
-              <span className="absolute inset-x-0 top-0 h-0.5 bg-current" />
-              <span className="absolute inset-x-0 bottom-0 h-0.5 bg-current" />
-            </span>
-            Fill
-          </button>
-          <button
-            type="button"
-            onClick={() => onUpdate({ fit: 'fit' })}
-            aria-pressed={clip.fit === 'fit'}
-            aria-label="Fit video inside canvas"
-            title="Fit video inside canvas"
-            className={`flex h-9 items-center gap-2 rounded-lg px-2 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${clip.fit === 'fit'
-              ? 'bg-white/5 text-[#ff7a33]'
-              : 'text-[#aeb3bc] hover:bg-white/5 hover:text-white'}`}
-          >
-            <span className="relative flex h-5 w-6 shrink-0 items-center justify-center border-2 border-current" aria-hidden="true">
-              <span className="h-3 w-2 border border-current bg-current/20" />
-            </span>
-            Fit
-          </button>
-        </div>
         </PropertyCard>
       </div>
 
@@ -872,39 +872,39 @@ const VideoInspector = ({
               <InspectorRangeControl label="Opacity" value={Math.round(transform.opacity * 100)} min={0} max={100} resetValue={100} suffix="%" onChange={(value) => updateTransform({ opacity: value / 100 })} />
             </div>
             <div className="mt-3 grid grid-cols-[42px_minmax(0,1fr)] gap-2">
-            <button
-              type="button"
-              onClick={() => onUpdate({ muted: !clip.muted })}
-              aria-pressed={Boolean(clip.muted)}
-              aria-label={clip.muted ? 'Unmute video clip' : 'Mute video clip'}
-              title={clip.muted ? 'Unmute video clip' : 'Mute video clip'}
-              className={`flex h-10 items-center justify-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${clip.muted
-                ? 'border-[#ff5500]/60 bg-[#ff5500]/10 text-[#ff7a33]'
-                : 'border-white/10 text-[#9da4ae] hover:bg-white/5 hover:text-white'}`}
-            >
-              {clip.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-            </button>
-            <div className="space-y-1.5">
               <button
                 type="button"
-                onClick={extractAudio}
-                disabled={extractionUnavailable}
-                aria-busy={extractingAudio}
-                aria-label={extractingAudio
-                  ? 'Extracting MP3 from selected video'
-                  : 'Extract MP3 from selected video'}
-                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#111318] px-3 text-[10px] font-extrabold text-[#dfe2e6] transition hover:border-[#ff5500]/45 hover:text-[#ff8a4d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-not-allowed disabled:text-[#727985] disabled:opacity-70"
+                onClick={() => onUpdate({ muted: !clip.muted })}
+                aria-pressed={Boolean(clip.muted)}
+                aria-label={clip.muted ? 'Unmute video clip' : 'Mute video clip'}
+                title={clip.muted ? 'Unmute video clip' : 'Mute video clip'}
+                className={`flex h-10 items-center justify-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 ${clip.muted
+                  ? 'border-[#ff5500]/60 bg-[#ff5500]/10 text-[#ff7a33]'
+                  : 'border-white/10 text-[#9da4ae] hover:bg-white/5 hover:text-white'}`}
               >
-                {extractingAudio ? (
-                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                ) : (
-                  <FileMusic className="h-3.5 w-3.5" aria-hidden="true" />
-                )}
-                <span aria-live="polite">
-                  {extractingAudio ? 'Extracting MP3…' : 'Extract MP3'}
-                </span>
+                {clip.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
               </button>
-            </div>
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={extractAudio}
+                  disabled={extractionUnavailable}
+                  aria-busy={extractingAudio}
+                  aria-label={extractingAudio
+                    ? 'Extracting MP3 from selected video'
+                    : 'Extract MP3 from selected video'}
+                  className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#111318] px-3 text-[10px] font-extrabold text-[#dfe2e6] transition hover:border-[#ff5500]/45 hover:text-[#ff8a4d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-not-allowed disabled:text-[#727985] disabled:opacity-70"
+                >
+                  {extractingAudio ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <FileMusic className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  <span aria-live="polite">
+                    {extractingAudio ? 'Extracting MP3…' : 'Extract MP3'}
+                  </span>
+                </button>
+              </div>
             </div>
           </PropertyCard>
         )}

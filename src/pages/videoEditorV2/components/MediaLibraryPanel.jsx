@@ -79,7 +79,7 @@ const MediaThumbnail = ({ item }) => {
   const startVideoPreview = () => {
     const video = videoRef.current;
     if (!video) return;
-    void video.play().catch(() => {});
+    void video.play().catch(() => { });
   };
 
   const stopVideoPreview = () => {

@@ -100,11 +100,11 @@ const getRowStatus = (row) => {
   const status = STATUS_ALIASES[rawStatus] || 'ready';
   const hasUnexportedChanges = Boolean(
     row.changed
-      || row.dirty
-      || row.isDirty
-      || row.needsExport
-      || row.needsReexport
-      || row.editorProjectStale,
+    || row.dirty
+    || row.isDirty
+    || row.needsExport
+    || row.needsReexport
+    || row.editorProjectStale,
   );
 
   if (
