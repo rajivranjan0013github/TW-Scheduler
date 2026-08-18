@@ -100,6 +100,7 @@ export const usePreviewAudio = () => {
       const campaignId = getActiveCampaignId();
       if (campaignId) params.set('campaignId', campaignId);
       params.set('folderId', PLATFORM_AUDIO_FOLDER_ID);
+      params.set('includeSubfolders', 'true');
       const response = await fetch(`${API_BASE_URL}/api/media?${params.toString()}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

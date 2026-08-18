@@ -223,8 +223,49 @@ const formatFileSize = (size) => {
   return `${size} B`;
 };
 
-const MediaFolderPreview = ({ folder }) => {
-  const preview = folder.coverMedia || folder.previewMedia;
+export const getFolderStats = (folder, allFolders = []) => {
+  const folderId = normalizeFolderId(folder?._id);
+  const childSubfolders = allFolders.filter(
+    (item) => normalizeFolderId(item?.parentFolderId) === folderId
+  );
+  const subfolderCount = childSubfolders.length || Number(folder?.subfolderCount || 0);
+  const directMediaCount = Number(folder?.itemCount ?? (folder?.carouselOrder || []).length ?? 0);
+  const totalSubItems = childSubfolders.reduce(
+    (acc, sub) => acc + Number(sub.itemCount ?? (sub.carouselOrder || []).length ?? 0),
+    0
+  );
+
+  let label = '';
+  if (subfolderCount > 0 && directMediaCount > 0) {
+    label = `${subfolderCount} ${subfolderCount === 1 ? 'folder' : 'folders'} • ${directMediaCount} ${directMediaCount === 1 ? 'item' : 'items'}`;
+  } else if (subfolderCount > 0) {
+    if (totalSubItems > 0) {
+      label = `${subfolderCount} ${subfolderCount === 1 ? 'folder' : 'folders'} • ${totalSubItems} ${totalSubItems === 1 ? 'item' : 'items'}`;
+    } else {
+      label = `${subfolderCount} ${subfolderCount === 1 ? 'folder' : 'folders'}`;
+    }
+  } else {
+    label = `${directMediaCount} ${directMediaCount === 1 ? 'item' : 'items'}`;
+  }
+
+  let preview = folder?.coverMedia || folder?.previewMedia;
+  if (!preview && childSubfolders.length > 0) {
+    const subWithPreview = childSubfolders.find((sub) => sub.coverMedia || sub.previewMedia);
+    preview = subWithPreview?.coverMedia || subWithPreview?.previewMedia || null;
+  }
+
+  return {
+    subfolderCount,
+    directMediaCount,
+    totalSubItems,
+    label,
+    preview,
+  };
+};
+
+const MediaFolderPreview = ({ folder, allFolders = [] }) => {
+  const stats = getFolderStats(folder, allFolders);
+  const preview = stats.preview;
   const previewSource = preview?.thumbnailUrl || preview?.url;
   const [useProxy, setUseProxy] = useState(false);
   const imageSource = useProxy ? getProxiedAssetUrl(previewSource) : getAssetUrl(previewSource);
@@ -1763,22 +1804,22 @@ export const MediaLibrary = () => {
     const uploadDisabled = uploading || (activeFolderId === 'root' && !uploadFolderName.trim());
 
     return (
-      <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
-        <div className="sticky top-0 z-10 border-b border-[#e5e5ea] bg-white px-5 py-3 shadow-sm">
+      <div className="min-h-screen bg-black text-white">
+        <div className="sticky top-0 z-10 border-b border-white/[0.08] bg-[#0a0a0a] px-5 py-3 shadow-md">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
                 onClick={clearFileUploadDrafts}
                 disabled={uploading}
-                className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-[#d1d1d6] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+                className="flex flex-shrink-0 items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-white/10 disabled:opacity-50"
               >
                 <ChevronRight className="h-3.5 w-3.5 rotate-180" />
                 Back
               </button>
               <div className="min-w-0">
-                <h2 className="m-0 text-base font-bold tracking-tight text-black">Review upload</h2>
-                <p className="m-0 mt-0.5 text-[11px] font-medium text-[#6e6e73]">
+                <h2 className="m-0 text-base font-bold tracking-tight text-white">Review upload</h2>
+                <p className="m-0 mt-0.5 text-[11px] font-medium text-zinc-400">
                   {fileUploadDrafts.length} files selected &bull; order preserved &bull; {matchedCaptions}/{fileUploadDrafts.length} captions matched
                 </p>
               </div>
@@ -1788,7 +1829,7 @@ export const MediaLibrary = () => {
                 type="button"
                 onClick={clearFileUploadDrafts}
                 disabled={uploading}
-                className="rounded-md border border-[#d1d1d6] bg-white px-3 py-1.5 text-xs font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+                className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-white/10 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -1796,7 +1837,7 @@ export const MediaLibrary = () => {
                 type="button"
                 onClick={handleConfirmFileUpload}
                 disabled={uploadDisabled}
-                className="inline-flex items-center gap-1.5 rounded-md bg-[#0071e3] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#147ce5] disabled:cursor-not-allowed disabled:bg-[#c7c7cc]"
+                className="inline-flex items-center gap-1.5 rounded-md bg-[#7831d6] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-50 shadow-md shadow-[#7831d6]/25"
               >
                 {uploading ? (
                   <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
@@ -1810,32 +1851,32 @@ export const MediaLibrary = () => {
         </div>
 
         {errorMessage && (
-          <div className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-[#ff9500]/30 bg-[#fff7ed] px-3 py-2 text-xs font-medium text-[#9a3412]">
+          <div className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200">
             <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
 
         {uploading && (
-          <div className="mx-5 mt-3 overflow-hidden rounded-lg border border-[#bfdbfe] bg-[#eff6ff]">
+          <div className="mx-5 mt-3 overflow-hidden rounded-lg border border-[#7831d6]/30 bg-[#7831d6]/10">
             <div className="flex items-center gap-3 px-4 py-3">
-              <div className="h-4 w-4 rounded-full border-2 border-[#0071e3] border-t-transparent animate-spin" />
+              <div className="h-4 w-4 rounded-full border-2 border-[#7831d6] border-t-transparent animate-spin" />
               <div className="min-w-0 flex-1">
-                <p className="m-0 text-xs font-semibold text-[#1d4ed8]">{getUploadProgressText()}</p>
+                <p className="m-0 text-xs font-semibold text-[#c4b5fd]">{getUploadProgressText()}</p>
                 {uploadProgress?.currentFile && (
-                  <p className="m-0 mt-0.5 truncate text-[11px] text-[#2563eb]">{uploadProgress.currentFile}</p>
+                  <p className="m-0 mt-0.5 truncate text-[11px] text-zinc-400">{uploadProgress.currentFile}</p>
                 )}
               </div>
               {uploadProgress?.total > 0 && (
-                <span className="text-[11px] font-bold text-[#1d4ed8]">
+                <span className="text-[11px] font-bold text-[#c4b5fd]">
                   {uploadProgress.completed}/{uploadProgress.total}
                 </span>
               )}
             </div>
             {uploadProgress?.total > 0 && (
-              <div className="h-1 bg-[#bfdbfe]/60">
+              <div className="h-1 bg-[#7831d6]/20">
                 <div
-                  className="h-full bg-[#0071e3] transition-all duration-300"
+                  className="h-full bg-[#7831d6] transition-all duration-300"
                   style={{ width: `${Math.round(((uploadProgress.completed || 0) / uploadProgress.total) * 100)}%` }}
                 />
               </div>
@@ -1844,15 +1885,15 @@ export const MediaLibrary = () => {
         )}
 
         <div className="grid gap-3 p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="overflow-hidden rounded-lg border border-[#e5e5ea] bg-white shadow-sm">
-            <div className="grid grid-cols-[58px_76px_minmax(160px,1fr)_minmax(220px,1.35fr)_92px] items-center gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-[#6e6e73]">
+          <section className="overflow-hidden rounded-lg border border-white/[0.08] bg-[#0a0a0a] shadow-sm">
+            <div className="grid grid-cols-[58px_76px_minmax(160px,1fr)_minmax(220px,1.35fr)_92px] items-center gap-3 border-b border-white/[0.08] bg-black px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
               <span>Order</span>
               <span>Preview</span>
               <span>File</span>
               <span>Caption</span>
               <span>Status</span>
             </div>
-            <div className="divide-y divide-[#f2f2f7]">
+            <div className="divide-y divide-white/[0.05]">
               {fileUploadDrafts.map((draft, index) => {
                 const hasCaption = Boolean(draft.caption.trim());
                 return (
@@ -1860,21 +1901,21 @@ export const MediaLibrary = () => {
                     key={draft.id}
                     className="grid grid-cols-[58px_76px_minmax(160px,1fr)_minmax(220px,1.35fr)_92px] items-center gap-3 px-3 py-2.5"
                   >
-                    <span className="font-mono text-xs font-bold text-[#6e6e73]">
+                    <span className="font-mono text-xs font-bold text-zinc-500">
                       {String(index + 1).padStart(2, '0')}
                     </span>
-                    <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md border border-[#e5e5ea] bg-[#f5f5f7]">
+                    <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-black">
                       {draft.file.type.startsWith('video/') ? (
                         <video src={draft.previewUrl} muted playsInline className="h-full w-full object-cover" />
                       ) : draft.file.type.startsWith('audio/') ? (
-                        <Music className="h-5 w-5 text-[#6e6e73]" />
+                        <Music className="h-5 w-5 text-zinc-400" />
                       ) : (
                         <img src={draft.previewUrl} alt="" className="h-full w-full object-cover" />
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="m-0 truncate text-xs font-semibold text-[#1d1d1f]" title={draft.name}>{draft.name}</p>
-                      <p className="m-0 mt-0.5 text-[10px] font-medium text-[#8e8e93]">
+                      <p className="m-0 truncate text-xs font-semibold text-white" title={draft.name}>{draft.name}</p>
+                      <p className="m-0 mt-0.5 text-[10px] font-medium text-zinc-400">
                         {draft.file.type || 'Media'} {formatFileSize(draft.file.size) ? `· ${formatFileSize(draft.file.size)}` : ''}
                       </p>
                     </div>
@@ -1883,12 +1924,12 @@ export const MediaLibrary = () => {
                       onChange={(e) => updateFileUploadCaption(draft.id, e.target.value)}
                       disabled={uploading}
                       placeholder="No caption matched. Add one here..."
-                      className="h-16 w-full resize-none rounded-md border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-2 text-[11px] leading-relaxed text-[#1d1d1f] placeholder:text-[#a1a1aa] focus:border-[#0071e3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/10 disabled:opacity-50"
+                      className="h-16 w-full resize-none rounded-md border border-white/10 bg-black px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-zinc-500 focus:border-[#7831d6] focus:outline-none focus:ring-1 focus:ring-[#7831d6] disabled:opacity-50"
                     />
                     <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold ${
                       hasCaption
-                        ? 'bg-[#ecfdf3] text-[#15803d]'
-                        : 'bg-[#fff7ed] text-[#b45309]'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                     }`}>
                       {hasCaption ? <CheckCircle2 className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
                       {hasCaption ? 'Matched' : 'Missing'}
@@ -1900,66 +1941,66 @@ export const MediaLibrary = () => {
           </section>
 
           <aside className="space-y-3">
-            <section className="rounded-lg border border-[#e5e5ea] bg-white p-3 shadow-sm">
+            <section className="rounded-lg border border-white/[0.08] bg-[#0a0a0a] p-3 shadow-sm">
               <div className="mb-3 flex items-center gap-2">
-                <Folder className="h-4 w-4 text-[#6e6e73]" />
-                <h3 className="m-0 text-xs font-bold text-black">Target folder</h3>
+                <Folder className="h-4 w-4 text-zinc-400" />
+                <h3 className="m-0 text-xs font-bold text-white">Target folder</h3>
               </div>
               {activeFolderId === 'root' ? (
                 <div className="space-y-2">
-                  <p className="m-0 text-[11px] font-medium text-[#6e6e73]">
+                  <p className="m-0 text-[11px] font-medium text-zinc-400">
                     At Library Root: create folder first
                   </p>
                   <label className="block">
-                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#8e8e93]">New folder name</span>
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-zinc-400">New folder name</span>
                     <input
                       type="text"
                       value={uploadFolderName}
                       onChange={(e) => setUploadFolderName(e.target.value)}
                       disabled={uploading}
                       placeholder="Folder name"
-                      className="w-full rounded-md border border-[#d1d1d6] bg-white px-2.5 py-2 text-xs font-semibold text-[#1d1d1f] placeholder:text-[#a1a1aa] focus:border-[#0071e3] focus:outline-none focus:ring-2 focus:ring-[#0071e3]/10 disabled:opacity-50"
+                      className="w-full rounded-md border border-white/10 bg-black px-2.5 py-2 text-xs font-semibold text-white placeholder:text-zinc-500 focus:border-[#7831d6] focus:outline-none focus:ring-1 focus:ring-[#7831d6] disabled:opacity-50"
                     />
                   </label>
                   {canManageGlobalMedia && (
-                    <label className="flex items-center justify-between gap-3 rounded-md border border-[#e5e5ea] bg-white px-3 py-2">
-                      <span className="text-[11px] font-semibold text-[#1d1d1f]">Global folder</span>
+                    <label className="flex items-center justify-between gap-3 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-2">
+                      <span className="text-[11px] font-semibold text-white">Global folder</span>
                       <input
                         type="checkbox"
                         checked={uploadFolderScope === 'global'}
                         onChange={(e) => setUploadFolderScope(e.target.checked ? 'global' : 'campaign')}
                         disabled={uploading}
-                        className="h-3.5 w-3.5 accent-[#0071e3]"
+                        className="h-3.5 w-3.5 accent-[#7831d6]"
                       />
                     </label>
                   )}
                 </div>
               ) : (
-                <div className="rounded-md border border-[#dbeafe] bg-[#eff6ff] px-3 py-2">
-                  <p className="m-0 text-[11px] font-bold text-[#1d4ed8]">Inside folder: upload here</p>
-                  <p className="m-0 mt-0.5 truncate text-xs font-semibold text-[#1d1d1f]" title={activeFolder?.name}>
+                <div className="rounded-md border border-[#7831d6]/30 bg-[#7831d6]/15 px-3 py-2">
+                  <p className="m-0 text-[11px] font-bold text-[#c4b5fd]">Inside folder: upload here</p>
+                  <p className="m-0 mt-0.5 truncate text-xs font-semibold text-white" title={activeFolder?.name}>
                     Current folder: {activeFolder?.name || 'Current folder'}
                   </p>
                   {activeFolderScope === 'global' && (
-                    <p className="m-0 mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#4f46e5]">Global</p>
+                    <p className="m-0 mt-0.5 text-[10px] font-bold uppercase tracking-wide text-[#c4b5fd]">Global</p>
                   )}
                 </div>
               )}
             </section>
 
-            <section className="rounded-lg border border-[#e5e5ea] bg-white p-3 shadow-sm">
-              <h3 className="m-0 text-xs font-bold text-black">Ready to upload</h3>
-              <p className="m-0 mt-1 text-[11px] font-medium leading-relaxed text-[#6e6e73]">
-                Assets and captions will be saved to <span className="font-bold text-[#1d1d1f]">{uploadTargetName}</span>.
+            <section className="rounded-lg border border-white/[0.08] bg-[#0a0a0a] p-3 shadow-sm">
+              <h3 className="m-0 text-xs font-bold text-white">Ready to upload</h3>
+              <p className="m-0 mt-1 text-[11px] font-medium leading-relaxed text-zinc-400">
+                Assets and captions will be saved to <span className="font-bold text-white">{uploadTargetName}</span>.
                 {uploadTargetScope === 'global' ? ' This folder is global.' : ''}
               </p>
               <div className="mt-3 grid grid-cols-4 gap-1.5">
                 {fileUploadDrafts.slice(0, 12).map((draft) => (
-                  <div key={draft.id} className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-[#f5f5f7]">
+                  <div key={draft.id} className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-black border border-white/10">
                     {draft.file.type.startsWith('video/') ? (
                       <video src={draft.previewUrl} muted playsInline className="h-full w-full object-cover" />
                     ) : draft.file.type.startsWith('audio/') ? (
-                      <Music className="h-4 w-4 text-[#8e8e93]" />
+                      <Music className="h-4 w-4 text-zinc-400" />
                     ) : (
                       <img src={draft.previewUrl} alt="" className="h-full w-full object-cover" />
                     )}
@@ -1967,7 +2008,7 @@ export const MediaLibrary = () => {
                 ))}
               </div>
               {fileUploadDrafts.length > 12 && (
-                <p className="m-0 mt-2 text-[10px] font-semibold text-[#8e8e93]">
+                <p className="m-0 mt-2 text-[10px] font-semibold text-zinc-500">
                   +{fileUploadDrafts.length - 12} more files
                 </p>
               )}
@@ -1983,23 +2024,23 @@ export const MediaLibrary = () => {
     const validSets = carouselDrafts.filter((set) => set.slides.length >= 2 && set.slides.length <= 10).length;
 
     return (
-      <div className="min-h-screen bg-[#f0f2f5] text-[#1d1d1f]">
+      <div className="min-h-screen bg-black text-white">
         {/* Sticky Header Bar */}
-        <div className="sticky top-0 z-10 bg-white border-b border-[#e5e7eb] px-6 py-3 shadow-sm">
+        <div className="sticky top-0 z-10 bg-[#0a0a0a] border-b border-white/[0.08] px-6 py-3 shadow-md">
           <div className="flex items-center justify-between gap-4">
             {/* Left: Back + Title + Stats */}
             <div className="flex items-center gap-4 min-w-0">
               <button
                 type="button"
                 onClick={clearCarouselDrafts}
-                className="flex items-center gap-1.5 rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-semibold text-[#374151] hover:bg-[#f9fafb] transition-colors flex-shrink-0 shadow-sm"
+                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10 transition-colors flex-shrink-0 shadow-sm"
               >
                 <ChevronRight className="h-3.5 w-3.5 rotate-180" />
                 Back
               </button>
               <div className="min-w-0">
-                <h2 className="m-0 text-xl font-bold tracking-tight text-[#111827] leading-tight">{carouselParentName || 'Carousel Sets'}</h2>
-                <p className="m-0 text-xs text-[#6b7280] mt-0.5">
+                <h2 className="m-0 text-xl font-bold tracking-tight text-white leading-tight">{carouselParentName || 'Carousel Sets'}</h2>
+                <p className="m-0 text-xs text-zinc-400 mt-0.5">
                   {carouselDrafts.length} sets &bull; {totalSlides} slides &bull; {validSets}/{carouselDrafts.length} ready
                 </p>
               </div>
@@ -2010,7 +2051,7 @@ export const MediaLibrary = () => {
                 type="button"
                 onClick={clearCarouselDrafts}
                 disabled={uploading}
-                className="rounded-lg border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-semibold text-[#374151] hover:bg-[#f9fafb] transition-colors disabled:opacity-50"
+                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-zinc-300 hover:bg-white/10 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -2018,7 +2059,7 @@ export const MediaLibrary = () => {
                 type="button"
                 onClick={handleSaveCarouselSets}
                 disabled={uploading}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#4f46e5] px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#4338ca] transition-colors disabled:bg-[#a5b4fc] disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#7831d6] px-5 py-2 text-sm font-semibold text-white shadow-md shadow-[#7831d6]/25 hover:bg-[#6825bc] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {uploading ? (
                   <div className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
@@ -2033,12 +2074,12 @@ export const MediaLibrary = () => {
 
         {/* Upload progress panel — per-set breakdown */}
         {uploading && (
-          <div className="mx-6 mt-4 rounded-xl border border-[#c7d2fe] bg-[#eef2ff] overflow-hidden">
+          <div className="mx-6 mt-4 rounded-xl border border-[#7831d6]/30 bg-[#7831d6]/10 overflow-hidden">
             {/* Header row */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-[#c7d2fe]/60">
-              <div className="h-4 w-4 rounded-full border-2 border-[#4f46e5] border-t-transparent animate-spin flex-shrink-0" />
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-[#7831d6]/20">
+              <div className="h-4 w-4 rounded-full border-2 border-[#7831d6] border-t-transparent animate-spin flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="m-0 text-xs font-semibold text-[#3730a3]">
+                <p className="m-0 text-xs font-semibold text-[#c4b5fd]">
                   {(() => {
                     const done = Object.values(setProgress).filter(s => s === 'done').length;
                     const total = carouselDrafts.length;
@@ -2050,12 +2091,12 @@ export const MediaLibrary = () => {
                   })()}
                 </p>
                 {uploadProgress?.currentFile && (
-                  <p className="m-0 mt-0.5 truncate text-[11px] text-[#6366f1]">{uploadProgress.currentFile}</p>
+                  <p className="m-0 mt-0.5 truncate text-[11px] text-zinc-400">{uploadProgress.currentFile}</p>
                 )}
               </div>
               {/* Overall progress fraction */}
               {uploadProgress?.total > 0 && (
-                <span className="flex-shrink-0 text-[11px] font-bold text-[#4f46e5]">
+                <span className="flex-shrink-0 text-[11px] font-bold text-[#c4b5fd]">
                   {uploadProgress.completed}/{uploadProgress.total}
                 </span>
               )}
@@ -2063,9 +2104,9 @@ export const MediaLibrary = () => {
 
             {/* Overall file progress bar */}
             {uploadProgress?.total > 0 && (
-              <div className="h-1 w-full bg-[#c7d2fe]/40">
+              <div className="h-1 w-full bg-[#7831d6]/20">
                 <div
-                  className="h-full bg-[#4f46e5] transition-all duration-300"
+                  className="h-full bg-[#7831d6] transition-all duration-300"
                   style={{ width: `${Math.round(((uploadProgress.completed || 0) / uploadProgress.total) * 100)}%` }}
                 />
               </div>
@@ -2081,36 +2122,36 @@ export const MediaLibrary = () => {
                       {/* Status icon */}
                       <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
                         {status === 'done' && (
-                          <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                           </svg>
                         )}
                         {status === 'uploading' && (
-                          <div className="w-3.5 h-3.5 rounded-full border-2 border-[#4f46e5] border-t-transparent animate-spin" />
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-[#7831d6] border-t-transparent animate-spin" />
                         )}
                         {status === 'error' && (
-                          <svg className="w-4 h-4 text-[#dc2626]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         )}
                         {status === 'pending' && (
-                          <div className="w-3 h-3 rounded-full border-2 border-[#c7d2fe]" />
+                          <div className="w-3 h-3 rounded-full border-2 border-white/20" />
                         )}
                       </span>
                       <span className={`text-[11px] font-semibold truncate flex-1 ${
-                        status === 'done' ? 'text-[#15803d]'
-                        : status === 'error' ? 'text-[#dc2626]'
-                        : status === 'uploading' ? 'text-[#3730a3]'
-                        : 'text-[#9ca3af]'
+                        status === 'done' ? 'text-emerald-400'
+                        : status === 'error' ? 'text-rose-400'
+                        : status === 'uploading' ? 'text-[#c4b5fd]'
+                        : 'text-zinc-400'
                       }`}>
                         {set.name}
                         <span className="ml-1.5 font-normal opacity-70">· {set.slides.length} slides</span>
                       </span>
                       <span className={`flex-shrink-0 text-[10px] font-bold uppercase tracking-wide ${
-                        status === 'done' ? 'text-[#16a34a]'
-                        : status === 'error' ? 'text-[#dc2626]'
-                        : status === 'uploading' ? 'text-[#4f46e5]'
-                        : 'text-[#d1d5db]'
+                        status === 'done' ? 'text-emerald-400'
+                        : status === 'error' ? 'text-rose-400'
+                        : status === 'uploading' ? 'text-[#c4b5fd]'
+                        : 'text-zinc-500'
                       }`}>
                         {status === 'done' ? 'Done' : status === 'error' ? 'Failed' : status === 'uploading' ? 'Uploading' : 'Waiting'}
                       </span>
@@ -2129,22 +2170,22 @@ export const MediaLibrary = () => {
             const hasSlideWarning = set.slides.length < 2 || set.slides.length > 10;
 
             return (
-              <section key={set.id} className="rounded-xl bg-white border border-[#e5e7eb] shadow-sm overflow-hidden">
+              <section key={set.id} className="rounded-xl bg-[#0a0a0a] border border-white/[0.08] shadow-sm overflow-hidden">
                 {/* Top header: number + name + badges — compact single row */}
-                <div className="flex items-center gap-2.5 px-4 py-1.5 border-b border-[#f3f4f6]">
-                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-[#f3f4f6] text-xs font-bold text-[#374151]">
+                <div className="flex items-center gap-2.5 px-4 py-1.5 border-b border-white/[0.08] bg-black">
+                  <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-white/10 text-xs font-bold text-white">
                     {setIndex + 1}
                   </span>
-                  <h3 className="m-0 flex-1 min-w-0 truncate text-sm font-semibold text-[#111827]">{set.name}</h3>
+                  <h3 className="m-0 flex-1 min-w-0 truncate text-sm font-semibold text-white">{set.name}</h3>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className="rounded-full bg-[#dbeafe] px-2 py-0.5 text-[11px] font-semibold text-[#1d4ed8]">
+                    <span className="rounded-full bg-[#7831d6]/20 px-2 py-0.5 text-[11px] font-semibold text-[#c4b5fd]">
                       {set.slides.length} slides
                     </span>
                     {hasCaption && (
-                      <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-[11px] font-semibold text-[#15803d]">Caption ✓</span>
+                      <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">Caption ✓</span>
                     )}
                     {hasSlideWarning && (
-                      <span className="rounded-full bg-[#fef3c7] px-2 py-0.5 text-[11px] font-semibold text-[#b45309]">2–10 needed</span>
+                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[11px] font-semibold text-amber-300">2–10 needed</span>
                     )}
                   </div>
                 </div>
@@ -2164,7 +2205,7 @@ export const MediaLibrary = () => {
                             onDragOver={(event) => handleSlideDragOver(event, set.id, index)}
                             onDrop={handleSlideDrop}
                             onDragEnd={() => setDraggingSlide(null)}
-                            className={`group relative flex-shrink-0 rounded-lg overflow-hidden ${isDragging ? 'opacity-50' : ''} ${uploading ? '' : 'cursor-grab active:cursor-grabbing'}`}
+                            className={`group relative flex-shrink-0 rounded-lg overflow-hidden border border-white/10 ${isDragging ? 'opacity-50' : ''} ${uploading ? '' : 'cursor-grab active:cursor-grabbing'}`}
                             style={{ width: '96px' }}
                             title={slide.name}
                           >
@@ -2173,7 +2214,7 @@ export const MediaLibrary = () => {
                             ) : (
                               <img src={slide.previewUrl} className="w-full h-auto block" alt="" />
                             )}
-                            <span className="absolute left-1 top-1 rounded bg-white/90 px-1 py-0.5 text-[9px] font-bold text-[#374151] shadow-sm">
+                            <span className="absolute left-1 top-1 rounded bg-black/80 border border-white/10 px-1 py-0.5 text-[9px] font-bold text-white shadow-sm">
                               {index + 1}
                             </span>
 
@@ -2184,21 +2225,21 @@ export const MediaLibrary = () => {
                   </div>
 
                   {/* Caption */}
-                  <div className="flex-shrink-0 w-[380px] p-2 border-l border-[#f3f4f6] flex flex-col gap-1">
-                    <p className="m-0 text-[11px] font-semibold text-[#374151]">Caption</p>
+                  <div className="flex-shrink-0 w-[380px] p-2 border-l border-white/[0.08] flex flex-col gap-1">
+                    <p className="m-0 text-[11px] font-semibold text-zinc-300">Caption</p>
                     <textarea
                       value={set.caption}
                       onChange={(e) => updateCarouselCaption(set.id, e.target.value)}
                       disabled={uploading}
                       placeholder="Caption..."
-                      className="flex-1 w-full resize-none rounded-lg border border-[#e5e7eb] bg-[#f9fafb] p-2.5 text-xs leading-relaxed text-[#111827] placeholder:text-[#9ca3af] focus:border-[#6366f1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4f46e5]/10 transition-all disabled:opacity-50"
+                      className="flex-1 w-full resize-none rounded-lg border border-white/10 bg-black p-2.5 text-xs leading-relaxed text-white placeholder:text-zinc-500 focus:border-[#7831d6] focus:outline-none focus:ring-1 focus:ring-[#7831d6] transition-all disabled:opacity-50"
                     />
                     {carouselDrafts.length > 1 && set.caption.trim() && (
                       <button
                         type="button"
                         onClick={() => applyToAll(set.caption)}
                         disabled={uploading}
-                        className="self-end text-[11px] font-semibold text-[#4f46e5] hover:text-[#4338ca] disabled:opacity-40 transition-colors"
+                        className="self-end text-[11px] font-semibold text-[#c4b5fd] hover:text-white disabled:opacity-40 transition-colors"
                       >
                         Apply to all sets ↓
                       </button>
@@ -2214,7 +2255,7 @@ export const MediaLibrary = () => {
   }
 
   return (
-    <div className="p-4 space-y-3 bg-[#f5f5f7] min-h-screen text-[#1d1d1f]">
+    <div className="p-4 space-y-3 bg-[#0a0a0a] min-h-screen text-white">
       <input
         ref={folderCoverInputRef}
         type="file"
@@ -2223,33 +2264,33 @@ export const MediaLibrary = () => {
         onChange={handleFolderCoverSelect}
       />
 
-      <header className="flex flex-col gap-4 border-b border-[#dedee3] pb-4 lg:flex-row lg:items-center lg:justify-between">
+      <header className="flex flex-col gap-4 border-b border-white/[0.08] pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h1 className="m-0 text-[22px] font-bold tracking-[-0.02em] text-[#1d1d1f]">
+          <h1 className="m-0 text-[22px] font-bold tracking-[-0.02em] text-white">
             Media Library
           </h1>
           <nav
-            className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-x-auto text-xs font-medium text-[#7b7b80]"
+            className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-x-auto text-xs font-medium text-zinc-400"
             aria-label="Media folder breadcrumb"
           >
             <button
               type="button"
               onClick={() => { setActiveFolderId('root'); setSearchQuery(''); }}
-              className={`flex-shrink-0 rounded px-1 py-0.5 transition-colors hover:text-[#1d1d1f] ${
-                activeFolderId === 'root' ? 'font-semibold text-[#1d1d1f]' : ''
+              className={`flex-shrink-0 rounded px-1 py-0.5 transition-colors hover:text-white ${
+                activeFolderId === 'root' ? 'font-semibold text-white' : ''
               }`}
             >
               All media
             </button>
             {breadcrumbFolders.map((folder) => (
               <React.Fragment key={folder._id}>
-                <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-[#b4b4b9]" />
+                <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-zinc-600" />
                 <button
                   type="button"
                   onClick={() => setActiveFolderId(folder._id)}
                   title={folder.name}
-                  className={`max-w-[180px] flex-shrink-0 truncate rounded px-1 py-0.5 transition-colors hover:text-[#1d1d1f] ${
-                    folder._id === activeFolderId ? 'font-semibold text-[#1d1d1f]' : ''
+                  className={`max-w-[180px] flex-shrink-0 truncate rounded px-1 py-0.5 transition-colors hover:text-white ${
+                    folder._id === activeFolderId ? 'font-semibold text-white' : ''
                   }`}
                 >
                   {folder.name || 'Folder'}
@@ -2261,13 +2302,13 @@ export const MediaLibrary = () => {
 
         <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-shrink-0">
           <label className="relative min-w-[220px] flex-1 lg:w-64 lg:flex-none">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e8e93]" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
             <input
               type="text"
               placeholder="Search files and folders"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-full rounded-lg border border-white/10 bg-[#0a0a0a] pl-9 pr-3 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 placeholder:text-zinc-500"
+              className="h-9 w-full rounded-lg border border-white/[0.08] bg-[#0a0a0a] pl-9 pr-3 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 placeholder:text-zinc-500"
             />
           </label>
           {canManageFolders && canManageActiveLocation && (
@@ -2323,7 +2364,7 @@ export const MediaLibrary = () => {
             const isSettingThisFolderCover = settingFolderCoverId === folder._id;
             const isFolderBusy = isDeletingThisFolder || isSettingThisFolderCover;
             const canManageThisFolder = normalizeScope(folder.scope) !== 'global' || canManageGlobalMedia;
-            const itemCount = Number(folder.itemCount ?? (folder.carouselOrder || []).length);
+            const stats = getFolderStats(folder, folders);
             return (
             <div
               key={folder._id}
@@ -2331,13 +2372,13 @@ export const MediaLibrary = () => {
                 if (isFolderBusy) return;
                 setActiveFolderId(folder._id);
               }}
-              className={`relative flex min-w-0 items-center gap-4 rounded-xl px-2 py-2.5 group transition-colors ${
+              className={`relative flex min-w-0 items-center gap-4 rounded-xl px-2 py-2.5 group transition-colors border border-transparent ${
                 isFolderBusy
                   ? 'cursor-wait opacity-70'
-                  : 'cursor-pointer hover:bg-white/[0.06]'
+                  : 'cursor-pointer hover:bg-white/[0.04] hover:border-white/[0.08]'
               }`}
             >
-              <MediaFolderPreview folder={folder} />
+              <MediaFolderPreview folder={folder} allFolders={folders} />
 
               <div className="flex-1 min-w-0 overflow-hidden">
                 <span
@@ -2347,7 +2388,7 @@ export const MediaLibrary = () => {
                   {folder.name}
                 </span>
                 <span className="mt-1 block text-xs font-medium text-zinc-400">
-                  {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                  {stats.label}
                 </span>
                 <div className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-hidden">
                   {folder.kind === 'carousel_set' && (
@@ -2392,14 +2433,14 @@ export const MediaLibrary = () => {
 	                      setOpenFolderMenuId((current) => (current === folder._id ? null : folder._id));
 	                    }}
 	                    disabled={isFolderBusy}
-	                    className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[#f5f5f7] text-gray-400 hover:text-black transition-all disabled:cursor-wait disabled:opacity-40"
+	                    className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 text-zinc-400 hover:text-white transition-all disabled:cursor-wait disabled:opacity-40"
 	                    title="Folder actions"
 	                    aria-label="Folder actions"
 	                  >
-                    <MoreVertical className="w-3 h-3" />
+                    <MoreVertical className="w-3.5 h-3.5" />
                   </button>
                   {openFolderMenuId === folder._id && (
-                    <div className="absolute right-0 top-6 z-20 w-36 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
+                    <div className="absolute right-0 top-6 z-20 w-36 overflow-hidden rounded-lg border border-white/[0.08] bg-[#0a0a0a] py-1 shadow-2xl text-white">
                       <button
                         type="button"
 	                        onClick={(e) => {
@@ -2409,9 +2450,9 @@ export const MediaLibrary = () => {
 	                          navigate('/scheduler/new', { state: { preselectedFolderId: folder._id } });
 	                        }}
 	                        disabled={isDeletingThisFolder}
-	                        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
+	                        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
 	                      >
-                        <Clock className="h-3 w-3" />
+                        <Clock className="h-3 w-3 text-[#c4b5fd]" />
                         <span>Schedule</span>
                       </button>
                       {canManageFolders && canManageThisFolder && (
@@ -2420,27 +2461,27 @@ export const MediaLibrary = () => {
 	                            type="button"
 	                            onClick={(e) => openRenameFolderModal(folder, e)}
 	                            disabled={isDeletingThisFolder}
-	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
 	                          >
-                            <Pencil className="h-3 w-3" />
+                            <Pencil className="h-3 w-3 text-[#c4b5fd]" />
                             <span>Rename</span>
                           </button>
 	                          <button
 	                            type="button"
 	                            onClick={(e) => openFolderTagsModal(folder, e)}
 	                            disabled={isDeletingThisFolder}
-	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
 	                          >
-                            <Tags className="h-3 w-3" />
+                            <Tags className="h-3 w-3 text-[#c4b5fd]" />
                             <span>Add tags</span>
                           </button>
 	                          <button
 	                            type="button"
 	                            onClick={(e) => openFolderCoverPicker(folder, e)}
 	                            disabled={isFolderBusy}
-	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
 	                          >
-                            <Images className="h-3 w-3" />
+                            <Images className="h-3 w-3 text-[#c4b5fd]" />
                             <span>{folder.coverMediaId ? 'Change cover' : 'Set cover image'}</span>
                           </button>
                           {folder.coverMediaId && (
@@ -2448,7 +2489,7 @@ export const MediaLibrary = () => {
 	                            type="button"
 	                            onClick={(e) => handleRemoveFolderCover(folder, e)}
 	                            disabled={isFolderBusy}
-	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#6e6e73] hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-50"
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-zinc-400 hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
 	                          >
                               <X className="h-3 w-3" />
                               <span>Remove cover</span>
@@ -2459,7 +2500,7 @@ export const MediaLibrary = () => {
 	                            type="button"
 	                            onClick={(e) => handleChangeFolderScope(folder, 'global', e)}
 	                            disabled={isDeletingThisFolder || savingFolderId === folder._id}
-	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#4f46e5] hover:bg-[#eef2ff] disabled:cursor-wait disabled:opacity-50"
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#c4b5fd] hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
 	                          >
                               <Folder className="h-3 w-3" />
                               <span>{savingFolderId === folder._id ? 'Saving...' : 'Make global'}</span>
@@ -2470,10 +2511,10 @@ export const MediaLibrary = () => {
 	                            type="button"
 	                            onClick={(e) => handleChangeFolderScope(folder, 'campaign', e)}
 	                            disabled={isDeletingThisFolder || savingFolderId === folder._id}
-	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#1d4ed8] hover:bg-[#eff6ff] disabled:cursor-wait disabled:opacity-50"
+	                            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-zinc-300 hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
 	                          >
                               <Folder className="h-3 w-3" />
-                              <span>{savingFolderId === folder._id ? 'Saving...' : 'Make campaign only'}</span>
+                              <span>Make campaign-only</span>
                             </button>
                           )}
                         </>
@@ -2483,7 +2524,7 @@ export const MediaLibrary = () => {
 	                          type="button"
 	                          onClick={(e) => openDeleteFolderModal(folder, e)}
 	                          disabled={isDeletingThisFolder}
-	                          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50 disabled:cursor-wait disabled:opacity-50"
+	                          className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] font-semibold text-rose-400 hover:bg-rose-500/20 disabled:cursor-wait disabled:opacity-50"
 	                        >
                           <Trash2 className="h-3 w-3" />
                           <span>Delete</span>
@@ -2494,17 +2535,17 @@ export const MediaLibrary = () => {
 	                </div>
 	              )}
               {isDeletingThisFolder && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/75 backdrop-blur-[1px]">
-                  <div className="inline-flex items-center gap-2 rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-2.5 py-1.5 text-[11px] font-bold text-[#1d4ed8] shadow-sm">
-                    <span className="h-3 w-3 rounded-full border-2 border-[#0071e3] border-t-transparent animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/75 backdrop-blur-[1px]">
+                  <div className="inline-flex items-center gap-2 rounded-md border border-rose-500/30 bg-rose-500/15 px-2.5 py-1.5 text-[11px] font-bold text-rose-400 shadow-sm">
+                    <span className="h-3 w-3 rounded-full border-2 border-rose-400 border-t-transparent animate-spin" />
                     <span>Deleting...</span>
                   </div>
                 </div>
               )}
 	              {isSettingThisFolderCover && (
-	                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/75 backdrop-blur-[1px]">
-	                  <div className="inline-flex items-center gap-2 rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-2.5 py-1.5 text-[11px] font-bold text-[#1d4ed8] shadow-sm">
-	                    <span className="h-3 w-3 rounded-full border-2 border-[#0071e3] border-t-transparent animate-spin" />
+	                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/75 backdrop-blur-[1px]">
+	                  <div className="inline-flex items-center gap-2 rounded-md border border-[#7831d6]/30 bg-[#7831d6]/20 px-2.5 py-1.5 text-[11px] font-bold text-[#c4b5fd] shadow-sm">
+	                    <span className="h-3 w-3 rounded-full border-2 border-[#7831d6] border-t-transparent animate-spin" />
 	                    <span>Updating cover...</span>
 	                  </div>
 	                </div>
@@ -2513,12 +2554,12 @@ export const MediaLibrary = () => {
             );
           })}
           {loadingFolders && (
-            <div className="col-span-full border border-dashed border-[#e5e5ea] py-3 rounded-lg text-center text-[#8e8e93] text-[11px]">
+            <div className="col-span-full border border-dashed border-white/[0.08] py-3 rounded-lg text-center text-zinc-500 text-[11px]">
               Loading folders...
             </div>
           )}
           {!loadingFolders && activeFolderId === 'root' && folders.length === 0 && (
-            <div className="col-span-full border border-dashed border-[#e5e5ea] py-3 rounded-lg text-center text-[#8e8e93] text-[11px]">
+            <div className="col-span-full border border-dashed border-white/[0.08] py-3 rounded-lg text-center text-zinc-500 text-[11px]">
               No campaigns created.
             </div>
           )}
@@ -2528,14 +2569,14 @@ export const MediaLibrary = () => {
       {/* Media Files Grid */}
       <div className="space-y-3">
           {canSchedule && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-[#0a0a0a] px-3 py-2 shadow-sm text-white">
               <div className="min-w-0">
-                <p className="m-0 text-[11px] font-bold text-[#1d1d1f]">
+                <p className="m-0 text-[11px] font-bold text-white">
                   {selectedMediaIds.length > 0
                     ? `${selectedMediaIds.length} ${selectedMediaType || 'media'} file${selectedMediaIds.length === 1 ? '' : 's'} selected`
                     : 'Select media files'}
                 </p>
-                <p className="m-0 mt-0.5 text-[10px] font-medium text-[#6e6e73]">
+                <p className="m-0 mt-0.5 text-[10px] font-medium text-zinc-400">
                   {selectedMediaIds.length > 0
                     ? 'Only one media type can be selected per schedule batch.'
                     : 'Use checkboxes to schedule files directly.'}
@@ -2546,7 +2587,7 @@ export const MediaLibrary = () => {
                   type="button"
                   onClick={handleSelectAllVisibleMedia}
                   disabled={filteredMedia.length === 0}
-                  className="rounded-md border border-[#d1d1d6] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {allSelectableVisibleSelected ? 'Deselect visible' : 'Select visible'}
                 </button>
@@ -2554,7 +2595,7 @@ export const MediaLibrary = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedMediaIds([])}
-                    className="rounded-md border border-[#d1d1d6] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#6e6e73] hover:bg-[#f5f5f7]"
+                    className="rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-zinc-400 hover:text-white hover:bg-white/10"
                   >
                     Clear
                   </button>
@@ -2563,7 +2604,7 @@ export const MediaLibrary = () => {
                   type="button"
                   onClick={handleScheduleSelectedMedia}
                   disabled={selectedMediaIds.length === 0}
-                  className="inline-flex items-center gap-1 rounded-md bg-[#0071e3] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#147ce5] disabled:cursor-not-allowed disabled:bg-[#c7c7cc]"
+                  className="inline-flex items-center gap-1 rounded-md bg-[#7831d6] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Clock className="h-3 w-3" />
                   <span>Schedule selected</span>
@@ -2573,7 +2614,7 @@ export const MediaLibrary = () => {
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {loadingMedia && (
-              <div className="col-span-full border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm">
+              <div className="col-span-full border border-dashed border-white/[0.08] p-12 rounded-xl text-center text-zinc-500 text-xs bg-[#0a0a0a] shadow-sm">
                 Loading media assets...
               </div>
             )}
@@ -2585,25 +2626,25 @@ export const MediaLibrary = () => {
               return (
               <div
                 key={item._id}
-                className={`bg-white border rounded-xl overflow-visible group transition-all flex flex-col relative shadow-sm ${
+                className={`bg-[#0a0a0a] border rounded-xl overflow-visible group transition-all flex flex-col relative shadow-sm ${
                   isSelected
-                    ? 'border-[#0071e3] ring-2 ring-[#0071e3]/20'
+                    ? 'border-[#7831d6] ring-2 ring-[#7831d6]/30'
                     : selectionLocked
-                      ? 'border-[#e5e5ea] opacity-60'
-                      : 'border-[#e5e5ea] hover:border-gray-400'
+                      ? 'border-white/[0.08] opacity-60'
+                      : 'border-white/[0.08] hover:border-white/20'
                 }`}
               >
                 {(() => {
                   return (
                     <>
                       {/* Media Preview Box */}
-                      <div className={`${item.type === 'audio' ? 'aspect-square' : 'aspect-[9/16]'} bg-[#f5f5f7] relative overflow-hidden rounded-xl flex items-center justify-center`}>
+                      <div className={`${item.type === 'audio' ? 'aspect-square' : 'aspect-[9/16]'} bg-black relative overflow-hidden rounded-xl flex items-center justify-center`}>
                         {canSchedule && (
                           <label
-                            className={`absolute left-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg border bg-white/95 shadow-sm ${
+                            className={`absolute left-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg border bg-black/80 shadow-sm ${
                               selectionLocked
-                                ? 'cursor-not-allowed border-[#d1d1d6] text-[#8e8e93]'
-                                : 'cursor-pointer border-[#d1d1d6] text-[#1d1d1f] hover:border-[#0071e3]'
+                                ? 'cursor-not-allowed border-white/10 text-zinc-600'
+                                : 'cursor-pointer border-white/10 text-white hover:border-[#7831d6]'
                             }`}
                             title={selectionLocked ? `Clear ${selectedMediaType} selection before selecting ${item.type}` : (isSelected ? 'Deselect media' : 'Select media')}
                             onClick={(e) => e.stopPropagation()}
@@ -2613,7 +2654,7 @@ export const MediaLibrary = () => {
                               checked={isSelected}
                               disabled={selectionLocked}
                               onChange={() => toggleMediaSelection(item)}
-                              className="h-3.5 w-3.5 accent-[#0071e3]"
+                              className="h-3.5 w-3.5 accent-[#7831d6]"
                               aria-label={isSelected ? 'Deselect media' : 'Select media'}
                             />
                           </label>
@@ -2662,7 +2703,7 @@ export const MediaLibrary = () => {
                             }}
                           >
                             <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-                              <p className="text-xs font-semibold text-[#1d1d1f] truncate leading-tight m-0">
+                              <p className="text-xs font-semibold text-white truncate leading-tight m-0">
                                 {item.name || 'Audio'}
                               </p>
                               {/* Waveform with progress */}
@@ -2671,7 +2712,7 @@ export const MediaLibrary = () => {
                                 {[3,7,5,12,8,18,10,22,15,28,20,32,25,35,30,38,33,40,36,38,33,35,30,28,25,32,38,35,30,28,22,18,25,32,28,22,15,20,12,10,7,12,8,5,3,7,10,5,3,4].map((h, i) => (
                                   <div
                                     key={i}
-                                    className="flex-1 rounded-full bg-[#d1d5db]"
+                                    className="flex-1 rounded-full bg-zinc-800"
                                     style={{ height: `${(h / 40) * 100}%`, minWidth: '2px' }}
                                   />
                                 ))}
@@ -2684,13 +2725,13 @@ export const MediaLibrary = () => {
                                   {[3,7,5,12,8,18,10,22,15,28,20,32,25,35,30,38,33,40,36,38,33,35,30,28,25,32,38,35,30,28,22,18,25,32,28,22,15,20,12,10,7,12,8,5,3,7,10,5,3,4].map((h, i) => (
                                     <div
                                       key={i}
-                                      className="flex-1 rounded-full bg-[#0071e3]"
+                                      className="flex-1 rounded-full bg-[#7831d6]"
                                       style={{ height: `${(h / 40) * 100}%`, minWidth: '2px' }}
                                     />
                                   ))}
                                 </div>
                               </div>
-                              <p className="text-[11px] text-[#8e8e93] m-0 leading-none" data-audio-duration={item._id}></p>
+                              <p className="text-[11px] text-zinc-500 m-0 leading-none" data-audio-duration={item._id}></p>
                             </div>
                             <audio
                               src={getAssetUrl(item.url)}
@@ -2710,19 +2751,19 @@ export const MediaLibrary = () => {
                         ) : (
                           <img src={getAssetUrl(item.url)} crossOrigin="anonymous" className="h-full w-full object-cover object-[center_40%]" alt="" />
                         )}
-                        <div className={`${canSchedule ? 'left-10' : 'left-2'} absolute top-2 bg-white/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-black border border-[#e5e5ea] shadow-sm`}>
+                        <div className={`${canSchedule ? 'left-10' : 'left-2'} absolute top-2 bg-[#0a0a0a]/90 px-2 py-0.5 rounded text-[8px] uppercase font-bold text-white border border-white/[0.08] shadow-sm`}>
                           {item.type}
                         </div>
                         {normalizeScope(item.scope) === 'global' && (
-                          <div className="absolute right-10 top-2 rounded bg-[#eef2ff] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#4f46e5] shadow-sm">
+                          <div className="absolute right-10 top-2 rounded bg-[#7831d6]/20 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#c4b5fd] shadow-sm">
                             Global
                           </div>
                         )}
                         <div
                           className={`absolute left-2 ${canSchedule ? 'top-11' : 'top-9'} inline-flex h-7 w-7 items-center justify-center rounded-lg border shadow-sm ${
                             item.caption?.trim()
-                              ? 'border-[#34c759]/20 bg-white/95 text-[#15803d]'
-                              : 'border-[#ff9500]/20 bg-white/95 text-[#b45309]'
+                              ? 'border-emerald-500/30 bg-[#0a0a0a]/95 text-emerald-400'
+                              : 'border-amber-500/30 bg-[#0a0a0a]/95 text-amber-300'
                           }`}
                           title={item.caption?.trim() ? 'Caption saved' : 'No caption saved'}
                         >
@@ -2732,7 +2773,7 @@ export const MediaLibrary = () => {
                             <MessageSquareWarning className="h-3.5 w-3.5" />
                           )}
                         </div>
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">
                           <p className="m-0 truncate" title={item.name}>{item.name || 'Untitled media'}</p>
                         </div>
                         {(item.tags || []).length > 0 && (
@@ -2740,14 +2781,14 @@ export const MediaLibrary = () => {
                             {(item.tags || []).slice(0, 2).map((tag) => (
                               <span
                                 key={tag}
-                                className="max-w-[82px] truncate rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-bold text-[#1d1d1f] shadow-sm"
+                                className="max-w-[82px] truncate rounded bg-black/80 border border-white/10 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm"
                                 title={tag}
                               >
                                 {tag}
                               </span>
                             ))}
                             {(item.tags || []).length > 2 && (
-                              <span className="rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm">
+                              <span className="rounded bg-black/80 border border-white/10 px-1.5 py-0.5 text-[9px] font-bold text-zinc-400 shadow-sm">
                                 +{item.tags.length - 2}
                               </span>
                             )}
@@ -2763,7 +2804,7 @@ export const MediaLibrary = () => {
                             e.stopPropagation();
                             setOpenMediaMenuId((current) => (current === item._id ? null : item._id));
                           }}
-                          className="p-1.5 bg-white/95 hover:bg-white hover:text-black rounded-lg transition-all text-gray-500 border border-[#e5e5ea] shadow-sm"
+                          className="p-1.5 bg-[#0a0a0a]/90 hover:bg-[#1f1f23] hover:text-white rounded-lg transition-all text-zinc-400 border border-white/[0.08] shadow-sm"
                           title="Media actions"
                           aria-label="Media actions"
                         >
@@ -2780,35 +2821,16 @@ export const MediaLibrary = () => {
                               }}
                               className="fixed inset-0 z-10 cursor-default bg-transparent"
                             />
-                            <div className="absolute right-0 top-8 z-20 w-40 overflow-hidden rounded-lg border border-[#e5e5ea] bg-white py-1 shadow-lg">
+                            <div className="absolute right-0 top-8 z-20 w-40 overflow-hidden rounded-lg border border-white/[0.08] bg-[#0a0a0a] py-1 shadow-2xl text-white">
                               <button
                                 type="button"
                                 onClick={(e) => openRenameMediaModal(item, e)}
                                 disabled={!canManageThisMedia}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10"
                               >
-                                <Pencil className="h-3.5 w-3.5" />
+                                <Pencil className="h-3.5 w-3.5 text-[#c4b5fd]" />
                                 <span>Rename</span>
                               </button>
-                              <button
-                                type="button"
-                                onClick={(e) => openCaptionDialog(item, e)}
-                                disabled={!canManageThisMedia}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
-                              >
-                                <MessageSquareCheck className="h-3.5 w-3.5" />
-                                <span>Edit caption</span>
-                              </button>
-                              {canUpload && canManageThisMedia && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => openMediaTagsModal(item, e)}
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
-                                >
-                                  <Tags className="h-3.5 w-3.5" />
-                                  <span>Add tags</span>
-                                </button>
-                              )}
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -2816,16 +2838,16 @@ export const MediaLibrary = () => {
                                   setOpenMediaMenuId(null);
                                   navigate('/scheduler/new', { state: { preselectedMediaId: item._id } });
                                 }}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10"
                               >
-                                <Clock className="h-3.5 w-3.5" />
+                                <Clock className="h-3.5 w-3.5 text-[#c4b5fd]" />
                                 <span>Schedule</span>
                               </button>
                               {canDelete && canManageThisMedia && (
                                 <button
                                   type="button"
                                   onClick={(e) => handleDeleteMedia(item._id, e)}
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50"
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-rose-400 hover:bg-rose-500/20"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                   <span>Delete</span>
@@ -2843,7 +2865,7 @@ export const MediaLibrary = () => {
             })}
 
             {!loadingMedia && filteredMedia.length === 0 && (
-              <div className="col-span-full border border-dashed border-[#e5e5ea] p-12 rounded-xl text-center text-gray-500 text-xs bg-white shadow-sm">
+              <div className="col-span-full border border-dashed border-white/[0.08] p-12 rounded-xl text-center text-zinc-500 text-xs bg-[#0a0a0a] shadow-sm">
                 No media assets found.
               </div>
             )}
@@ -2855,26 +2877,26 @@ export const MediaLibrary = () => {
                 type="button"
                 onClick={() => void fetchMedia(page + 1)}
                 disabled={loadingMore}
-                className="flex items-center gap-2 bg-white border border-[#e5e5ea] hover:bg-[#f5f5f7] text-[#1d1d1f] hover:text-black px-6 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 bg-[#7831d6] hover:bg-[#6825bc] text-white px-6 py-2 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-[#7831d6]/25 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loadingMore ? (
                   <>
-                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Loading more...</span>
                   </>
                 ) : (
-                  <span>Load More</span>
+                  <span>Load more media</span>
                 )}
               </button>
             </div>
           )}
-        </div>
+      </div>
 
       {/* New Folder Modal */}
       {showNewFolderModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-sm text-black shadow-xl">
-            <h3 className="text-sm font-semibold text-black mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+          <div className="bg-[#0a0a0a] border border-white/[0.08] p-6 rounded-2xl w-full max-w-sm text-white shadow-2xl">
+            <h3 className="text-sm font-bold text-white mb-4">
               {activeFolderId === 'root' ? 'New Campaign Folder' : 'New Nested Folder'}
             </h3>
             <form onSubmit={handleCreateFolder} className="space-y-4">
@@ -2883,22 +2905,22 @@ export const MediaLibrary = () => {
                 placeholder="Campaign folder name"
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
-                className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black"
+                className="w-full bg-black border border-white/10 px-3.5 py-2 rounded-lg focus:outline-none focus:border-[#7831d6] focus:ring-1 focus:ring-[#7831d6] text-xs text-white placeholder:text-zinc-500"
                 autoFocus
               />
               {activeFolderId === 'root' && canManageGlobalMedia && (
-                <label className="flex items-center justify-between gap-3 rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] px-3.5 py-2">
-                  <span className="text-xs font-semibold text-[#1d1d1f]">Global folder</span>
+                <label className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3.5 py-2">
+                  <span className="text-xs font-semibold text-white">Global folder</span>
                   <input
                     type="checkbox"
                     checked={newFolderScope === 'global'}
                     onChange={(e) => setNewFolderScope(e.target.checked ? 'global' : 'campaign')}
-                    className="h-3.5 w-3.5 accent-[#0071e3]"
+                    className="h-3.5 w-3.5 accent-[#7831d6]"
                   />
                 </label>
               )}
               {activeFolderId !== 'root' && activeFolderScope === 'global' && (
-                <div className="rounded-lg border border-[#c7d2fe] bg-[#eef2ff] px-3.5 py-2 text-[11px] font-semibold text-[#4338ca]">
+                <div className="rounded-lg border border-[#7831d6]/30 bg-[#7831d6]/20 px-3.5 py-2 text-[11px] font-semibold text-[#c4b5fd]">
                   This nested folder will be global.
                 </div>
               )}
@@ -2906,13 +2928,13 @@ export const MediaLibrary = () => {
                 <button
                   type="button"
                   onClick={() => { setShowNewFolderModal(false); setNewFolderName(''); setNewFolderScope('campaign'); }}
-                  className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-zinc-300 border border-white/10"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#0071e3] hover:bg-[#147ce5] rounded-lg text-xs text-white"
+                  className="px-4 py-2 bg-[#7831d6] hover:bg-[#6825bc] rounded-lg text-xs font-semibold text-white shadow-md shadow-[#7831d6]/30"
                 >
                   Create
                 </button>
@@ -2924,15 +2946,15 @@ export const MediaLibrary = () => {
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white border border-[#e5e5ea] rounded-xl w-full max-w-sm text-black shadow-xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#0a0a0a] border border-white/[0.08] rounded-xl w-full max-w-sm text-white shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#e5e5ea]">
-              <h3 className="text-xs font-bold text-black">Upload Assets</h3>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08]">
+              <h3 className="text-xs font-bold text-white">Upload Assets</h3>
               {!uploading && (
                 <button
                   onClick={() => { clearCarouselDrafts(); clearFileUploadDrafts(); setShowUploadModal(false); }}
-                  className="text-gray-400 hover:text-black transition-colors"
+                  className="text-zinc-400 hover:text-white transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2943,54 +2965,54 @@ export const MediaLibrary = () => {
 
             {uploading ? (
               <div className="px-4 py-6 flex flex-col items-center gap-2 text-center">
-                <div className="w-7 h-7 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs font-semibold text-[#1d1d1f]">{getUploadProgressText()}</span>
+                <div className="w-7 h-7 border-2 border-[#7831d6] border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs font-semibold text-white">{getUploadProgressText()}</span>
                 {uploadProgress?.currentFile && (
-                  <span className="max-w-[260px] truncate text-[10px] text-gray-500">{uploadProgress.currentFile}</span>
+                  <span className="max-w-[260px] truncate text-[10px] text-zinc-400">{uploadProgress.currentFile}</span>
                 )}
               </div>
             ) : (
               <div className="p-2 space-y-1.5">
                 {/* Row: Files */}
-                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-[#e5e5ea] hover:border-[#0071e3] hover:bg-[#f0f7ff] cursor-pointer transition-all group relative">
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/[0.08] hover:border-[#7831d6]/50 hover:bg-white/[0.04] cursor-pointer transition-all group relative">
                   <input key={fileUploadInputKey} type="file" accept="image/*,video/*,audio/*,text/plain,.txt" multiple onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#f5f5f7] flex items-center justify-center group-hover:bg-[#dbeafe] transition-colors">
-                    <Upload className="w-4 h-4 text-gray-500 group-hover:text-[#0071e3]" />
+                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-[#7831d6]/20 transition-colors">
+                    <Upload className="w-4 h-4 text-zinc-400 group-hover:text-[#c4b5fd]" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Upload files</p>
-                    <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Multiple files · optional .txt captions</p>
+                    <p className="text-xs font-semibold text-white leading-tight">Upload files</p>
+                    <p className="text-[10px] text-zinc-400 leading-tight mt-0.5">Multiple files · optional .txt captions</p>
                   </div>
                 </label>
 
                 {/* Row: Carousel folders */}
-                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-[#c7d2fe] hover:border-[#4f46e5] hover:bg-[#f5f3ff] cursor-pointer transition-all group relative">
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/[0.08] hover:border-[#7831d6]/50 hover:bg-white/[0.04] cursor-pointer transition-all group relative">
                   <input type="file" accept="image/*,video/*" multiple webkitdirectory="true" directory="true" onChange={handleCarouselFolderSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#ede9fe] flex items-center justify-center group-hover:bg-[#ddd6fe] transition-colors">
-                    <Images className="w-4 h-4 text-[#4f46e5]" />
+                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#7831d6]/20 border border-[#7831d6]/30 flex items-center justify-center group-hover:bg-[#7831d6]/30 transition-colors">
+                    <Images className="w-4 h-4 text-[#c4b5fd]" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Import carousel folders</p>
-                    <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Parent folder · one subfolder per carousel set</p>
+                    <p className="text-xs font-semibold text-white leading-tight">Import carousel folders</p>
+                    <p className="text-[10px] text-zinc-400 leading-tight mt-0.5">Parent folder · one subfolder per carousel set</p>
                   </div>
                 </label>
 
                 {/* Row: Carousel from files */}
-                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-[#c7d2fe] hover:border-[#4f46e5] hover:bg-[#f5f3ff] cursor-pointer transition-all group relative">
+                <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/[0.08] hover:border-[#7831d6]/50 hover:bg-white/[0.04] cursor-pointer transition-all group relative">
                   <input key={carouselUploadInputKey} type="file" accept="image/*,video/*" multiple onChange={handleCarouselFilesSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#ede9fe] flex items-center justify-center group-hover:bg-[#ddd6fe] transition-colors">
-                    <Images className="w-4 h-4 text-[#4f46e5]" />
+                  <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-[#7831d6]/20 border border-[#7831d6]/30 flex items-center justify-center group-hover:bg-[#7831d6]/30 transition-colors">
+                    <Images className="w-4 h-4 text-[#c4b5fd]" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-[#1d1d1f] leading-tight">Create carousel from files</p>
-                    <p className="text-[10px] text-gray-400 leading-tight mt-0.5">Pick images/videos · drag to reorder</p>
+                    <p className="text-xs font-semibold text-white leading-tight">Create carousel from files</p>
+                    <p className="text-[10px] text-zinc-400 leading-tight mt-0.5">Pick images/videos · drag to reorder</p>
                   </div>
                 </label>
 
                 {/* Caption hint */}
-                <div className="flex items-center gap-2 rounded-lg bg-[#eff6ff] border border-[#bfdbfe] px-2.5 py-2 text-[10px] text-[#1d4ed8]">
+                <div className="flex items-center gap-2 rounded-lg bg-[#7831d6]/10 border border-[#7831d6]/20 px-2.5 py-2 text-[10px] text-[#c4b5fd]">
                   <Info className="w-3 h-3 flex-shrink-0" />
-                  <span><strong>Caption tip:</strong> Include a <code className="font-mono">.txt</code> file with the same name as each media file to auto-match captions.</span>
+                  <span><strong>Caption tip:</strong> Include a <code className="font-mono bg-black/40 px-1 py-0.5 rounded">.txt</code> file with the same name as each media file to auto-match captions.</span>
                 </div>
               </div>
             )}
@@ -2999,30 +3021,30 @@ export const MediaLibrary = () => {
       )}
 
       {renamingFolder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-sm text-black shadow-xl">
-            <h3 className="text-sm font-semibold text-black mb-4">Rename Folder</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+          <div className="bg-[#0a0a0a] border border-white/[0.08] p-6 rounded-2xl w-full max-w-sm text-white shadow-2xl">
+            <h3 className="text-sm font-bold text-white mb-4">Rename Folder</h3>
             <form onSubmit={handleRenameFolder} className="space-y-4">
               <input
                 type="text"
                 placeholder="Folder name"
                 value={renameFolderName}
                 onChange={(e) => setRenameFolderName(e.target.value)}
-                className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-apple-blue text-xs text-black"
+                className="w-full bg-black border border-white/10 px-3.5 py-2 rounded-lg focus:outline-none focus:border-[#7831d6] focus:ring-1 focus:ring-[#7831d6] text-xs text-white"
                 autoFocus
               />
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={closeRenameFolderModal}
-                  className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-zinc-300 border border-white/10"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingFolderId === renamingFolder._id || !renameFolderName.trim()}
-                  className="px-4 py-2 bg-[#0071e3] hover:bg-[#147ce5] rounded-lg text-xs text-white disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
+                  className="px-4 py-2 bg-[#7831d6] hover:bg-[#6825bc] rounded-lg text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {savingFolderId === renamingFolder._id ? 'Saving...' : 'Save'}
                 </button>
@@ -3033,25 +3055,25 @@ export const MediaLibrary = () => {
       )}
 
       {folderPendingDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="w-full max-w-sm rounded-2xl border border-[#e5e5ea] bg-white p-5 text-black shadow-xl">
-            <div className="mb-4 flex items-start gap-3 border-b border-[#e5e5ea] pb-3">
-              <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+          <div className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5 text-white shadow-2xl">
+            <div className="mb-4 flex items-start gap-3 border-b border-white/[0.08] pb-3">
+              <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-rose-500/20 text-rose-400">
                 <Trash2 className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <h3 className="m-0 text-sm font-bold text-black">Delete folder</h3>
-                <p className="m-0 mt-1 truncate text-[11px] font-semibold text-[#6e6e73]" title={folderPendingDelete.name}>
+                <h3 className="m-0 text-sm font-bold text-white">Delete folder</h3>
+                <p className="m-0 mt-1 truncate text-[11px] font-semibold text-zinc-400" title={folderPendingDelete.name}>
                   {folderPendingDelete.name || 'Folder'}
                 </p>
               </div>
             </div>
-            <p className="m-0 text-xs leading-relaxed text-[#374151]">
+            <p className="m-0 text-xs leading-relaxed text-zinc-300">
               This will delete the folder and every file inside it. Large folders can take a moment while stored media is removed.
             </p>
             {deletingFolderId === folderPendingDelete._id && (
-              <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-xs font-semibold text-[#1d4ed8]">
-                <span className="h-3.5 w-3.5 rounded-full border-2 border-[#0071e3] border-t-transparent animate-spin" />
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-xs font-semibold text-rose-400">
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-rose-400 border-t-transparent animate-spin" />
                 <span>Deleting folder and files...</span>
               </div>
             )}
@@ -3060,7 +3082,7 @@ export const MediaLibrary = () => {
                 type="button"
                 onClick={closeDeleteFolderModal}
                 disabled={Boolean(deletingFolderId)}
-                className="rounded-lg border border-[#e5e5ea] bg-white px-4 py-2 text-xs font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-zinc-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -3068,7 +3090,7 @@ export const MediaLibrary = () => {
                 type="button"
                 onClick={handleConfirmDeleteFolder}
                 disabled={Boolean(deletingFolderId)}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:cursor-wait disabled:bg-red-300"
+                className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-wait disabled:opacity-50"
               >
                 {deletingFolderId === folderPendingDelete._id && (
                   <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
@@ -3081,19 +3103,19 @@ export const MediaLibrary = () => {
       )}
 
       {taggingFolder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-md text-black shadow-xl">
-            <div className="mb-4 flex items-start justify-between gap-3 border-b border-[#e5e5ea] pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+          <div className="bg-[#0a0a0a] border border-white/[0.08] p-6 rounded-2xl w-full max-w-md text-white shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/[0.08] pb-3">
               <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-black">Manage Folder Tags</h3>
-                <p className="mt-1 truncate text-[11px] text-[#8e8e93]" title={taggingFolder.name}>
+                <h3 className="text-sm font-bold text-white">Manage Folder Tags</h3>
+                <p className="mt-1 truncate text-[11px] text-zinc-400" title={taggingFolder.name}>
                   {taggingFolder.name || 'Folder'}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeFolderTagsModal}
-                className="rounded-md p-1 text-gray-400 hover:bg-[#f5f5f7] hover:text-black"
+                className="rounded-md p-1 text-zinc-400 hover:bg-white/10 hover:text-white"
                 aria-label="Close folder tags"
               >
                 <X className="h-4 w-4" />
@@ -3101,18 +3123,18 @@ export const MediaLibrary = () => {
             </div>
 
             <form onSubmit={handleSaveFolderTags} className="space-y-4">
-              <div className="rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] p-2">
+              <div className="rounded-lg border border-white/[0.08] bg-black p-2">
                 <div className="flex min-h-[38px] flex-wrap items-center gap-1.5">
                   {folderTagDrafts.map((tag) => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-[#1d1d1f] shadow-sm ring-1 ring-[#e5e5ea]"
+                      className="inline-flex items-center gap-1 rounded-md bg-white/10 border border-white/10 px-2 py-1 text-[11px] font-semibold text-white shadow-sm"
                     >
                       {tag}
                       <button
                         type="button"
                         onClick={() => removeFolderTagDraft(tag)}
-                        className="rounded p-0.5 text-[#8e8e93] hover:bg-[#f5f5f7] hover:text-black"
+                        className="rounded p-0.5 text-zinc-400 hover:bg-white/20 hover:text-white"
                         aria-label={`Remove ${tag}`}
                       >
                         <X className="h-3 w-3" />
@@ -3125,7 +3147,7 @@ export const MediaLibrary = () => {
                     onChange={(e) => setFolderTagInput(e.target.value)}
                     onKeyDown={handleFolderTagInputKeyDown}
                     placeholder={folderTagDrafts.length ? 'Add another tag...' : 'Type a tag and press Enter'}
-                    className="min-w-[150px] flex-1 bg-transparent px-1 py-1 text-xs text-black placeholder:text-gray-400 focus:outline-none"
+                    className="min-w-[150px] flex-1 bg-transparent px-1 py-1 text-xs text-white placeholder:text-zinc-500 focus:outline-none"
                     autoFocus
                   />
                 </div>
@@ -3136,7 +3158,7 @@ export const MediaLibrary = () => {
                   type="button"
                   onClick={() => addFolderTagDraft()}
                   disabled={!folderTagInput.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 text-xs font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Add</span>
@@ -3145,14 +3167,14 @@ export const MediaLibrary = () => {
                   <button
                     type="button"
                     onClick={closeFolderTagsModal}
-                    className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-zinc-300 border border-white/10"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={savingFolderTagsId === taggingFolder._id}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#0071e3] px-4 py-2 text-xs font-semibold text-white hover:bg-[#147ce5] disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#7831d6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Save className="h-3.5 w-3.5" />
                     <span>{savingFolderTagsId === taggingFolder._id ? 'Saving...' : 'Save tags'}</span>
@@ -3165,19 +3187,19 @@ export const MediaLibrary = () => {
       )}
 
       {taggingMedia && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-md text-black shadow-xl">
-            <div className="mb-4 flex items-start justify-between gap-3 border-b border-[#e5e5ea] pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+          <div className="bg-[#0a0a0a] border border-white/[0.08] p-6 rounded-2xl w-full max-w-md text-white shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3 border-b border-white/[0.08] pb-3">
               <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-black">Manage Media Tags</h3>
-                <p className="mt-1 truncate text-[11px] text-[#8e8e93]" title={taggingMedia.name}>
+                <h3 className="text-sm font-bold text-white">Manage Media Tags</h3>
+                <p className="mt-1 truncate text-[11px] text-zinc-400" title={taggingMedia.name}>
                   {taggingMedia.name || 'Media asset'}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closeMediaTagsModal}
-                className="rounded-md p-1 text-gray-400 hover:bg-[#f5f5f7] hover:text-black"
+                className="rounded-md p-1 text-zinc-400 hover:bg-white/10 hover:text-white"
                 aria-label="Close media tags"
               >
                 <X className="h-4 w-4" />
@@ -3185,18 +3207,18 @@ export const MediaLibrary = () => {
             </div>
 
             <form onSubmit={handleSaveMediaTags} className="space-y-4">
-              <div className="rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] p-2">
+              <div className="rounded-lg border border-white/[0.08] bg-black p-2">
                 <div className="flex min-h-[38px] flex-wrap items-center gap-1.5">
                   {mediaTagDrafts.map((tag) => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-[#1d1d1f] shadow-sm ring-1 ring-[#e5e5ea]"
+                      className="inline-flex items-center gap-1 rounded-md bg-white/10 border border-white/10 px-2 py-1 text-[11px] font-semibold text-white shadow-sm"
                     >
                       {tag}
                       <button
                         type="button"
                         onClick={() => removeMediaTagDraft(tag)}
-                        className="rounded p-0.5 text-[#8e8e93] hover:bg-[#f5f5f7] hover:text-black"
+                        className="rounded p-0.5 text-zinc-400 hover:bg-white/20 hover:text-white"
                         aria-label={`Remove ${tag}`}
                       >
                         <X className="h-3 w-3" />
@@ -3209,7 +3231,7 @@ export const MediaLibrary = () => {
                     onChange={(e) => setMediaTagInput(e.target.value)}
                     onKeyDown={handleMediaTagInputKeyDown}
                     placeholder={mediaTagDrafts.length ? 'Add another tag...' : 'Type a tag and press Enter'}
-                    className="min-w-[150px] flex-1 bg-transparent px-1 py-1 text-xs text-black placeholder:text-gray-400 focus:outline-none"
+                    className="min-w-[150px] flex-1 bg-transparent px-1 py-1 text-xs text-white placeholder:text-zinc-500 focus:outline-none"
                     autoFocus
                   />
                 </div>
@@ -3220,7 +3242,7 @@ export const MediaLibrary = () => {
                   type="button"
                   onClick={() => addMediaTagDraft()}
                   disabled={!mediaTagInput.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 text-xs font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Add</span>
@@ -3229,14 +3251,14 @@ export const MediaLibrary = () => {
                   <button
                     type="button"
                     onClick={closeMediaTagsModal}
-                    className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-zinc-300 border border-white/10"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={savingMediaTagsId === taggingMedia._id}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#0071e3] px-4 py-2 text-xs font-semibold text-white hover:bg-[#147ce5] disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#7831d6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Save className="h-3.5 w-3.5" />
                     <span>{savingMediaTagsId === taggingMedia._id ? 'Saving...' : 'Save tags'}</span>
@@ -3249,30 +3271,30 @@ export const MediaLibrary = () => {
       )}
 
       {renamingMedia && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-sm text-black shadow-xl">
-            <h3 className="text-sm font-semibold text-black mb-4">Rename Media File</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+          <div className="bg-[#0a0a0a] border border-white/[0.08] p-6 rounded-2xl w-full max-w-sm text-white shadow-2xl">
+            <h3 className="text-sm font-bold text-white mb-4">Rename Media File</h3>
             <form onSubmit={handleRenameMedia} className="space-y-4">
               <input
                 type="text"
                 placeholder="File name"
                 value={renameMediaName}
                 onChange={(e) => setRenameMediaName(e.target.value)}
-                className="w-full bg-[#f5f5f7] border border-[#e5e5ea] px-3.5 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0071e3] text-xs text-black"
+                className="w-full bg-black border border-white/10 px-3.5 py-2 rounded-lg focus:outline-none focus:border-[#7831d6] focus:ring-1 focus:ring-[#7831d6] text-xs text-white"
                 autoFocus
               />
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={closeRenameMediaModal}
-                  className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-zinc-300 border border-white/10"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingMediaNameId === renamingMedia._id || !renameMediaName.trim()}
-                  className="px-4 py-2 bg-[#0071e3] hover:bg-[#147ce5] rounded-lg text-xs text-white disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
+                  className="px-4 py-2 bg-[#7831d6] hover:bg-[#6825bc] rounded-lg text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {savingMediaNameId === renamingMedia._id ? 'Saving...' : 'Save'}
                 </button>
@@ -3283,12 +3305,12 @@ export const MediaLibrary = () => {
       )}
 
       {captionDialogMedia && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="bg-white border border-[#e5e5ea] p-6 rounded-2xl w-full max-w-lg text-black shadow-xl">
-            <div className="flex items-center justify-between mb-4 border-b border-[#e5e5ea] pb-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
+          <div className="bg-[#0a0a0a] border border-white/[0.08] p-6 rounded-2xl w-full max-w-lg text-white shadow-2xl">
+            <div className="flex items-center justify-between mb-4 border-b border-white/[0.08] pb-2">
               <div>
-                <h3 className="text-sm font-semibold text-black">Edit Caption</h3>
-                <p className="mt-1 truncate text-[11px] text-[#8e8e93] max-w-[240px]" title={captionDialogMedia.name}>
+                <h3 className="text-sm font-bold text-white">Edit Caption</h3>
+                <p className="mt-1 truncate text-[11px] text-zinc-400 max-w-[240px]" title={captionDialogMedia.name}>
                   {captionDialogMedia.name || 'Media asset'}
                 </p>
               </div>
@@ -3296,7 +3318,7 @@ export const MediaLibrary = () => {
                 type="button"
                 onClick={handleGenerateAICaption}
                 disabled={generatingCaption}
-                className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] disabled:bg-[#a7c7ed] disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm"
+                className="flex items-center gap-1.5 bg-[#7831d6] hover:bg-[#6825bc] disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-md shadow-[#7831d6]/25"
               >
                 <Sparkles className={`h-3.5 w-3.5 ${generatingCaption ? 'animate-spin' : ''}`} />
                 <span>{generatingCaption ? 'Generating...' : 'AI Generate'}</span>
@@ -3310,21 +3332,21 @@ export const MediaLibrary = () => {
                   [captionDialogMedia._id]: e.target.value,
                 }))}
                 placeholder="Caption for this asset..."
-                className="h-40 w-full rounded-lg border border-[#e5e5ea] bg-[#f5f5f7] p-3 text-xs leading-relaxed text-black placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#0071e3] resize-none"
+                className="h-40 w-full rounded-lg border border-white/10 bg-black p-3 text-xs leading-relaxed text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#7831d6] focus:ring-1 focus:ring-[#7831d6] resize-none"
                 autoFocus
               />
               <div className="flex justify-end gap-3 pt-1">
                 <button
                   type="button"
                   onClick={closeCaptionDialog}
-                  className="px-4 py-2 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-lg text-xs border border-[#e5e5ea]"
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-zinc-300 border border-white/10"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingCaptionId === captionDialogMedia._id || getCaptionDraft(captionDialogMedia) === (captionDialogMedia.caption || '')}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#0071e3] px-4 py-2 text-xs font-semibold text-white hover:bg-[#147ce5] disabled:cursor-not-allowed disabled:bg-[#a7c7ed]"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#7831d6] px-4 py-2 text-xs font-semibold text-white hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-50 shadow-md shadow-[#7831d6]/25"
                 >
                   <Save className="h-3.5 w-3.5" />
                   <span>{savingCaptionId === captionDialogMedia._id ? 'Saving...' : 'Save caption'}</span>

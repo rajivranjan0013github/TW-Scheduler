@@ -44,41 +44,44 @@ export const Login = () => {
   };
 
   return (
-    <div className="h-screen overflow-y-auto bg-[#fbfbfd] text-[#1d1d1f] font-sans">
-      <header className="border-b border-[#d2d2d7] bg-white px-5 py-4">
+    <div className="h-screen overflow-y-auto bg-black text-white font-sans selection:bg-[#7831d6] selection:text-white">
+      <header className="border-b border-white/10 bg-black/80 backdrop-blur-md px-5 py-4">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#3478f6]">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#c4b5fd] transition hover:text-white">
             <ArrowLeft className="h-4 w-4" />
             EasyPost
           </Link>
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Sparkles className="h-4 w-4 text-[#3478f6]" />
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
+            <Sparkles className="h-4 w-4 text-[#c4b5fd]" />
             Secure login
           </div>
         </div>
       </header>
 
-      <main className="flex min-h-[calc(100vh-66px)] items-center justify-center px-5 py-12">
-        <div className="w-full max-w-md">
+      <main className="relative flex min-h-[calc(100vh-66px)] items-center justify-center px-5 py-12">
+        {/* Subtle radial glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-[#7831d6]/15 blur-[120px] pointer-events-none rounded-full" />
+
+        <div className="relative w-full max-w-md">
           <div className="text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-[#5e9cff] bg-white text-[#3478f6] shadow-[0_8px_24px_rgba(52,120,246,0.18)]">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-[#7831d6]/40 bg-[#7831d6]/20 text-[#c4b5fd] shadow-[0_0_24px_rgba(120,49,214,0.35)]">
               <Sparkles className="h-7 w-7" />
             </div>
-            <h1 className="m-0 mt-6 text-3xl font-semibold tracking-tight text-[#1d1d1f]">Sign in to EasyPost</h1>
-            <p className="m-0 mt-2 text-sm leading-6 text-[#6e6e73]">
+            <h1 className="m-0 mt-6 text-3xl font-black tracking-tight text-white">Sign in to EasyPost</h1>
+            <p className="m-0 mt-2 text-sm leading-6 text-zinc-400">
               Access your publishing calendar, connected channels, media library, and insights.
             </p>
           </div>
 
-          <div className="mt-8 rounded-xl border border-[#d2d2d7] bg-white p-6 shadow-sm">
-            <div className="flex items-center gap-2 border-b border-[#e5e5ea] pb-4">
-              <LockKeyhole className="h-4 w-4 text-[#6e6e73]" />
-              <p className="m-0 text-sm font-semibold text-[#1d1d1f]">Workspace authentication</p>
+          <div className="mt-8 rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 shadow-2xl">
+            <div className="flex items-center gap-2 border-b border-white/10 pb-4">
+              <LockKeyhole className="h-4 w-4 text-zinc-400" />
+              <p className="m-0 text-sm font-bold text-white">Workspace authentication</p>
             </div>
 
             <button
               onClick={handleGoogleLogin}
-              className="mt-6 flex w-full items-center justify-center gap-3 rounded-lg border border-[#d2d2d7] bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7]"
+              className="mt-6 flex w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-white/10"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -109,11 +112,11 @@ export const Login = () => {
               Sign in with Facebook
             </button>
 
-            <p className="m-0 mt-4 text-center text-xs leading-5 text-[#6e6e73]">
+            <p className="m-0 mt-4 text-center text-xs leading-5 text-zinc-400">
               By signing in, you agree to the{' '}
-              <Link to="/terms-and-conditions" className="font-semibold text-[#3478f6]">Terms</Link>
+              <Link to="/terms-and-conditions" className="font-semibold text-[#c4b5fd] hover:text-white">Terms</Link>
               {' '}and{' '}
-              <Link to="/privacy-policy" className="font-semibold text-[#3478f6]">Privacy Policy</Link>.
+              <Link to="/privacy-policy" className="font-semibold text-[#c4b5fd] hover:text-white">Privacy Policy</Link>.
             </p>
           </div>
         </div>
@@ -123,3 +126,4 @@ export const Login = () => {
 };
 
 export default Login;
+

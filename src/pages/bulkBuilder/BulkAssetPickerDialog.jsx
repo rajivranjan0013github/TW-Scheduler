@@ -156,6 +156,7 @@ export const BulkAssetPickerDialog = ({
         const campaignId = getActiveCampaignId();
         if (campaignId) params.set('campaignId', campaignId);
         params.set('folderId', PLATFORM_AUDIO_FOLDER_ID);
+        params.set('includeSubfolders', 'true');
         const response = await fetch(`${API_BASE_URL}/api/media?${params.toString()}`, { headers });
         if (!response.ok) throw new Error('Unable to load audio tracks.');
         const items = await response.json();

@@ -577,7 +577,9 @@ export const MediaLibraryPanel = ({
                           {folder.name || 'Untitled'}
                         </span>
                         <span className="mt-1 block text-[9px] font-medium text-[#8b929d]">
-                          {Number(folder.itemCount || 0)} items
+                          {Number(folder.subfolderCount || 0) > 0 && Number(folder.itemCount || 0) === 0
+                            ? `${folder.subfolderCount} ${folder.subfolderCount === 1 ? 'folder' : 'folders'}`
+                            : `${Number(folder.itemCount || 0)} items`}
                         </span>
                       </span>
                     </button>

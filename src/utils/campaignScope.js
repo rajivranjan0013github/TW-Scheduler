@@ -9,3 +9,16 @@ export const withCampaignScope = (baseQuery = '') => {
   const query = params.toString();
   return query ? `?${query}` : '';
 };
+
+export const invalidateAllCampaignQueries = async (queryClient, campaignId = getActiveCampaignId()) => {
+  if (!queryClient) return;
+  await Promise.allSettled([
+    queryClient.invalidateQueries({ queryKey: ['admin'] }),
+    queryClient.invalidateQueries({ queryKey: ['channels'] }),
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+    queryClient.invalidateQueries({ queryKey: ['scheduler'] }),
+    queryClient.invalidateQueries({ queryKey: ['publishedPosts'] }),
+    queryClient.invalidateQueries({ queryKey: ['creator'] }),
+    campaignId ? queryClient.invalidateQueries({ queryKey: ['campaign', campaignId] }) : Promise.resolve(),
+  ]);
+};

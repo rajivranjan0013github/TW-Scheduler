@@ -30,46 +30,46 @@ const sections = [
 ];
 
 export const TermsAndConditions = () => (
-  <div className="h-screen overflow-y-auto bg-[#fbfbfd] text-[#1d1d1f] font-sans">
-    <header className="border-b border-[#d2d2d7] bg-white px-5 py-4">
+  <div className="h-screen overflow-y-auto bg-black text-white font-sans selection:bg-[#7831d6] selection:text-white">
+    <header className="border-b border-white/10 bg-black/80 backdrop-blur-md px-5 py-4">
       <div className="mx-auto flex max-w-4xl items-center justify-between">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#3478f6]">
+        <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#c4b5fd] transition hover:text-white">
           <ArrowLeft className="h-4 w-4" />
           Back to EasyPost
         </Link>
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <Sparkles className="h-4 w-4 text-[#3478f6]" />
+        <div className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
+          <Sparkles className="h-4 w-4 text-[#c4b5fd]" />
           EasyPost
         </div>
       </div>
     </header>
 
     <main className="mx-auto max-w-4xl px-5 py-12">
-      <p className="m-0 text-xs font-semibold uppercase tracking-wider text-[#6e6e73]">Legal</p>
-      <h1 className="m-0 mt-3 text-4xl font-semibold tracking-tight text-[#1d1d1f]">Terms and Conditions</h1>
-      <p className="m-0 mt-3 text-sm text-[#6e6e73]">Last updated: June 16, 2026</p>
+      <p className="m-0 text-xs font-bold uppercase tracking-wider text-zinc-400">Legal</p>
+      <h1 className="m-0 mt-3 text-4xl font-black tracking-tight text-white">Terms and Conditions</h1>
+      <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: June 16, 2026</p>
 
-      <div className="mt-8 rounded-lg border border-[#d2d2d7] bg-white p-6">
-        <p className="m-0 text-base leading-7 text-[#515154]">
+      <div className="mt-8 rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-xl">
+        <p className="m-0 text-base leading-7 text-zinc-300">
           These Terms and Conditions govern your use of EasyPost. By accessing the platform, you agree to use it responsibly and only with accounts and content you are authorized to manage.
         </p>
       </div>
 
       <div className="mt-8 space-y-4">
         {sections.map((section) => (
-          <section key={section.title} className="rounded-lg border border-[#e5e5ea] bg-white p-6">
-            <h2 className="m-0 text-lg font-semibold text-[#1d1d1f]">{section.title}</h2>
-            <p className="m-0 mt-3 text-sm leading-7 text-[#515154]">{section.body}</p>
+          <section key={section.title} className="rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-md">
+            <h2 className="m-0 text-lg font-bold text-white">{section.title}</h2>
+            <p className="m-0 mt-3 text-sm leading-7 text-zinc-400">{section.body}</p>
           </section>
         ))}
       </div>
 
-      <p className="m-0 mt-8 text-sm leading-7 text-[#6e6e73]">
+      <p className="m-0 mt-8 text-sm leading-7 text-zinc-400">
         If you do not agree with these terms, do not use EasyPost or connect publishing channels to the workspace.
       </p>
-      <p className="m-0 mt-4 text-xs text-[#8e8e93]">
+      <p className="m-0 mt-4 text-xs text-zinc-500">
         This product is powered by{' '}
-        <a href="https://thethousandways.com/" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#3478f6]">
+        <a href="https://thethousandways.com/" target="_blank" rel="noopener noreferrer" className="underline text-zinc-400 hover:text-white">
           thousandway to make
         </a>
       </p>

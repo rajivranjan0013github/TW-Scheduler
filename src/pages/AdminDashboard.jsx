@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { CalendarClock, Eye, Megaphone, RefreshCw, Rows3, Loader2 } from 'lucide-react';
-import { getActiveCampaignId } from '../utils/campaignScope';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CalendarClock, Eye, Megaphone, RefreshCw, Rows3, Loader2, Sparkles } from 'lucide-react';
+import { getActiveCampaignId, invalidateAllCampaignQueries } from '../utils/campaignScope';
 import {
   AccountIdentity,
   ActivityCell,
@@ -82,12 +82,15 @@ const fetchMetrics = async (campaignId) => {
 
 export const AdminDashboard = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [requestedCampaignId, setRequestedCampaignId] = useState(getActiveCampaignId);
   const [selectedTimeRange, setSelectedTimeRange] = useState('today');
   const [searchChannel, setSearchChannel] = useState('');
   const [filterPlatform, setFilterPlatform] = useState('all');
   const [searchUser, setSearchUser] = useState('');
   const [selectedGraphDate, setSelectedGraphDate] = useState(null);
+  const [syncingCampaign, setSyncingCampaign] = useState(false);
+  const [syncBanner, setSyncBanner] = useState(null);
 
   const campaignsQuery = useQuery({
     queryKey: ['admin', 'campaigns', 'overview'],
@@ -176,6 +179,64 @@ export const AdminDashboard = () => {
   const metricsLoading = metricsQuery.isFetching;
   const error = campaignsQuery.error?.message || metricsQuery.error?.message || '';
   const selectedTimeLabel = selectedRange.label;
+  const handleSyncCampaign = async () => {
+    if (!selectedCampaignId || syncingCampaign) return;
+    setSyncingCampaign(true);
+    setSyncBanner({ type: 'info', message: 'Starting background sync for campaign channels...' });
+
+    try {
+      const token = localStorage.getItem('tw_token');
+      const res = await fetch(`${API_BASE_URL}/api/admin/campaigns/${selectedCampaignId}/sync`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to start campaign sync.');
+
+      if (data.queued === 0) {
+        setSyncBanner({ type: 'info', message: data.message || 'No connected accounts to sync.' });
+        setSyncingCampaign(false);
+        return;
+      }
+
+      setSyncBanner({ type: 'info', message: `Syncing ${data.queued} account(s)...` });
+
+      let finishedStatus = null;
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        const statusRes = await fetch(`${API_BASE_URL}/api/admin/campaigns/${selectedCampaignId}/sync-status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!statusRes.ok) continue;
+        const statusPayload = await statusRes.json();
+        if (statusPayload.status !== 'running') {
+          finishedStatus = statusPayload;
+          break;
+        }
+      }
+
+      await invalidateAllCampaignQueries(queryClient, selectedCampaignId);
+      await metricsQuery.refetch();
+
+      if (finishedStatus?.syncIssues > 0) {
+        setSyncBanner({
+          type: 'warning',
+          message: `Sync completed with ${finishedStatus.syncIssues} account issue(s). Check channel statuses below.`,
+        });
+      } else {
+        setSyncBanner({
+          type: 'success',
+          message: 'Campaign synchronization completed successfully.',
+        });
+      }
+    } catch (err) {
+      setSyncBanner({ type: 'error', message: err.message || 'Campaign sync failed.' });
+    } finally {
+      setSyncingCampaign(false);
+      setTimeout(() => setSyncBanner(null), 6000);
+    }
+  };
+
   const openAccountFeed = (account) => {
     sessionStorage.removeItem('admin_view_context');
     navigate(`/channels/${account._id}/feed`, {
@@ -248,14 +309,56 @@ export const AdminDashboard = () => {
               campaignsQuery.refetch(),
               selectedCampaignId ? metricsQuery.refetch() : Promise.resolve(),
             ])}
-            disabled={loading || metricsLoading}
+            disabled={loading || metricsLoading || syncingCampaign}
             className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-[#d2d2d7] bg-white px-2.5 text-[11px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7] disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Reload metrics from database"
           >
             <RefreshCw className={`h-3 w-3 ${loading || metricsLoading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+
+          <button
+            type="button"
+            onClick={handleSyncCampaign}
+            disabled={!selectedCampaignId || syncingCampaign || loading}
+            className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md bg-[#3478f6] px-3 text-[11px] font-semibold text-white transition hover:bg-[#2860c7] shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Fetch fresh views, likes, and comments from Meta Graph API"
+          >
+            {syncingCampaign ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3 w-3" />
+                Sync Campaign
+              </>
+            )}
+          </button>
         </div>
       </div>
+
+      {syncBanner && (
+        <div className={`mb-3 rounded-lg border px-3 py-2 text-xs font-medium flex items-center justify-between ${
+          syncBanner.type === 'error'
+            ? 'border-red-200 bg-red-50 text-red-700'
+            : syncBanner.type === 'warning'
+            ? 'border-amber-200 bg-amber-50 text-amber-700'
+            : syncBanner.type === 'success'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border-blue-200 bg-blue-50 text-blue-700'
+        }`}>
+          <span>{syncBanner.message}</span>
+          <button
+            type="button"
+            onClick={() => setSyncBanner(null)}
+            className="text-xs opacity-70 hover:opacity-100"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
