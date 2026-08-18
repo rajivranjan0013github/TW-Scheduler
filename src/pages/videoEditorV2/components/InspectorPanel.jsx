@@ -1,23 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
+  Eraser,
   FileMusic,
   LoaderCircle,
   MoveHorizontal,
   MoveVertical,
+  PenTool,
   RotateCcw,
   SlidersHorizontal,
   Sparkles,
+  Square,
+  Trash2,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import {
+  DEFAULT_PATCH_REMOVAL,
   DEFAULT_TEXT_STYLE,
   MAX_PLAYBACK_RATE,
   MIN_CLIP_DURATION,
   MIN_CROP_SIZE,
   MIN_PLAYBACK_RATE,
   normalizeCrop,
+  normalizePatchRemoval,
 } from '../project';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -29,6 +35,11 @@ const TEXT_STROKE_PRESETS = [
   { label: '2', value: 2 },
   { label: '4', value: 4 },
   { label: '8', value: 8 },
+];
+
+const PATCH_MASK_TOOLS = [
+  { id: 'points', label: 'Points', Icon: PenTool },
+  { id: 'rectangle', label: 'Rectangle', Icon: Square },
 ];
 
 const formatCompactNumber = (value) => {
@@ -369,8 +380,12 @@ const VideoInspector = ({
     flipY: Boolean(clip.transform?.flipY),
   };
   const crop = normalizeCrop(clip.crop);
+  const patchRemoval = normalizePatchRemoval(clip.patchRemoval);
   const updateTransform = (changes) => onUpdate({ transform: { ...clip.transform, ...changes } });
   const updateCrop = (changes) => onUpdate({ crop: normalizeCrop({ ...crop, ...changes }) });
+  const updatePatchRemoval = (changes) => onUpdate({
+    patchRemoval: normalizePatchRemoval({ ...patchRemoval, ...changes }),
+  });
   const playbackRate = clamp(
     Number(clip.playbackRate) || 1,
     MIN_PLAYBACK_RATE,
@@ -591,6 +606,134 @@ const VideoInspector = ({
             <ScrubbableNumberControl label="Height" value={Math.round(crop.height * 100)} min={MIN_CROP_SIZE * 100} max={Math.round((1 - crop.y) * 100)} suffix="%" onChange={(value) => updateCrop({ height: value / 100 })} />
           </div>
         </CollapsiblePropertyCard>
+
+        {clip.type === 'video' && (
+          <PropertyCard
+            title="Patch removal"
+            action={patchRemoval.enabled ? (
+              <button
+                type="button"
+                onClick={() => onUpdate({ patchRemoval: DEFAULT_PATCH_REMOVAL })}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-[#737b87] transition hover:bg-red-500/10 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60"
+                title="Remove patch effect"
+                aria-label="Remove patch effect"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          >
+            {!patchRemoval.enabled ? (
+              <button
+                type="button"
+                onClick={() => updatePatchRemoval({
+                  enabled: true,
+                  editing: true,
+                  targetPath: [],
+                  sourceOffset: DEFAULT_PATCH_REMOVAL.sourceOffset,
+                })}
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#111318] px-3 text-[10px] font-extrabold text-[#dfe2e6] transition hover:border-violet-400/50 hover:text-violet-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70"
+              >
+                <Eraser className="h-4 w-4" />
+                Create source patch
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => updatePatchRemoval({
+                      editing: !patchRemoval.editing,
+                      pathClosed: patchRemoval.maskTool === 'points'
+                        && patchRemoval.targetPath.length >= 3
+                        ? true
+                        : patchRemoval.pathClosed,
+                    })}
+                    className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70 ${patchRemoval.editing
+                      ? 'border-violet-400/70 bg-violet-400/15 text-violet-200'
+                      : 'border-white/10 bg-[#111318] text-[#b8bec8] hover:border-white/20 hover:text-white'}`}
+                  >
+                    <PenTool className="h-3.5 w-3.5" />
+                    {patchRemoval.editing ? 'Done editing' : 'Edit patch'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updatePatchRemoval({
+                      editing: true,
+                      targetPath: [],
+                      pathClosed: patchRemoval.maskTool !== 'points',
+                      sourceOffset: DEFAULT_PATCH_REMOVAL.sourceOffset,
+                    })}
+                    className="flex h-9 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-[#111318] px-2 text-[9px] font-bold text-[#b8bec8] transition hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Redraw
+                  </button>
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-[9px] font-bold uppercase tracking-[0.12em] !text-[#858d99]">
+                    Mask shape
+                  </p>
+                  <div className="grid grid-cols-2 gap-1" role="group" aria-label="Mask drawing tool">
+                    {PATCH_MASK_TOOLS.map(({ id, label, Icon }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => updatePatchRemoval({
+                          maskTool: id,
+                          pathClosed: id !== 'points',
+                          editing: true,
+                          targetPath: [],
+                          sourceOffset: DEFAULT_PATCH_REMOVAL.sourceOffset,
+                        })}
+                        aria-pressed={patchRemoval.maskTool === id}
+                        title={`Draw ${label.toLowerCase()} mask`}
+                        className={`flex h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-lg border text-[8px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70 ${patchRemoval.maskTool === id
+                          ? 'border-violet-400/70 bg-violet-400/15 text-violet-200'
+                          : 'border-white/10 bg-[#111318] text-[#9299a4] hover:border-white/20 hover:text-white'}`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        <span className="truncate">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <InspectorRangeControl
+                  label="Edge softness"
+                  value={Math.round(patchRemoval.feather * 1000) / 10}
+                  min={0}
+                  max={15}
+                  step={0.1}
+                  suffix="%"
+                  onChange={(value) => updatePatchRemoval({ feather: value / 100 })}
+                />
+                <InspectorRangeControl
+                  label="Patch opacity"
+                  value={Math.round(patchRemoval.opacity * 100)}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  onChange={(value) => updatePatchRemoval({ opacity: value / 100 })}
+                />
+                <button
+                  type="button"
+                  onClick={() => updatePatchRemoval({
+                    sourceOffset: DEFAULT_PATCH_REMOVAL.sourceOffset,
+                    editing: true,
+                  })}
+                  className="flex h-8 w-full items-center justify-center gap-1.5 rounded-lg text-[9px] font-bold text-[#9097a2] transition hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Reset source position
+                </button>
+                <p className="text-[9px] font-medium leading-relaxed !text-[#858d99]">
+                  Purple is the covered area. Drag the green source to clean nearby pixels.
+                </p>
+              </div>
+            )}
+          </PropertyCard>
+        )}
 
         {clip.type === 'video' && (
           <PropertyCard title="Audio">
@@ -914,6 +1057,9 @@ export const InspectorPanel = ({
         flipY: false,
       },
       crop: { x: 0, y: 0, width: 1, height: 1 },
+      ...(selectedClip.type === 'video'
+        ? { patchRemoval: DEFAULT_PATCH_REMOVAL }
+        : {}),
     });
   };
 

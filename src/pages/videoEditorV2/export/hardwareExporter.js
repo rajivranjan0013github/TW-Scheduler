@@ -27,6 +27,11 @@ import {
 } from './media.js';
 import { normalizeProject } from './normalizeProject.js';
 import { renderTextClipToPng } from './textOverlayRenderer.js';
+import {
+  createPatchRemovalBuffers,
+  drawPatchedMediaFrame,
+} from './patchRemovalRenderer.js';
+import { hasPatchRemovalMask } from '../project/patchRemoval.js';
 
 const clamp = (value, minimum, maximum) => (
   Math.min(maximum, Math.max(minimum, value))
@@ -128,7 +133,8 @@ const getTextFadeOpacity = (clip, timelineTime) => {
   return Math.min(fadeInOpacity, fadeOutOpacity);
 };
 
-const drawMediaLayer = ({ context, source, clip, output }) => {
+const drawMediaLayer = ({ context, source, clip, output, patchSurfaces }) => {
+  let mediaSource = source;
   const sourceWidth = Math.max(1, Number(source.width || source.videoWidth) || output.width);
   const sourceHeight = Math.max(1, Number(source.height || source.videoHeight) || output.height);
   const crop = clip.crop || { x: 0, y: 0, width: 1, height: 1 };
@@ -141,10 +147,39 @@ const drawMediaLayer = ({ context, source, clip, output }) => {
     flipX: false,
     flipY: false,
   };
-  const sourceX = crop.x * sourceWidth;
-  const sourceY = crop.y * sourceHeight;
-  const croppedWidth = Math.max(1, crop.width * sourceWidth);
-  const croppedHeight = Math.max(1, crop.height * sourceHeight);
+  let sourceX = crop.x * sourceWidth;
+  let sourceY = crop.y * sourceHeight;
+  let croppedWidth = Math.max(1, crop.width * sourceWidth);
+  let croppedHeight = Math.max(1, crop.height * sourceHeight);
+
+  if (clip.type === 'video' && hasPatchRemovalMask(clip.patchRemoval)) {
+    const maximumPatchEdge = Math.max(output.width, output.height, 1280);
+    const patchScale = Math.min(1, maximumPatchEdge / Math.max(croppedWidth, croppedHeight));
+    const patchWidth = Math.max(1, Math.round(croppedWidth * patchScale));
+    const patchHeight = Math.max(1, Math.round(croppedHeight * patchScale));
+    let surface = patchSurfaces.get(clip.id);
+    if (!surface) {
+      surface = {
+        canvas: createCanvas(patchWidth, patchHeight),
+        buffers: createPatchRemovalBuffers(),
+      };
+      patchSurfaces.set(clip.id, surface);
+    }
+    drawPatchedMediaFrame({
+      destination: surface.canvas,
+      source,
+      crop,
+      patchRemoval: clip.patchRemoval,
+      width: patchWidth,
+      height: patchHeight,
+      buffers: surface.buffers,
+    });
+    mediaSource = surface.canvas;
+    sourceX = 0;
+    sourceY = 0;
+    croppedWidth = patchWidth;
+    croppedHeight = patchHeight;
+  }
   const croppedAspect = croppedWidth / croppedHeight;
   const targetWidth = output.width * transform.scale;
   const targetHeight = output.height * transform.scale;
@@ -173,7 +208,7 @@ const drawMediaLayer = ({ context, source, clip, output }) => {
     context.clip();
   }
   context.drawImage(
-    source,
+    mediaSource,
     sourceX,
     sourceY,
     croppedWidth,
@@ -373,6 +408,7 @@ const renderHardwareVideo = async ({ project, media, signal, onProgress }) => {
     signal,
     onProgress,
   });
+  const patchSurfaces = new Map();
   const target = new BufferTarget();
   const container = new Output({
     format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
@@ -435,7 +471,13 @@ const renderHardwareVideo = async ({ project, media, signal, onProgress }) => {
         const source = resource.kind === 'video'
           ? videoFrames.get(resource)
           : resource.bitmap;
-        if (source) drawMediaLayer({ context, source, clip: resource.clip, output });
+        if (source) drawMediaLayer({
+          context,
+          source,
+          clip: resource.clip,
+          output,
+          patchSurfaces,
+        });
       });
 
       await videoSource.add(
@@ -744,13 +786,28 @@ export const exportProjectWithBestAvailableEngine = async (options = {}) => {
     onProgress,
     signal,
   } = options;
+  const hasPatchRemoval = project?.tracks?.some((track) => (
+    track.clips?.some((clip) => clip.type === 'video' && hasPatchRemovalMask(clip.patchRemoval))
+  ));
   if (exportOptions.hardwareAcceleration === false) {
+    if (hasPatchRemoval) {
+      throw new VideoExportError(
+        'Patch removal requires browser hardware video encoding. Enable hardware acceleration to export this project.',
+        { code: 'PATCH_REMOVAL_HARDWARE_REQUIRED' },
+      );
+    }
     const { exportProjectInBrowser } = await import('./browserExporter.js');
     return exportProjectInBrowser(options);
   }
 
   const supported = await canUseHardwareAcceleratedExport(project, exportOptions);
   if (!supported) {
+    if (hasPatchRemoval) {
+      throw new VideoExportError(
+        'This browser cannot export patch removal. Use a browser with WebCodecs hardware encoding support.',
+        { code: 'PATCH_REMOVAL_HARDWARE_UNAVAILABLE' },
+      );
+    }
     emitProgress(onProgress, {
       phase: 'preparing',
       progress: 0,
@@ -764,6 +821,7 @@ export const exportProjectWithBestAvailableEngine = async (options = {}) => {
     return await exportProjectWithHardwareAcceleration(options);
   } catch (error) {
     if (isCancellation(error, signal)) throw error;
+    if (hasPatchRemoval) throw error;
     emitProgress(onProgress, {
       phase: 'preparing',
       progress: 0,

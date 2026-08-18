@@ -278,6 +278,9 @@ const mergeClipChanges = (clip, changes) => ({
   ...clip,
   ...changes,
   crop: changes.crop ? { ...clip.crop, ...changes.crop } : clip.crop,
+  patchRemoval: changes.patchRemoval
+    ? { ...clip.patchRemoval, ...changes.patchRemoval }
+    : clip.patchRemoval,
   transform: changes.transform ? { ...clip.transform, ...changes.transform } : clip.transform,
   effects: changes.effects ? { ...clip.effects, ...changes.effects } : clip.effects,
   style: changes.style ? { ...clip.style, ...changes.style } : clip.style,

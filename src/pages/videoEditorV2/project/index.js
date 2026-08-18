@@ -21,6 +21,13 @@ export {
 } from './projectConstants.js';
 
 export {
+  DEFAULT_PATCH_REMOVAL,
+  getPatchSourcePath,
+  hasPatchRemovalMask,
+  normalizePatchRemoval,
+} from './patchRemoval.js';
+
+export {
   calculateProjectDuration,
   clampNumber,
   cloneProject,

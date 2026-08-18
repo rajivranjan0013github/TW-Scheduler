@@ -12,6 +12,7 @@ import {
   MIN_CROP_SIZE,
   MIN_PLAYBACK_RATE,
 } from '../project/projectConstants.js';
+import { normalizePatchRemoval } from '../project/patchRemoval.js';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -165,6 +166,9 @@ const normalizeClip = (clip, track, trackIndex, clipIndex) => {
       volume: clamp(finiteNumber(clip?.volume, 1), 0, 4),
       muted: Boolean(clip?.muted),
       crop: normalizeCrop(clip?.crop),
+      patchRemoval: type === 'video'
+        ? normalizePatchRemoval(clip?.patchRemoval)
+        : undefined,
       transform: normalizeTransform(clip?.transform),
       fit: normalizeFit(clip?.fit),
     };

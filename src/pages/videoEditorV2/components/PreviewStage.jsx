@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   Grid3X3,
@@ -11,10 +11,17 @@ import {
 } from 'lucide-react';
 import {
   DEFAULT_TEXT_STYLE,
+  getPatchSourcePath,
+  hasPatchRemovalMask,
   MAX_PLAYBACK_RATE,
   MIN_CROP_SIZE,
   MIN_PLAYBACK_RATE,
+  normalizePatchRemoval,
 } from '../project';
+import {
+  createPatchRemovalBuffers,
+  drawPatchedMediaFrame,
+} from '../export/patchRemovalRenderer.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const compareVisualLayers = (left, right) => (
@@ -39,7 +46,7 @@ const COMPACT_TEXT_HANDLE_MODES = new Set(['nw', 'right']);
 const MIN_MEDIA_SCALE = 0.05;
 const MAX_MEDIA_SCALE = 10;
 const MIN_PREVIEW_ZOOM = 0.5;
-const MAX_PREVIEW_ZOOM = 2;
+const MAX_PREVIEW_ZOOM = 3;
 const MEDIA_RESIZE_HANDLES = [
   { mode: 'nw', label: 'Resize media from top left', className: '-left-3 -top-3 cursor-nwse-resize', markerClassName: 'h-3.5 w-3.5 rounded-full' },
   { mode: 'n', label: 'Resize media from top', className: 'left-1/2 -top-2.5 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-2 w-8 rounded-full' },
@@ -462,6 +469,422 @@ const useMediaResize = ({ clip, mediaSize, stageSize, onSelect, onUpdate }) => {
   return { crop, geometry, transform, startMove, startResize };
 };
 
+const getPathBounds = (points) => points.reduce((bounds, point) => ({
+  minX: Math.min(bounds.minX, point.x),
+  maxX: Math.max(bounds.maxX, point.x),
+  minY: Math.min(bounds.minY, point.y),
+  maxY: Math.max(bounds.maxY, point.y),
+}), { minX: 1, maxX: 0, minY: 1, maxY: 0 });
+
+const getPathCenter = (points) => {
+  if (!points.length) return { x: 0.5, y: 0.5 };
+  const bounds = getPathBounds(points);
+  return {
+    x: (bounds.minX + bounds.maxX) / 2,
+    y: (bounds.minY + bounds.maxY) / 2,
+  };
+};
+
+const pathToSvgPoints = (points) => points
+  .map((point) => `${point.x * 1000},${point.y * 1000}`)
+  .join(' ');
+
+const createRectangleMaskPath = (start, end) => [
+  { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y) },
+  { x: Math.max(start.x, end.x), y: Math.min(start.y, end.y) },
+  { x: Math.max(start.x, end.x), y: Math.max(start.y, end.y) },
+  { x: Math.min(start.x, end.x), y: Math.max(start.y, end.y) },
+];
+
+const createGeometricMaskPath = (_tool, start, end) => createRectangleMaskPath(start, end);
+
+const PatchMaskEditor = ({ patchRemoval, geometry, onPreviewChange, onChange }) => {
+  const normalizedPatch = normalizePatchRemoval(patchRemoval);
+  const [draftPatch, setDraftPatch] = useState(normalizedPatch);
+  const svgRef = useRef(null);
+  const interactionRef = useRef(null);
+
+  useEffect(() => {
+    if (!interactionRef.current) setDraftPatch(normalizedPatch);
+  }, [patchRemoval]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pointFromEvent = (event) => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0.5, y: 0.5 };
+    return {
+      x: clamp((event.clientX - rect.left) / Math.max(1, rect.width), 0, 1),
+      y: clamp((event.clientY - rect.top) / Math.max(1, rect.height), 0, 1),
+    };
+  };
+
+  const startDrawing = (event) => {
+    if (event.button !== 0) return;
+    if (draftPatch.maskTool === 'points' && !draftPatch.pathClosed) {
+      event.preventDefault();
+      event.stopPropagation();
+      const point = pointFromEvent(event);
+      const nextPatch = normalizePatchRemoval({
+        ...draftPatch,
+        pathClosed: false,
+        targetPath: [...draftPatch.targetPath, point].slice(0, 512),
+      });
+      setDraftPatch(nextPatch);
+      onPreviewChange(nextPatch);
+      onChange(nextPatch);
+      return;
+    }
+    if (draftPatch.targetPath.length >= 3) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = pointFromEvent(event);
+    const points = draftPatch.maskTool === 'brush' ? [point] : [];
+    interactionRef.current = {
+      type: 'draw',
+      tool: draftPatch.maskTool,
+      pointerId: event.pointerId,
+      start: point,
+      points,
+    };
+    const nextPatch = { ...draftPatch, targetPath: points };
+    setDraftPatch(nextPatch);
+    onPreviewChange(nextPatch);
+    svgRef.current?.setPointerCapture?.(event.pointerId);
+  };
+
+  const startDraggingPath = (event, type) => {
+    if (event.button !== 0 || !hasPatchRemovalMask(draftPatch)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    interactionRef.current = {
+      type,
+      pointerId: event.pointerId,
+      start: pointFromEvent(event),
+      patch: draftPatch,
+    };
+    svgRef.current?.setPointerCapture?.(event.pointerId);
+  };
+
+  const moveInteraction = (event) => {
+    const interaction = interactionRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = pointFromEvent(event);
+
+    if (interaction.type === 'draw') {
+      if (interaction.tool !== 'brush') {
+        interaction.points = createGeometricMaskPath(interaction.tool, interaction.start, point);
+        const nextPatch = { ...draftPatch, targetPath: interaction.points };
+        interaction.latest = nextPatch;
+        setDraftPatch(nextPatch);
+        onPreviewChange(nextPatch);
+        return;
+      }
+      const lastPoint = interaction.points[interaction.points.length - 1];
+      if (Math.hypot(point.x - lastPoint.x, point.y - lastPoint.y) < 0.006) return;
+      interaction.points = [...interaction.points, point].slice(0, 512);
+      const nextPatch = { ...draftPatch, targetPath: interaction.points };
+      interaction.latest = nextPatch;
+      setDraftPatch(nextPatch);
+      onPreviewChange(nextPatch);
+      return;
+    }
+
+    const deltaX = point.x - interaction.start.x;
+    const deltaY = point.y - interaction.start.y;
+    const bounds = getPathBounds(interaction.patch.targetPath);
+    if (interaction.type === 'source') {
+      const nextOffsetX = clamp(
+        interaction.patch.sourceOffset.x + deltaX,
+        -bounds.minX,
+        1 - bounds.maxX,
+      );
+      const nextOffsetY = clamp(
+        interaction.patch.sourceOffset.y + deltaY,
+        -bounds.minY,
+        1 - bounds.maxY,
+      );
+      const nextPatch = {
+        ...interaction.patch,
+        sourceOffset: { x: nextOffsetX, y: nextOffsetY },
+      };
+      interaction.latest = nextPatch;
+      setDraftPatch(nextPatch);
+      onPreviewChange(nextPatch);
+      return;
+    }
+
+    const adjustedX = clamp(deltaX, -bounds.minX, 1 - bounds.maxX);
+    const adjustedY = clamp(deltaY, -bounds.minY, 1 - bounds.maxY);
+    const nextPatch = {
+      ...interaction.patch,
+      targetPath: interaction.patch.targetPath.map((pathPoint) => ({
+        x: pathPoint.x + adjustedX,
+        y: pathPoint.y + adjustedY,
+      })),
+      sourceOffset: {
+        x: interaction.patch.sourceOffset.x - adjustedX,
+        y: interaction.patch.sourceOffset.y - adjustedY,
+      },
+    };
+    interaction.latest = nextPatch;
+    setDraftPatch(nextPatch);
+    onPreviewChange(nextPatch);
+  };
+
+  const finishInteraction = (event) => {
+    const interaction = interactionRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (interaction.type === 'draw' && interaction.tool !== 'brush') {
+      interaction.points = createGeometricMaskPath(
+        interaction.tool,
+        interaction.start,
+        pointFromEvent(event),
+      );
+    }
+    const interactionPatch = interaction.type === 'draw'
+      ? { ...draftPatch, targetPath: interaction.points }
+      : interaction.latest || draftPatch;
+    interactionRef.current = null;
+    if (svgRef.current?.hasPointerCapture?.(event.pointerId)) {
+      svgRef.current.releasePointerCapture(event.pointerId);
+    }
+    const pathBounds = getPathBounds(interactionPatch.targetPath);
+    const validPath = interactionPatch.targetPath.length >= 3
+      && pathBounds.maxX - pathBounds.minX >= 0.005
+      && pathBounds.maxY - pathBounds.minY >= 0.005;
+    const nextPatch = normalizePatchRemoval({
+      ...interactionPatch,
+      targetPath: validPath ? interactionPatch.targetPath : [],
+    });
+    setDraftPatch(nextPatch);
+    onPreviewChange(nextPatch);
+    onChange(nextPatch);
+  };
+
+  const targetPath = draftPatch.targetPath;
+  const sourcePath = getPatchSourcePath(draftPatch);
+  const targetCenter = getPathCenter(targetPath);
+  const sourceCenter = getPathCenter(sourcePath);
+  const pointPathOpen = draftPatch.maskTool === 'points' && !draftPatch.pathClosed;
+  const maskComplete = hasPatchRemovalMask(draftPatch);
+  const dotScaleX = 1000 / Math.max(1, geometry.contentWidth);
+  const dotScaleY = 1000 / Math.max(1, geometry.contentHeight);
+
+  const closePointPath = (event) => {
+    if (!pointPathOpen || targetPath.length < 3) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const nextPatch = normalizePatchRemoval({ ...draftPatch, pathClosed: true });
+    setDraftPatch(nextPatch);
+    onPreviewChange(nextPatch);
+    onChange(nextPatch);
+  };
+
+  return (
+    <span
+      className="absolute z-[65] overflow-hidden"
+      style={{
+        left: geometry.contentLeft,
+        top: geometry.contentTop,
+        width: geometry.contentWidth,
+        height: geometry.contentHeight,
+      }}
+    >
+      <svg
+        ref={svgRef}
+        viewBox="0 0 1000 1000"
+        preserveAspectRatio="none"
+        className={`absolute inset-0 h-full w-full touch-none ${maskComplete ? 'cursor-default' : 'cursor-crosshair'}`}
+        onPointerDown={startDrawing}
+        onPointerMove={moveInteraction}
+        onPointerUp={finishInteraction}
+        onPointerCancel={finishInteraction}
+        aria-label="Patch removal mask editor"
+      >
+        {pointPathOpen && targetPath.length > 0 && (
+          <>
+            <polyline
+              points={pathToSvgPoints(targetPath)}
+              fill="none"
+              stroke="rgba(15,23,42,0.5)"
+              strokeWidth="4.5"
+              strokeDasharray="8 7"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
+            />
+            <polyline
+              points={pathToSvgPoints(targetPath)}
+              fill="none"
+              stroke="#ffffff"
+              strokeWidth="2.5"
+              strokeDasharray="8 7"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
+            />
+            {targetPath.map((point, index) => (
+              <ellipse
+                key={`${point.x}-${point.y}-${index}`}
+                cx={point.x * 1000}
+                cy={point.y * 1000}
+                rx={(index === 0 ? 4 : 3) * dotScaleX}
+                ry={(index === 0 ? 4 : 3) * dotScaleY}
+                fill={index === targetPath.length - 1 ? '#0ea5e9' : '#ffffff'}
+                stroke="#0ea5e9"
+                strokeWidth="1.25"
+                vectorEffect="non-scaling-stroke"
+                className={index === 0 && targetPath.length >= 3 ? 'cursor-pointer' : ''}
+                onPointerDown={index === 0 ? closePointPath : undefined}
+              />
+            ))}
+          </>
+        )}
+        {maskComplete && (
+          <>
+            <line
+              x1={targetCenter.x * 1000}
+              y1={targetCenter.y * 1000}
+              x2={sourceCenter.x * 1000}
+              y2={sourceCenter.y * 1000}
+              stroke="rgba(255,255,255,0.7)"
+              strokeWidth="3"
+              strokeDasharray="10 10"
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
+            />
+            <polygon
+              points={pathToSvgPoints(targetPath)}
+              fill="transparent"
+              stroke="#a78bfa"
+              strokeWidth="4"
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="all"
+              className="cursor-move"
+              onPointerDown={(event) => startDraggingPath(event, 'target')}
+            />
+            <polygon
+              points={pathToSvgPoints(sourcePath)}
+              fill="transparent"
+              stroke="#4ade80"
+              strokeWidth="4"
+              strokeDasharray="10 7"
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="all"
+              className="cursor-move"
+              onPointerDown={(event) => startDraggingPath(event, 'source')}
+            />
+            <ellipse
+              cx={targetCenter.x * 1000}
+              cy={targetCenter.y * 1000}
+              rx={4 * dotScaleX}
+              ry={4 * dotScaleY}
+              fill="#8b5cf6"
+              stroke="white"
+              strokeWidth="3"
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
+            />
+            <ellipse
+              cx={sourceCenter.x * 1000}
+              cy={sourceCenter.y * 1000}
+              rx={4 * dotScaleX}
+              ry={4 * dotScaleY}
+              fill="#22c55e"
+              stroke="white"
+              strokeWidth="3"
+              vectorEffect="non-scaling-stroke"
+              pointerEvents="none"
+            />
+          </>
+        )}
+      </svg>
+      {!maskComplete && (
+        <span className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/15 bg-black/75 px-3 py-2 text-[10px] font-bold text-white shadow-xl backdrop-blur">
+          {draftPatch.maskTool === 'points'
+            ? targetPath.length >= 3
+              ? 'Click the first green dot to close the mask'
+              : 'Click around the object to place mask dots'
+            : 'Drag to draw a rectangle mask'}
+        </span>
+      )}
+    </span>
+  );
+};
+
+const PatchedVideoCanvas = ({
+  videoRef,
+  clip,
+  crop,
+  geometry,
+  currentTime,
+  isPlaying,
+}) => {
+  const canvasRef = useRef(null);
+  const buffersRef = useRef(createPatchRemovalBuffers());
+
+  const renderFrame = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < 2 || video.videoWidth <= 0) return;
+    const croppedWidth = Math.max(1, video.videoWidth * crop.width);
+    const croppedHeight = Math.max(1, video.videoHeight * crop.height);
+    const previewScale = Math.min(1, 1280 / Math.max(croppedWidth, croppedHeight));
+    drawPatchedMediaFrame({
+      destination: canvas,
+      source: video,
+      crop,
+      patchRemoval: clip.patchRemoval,
+      width: croppedWidth * previewScale,
+      height: croppedHeight * previewScale,
+      buffers: buffersRef.current,
+    });
+  }, [clip.patchRemoval, crop, videoRef]);
+
+  useEffect(() => {
+    renderFrame();
+  }, [currentTime, renderFrame]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return undefined;
+    video.addEventListener('loadeddata', renderFrame);
+    video.addEventListener('seeked', renderFrame);
+    return () => {
+      video.removeEventListener('loadeddata', renderFrame);
+      video.removeEventListener('seeked', renderFrame);
+    };
+  }, [renderFrame, videoRef]);
+
+  useEffect(() => {
+    if (!isPlaying) return undefined;
+    let frame = 0;
+    const update = () => {
+      renderFrame();
+      frame = requestAnimationFrame(update);
+    };
+    frame = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frame);
+  }, [isPlaying, renderFrame]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none absolute max-w-none"
+      style={{
+        left: geometry.contentLeft,
+        top: geometry.contentTop,
+        width: geometry.contentWidth,
+        height: geometry.contentHeight,
+      }}
+      aria-hidden="true"
+    />
+  );
+};
+
 const PreviewVideoLayer = ({
   clip,
   currentTime,
@@ -473,6 +896,7 @@ const PreviewVideoLayer = ({
 }) => {
   const videoRef = useRef(null);
   const [mediaSize, setMediaSize] = useState({ width: 0, height: 0 });
+  const [patchPreview, setPatchPreview] = useState(null);
   const { crop, geometry, transform, startMove, startResize } = useMediaResize({
     clip,
     mediaSize,
@@ -480,6 +904,10 @@ const PreviewVideoLayer = ({
     onSelect,
     onUpdate,
   });
+  const patchRemoval = normalizePatchRemoval(clip.patchRemoval);
+  const patchEditing = selected && patchRemoval.enabled && patchRemoval.editing;
+  const renderedPatchRemoval = patchPreview || patchRemoval;
+  const patchActive = hasPatchRemovalMask(renderedPatchRemoval);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -491,7 +919,11 @@ const PreviewVideoLayer = ({
     if (!video) return undefined;
     const nextSourceTime = Number(clip.sourceStart || 0) +
       Math.max(0, currentTime - Number(clip.timelineStart || 0)) * Number(clip.playbackRate || 1);
-    if (Number.isFinite(nextSourceTime) && Math.abs(video.currentTime - nextSourceTime) > 0.16) {
+    const seekTolerance = isPlaying ? 0.16 : 0.001;
+    if (
+      Number.isFinite(nextSourceTime)
+      && Math.abs(video.currentTime - nextSourceTime) > seekTolerance
+    ) {
       try {
         video.currentTime = nextSourceTime;
       } catch {
@@ -516,7 +948,7 @@ const PreviewVideoLayer = ({
         event.stopPropagation();
         onSelect(clip.id);
       }}
-      onPointerDown={startMove}
+      onPointerDown={patchEditing ? undefined : startMove}
       className={`absolute cursor-move overflow-visible ${selected ? 'outline outline-2 outline-[#8b5cf6]' : ''}`}
       style={getMediaLayerStyle(geometry, transform)}
       aria-label={`Select ${clip.name || 'video clip'}`}
@@ -536,8 +968,29 @@ const PreviewVideoLayer = ({
           className="pointer-events-none absolute max-w-none"
           style={getCroppedMediaStyle(geometry, crop)}
         />
+        {patchActive && (
+          <PatchedVideoCanvas
+            videoRef={videoRef}
+            clip={{ ...clip, patchRemoval: renderedPatchRemoval }}
+            crop={crop}
+            geometry={geometry}
+            currentTime={currentTime}
+            isPlaying={isPlaying}
+          />
+        )}
+        {patchEditing && (
+          <PatchMaskEditor
+            patchRemoval={patchRemoval}
+            geometry={geometry}
+            onPreviewChange={setPatchPreview}
+            onChange={(nextPatch) => {
+              setPatchPreview(null);
+              onUpdate(clip.id, { patchRemoval: nextPatch });
+            }}
+          />
+        )}
       </span>
-      {selected && MEDIA_RESIZE_HANDLES.map((handle) => (
+      {selected && !patchEditing && MEDIA_RESIZE_HANDLES.map((handle) => (
         <span
           key={handle.mode}
           className={`absolute z-[70] grid h-5 w-5 touch-none place-items-center ${handle.className}`}
@@ -1722,6 +2175,14 @@ export const PreviewStage = ({
     cropSession.clipId === selectedVisualClip.id,
   );
   const cropDraft = isCropping ? cropSession.crop : null;
+  const selectedPatchRemoval = selectedVisualClip?.type === 'video'
+    ? normalizePatchRemoval(selectedVisualClip.patchRemoval)
+    : null;
+  const isPatchEditing = Boolean(
+    selectedVisualClip
+    && selectedPatchRemoval?.enabled
+    && selectedPatchRemoval.editing,
+  );
 
   useEffect(() => {
     if (!cropSession || cropSession.clipId === selectedClipId) return undefined;
@@ -1762,7 +2223,8 @@ export const PreviewStage = ({
         ? 'h-screen w-screen border-0 bg-black'
         : 'h-full border-l border-white/10'}`}
       onKeyDown={(event) => {
-        if (isCropping) event.stopPropagation();
+        const isFrameStepKey = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
+        if ((isCropping || isPatchEditing) && !isFrameStepKey) event.stopPropagation();
       }}
     >
       <div className={`relative flex min-h-0 flex-1 overflow-hidden ${isFullscreen ? 'p-0' : 'p-3'}`}>
@@ -1872,7 +2334,48 @@ export const PreviewStage = ({
       <div className={`${isFullscreen
         ? 'absolute bottom-4 left-1/2 z-[80] -translate-x-1/2'
         : 'mx-auto mb-3 shrink-0'} flex h-11 w-fit items-center gap-2 rounded-xl border border-white/10 bg-[#1a1b20]/95 px-2 shadow-[0_12px_30px_rgba(0,0,0,0.32)] backdrop-blur-md`}>
-        {isCropping ? (
+        {isPatchEditing ? (
+          <>
+            <span className="px-1 text-[10px] font-bold text-zinc-300">
+              {hasPatchRemovalMask(selectedPatchRemoval)
+                ? 'Drag purple target or green source'
+                : selectedPatchRemoval.maskTool === 'points'
+                  ? 'Place dots, then click the first dot'
+                  : 'Draw the target mask'}
+            </span>
+            <button
+              type="button"
+              onClick={() => onUpdateClip(selectedVisualClip.id, {
+                patchRemoval: {
+                  ...selectedPatchRemoval,
+                  targetPath: [],
+                  pathClosed: selectedPatchRemoval.maskTool !== 'points',
+                },
+              })}
+              className="flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[10px] font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Redraw
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdateClip(selectedVisualClip.id, {
+                patchRemoval: {
+                  ...selectedPatchRemoval,
+                  editing: false,
+                  pathClosed: selectedPatchRemoval.maskTool === 'points'
+                    && selectedPatchRemoval.targetPath.length >= 3
+                    ? true
+                    : selectedPatchRemoval.pathClosed,
+                },
+              })}
+              className="flex h-8 items-center gap-1.5 rounded-lg bg-violet-500 px-3 text-[10px] font-extrabold text-white shadow-[0_5px_14px_rgba(139,92,246,0.3)] transition hover:bg-violet-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1a1b20]"
+            >
+              <Check className="h-3.5 w-3.5" />
+              Done
+            </button>
+          </>
+        ) : isCropping ? (
           <>
             <button
               type="button"

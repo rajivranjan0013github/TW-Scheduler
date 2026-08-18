@@ -17,6 +17,7 @@ import {
   TRACK_TYPE_VALUES,
   trackAcceptsClipType,
 } from './projectConstants.js';
+import { normalizePatchRemoval } from './patchRemoval.js';
 
 let fallbackIdCounter = 0;
 
@@ -197,6 +198,7 @@ export const createVideoClip = (input = {}) => ({
   muted: Boolean(input.muted),
   fit: ['fit', 'fill', 'stretch'].includes(input.fit) ? input.fit : 'fit',
   crop: normalizeCrop(input.crop),
+  patchRemoval: normalizePatchRemoval(input.patchRemoval),
   transform: normalizeTransform(input.transform),
   effects: {
     brightness: clampNumber(input.effects?.brightness, -1, 1, 0),
