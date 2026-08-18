@@ -4,7 +4,12 @@ import {
   subscribeToBulkRows,
   writeBulkRowsSnapshot,
 } from './bulkProjectStore';
-import { syncBulkRowContent } from '../videoEditorV2/project';
+import {
+  bulkRowToProject,
+  projectToBulkRow,
+  syncBulkRowContent,
+  updateClipById,
+} from '../videoEditorV2/project';
 
 export { BULK_ROWS_STORAGE_KEY } from './bulkProjectStore';
 
@@ -308,6 +313,20 @@ export const useBulkRows = () => {
     );
   }, []);
 
+  const updateRowEditorClip = useCallback((rowId, clipId, changes) => {
+    setRows((prev) => prev.map((row) => {
+      if (row.id !== rowId) return row;
+      const dualVideoEnabled = getIsDualVideoFromStorage();
+      const project = bulkRowToProject(row, { isDualVideo: dualVideoEnabled });
+      const nextProject = updateClipById(project, clipId, changes);
+
+      return sanitizeBulkRowForStorage(projectToBulkRow(nextProject, row, {
+        isDualVideo: dualVideoEnabled,
+        clearResult: true,
+      }));
+    }));
+  }, []);
+
   const getReadyRows = useCallback(() => {
     const isDual = getIsDualVideoFromStorage();
     return rows.filter((r) => r.video1 && (!isDual || r.video2) && r.status !== 'done');
@@ -368,6 +387,7 @@ export const useBulkRows = () => {
     updateRow,
     updateRowTextSettings,
     updateRowDragPos,
+    updateRowEditorClip,
     getReadyRows,
     markRowStatus,
     clearAllRows,

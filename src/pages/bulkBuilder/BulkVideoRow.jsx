@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Video, Music, Type, X, Move, Pencil } from 'lucide-react';
 import {
-  FONT_FAMILY_CSS,
   PREVIEW_FRAME_HEIGHT,
   PREVIEW_FRAME_WIDTH,
-  WEIGHT_MAP,
 } from '../videoEditor/videoEditorConstants';
-import { getOverlayTextHeight, getOverlayTextWidth, hexToRgba } from '../videoEditor/videoEditorUtils';
+import { getOverlayTextHeight, getOverlayTextWidth } from '../videoEditor/videoEditorUtils';
+import { bulkRowToProject, getAllClips, TRACK_TYPES } from '../videoEditorV2/project';
+import { getActiveEditorDragItem, readEditorDragData } from '../videoEditorV2/media/editorDragData';
 import { DEFAULT_DRAG_POS } from './useBulkRows';
 import { FloatingTextControls } from './FloatingTextControls';
 import LoadingVideoPreview from '../../components/LoadingVideoPreview';
@@ -16,6 +16,19 @@ const SOURCE_PREVIEW_WIDTH = PREVIEW_FRAME_WIDTH;
 const SOURCE_PREVIEW_HEIGHT = PREVIEW_FRAME_HEIGHT;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const MIN_TEXT_BOX_WIDTH = 0.08;
+const MAX_TEXT_BOX_WIDTH = 1.0;
+const MIN_TEXT_SCALE = 0.25;
+const MAX_TEXT_SCALE = 3;
+const CENTER_GUIDE_THRESHOLD_PX = 6;
+const TEXT_RESIZE_HANDLES = [
+  { mode: 'left', label: 'Resize text box from left', className: '-left-2 top-1/2 h-7 w-4 -translate-y-1/2 cursor-ew-resize', indicatorClassName: 'h-4 w-1 rounded-full' },
+  { mode: 'right', label: 'Resize text box from right', className: '-right-2 top-1/2 h-7 w-4 -translate-y-1/2 cursor-ew-resize', indicatorClassName: 'h-4 w-1 rounded-full' },
+  { mode: 'nw', label: 'Scale text from top left', className: '-left-2.5 -top-2.5 h-5 w-5 cursor-nwse-resize', indicatorClassName: 'h-2 w-2 rounded-[2px]' },
+  { mode: 'ne', label: 'Scale text from top right', className: '-right-2.5 -top-2.5 h-5 w-5 cursor-nesw-resize', indicatorClassName: 'h-2 w-2 rounded-[2px]' },
+  { mode: 'sw', label: 'Scale text from bottom left', className: '-bottom-2.5 -left-2.5 h-5 w-5 cursor-nesw-resize', indicatorClassName: 'h-2 w-2 rounded-[2px]' },
+  { mode: 'se', label: 'Scale text from bottom right', className: '-bottom-2.5 -right-2.5 h-5 w-5 cursor-nwse-resize', indicatorClassName: 'h-2 w-2 rounded-[2px]' },
+];
 
 const getSourceBoxMetrics = (text, settings) => {
   const textWidth = getOverlayTextWidth(
@@ -56,11 +69,15 @@ export const BulkVideoRow = ({
   onPickVideo1,
   onPickVideo2,
   onPickAudio,
+  onDropVideo1,
+  onDropVideo2,
+  onDropAudio,
   onOpenCaptionDrawer,
   onCaptionOverlayClick,
   onUpdateCaption,
   onUpdateTextSettings,
   onUpdateDragPos,
+  onUpdateTextClip,
   onCloseCaptionControls,
   onRemove,
   zoomScale = 1,
@@ -75,11 +92,22 @@ export const BulkVideoRow = ({
   const video1PreviewRef = useRef(null);
   const video2PreviewRef = useRef(null);
   const captionTextRef = useRef(null);
+  const captionLayerRef = useRef(null);
   const dragSessionRef = useRef(null);
+  const resizeDraftRef = useRef(null);
+  const resizeCleanupRef = useRef(null);
   const didDragCaptionRef = useRef(false);
   const suppressTextSelectionRef = useRef(false);
   const [isEditingCaption, setIsEditingCaption] = useState(false);
   const [isDraggingCaption, setIsDraggingCaption] = useState(false);
+  const [dragOverSlot, setDragOverSlot] = useState(null); // 'video1' | 'video2' | 'audio' | null
+  const [alignmentGuides, setAlignmentGuides] = useState({
+    vertical: false,
+    horizontal: false,
+  });
+  const [resizeDraft, setResizeDraft] = useState(null);
+  const [dragDraft, setDragDraft] = useState(null);
+  const dragDraftRef = useRef(null);
   const [video1TileSize, setVideo1TileSize] = useState({
     width: SOURCE_PREVIEW_WIDTH,
     height: SOURCE_PREVIEW_HEIGHT,
@@ -107,10 +135,18 @@ export const BulkVideoRow = ({
     return () => resizeObserver.disconnect();
   }, []);
 
+  useEffect(() => () => resizeCleanupRef.current?.(), []);
+
   const previewScaleX = video1TileSize.width / SOURCE_PREVIEW_WIDTH;
   const previewScaleY = video1TileSize.height / SOURCE_PREVIEW_HEIGHT;
+  const previewProject = useMemo(() => bulkRowToProject(row), [row]);
+  const previewTextClip = useMemo(() => {
+    const textClips = getAllClips(previewProject).filter((clip) => (
+      clip.type === TRACK_TYPES.TEXT && clip.enabled !== false
+    ));
+    return textClips.find((clip) => clip.metadata?.bulkCaption === true) || textClips[0] || null;
+  }, [previewProject]);
   const sourceMetrics = getSourceBoxMetrics(caption, textSettings);
-  const sourceTextWidth = sourceMetrics.textWidth;
   const sourceTextHeight = sourceMetrics.textHeight;
   const sourceBoxWidth = sourceMetrics.boxWidth;
   const sourceBoxHeight = sourceMetrics.boxHeight;
@@ -118,31 +154,48 @@ export const BulkVideoRow = ({
   const maxSourceY = Math.max(0, SOURCE_PREVIEW_HEIGHT - sourceTextHeight);
   const clampedSourceX = clamp(dragPos.x, 0, maxSourceX);
   const clampedSourceY = clamp(dragPos.y, 0, maxSourceY);
-  const captionLeft = clampedSourceX * previewScaleX;
-  const captionTop = clampedSourceY * previewScaleY;
-  
-  const minCenterX = -Math.round((SOURCE_PREVIEW_WIDTH - sourceBoxWidth) / 2);
-  const maxCenterX = Math.round((SOURCE_PREVIEW_WIDTH - sourceBoxWidth) / 2);
-  const minCenterY = -Math.round((SOURCE_PREVIEW_HEIGHT - sourceBoxHeight) / 2);
-  const maxCenterY = Math.round((SOURCE_PREVIEW_HEIGHT - sourceBoxHeight) / 2);
-  const centerPlacement = {
-    x: Math.round(clampedSourceX + sourceBoxWidth / 2 - SOURCE_PREVIEW_WIDTH / 2),
-    y: Math.round(clampedSourceY + sourceBoxHeight / 2 - SOURCE_PREVIEW_HEIGHT / 2),
-    minX: minCenterX,
-    maxX: maxCenterX,
-    minY: minCenterY,
-    maxY: maxCenterY,
-  };
-  
-  const previewTextWidth = Math.max(20, sourceTextWidth * previewScaleX);
-  const previewTextHeight = Math.max(
-    14,
-    (sourceTextHeight - (textSettings.bgType !== 'None' ? 8 : 0)) * previewScaleY + 2
+  const editorTextStyle = previewTextClip?.style || {};
+  const editorTextTransform = previewTextClip?.transform || {};
+  const outputHeight = Math.max(1, Number(previewProject?.output?.height) || 1280);
+  const editorPreviewScale = video1TileSize.height / outputHeight;
+  const outputFontSize = Number(editorTextStyle.fontSize || 40);
+  const previewFontSize = clamp(outputFontSize * editorPreviewScale, 8, 96);
+  const hasTextBackground = String(editorTextStyle.backgroundType || 'none').toLowerCase() !== 'none';
+  const automaticPreviewPadding = Math.max(
+    0,
+    Number(editorTextStyle.padding || (hasTextBackground ? outputFontSize * 0.25 : 0))
+      * editorPreviewScale,
   );
-  const previewFontSize = Math.max(7, textSettings.fontSize * previewScaleX);
-  const previewStrokeWidth = textSettings.strokeWidth > 0
-    ? Math.max(0.5, textSettings.strokeWidth * previewScaleX)
-    : 0;
+  const previewPaddingX = editorTextStyle.paddingX === null || editorTextStyle.paddingX === undefined
+    ? automaticPreviewPadding
+    : Math.max(0, Number(editorTextStyle.paddingX) * editorPreviewScale);
+  const previewPaddingY = editorTextStyle.paddingY === null || editorTextStyle.paddingY === undefined
+    ? automaticPreviewPadding
+    : Math.max(0, Number(editorTextStyle.paddingY) * editorPreviewScale);
+  const previewStrokeWidth = Math.max(
+    0,
+    Number(editorTextStyle.strokeWidth ?? 3) * editorPreviewScale,
+  );
+  const previewBoxWidth = clamp(Number(editorTextStyle.boxWidth || 0), 0, 1);
+  const previewBoxHeight = clamp(Number(editorTextStyle.boxHeight || 0), 0, 1);
+  const previewTransform = {
+    x: Number(editorTextTransform.x ?? 0.5),
+    y: Number(editorTextTransform.y ?? 0.25),
+    scale: Number(editorTextTransform.scale ?? 1),
+    rotation: Number(editorTextTransform.rotation || 0),
+    opacity: Number(editorTextTransform.opacity ?? 1),
+  };
+  const visibleBoxWidth = resizeDraft?.boxWidth ?? previewBoxWidth;
+  const visibleBoxHeight = resizeDraft?.boxHeight ?? previewBoxHeight;
+  const visibleTransform = resizeDraft?.transform || dragDraft?.transform || previewTransform;
+  const resizeControlScale = Math.max(0.01, Number(inverseZoomScale) || 1)
+    / Math.max(0.01, Math.abs(Number(visibleTransform.scale) || 1));
+  const captionLines = caption.split('\n');
+  const captionEditorColumns = clamp(
+    Math.max(...captionLines.map((line) => line.length), 1) + 1,
+    4,
+    64,
+  );
 
   const statusColors = {
     draft: 'bg-zinc-800 text-zinc-400 border border-zinc-700/60',
@@ -189,13 +242,6 @@ export const BulkVideoRow = ({
       nextCaption,
       getCenteredDragPosForBox(getSourceBoxMetrics(nextCaption, textSettings))
     );
-  };
-
-  const handleUpdateCenterPlacement = ({ x = centerPlacement.x, y = centerPlacement.y }) => {
-    onUpdateDragPos?.({
-      x: clamp(SOURCE_PREVIEW_WIDTH / 2 + x - sourceBoxWidth / 2, 0, maxSourceX),
-      y: clamp(SOURCE_PREVIEW_HEIGHT / 2 + y - sourceBoxHeight / 2, 0, maxSourceY),
-    });
   };
 
   const handleUpdateTextSettings = (partialSettings) => {
@@ -262,6 +308,7 @@ export const BulkVideoRow = ({
 
   // Caption inline overlay dragging
   const handleCaptionPointerDown = (event) => {
+    if (event.button !== 0 || event.isPrimary === false) return;
     event.preventDefault();
     event.stopPropagation();
     didDragCaptionRef.current = false;
@@ -269,9 +316,10 @@ export const BulkVideoRow = ({
       pointerId: event.pointerId,
       startClientX: event.clientX,
       startClientY: event.clientY,
-      startX: Math.max(0, Math.min(maxSourceX, dragPos.x)),
-      startY: Math.max(0, Math.min(maxSourceY, dragPos.y)),
+      startTransformX: Number(previewTransform.x ?? 0.5),
+      startTransformY: Number(previewTransform.y ?? 0.25),
     };
+    setAlignmentGuides({ vertical: false, horizontal: false });
     setIsDraggingCaption(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -282,16 +330,61 @@ export const BulkVideoRow = ({
     event.preventDefault();
     event.stopPropagation();
 
-    const deltaX = (event.clientX - dragSession.startClientX) / Math.max(previewScaleX, 0.01);
-    const deltaY = (event.clientY - dragSession.startClientY) / Math.max(previewScaleY, 0.01);
-    if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+    const localZoom = Math.max(0.01, Number(zoomScale) || 1);
+    const stageWidth = Math.max(1, video1TileSize.width);
+    const stageHeight = Math.max(1, video1TileSize.height);
+
+    const deltaX = (event.clientX - dragSession.startClientX) / (stageWidth * localZoom);
+    const deltaY = (event.clientY - dragSession.startClientY) / (stageHeight * localZoom);
+
+    if (Math.abs(event.clientX - dragSession.startClientX) > 2 || Math.abs(event.clientY - dragSession.startClientY) > 2) {
       didDragCaptionRef.current = true;
     }
 
-    onUpdateDragPos?.({
-      x: Math.max(0, Math.min(maxSourceX, dragSession.startX + deltaX)),
-      y: Math.max(0, Math.min(maxSourceY, dragSession.startY + deltaY)),
+    // Keep the entire text box strictly bounded within the video frame edges
+    const layer = captionLayerRef.current;
+    const currentScale = Number(visibleTransform.scale || 1);
+    const layerWidth = (layer?.offsetWidth || sourceBoxWidth) * currentScale;
+    const layerHeight = (layer?.offsetHeight || sourceBoxHeight) * currentScale;
+    const halfWidthRatio = Math.min(0.48, (layerWidth / 2) / stageWidth);
+    const halfHeightRatio = Math.min(0.48, (layerHeight / 2) / stageHeight);
+
+    const minX = halfWidthRatio;
+    const maxX = Math.max(halfWidthRatio, 1 - halfWidthRatio);
+    const minY = halfHeightRatio;
+    const maxY = Math.max(halfHeightRatio, 1 - halfHeightRatio);
+
+    let nextTransformX = clamp(dragSession.startTransformX + deltaX, minX, maxX);
+    let nextTransformY = clamp(dragSession.startTransformY + deltaY, minY, maxY);
+
+    const xThreshold = CENTER_GUIDE_THRESHOLD_PX / (stageWidth * localZoom);
+    const yThreshold = CENTER_GUIDE_THRESHOLD_PX / (stageHeight * localZoom);
+    const shouldSnapVertical = Math.abs(nextTransformX - 0.5) <= xThreshold;
+    const shouldSnapHorizontal = Math.abs(nextTransformY - 0.5) <= yThreshold;
+
+    if (shouldSnapVertical) {
+      nextTransformX = 0.5;
+    }
+    if (shouldSnapHorizontal) {
+      nextTransformY = 0.5;
+    }
+
+    setAlignmentGuides({
+      vertical: shouldSnapVertical,
+      horizontal: shouldSnapHorizontal,
     });
+
+    const nextTransform = {
+      ...previewTextClip?.transform,
+      x: nextTransformX,
+      y: nextTransformY,
+      scale: previewTransform.scale,
+      rotation: previewTransform.rotation,
+      opacity: previewTransform.opacity,
+    };
+
+    dragDraftRef.current = nextTransform;
+    setDragDraft({ transform: nextTransform });
   };
 
   const handleCaptionPointerUp = (event) => {
@@ -299,13 +392,161 @@ export const BulkVideoRow = ({
     if (!dragSession || dragSession.pointerId !== event.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
+    const finalTransform = dragDraftRef.current;
     dragSessionRef.current = null;
+    dragDraftRef.current = null;
+    setDragDraft(null);
     setIsDraggingCaption(false);
+    setAlignmentGuides({ vertical: false, horizontal: false });
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {
       // Safe releases
     }
+
+    if (didDragCaptionRef.current && finalTransform && previewTextClip) {
+      onUpdateTextClip?.(previewTextClip.id, {
+        transform: finalTransform,
+      });
+    }
+  };
+
+  const startCaptionResize = (event, mode) => {
+    if (event.button !== 0 || event.isPrimary === false || !previewTextClip) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragSessionRef.current = null;
+    setIsDraggingCaption(false);
+    resizeCleanupRef.current?.();
+    resizeDraftRef.current = null;
+    setResizeDraft(null);
+
+    const layer = captionLayerRef.current;
+    if (!layer) return;
+
+    const stageWidth = Math.max(1, video1TileSize.width);
+    const stageHeight = Math.max(1, video1TileSize.height);
+    const localZoom = Math.max(0.01, Number(zoomScale) || 1);
+    const startPoint = { x: event.clientX, y: event.clientY };
+    const startWidth = Math.max(1, layer.offsetWidth);
+    const startHeight = Math.max(1, layer.offsetHeight);
+    const startScale = clamp(Number(previewTransform.scale || 1), 0.01, MAX_TEXT_SCALE);
+    const rotation = (Number(previewTransform.rotation || 0) * Math.PI) / 180;
+    const cosine = Math.cos(rotation);
+    const sine = Math.sin(rotation);
+    const minimumWidth = Math.max(stageWidth * MIN_TEXT_BOX_WIDTH, previewFontSize * 2);
+    const maximumWidth = stageWidth * MAX_TEXT_BOX_WIDTH;
+    const isSideHandle = mode === 'left' || mode === 'right';
+
+    const cleanup = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', finishResize);
+      document.removeEventListener('pointercancel', cancelResize);
+      resizeCleanupRef.current = null;
+    };
+
+    const completeResize = (shouldCommit) => {
+      const finalDraft = resizeDraftRef.current;
+      cleanup();
+      if (shouldCommit && finalDraft) {
+        onUpdateTextClip?.(previewTextClip.id, {
+          style: {
+            ...previewTextClip.style,
+            boxWidth: finalDraft.boxWidth,
+            boxHeight: finalDraft.boxHeight,
+          },
+          transform: finalDraft.transform,
+        });
+      }
+      resizeDraftRef.current = null;
+      setResizeDraft(null);
+    };
+
+    function move(moveEvent) {
+      moveEvent.preventDefault();
+      const worldDeltaX = (moveEvent.clientX - startPoint.x) / localZoom;
+      const worldDeltaY = (moveEvent.clientY - startPoint.y) / localZoom;
+      let nextBoxWidth = previewBoxWidth;
+      const nextBoxHeight = previewBoxHeight;
+      let nextTransform;
+
+      if (isSideHandle) {
+        const localDeltaX = (worldDeltaX * cosine + worldDeltaY * sine) / startScale;
+        const direction = mode === 'right' ? 1 : -1;
+        const nextWidth = clamp(
+          startWidth + direction * localDeltaX,
+          minimumWidth,
+          maximumWidth,
+        );
+        const appliedDelta = nextWidth - startWidth;
+        const centerShiftX = (appliedDelta * direction) / 2;
+        nextBoxWidth = nextWidth / stageWidth;
+
+        const worldCenterShiftX = centerShiftX * cosine * startScale;
+        const worldCenterShiftY = centerShiftX * sine * startScale;
+        const halfWidthRatio = Math.min(0.48, (nextWidth / 2) / stageWidth);
+        const minX = halfWidthRatio;
+        const maxX = Math.max(halfWidthRatio, 1 - halfWidthRatio);
+
+        nextTransform = {
+          ...previewTextClip.transform,
+          x: clamp(previewTransform.x + worldCenterShiftX / stageWidth, minX, maxX),
+          y: clamp(previewTransform.y + worldCenterShiftY / stageHeight, 0.05, 0.95),
+          scale: startScale,
+        };
+      } else {
+        const horizontalDirection = mode.includes('e') ? 1 : -1;
+        const verticalDirection = mode.includes('s') ? 1 : -1;
+        const localDiagonalX = horizontalDirection * startWidth * startScale;
+        const localDiagonalY = verticalDirection * startHeight * startScale;
+        const worldDiagonalX = localDiagonalX * cosine - localDiagonalY * sine;
+        const worldDiagonalY = localDiagonalX * sine + localDiagonalY * cosine;
+        const diagonalLengthSquared = Math.max(
+          1,
+          worldDiagonalX ** 2 + worldDiagonalY ** 2,
+        );
+        const scaleFactor = 1 + (
+          worldDeltaX * worldDiagonalX + worldDeltaY * worldDiagonalY
+        ) / diagonalLengthSquared;
+        const nextScale = clamp(
+          startScale * scaleFactor,
+          MIN_TEXT_SCALE,
+          MAX_TEXT_SCALE,
+        );
+        const scaleDelta = nextScale - startScale;
+        const localCenterShiftX = horizontalDirection * startWidth * scaleDelta / 2;
+        const localCenterShiftY = verticalDirection * startHeight * scaleDelta / 2;
+        const worldCenterShiftX = localCenterShiftX * cosine - localCenterShiftY * sine;
+        const worldCenterShiftY = localCenterShiftX * sine + localCenterShiftY * cosine;
+        nextTransform = {
+          ...previewTextClip.transform,
+          x: clamp(previewTransform.x + worldCenterShiftX / stageWidth, 0, 1),
+          y: clamp(previewTransform.y + worldCenterShiftY / stageHeight, 0, 1),
+          scale: nextScale,
+        };
+      }
+
+      const nextDraft = {
+        boxWidth: nextBoxWidth,
+        boxHeight: nextBoxHeight,
+        transform: nextTransform,
+      };
+      resizeDraftRef.current = nextDraft;
+      setResizeDraft(nextDraft);
+    }
+
+    function finishResize() {
+      completeResize(true);
+    }
+
+    function cancelResize() {
+      completeResize(false);
+    }
+
+    resizeCleanupRef.current = cleanup;
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', finishResize);
+    document.addEventListener('pointercancel', cancelResize);
   };
 
   const handleCaptionDoubleClick = (event) => {
@@ -323,6 +564,63 @@ export const BulkVideoRow = ({
         suppressTextSelectionRef.current = false;
       }, 80);
     }, 10);
+  };
+
+  const handleSlotDragOver = (event, slot) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'copy';
+    if (dragOverSlot !== slot) {
+      setDragOverSlot(slot);
+    }
+  };
+
+  const handleSlotDragLeave = (event, slot) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (dragOverSlot === slot) {
+      setDragOverSlot(null);
+    }
+  };
+
+  const handleSlotDrop = (event, slot) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragOverSlot(null);
+
+    const dragItem = getActiveEditorDragItem() || readEditorDragData(event.dataTransfer);
+    if (dragItem?.asset) {
+      const asset = dragItem.asset;
+      if (slot === 'video1') {
+        onDropVideo1?.(asset);
+      } else if (slot === 'video2') {
+        onDropVideo2?.(asset);
+      } else if (slot === 'audio') {
+        onDropAudio?.(asset);
+      }
+      return;
+    }
+
+    const files = Array.from(event.dataTransfer.files || []);
+    if (files.length > 0) {
+      const file = files[0];
+      const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm|m4v|mkv)$/i.test(file.name);
+      const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|aac|m4a|ogg)$/i.test(file.name);
+      const url = URL.createObjectURL(file);
+      const asset = {
+        id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: file.name,
+        url,
+        originalUrl: url,
+        sourceType: 'local',
+        type: isVideo ? 'video' : isAudio ? 'audio' : 'file',
+        file,
+      };
+
+      if (isVideo && slot === 'video1') onDropVideo1?.(asset);
+      else if (isVideo && slot === 'video2') onDropVideo2?.(asset);
+      else if (isAudio || slot === 'audio') onDropAudio?.(asset);
+    }
   };
 
   return (
@@ -382,7 +680,14 @@ export const BulkVideoRow = ({
             </button>
           </div>
 
-          <div className="relative group/tooltip">
+          <div
+            onDragOver={(e) => handleSlotDragOver(e, 'audio')}
+            onDragLeave={(e) => handleSlotDragLeave(e, 'audio')}
+            onDrop={(e) => handleSlotDrop(e, 'audio')}
+            className={`relative group/tooltip rounded-md transition-all ${
+              dragOverSlot === 'audio' ? 'ring-2 ring-[#ff5500] scale-105' : ''
+            }`}
+          >
             <button
               type="button"
               onClick={onPickAudio}
@@ -432,7 +737,23 @@ export const BulkVideoRow = ({
       <div className={isDualVideo ? "grid grid-cols-2 gap-2.5" : "flex justify-center"}>
         
         {/* Video 1 Preview Card */}
-        <div className={`relative ${isDualVideo ? "" : "w-[145px]"}`}>
+        <div
+          onDragOver={(e) => handleSlotDragOver(e, 'video1')}
+          onDragLeave={(e) => handleSlotDragLeave(e, 'video1')}
+          onDrop={(e) => handleSlotDrop(e, 'video1')}
+          className={`relative transition-all ${isDualVideo ? "" : "w-[145px]"} ${
+            dragOverSlot === 'video1'
+              ? 'ring-2 ring-[#ff5500] ring-offset-2 ring-offset-[#1c1c1e] scale-[1.02] rounded-xl z-20 shadow-[0_0_15px_rgba(255,85,0,0.5)]'
+              : ''
+          }`}
+        >
+          {dragOverSlot === 'video1' && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#ff5500]/20 backdrop-blur-[2px] rounded-xl border-2 border-dashed border-[#ff5500] pointer-events-none animate-pulse">
+              <span className="text-[10px] font-extrabold uppercase text-white bg-black/80 px-2 py-1 rounded-md shadow-lg border border-[#ff5500]/50">
+                Drop Video 1
+              </span>
+            </div>
+          )}
           {resolvedVideo1Url ? (
             <>
               <div
@@ -490,11 +811,33 @@ export const BulkVideoRow = ({
             </button>
           )}
 
+          {isDraggingCaption && alignmentGuides.vertical && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 left-1/2 z-[5] -translate-x-1/2 bg-[#ff5500] shadow-[0_0_4px_rgba(255,85,0,0.7)]"
+              style={{ width: `${Math.max(0.01, Number(inverseZoomScale) || 1)}px` }}
+            />
+          )}
+          {isDraggingCaption && alignmentGuides.horizontal && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-1/2 z-[5] -translate-y-1/2 bg-[#ff5500] shadow-[0_0_4px_rgba(255,85,0,0.7)]"
+              style={{ height: `${Math.max(0.01, Number(inverseZoomScale) || 1)}px` }}
+            />
+          )}
+
           {/* Styled Captions overlay */}
           {caption && resolvedVideo1Url && (
             <div
+              ref={captionLayerRef}
               data-caption-overlay="true"
-              className="absolute z-10"
+              className={`absolute z-10 flex max-w-full items-center justify-center whitespace-pre-wrap text-center [overflow-wrap:anywhere] ${
+                isEditingCaption
+                  ? 'outline outline-2 outline-[#ff5500]'
+                  : isActiveCaption || isDraggingCaption
+                    ? 'outline outline-1 outline-dashed outline-white/80'
+                    : ''
+              }`}
               onMouseDown={(e) => {
                 if (!isEditingCaption && e.detail > 1) {
                   e.preventDefault();
@@ -514,26 +857,45 @@ export const BulkVideoRow = ({
               }}
               onDoubleClick={handleCaptionDoubleClick}
               style={{
-                left: `${captionLeft}px`,
-                top: `${captionTop}px`,
+                left: `${visibleTransform.x * video1TileSize.width}px`,
+                top: `${visibleTransform.y * video1TileSize.height}px`,
+                width: visibleBoxWidth > 0 ? visibleBoxWidth * video1TileSize.width : undefined,
+                minHeight: visibleBoxHeight > 0
+                  ? visibleBoxHeight * video1TileSize.height
+                  : undefined,
+                boxSizing: 'border-box',
+                padding: `${previewPaddingY}px ${previewPaddingX}px`,
+                maxWidth: visibleBoxWidth > 0 ? video1TileSize.width : undefined,
+                transform: `translate(-50%, -50%) rotate(${visibleTransform.rotation}deg) scale(${visibleTransform.scale})`,
+                transformOrigin: 'center',
+                opacity: visibleTransform.opacity,
+                fontFamily: editorTextStyle.fontFamily || 'Outfit, sans-serif',
+                fontSize: `${previewFontSize}px`,
+                fontWeight: editorTextStyle.fontWeight || 600,
+                lineHeight: Number(editorTextStyle.lineHeight || 1.2),
+                letterSpacing: Number(editorTextStyle.letterSpacing || 0) * editorPreviewScale,
+                color: editorTextStyle.color || '#ffffff',
+                textAlign: editorTextStyle.textAlign || 'center',
+                WebkitTextStrokeWidth: `${previewStrokeWidth}px`,
+                WebkitTextStrokeColor: editorTextStyle.strokeColor || '#000000',
+                WebkitTextFillColor: editorTextStyle.color || '#ffffff',
+                paintOrder: 'stroke fill',
+                textRendering: 'geometricPrecision',
+                backgroundColor: hasTextBackground
+                  ? (editorTextStyle.backgroundColor || 'transparent')
+                  : 'transparent',
+                borderRadius: Number(
+                  editorTextStyle.borderRadius ?? editorTextStyle.backgroundRadius ?? 12,
+                ) * editorPreviewScale,
+                textShadow: editorTextStyle.shadow ? '0 2px 8px rgba(0,0,0,.55)' : 'none',
+                userSelect: isEditingCaption ? 'text' : 'none',
+                outlineWidth: isEditingCaption
+                  ? `${2 * resizeControlScale}px`
+                  : isActiveCaption || isDraggingCaption
+                    ? `${resizeControlScale}px`
+                    : undefined,
                 cursor: isEditingCaption ? 'text' : 'move',
                 touchAction: isEditingCaption ? 'auto' : 'none',
-                padding: textSettings.bgType !== 'None' ? `${Math.max(1, 3 * previewScaleY)}px ${Math.max(2, 6 * previewScaleX)}px` : '0px',
-                borderRadius: textSettings.bgType === 'Snapchat' ? '4px' : textSettings.bgType === 'White' ? '3px' : '0',
-                backgroundColor:
-                  textSettings.bgType === 'White'
-                    ? textSettings.bgColor
-                    : textSettings.bgType === 'Snapchat'
-                      ? hexToRgba(textSettings.bgColor, 0.6)
-                      : 'transparent',
-                outline: isEditingCaption
-                  ? '1px dashed rgba(255,255,255,0.8)'
-                  : isDraggingCaption
-                    ? '1px dashed rgba(255,255,255,0.5)'
-                    : isActiveCaption
-                      ? '1px dashed rgba(255,255,255,0.6)'
-                      : 'none',
-                outlineOffset: '2px',
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -544,49 +906,79 @@ export const BulkVideoRow = ({
                 onCaptionOverlayClick();
               }}
             >
-              <textarea
-                ref={captionTextRef}
-                value={caption}
-                onChange={(e) => handleCaptionChange(e.target.value)}
-                onBlur={() => setIsEditingCaption(false)}
-                onSelect={(e) => {
-                  if (!suppressTextSelectionRef.current) return;
-                  const textarea = e.currentTarget;
-                  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-                }}
-                onDoubleClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  captionTextRef.current?.setSelectionRange(caption.length, caption.length);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    setIsEditingCaption(false);
-                    captionTextRef.current?.blur();
-                  }
-                }}
-                readOnly={!isEditingCaption}
-                rows={Math.max(caption.split('\n').length, 1)}
-                className="block select-none bg-transparent p-0 m-0 resize-none overflow-hidden border-0 outline-none text-center leading-[1.3] break-words transition-all text-white"
-                style={{
-                  display: 'block',
-                  fontFamily: FONT_FAMILY_CSS[textSettings.fontFamily] || FONT_FAMILY_CSS.Roboto,
-                  fontWeight: WEIGHT_MAP[textSettings.fontWeight] || '400',
-                  fontSize: `${previewFontSize}px`,
-                  width: `${previewTextWidth}px`,
-                  minWidth: '20px',
-                  height: `${previewTextHeight}px`,
-                  boxSizing: 'border-box',
-                  color: textSettings.fontColor,
-                  WebkitTextStrokeWidth: previewStrokeWidth > 0 ? `${previewStrokeWidth}px` : '0px',
-                  WebkitTextStrokeColor: textSettings.strokeColor,
-                  paintOrder: 'stroke fill',
-                  whiteSpace: 'pre-wrap',
-                  pointerEvents: isEditingCaption ? 'auto' : 'none',
-                  userSelect: isEditingCaption ? 'auto' : 'none',
-                  caretColor: isEditingCaption ? '#ffffff' : 'transparent',
-                }}
-              />
+              {isEditingCaption ? (
+                <textarea
+                  ref={captionTextRef}
+                  value={caption}
+                  onChange={(e) => handleCaptionChange(e.target.value)}
+                  onBlur={() => setIsEditingCaption(false)}
+                  onSelect={(e) => {
+                    if (!suppressTextSelectionRef.current) return;
+                    const textarea = e.currentTarget;
+                    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    captionTextRef.current?.setSelectionRange(caption.length, caption.length);
+                  }}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Escape') {
+                      setIsEditingCaption(false);
+                      captionTextRef.current?.blur();
+                    }
+                  }}
+                  rows={Math.max(captionLines.length, 1)}
+                  cols={captionEditorColumns}
+                  aria-label="Edit text on preview"
+                  className="block min-h-[1.2em] min-w-[4ch] max-w-full cursor-text resize-none overflow-hidden border-0 bg-transparent p-0 outline-none"
+                  style={{
+                    fieldSizing: 'content',
+                    width: visibleBoxWidth > 0 ? '100%' : undefined,
+                    maxWidth: visibleBoxWidth > 0
+                      ? '100%'
+                      : video1TileSize.width,
+                    font: 'inherit',
+                    lineHeight: 'inherit',
+                    color: 'inherit',
+                    textAlign: 'inherit',
+                    WebkitTextStrokeWidth: `${previewStrokeWidth}px`,
+                    WebkitTextStrokeColor: editorTextStyle.strokeColor || '#000000',
+                    WebkitTextFillColor: editorTextStyle.color || '#ffffff',
+                    paintOrder: 'stroke fill',
+                    caretColor: editorTextStyle.color || '#ffffff',
+                  }}
+                />
+              ) : (
+                <span
+                  className="block whitespace-pre-wrap [overflow-wrap:anywhere]"
+                  style={{ width: visibleBoxWidth > 0 ? '100%' : undefined }}
+                >
+                  {caption}
+                </span>
+              )}
+
+              {isActiveCaption && TEXT_RESIZE_HANDLES.map((handle) => (
+                <button
+                  key={handle.mode}
+                  type="button"
+                  tabIndex={isEditingCaption ? -1 : 0}
+                  aria-label={handle.label}
+                  title={handle.label}
+                  onPointerDown={(event) => startCaptionResize(event, handle.mode)}
+                  onClick={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  className={`absolute z-[70] grid touch-none place-items-center bg-transparent outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white ${handle.className}`}
+                >
+                  <span
+                    className={`pointer-events-none border border-white bg-[#ff5500] shadow-[0_1px_5px_rgba(0,0,0,0.65)] ${handle.indicatorClassName}`}
+                    style={{ transform: `scale(${resizeControlScale})` }}
+                  />
+                </button>
+              ))}
             </div>
           )}
 
@@ -595,11 +987,7 @@ export const BulkVideoRow = ({
             <FloatingTextControls
               inverseZoomScale={inverseZoomScale}
               textSettings={textSettings}
-              dragPos={dragPos}
-              placement={centerPlacement}
-              onUpdatePlacement={handleUpdateCenterPlacement}
               onUpdate={handleUpdateTextSettings}
-              onUpdateDragPos={onUpdateDragPos}
               onClose={onCloseCaptionControls}
             />
           )}
@@ -614,7 +1002,23 @@ export const BulkVideoRow = ({
 
         {/* Video 2 Preview Card */}
         {isDualVideo && (
-          <div className="relative">
+          <div
+            onDragOver={(e) => handleSlotDragOver(e, 'video2')}
+            onDragLeave={(e) => handleSlotDragLeave(e, 'video2')}
+            onDrop={(e) => handleSlotDrop(e, 'video2')}
+            className={`relative transition-all ${
+              dragOverSlot === 'video2'
+                ? 'ring-2 ring-[#0071e3] ring-offset-2 ring-offset-[#1c1c1e] scale-[1.02] rounded-xl z-20 shadow-[0_0_15px_rgba(0,113,227,0.5)]'
+                : ''
+            }`}
+          >
+            {dragOverSlot === 'video2' && (
+              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-[#0071e3]/20 backdrop-blur-[2px] rounded-xl border-2 border-dashed border-[#0071e3] pointer-events-none animate-pulse">
+                <span className="text-[10px] font-extrabold uppercase text-white bg-black/80 px-2 py-1 rounded-md shadow-lg border border-[#0071e3]/50">
+                  Drop Video 2
+                </span>
+              </div>
+            )}
             {resolvedVideo2Url ? (
               <>
                 <div

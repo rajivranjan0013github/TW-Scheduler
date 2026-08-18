@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { DEFAULT_TEXT_SETTINGS, useBulkRows } from './bulkBuilder/useBulkRows';
 import { BulkVideoRow } from './bulkBuilder/BulkVideoRow';
 import { CaptionDrawer } from './bulkBuilder/CaptionDrawer';
-import { VideoLibraryPickerDialog } from './videoEditor/VideoLibraryPickerDialog';
+import { MediaLibraryPanel } from './videoEditorV2/components/MediaLibraryPanel';
 import { AudioDialog } from './videoEditor/AudioDialog';
 import { usePreviewAudio } from './videoEditor/usePreviewAudio';
 import { BulkAssetPickerDialog } from './bulkBuilder/BulkAssetPickerDialog';
@@ -70,6 +70,8 @@ export const BulkVideoBuilder = () => {
   useEffect(() => {
     localStorage.setItem('tw_bulk_builder_sidebar_open', String(isSidebarOpen));
   }, [isSidebarOpen]);
+
+  const [sidebarTab, setSidebarTab] = useState('frames'); // 'frames' | 'media'
 
   // Keyboard navigation & drag statuses
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -350,6 +352,8 @@ export const BulkVideoBuilder = () => {
     } else {
       setActivePickerRowId(rowId);
       setPickerSlot('video1');
+      setIsSidebarOpen(true);
+      setSidebarTab('media');
     }
   }, [tempLibrary.video1]);
 
@@ -360,17 +364,29 @@ export const BulkVideoBuilder = () => {
     } else {
       setActivePickerRowId(rowId);
       setPickerSlot('video2');
+      setIsSidebarOpen(true);
+      setSidebarTab('media');
     }
   }, [tempLibrary.video2]);
 
   const handleSelectLibraryVideo = useCallback((selectedVideo) => {
-    if (!activePickerRowId || !pickerSlot) return;
-    const field = pickerSlot === 'video1'
-      ? { video1: selectedVideo, video1Url: selectedVideo.url }
-      : { video2: selectedVideo, video2Url: selectedVideo.url };
-    bulk.updateRow(activePickerRowId, field);
+    const targetRowId = activePickerRowId || selectedRowId;
+    const targetSlot = pickerSlot || 'video1';
+    if (!targetRowId) {
+      if (bulk.rows.length > 0) {
+        bulk.updateRow(bulk.rows[0].id, {
+          video1: selectedVideo,
+          video1Url: selectedVideo.url || selectedVideo.originalUrl,
+        });
+      }
+      return;
+    }
+    const field = targetSlot === 'video1'
+      ? { video1: selectedVideo, video1Url: selectedVideo.url || selectedVideo.originalUrl }
+      : { video2: selectedVideo, video2Url: selectedVideo.url || selectedVideo.originalUrl };
+    bulk.updateRow(targetRowId, field);
     setTempLibrary((prev) => {
-      const key = pickerSlot === 'video1' ? 'video1' : 'video2';
+      const key = targetSlot === 'video1' ? 'video1' : 'video2';
       const current = Array.isArray(prev[key]) ? prev[key] : [];
       if (current.some((item) => item.id === selectedVideo.id)) return prev;
       return {
@@ -380,7 +396,43 @@ export const BulkVideoBuilder = () => {
     });
     setActivePickerRowId(null);
     setPickerSlot(null);
-  }, [activePickerRowId, pickerSlot, bulk]);
+  }, [activePickerRowId, pickerSlot, selectedRowId, bulk]);
+
+  // Drop handlers for Drag & Drop onto canvas card slots
+  const handleDropVideo1 = useCallback((rowId, asset) => {
+    bulk.updateRow(rowId, {
+      video1: asset,
+      video1Url: asset.url || asset.originalUrl,
+    });
+    setTempLibrary((prev) => {
+      const current = Array.isArray(prev.video1) ? prev.video1 : [];
+      if (current.some((item) => item.id === asset.id)) return prev;
+      return { ...prev, video1: [...current, asset] };
+    });
+  }, [bulk]);
+
+  const handleDropVideo2 = useCallback((rowId, asset) => {
+    bulk.updateRow(rowId, {
+      video2: asset,
+      video2Url: asset.url || asset.originalUrl,
+    });
+    setTempLibrary((prev) => {
+      const current = Array.isArray(prev.video2) ? prev.video2 : [];
+      if (current.some((item) => item.id === asset.id)) return prev;
+      return { ...prev, video2: [...current, asset] };
+    });
+  }, [bulk]);
+
+  const handleDropAudio = useCallback((rowId, asset) => {
+    bulk.updateRow(rowId, {
+      audio: asset,
+    });
+    setTempLibrary((prev) => {
+      const current = Array.isArray(prev.audio) ? prev.audio : [];
+      if (current.some((item) => item.id === asset.id)) return prev;
+      return { ...prev, audio: [...current, asset] };
+    });
+  }, [bulk]);
 
   // Audio picker callbacks
   const handleOpenAudioPicker = useCallback((rowId) => {
@@ -451,6 +503,8 @@ export const BulkVideoBuilder = () => {
     setQuickPickerType(null);
     setActivePickerRowId(rowId);
     setPickerSlot(slot);
+    setIsSidebarOpen(true);
+    setSidebarTab('media');
   }, [quickPickerRowId, quickPickerType]);
 
   const handleBrowseGlobalAudio = useCallback(() => {
@@ -619,6 +673,9 @@ export const BulkVideoBuilder = () => {
                   onPickVideo1={() => handlePickVideo1(row.id)}
                   onPickVideo2={() => handlePickVideo2(row.id)}
                   onPickAudio={() => handlePickAudio(row.id)}
+                  onDropVideo1={(asset) => handleDropVideo1(row.id, asset)}
+                  onDropVideo2={(asset) => handleDropVideo2(row.id, asset)}
+                  onDropAudio={(asset) => handleDropAudio(row.id, asset)}
                   onOpenCaptionDrawer={() => setCaptionDrawerRowId(row.id)}
                   onCaptionOverlayClick={() => setActiveCaptionRowId(prev => prev === row.id ? null : row.id)}
                   onUpdateCaption={(caption, dragPos) => {
@@ -636,6 +693,9 @@ export const BulkVideoBuilder = () => {
                     bulk.updateRowTextSettings(row.id, partialSettings);
                   }}
                   onUpdateDragPos={(dragPos) => bulk.updateRowDragPos(row.id, dragPos)}
+                  onUpdateTextClip={(clipId, changes) => (
+                    bulk.updateRowEditorClip(row.id, clipId, changes)
+                  )}
                   onCloseCaptionControls={() => setActiveCaptionRowId(null)}
                   onRemove={() => {
                     bulk.removeRow(row.id);
@@ -793,75 +853,127 @@ export const BulkVideoBuilder = () => {
         </div>
       </header>
 
-      {/* Floating Left Layers Panel Sidebar */}
+      {/* Floating Left Layers & Media Library Panel Sidebar */}
       {isSidebarOpen && (
-        <aside className="absolute top-20 left-4 bottom-4 w-64 bg-[#18181b]/95 border border-[#27272a] rounded-xl flex flex-col z-20 shadow-lg backdrop-blur-md">
-          <div className="p-4 border-b border-[#27272a] flex items-center justify-between shrink-0">
-            <h3 className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest flex items-center gap-1.5" style={{ color: '#a1a1aa' }}>
-              <Sliders className="w-3.5 h-3.5 text-[#ff5500]" />
-              Frames Directory
-            </h3>
-            <span className="text-[9px] font-extrabold text-gray-400 bg-[#27272a] px-2 py-0.5 rounded-full">
-              {bulk.rows.length}
-            </span>
+        <aside className="absolute top-20 left-4 bottom-4 w-80 bg-[#18181b]/95 border border-[#27272a] rounded-xl flex flex-col z-20 shadow-xl backdrop-blur-md overflow-hidden">
+          {/* Header Tab Switcher */}
+          <div className="p-2.5 border-b border-[#27272a] flex items-center justify-between shrink-0 bg-[#121214]/60">
+            <div className="grid grid-cols-2 gap-1 p-0.5 bg-[#27272a]/60 rounded-lg w-full">
+              <button
+                type="button"
+                onClick={() => setSidebarTab('frames')}
+                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[10px] font-extrabold uppercase tracking-wider transition-all ${
+                  sidebarTab === 'frames'
+                    ? 'bg-[#ff5500] text-white shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                <Sliders className="w-3 h-3" />
+                Frames ({bulk.rows.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSidebarTab('media')}
+                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[10px] font-extrabold uppercase tracking-wider transition-all ${
+                  sidebarTab === 'media'
+                    ? 'bg-[#0071e3] text-white shadow-sm'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                <Folder className="w-3 h-3" />
+                Media Library
+              </button>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {bulk.rows.map((row, idx) => {
-              const isSelected = selectedRowId === row.id;
-              const hasVideo = bulk.isDualVideo ? (row.video1 && row.video2) : row.video1;
-              return (
-                <div
-                  key={row.id}
-                  onClick={() => centerOnRow(row)}
-                  className={`group w-full flex items-center justify-between gap-2 p-2 rounded-lg text-left text-xs font-semibold cursor-pointer border transition-all duration-150 ${
-                    isSelected
-                      ? 'bg-[#27272a] text-white border-[#ff5500]/60 shadow-md'
-                      : 'bg-transparent text-gray-400 border-transparent hover:bg-[#1e1e24] hover:text-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 truncate min-w-0">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                      row.status === 'done' ? 'bg-green-500' :
-                      row.status === 'error' ? 'bg-red-500' :
-                      hasVideo ? 'bg-blue-500' : 'bg-gray-600'
-                    }`} />
-                    <span className="text-[10px] font-mono text-gray-500">#{idx + 1}</span>
-                    <span className="truncate" title={row.caption}>
-                      {row.caption || '(Blank Caption)'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        bulk.removeRow(row.id);
-                        if (selectedRowId === row.id) setSelectedRowId(null);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 flex h-5 w-5 items-center justify-center rounded-md hover:bg-red-950/40 text-gray-400 hover:text-red-400 transition-all"
-                      title="Remove frame"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+          {/* Active Target Banner (When picking a specific slot) */}
+          {activePickerRowId && pickerSlot && (
+            <div className="px-3 py-2 bg-blue-950/50 border-b border-blue-800/40 flex items-center justify-between gap-2 shrink-0">
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-blue-300 block truncate">
+                  Picking {pickerSlot === 'video1' ? 'First Video' : 'Second Video'} for Frame #{bulk.rows.findIndex((r) => r.id === activePickerRowId) + 1}
+                </span>
+                <span className="text-[8px] text-blue-400/80">Click any video below to select</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePickerRowId(null);
+                  setPickerSlot(null);
+                }}
+                className="text-[9px] font-bold uppercase text-blue-400 hover:text-white px-1.5 py-0.5 rounded bg-blue-900/40 hover:bg-blue-900/70 shrink-0"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
 
-            {/* Quick add card trigger */}
-            <button
-              type="button"
-              onClick={bulk.addRow}
-              className="w-full mt-2 rounded-lg border border-dashed border-[#27272a] bg-transparent py-2.5 flex items-center justify-center gap-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider transition-all hover:border-[#ff5500]/30 hover:bg-[#ff5500]/5 hover:text-[#ff5500]"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Frame
-            </button>
-          </div>
+          {sidebarTab === 'media' ? (
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-[#0f0f11]">
+              <MediaLibraryPanel
+                token={token}
+                initialMediaType="video"
+                onSelect={handleSelectLibraryVideo}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {bulk.rows.map((row, idx) => {
+                const isSelected = selectedRowId === row.id;
+                const hasVideo = bulk.isDualVideo ? (row.video1 && row.video2) : row.video1;
+                return (
+                  <div
+                    key={row.id}
+                    onClick={() => centerOnRow(row)}
+                    className={`group w-full flex items-center justify-between gap-2 p-2 rounded-lg text-left text-xs font-semibold cursor-pointer border transition-all duration-150 ${
+                      isSelected
+                        ? 'bg-[#27272a] text-white border-[#ff5500]/60 shadow-md'
+                        : 'bg-transparent text-gray-400 border-transparent hover:bg-[#1e1e24] hover:text-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        row.status === 'done' ? 'bg-green-500' :
+                        row.status === 'error' ? 'bg-red-500' :
+                        hasVideo ? 'bg-blue-500' : 'bg-gray-600'
+                      }`} />
+                      <span className="text-[10px] font-mono text-gray-500">#{idx + 1}</span>
+                      <span className="truncate" title={row.caption}>
+                        {row.caption || '(Blank Caption)'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          bulk.removeRow(row.id);
+                          if (selectedRowId === row.id) setSelectedRowId(null);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 flex h-5 w-5 items-center justify-center rounded-md hover:bg-red-950/40 text-gray-400 hover:text-red-400 transition-all"
+                        title="Remove frame"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Quick add card trigger */}
+              <button
+                type="button"
+                onClick={bulk.addRow}
+                className="w-full mt-2 rounded-lg border border-dashed border-[#27272a] bg-transparent py-2.5 flex items-center justify-center gap-1.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider transition-all hover:border-[#ff5500]/30 hover:bg-[#ff5500]/5 hover:text-[#ff5500]"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Frame
+              </button>
+            </div>
+          )}
           
-          <div className="p-3 bg-[#1e1e24]/40 border-t border-[#27272a] shrink-0 text-[10px] text-gray-500 leading-normal font-medium rounded-b-xl">
-            💡 <strong className="text-gray-400">Space + Drag</strong> to pan 2D canvas workspace. <strong className="text-gray-400">Pinch trackpad</strong> to zoom.
+          <div className="p-2.5 bg-[#1e1e24]/40 border-t border-[#27272a] shrink-0 text-[10px] text-gray-500 leading-normal font-medium">
+            💡 <strong className="text-gray-400">Space + Drag</strong> to pan canvas. <strong className="text-gray-400">Pinch trackpad</strong> to zoom.
           </div>
         </aside>
       )}
@@ -871,25 +983,12 @@ export const BulkVideoBuilder = () => {
         type="button"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className={`absolute top-20 z-30 p-2.5 bg-[#18181b]/95 hover:bg-[#27272a] text-gray-400 hover:text-white rounded-xl border border-[#27272a] shadow-lg backdrop-blur-md transition-all duration-200 active:scale-95 flex items-center justify-center ${
-          isSidebarOpen ? 'left-[276px]' : 'left-4'
+          isSidebarOpen ? 'left-[340px]' : 'left-4'
         }`}
-        title={isSidebarOpen ? "Collapse Layers Directory" : "Expand Layers Directory"}
+        title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
       >
         {isSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 text-[#ff5500]" />}
       </button>
-
-      {/* Video Library Picker Dialog */}
-      {activePickerRowId && pickerSlot && (
-        <VideoLibraryPickerDialog
-          slotLabel={pickerSlot === 'video1' ? 'First Video (Clip Starts)' : 'Second Video (Appended)'}
-          token={token}
-          onClose={() => {
-            setActivePickerRowId(null);
-            setPickerSlot(null);
-          }}
-          onSelectVideo={handleSelectLibraryVideo}
-        />
-      )}
 
       {/* Audio Picker Dialog */}
       {showAudioPickerRowId && (

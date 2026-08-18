@@ -1,12 +1,5 @@
-import { FONT_WEIGHTS, PREVIEW_FRAME_HEIGHT, PREVIEW_FRAME_WIDTH } from '../videoEditor/videoEditorConstants';
-import { DEFAULT_DRAG_POS, DEFAULT_TEXT_SETTINGS } from './useBulkRows';
-
-const POSITION_X_MIN = -Math.round(PREVIEW_FRAME_WIDTH / 2);
-const POSITION_X_MAX = Math.round(PREVIEW_FRAME_WIDTH / 2);
-const POSITION_Y_MIN = -Math.round(PREVIEW_FRAME_HEIGHT / 2);
-const POSITION_Y_MAX = Math.round(PREVIEW_FRAME_HEIGHT / 2);
-const FALLBACK_CENTER_X = PREVIEW_FRAME_WIDTH / 2;
-const FALLBACK_CENTER_Y = PREVIEW_FRAME_HEIGHT / 2;
+import { FONT_WEIGHTS } from '../videoEditor/videoEditorConstants';
+import { DEFAULT_TEXT_SETTINGS } from './useBulkRows';
 
 /**
  * Compact floating toolbar for per-row text styling (Figma Dark Theme).
@@ -15,30 +8,11 @@ const FALLBACK_CENTER_Y = PREVIEW_FRAME_HEIGHT / 2;
 export const FloatingTextControls = ({
   inverseZoomScale = 1,
   textSettings,
-  dragPos = DEFAULT_DRAG_POS,
-  placement,
-  onUpdatePlacement,
   onUpdate,
-  onUpdateDragPos,
   onClose,
 }) => {
-  const { fontFamily, fontWeight, fontSize, fontColor, strokeWidth, strokeColor, bgType } = textSettings;
+  const { fontFamily, fontWeight, fontColor, strokeWidth, strokeColor, bgType } = textSettings;
   const weightIdx = FONT_WEIGHTS.indexOf(fontWeight);
-  const fallbackPlacement = {
-    x: Math.round(Math.min(Math.max(dragPos.x, 0), PREVIEW_FRAME_WIDTH) - FALLBACK_CENTER_X),
-    y: Math.round(Math.min(Math.max(dragPos.y, 0), PREVIEW_FRAME_HEIGHT) - FALLBACK_CENTER_Y),
-    minX: POSITION_X_MIN,
-    maxX: POSITION_X_MAX,
-    minY: POSITION_Y_MIN,
-    maxY: POSITION_Y_MAX,
-  };
-  const activePlacement = placement || fallbackPlacement;
-  const placementX = Math.round(activePlacement.x);
-  const placementY = Math.round(activePlacement.y);
-  const sliderX = Math.max(POSITION_X_MIN, Math.min(POSITION_X_MAX, placementX));
-  const sliderY = Math.max(POSITION_Y_MIN, Math.min(POSITION_Y_MAX, placementY));
-  const placementXPercent = ((sliderX - POSITION_X_MIN) / (POSITION_X_MAX - POSITION_X_MIN)) * 100;
-  const placementYPercent = ((sliderY - POSITION_Y_MIN) / (POSITION_Y_MAX - POSITION_Y_MIN)) * 100;
 
   const handleBgTypeClick = (type) => {
     onUpdate({ bgType: type });
@@ -47,14 +21,16 @@ export const FloatingTextControls = ({
     else onUpdate({ bgType: type });
   };
 
-  const resetPosition = () => {
-    if (onUpdatePlacement) onUpdatePlacement({ x: 0, y: 0 });
-    else onUpdateDragPos?.({ ...dragPos, x: FALLBACK_CENTER_X, y: FALLBACK_CENTER_Y });
-  };
-
   const resetAll = () => {
-    onUpdate({ ...DEFAULT_TEXT_SETTINGS });
-    resetPosition();
+    onUpdate({
+      fontFamily: DEFAULT_TEXT_SETTINGS.fontFamily,
+      fontWeight: DEFAULT_TEXT_SETTINGS.fontWeight,
+      fontColor: DEFAULT_TEXT_SETTINGS.fontColor,
+      strokeWidth: DEFAULT_TEXT_SETTINGS.strokeWidth,
+      strokeColor: DEFAULT_TEXT_SETTINGS.strokeColor,
+      bgType: DEFAULT_TEXT_SETTINGS.bgType,
+      bgColor: DEFAULT_TEXT_SETTINGS.bgColor,
+    });
   };
 
   return (
@@ -123,76 +99,6 @@ export const FloatingTextControls = ({
           className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
           style={{ background: `linear-gradient(to right, #ff5500 ${(weightIdx / 5) * 100}%, #2d2d30 ${(weightIdx / 5) * 100}%)` }}
         />
-      </div>
-
-      {/* Size */}
-      <div className="space-y-1">
-        <span
-          className="cursor-default text-[10px] font-bold text-gray-400"
-          title="Double-click to reset size"
-          onDoubleClick={() => onUpdate({ fontSize: DEFAULT_TEXT_SETTINGS.fontSize })}
-        >
-          Size: {Number(fontSize).toFixed(2).replace(/\.00$/, '')}px
-        </span>
-        <input
-          type="range" min="10" max="48" step="1"
-          value={fontSize}
-          onChange={(e) => onUpdate({ fontSize: Number(e.target.value) })}
-          className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
-          style={{ background: `linear-gradient(to right, #ff5500 ${((fontSize - 10) / 38) * 100}%, #2d2d30 ${((fontSize - 10) / 38) * 100}%)` }}
-        />
-      </div>
-
-      {/* Placement */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <span
-            className="cursor-default text-[10px] font-bold text-gray-400"
-            title="Double-click to reset position"
-            onDoubleClick={resetPosition}
-          >
-            Position
-          </span>
-          <span className="text-[9px] font-bold text-gray-500">
-            X {placementX}, Y {placementY}
-          </span>
-        </div>
-        <div className="space-y-2">
-          <label className="grid grid-cols-[14px_1fr] items-center gap-2 text-[9px] font-bold text-gray-500">
-            X
-            <input
-              type="range"
-              min={POSITION_X_MIN}
-              max={POSITION_X_MAX}
-              step="1"
-              value={sliderX}
-              onChange={(e) => {
-                const x = Number(e.target.value);
-                if (onUpdatePlacement) onUpdatePlacement({ x, y: placementY });
-                else onUpdateDragPos?.({ ...dragPos, x: x + FALLBACK_CENTER_X });
-              }}
-              className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
-              style={{ background: `linear-gradient(to right, #2d2d30 0%, #2d2d30 ${placementXPercent}%, #ff5500 ${placementXPercent}%, #ff5500 ${placementXPercent + 1}%, #2d2d30 ${placementXPercent + 1}%, #2d2d30 100%)` }}
-            />
-          </label>
-          <label className="grid grid-cols-[14px_1fr] items-center gap-2 text-[9px] font-bold text-gray-500">
-            Y
-            <input
-              type="range"
-              min={POSITION_Y_MIN}
-              max={POSITION_Y_MAX}
-              step="1"
-              value={sliderY}
-              onChange={(e) => {
-                const y = Number(e.target.value);
-                if (onUpdatePlacement) onUpdatePlacement({ x: placementX, y });
-                else onUpdateDragPos?.({ ...dragPos, y: y + FALLBACK_CENTER_Y });
-              }}
-              className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
-              style={{ background: `linear-gradient(to right, #2d2d30 0%, #2d2d30 ${placementYPercent}%, #ff5500 ${placementYPercent}%, #ff5500 ${placementYPercent + 1}%, #2d2d30 ${placementYPercent + 1}%, #2d2d30 100%)` }}
-            />
-          </label>
-        </div>
       </div>
 
       {/* Colors row */}
