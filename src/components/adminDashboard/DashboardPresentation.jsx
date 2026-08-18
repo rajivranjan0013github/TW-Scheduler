@@ -6,17 +6,17 @@ const numberFormat = new Intl.NumberFormat();
 const fallbackAvatarUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
 
 export const MetricCard = ({ icon: Icon, label, value, note }) => (
-  <div className="rounded-lg border border-[#e5e5ea] bg-white px-3 py-2.5">
+  <div className="rounded-lg border border-white/10 bg-[#0a0a0a] px-3 py-2.5 shadow-sm">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">{label}</p>
-        <p className="m-0 mt-1 truncate text-xl font-semibold leading-none text-[#1d1d1f]">{value}</p>
+        <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{label}</p>
+        <p className="m-0 mt-1 truncate text-xl font-semibold leading-none text-white">{value}</p>
       </div>
-      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-[#f0f7ff] text-[#3478f6]">
+      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-[#7831d6]/20 text-[#c4b5fd]">
         <Icon className="h-3.5 w-3.5" />
       </span>
     </div>
-    {note && <p className="m-0 mt-1.5 truncate text-[10px] text-[#8e8e93]">{note}</p>}
+    {note && <p className="m-0 mt-1.5 truncate text-[10px] text-zinc-500">{note}</p>}
   </div>
 );
 
@@ -43,7 +43,7 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
           y={0}
           dy={7}
           textAnchor="middle"
-          fill={isSelected ? '#10b981' : '#6e6e73'}
+          fill={isSelected ? '#c4b5fd' : '#a1a1aa'}
           fontSize={9}
           fontWeight={isSelected ? 700 : 500}
         >
@@ -54,7 +54,7 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
           y={0}
           dy={18}
           textAnchor="middle"
-          fill={postCount > 0 ? (isSelected ? '#10b981' : '#3478f6') : '#b0b0b5'}
+          fill={postCount > 0 ? (isSelected ? '#c4b5fd' : '#7831d6') : '#52525b'}
           fontSize={8}
           fontWeight={postCount > 0 ? 700 : 400}
         >
@@ -65,12 +65,12 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
   };
 
   return (
-    <div className="mt-3 rounded-xl border border-[#d2d2d7] bg-white px-3 py-2.5">
+    <div className="mt-3 rounded-xl border border-white/10 bg-[#0a0a0a] px-3 py-2.5 shadow-sm">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73]">Last 30 days</p>
-          <p className="m-0 mt-0.5 text-sm font-semibold text-[#1d1d1f]">
-            Views by publish day <span className="text-[10px] font-normal text-[#8e8e93]">(Date / Posts)</span>
+          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Last 30 days</p>
+          <p className="m-0 mt-0.5 text-sm font-semibold text-white">
+            Views by publish day <span className="text-[10px] font-normal text-zinc-500">(Date / Posts)</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -78,12 +78,12 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
             <button
               type="button"
               onClick={() => onSelectDate?.(null)}
-              className="text-[10px] font-semibold text-[#3478f6] hover:underline"
+              className="text-[10px] font-semibold text-[#c4b5fd] hover:underline"
             >
               Clear date selection
             </button>
           )}
-          <p className="m-0 text-[10px] font-medium text-[#8e8e93]">Click any bar to inspect date activity</p>
+          <p className="m-0 text-[10px] font-medium text-zinc-500">Click any bar to inspect date activity</p>
         </div>
       </div>
       <div className="h-40 w-full cursor-pointer outline-none focus:outline-none focus-visible:outline-none [&_*]:outline-none [&_*]:focus:outline-none [&_*]:focus-visible:outline-none select-none">
@@ -98,20 +98,20 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
               height={26}
             />
             <YAxis
-              tick={{ fontSize: 9, fill: '#6e6e73' }}
+              tick={{ fontSize: 9, fill: '#a1a1aa' }}
               tickLine={false}
               axisLine={false}
               width={36}
               tickFormatter={(value) => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
             />
             <Tooltip
-              cursor={{ fill: 'rgba(52, 120, 246, 0.08)' }}
+              cursor={{ fill: 'rgba(120, 49, 214, 0.12)' }}
               formatter={(value, name) => [name === 'views' ? numberFormat.format(value) : value, name === 'views' ? 'Views' : 'Posts']}
               labelFormatter={(_, payload) => {
                 const p = payload?.[0]?.payload;
                 return p?.dateStr ? `${p.dateStr} (${p.posts || 0} posts)` : '';
               }}
-              contentStyle={{ borderRadius: 8, border: '1px solid #d2d2d7', fontSize: 11 }}
+              contentStyle={{ borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.15)', backgroundColor: '#0a0a0a', color: '#ffffff', fontSize: 11 }}
             />
             <Bar
               dataKey="views"
@@ -126,7 +126,7 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
               {chartData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={entry.isSelected ? '#10b981' : '#3478f6'}
+                  fill={entry.isSelected ? '#a855f7' : '#7831d6'}
                   style={{ outline: 'none' }}
                 />
               ))}
@@ -179,14 +179,14 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
             <span
               key={slot}
               title={post?.publishedAt ? formatPostDateTime(post.publishedAt) : hasPost ? 'Posted time unavailable' : 'No post'}
-              className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${hasPost ? 'border-[#10b981] bg-[#10b981] text-white' : 'border-[#d2d2d7] bg-white text-transparent'}`}
+              className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${hasPost ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-white/10 bg-white/5 text-transparent'}`}
             >
               {hasPost ? timeLabel || '✓' : '✓'}
             </span>
           );
         })}
         {totalPostsCount > 3 && (
-          <span className="text-[9px] font-semibold text-[#6e6e73]" title={`${totalPostsCount} posts on ${selectedGraphDate}`}>
+          <span className="text-[9px] font-semibold text-zinc-400" title={`${totalPostsCount} posts on ${selectedGraphDate}`}>
             +{totalPostsCount - 3}
           </span>
         )}
@@ -208,14 +208,14 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
             <span
               key={slot}
               title={post?.publishedAt ? formatPostDateTime(post.publishedAt) : hasPost ? 'Posted time unavailable' : 'No post'}
-              className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${hasPost ? 'border-[#3478f6] bg-[#3478f6] text-white' : 'border-[#d2d2d7] bg-white text-transparent'}`}
+              className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${hasPost ? 'border-[#7831d6] bg-[#7831d6] text-white' : 'border-white/10 bg-white/5 text-transparent'}`}
             >
               {hasPost ? timeLabel || '✓' : '✓'}
             </span>
           );
         })}
         {Number(account[selectedRange.postsKey] || 0) > 3 && (
-          <span className="text-[9px] font-semibold text-[#6e6e73]" title={`${account[selectedRange.postsKey]} posts in ${selectedRange.label.toLowerCase()}`}>
+          <span className="text-[9px] font-semibold text-zinc-400" title={`${account[selectedRange.postsKey]} posts in ${selectedRange.label.toLowerCase()}`}>
             +{Number(account[selectedRange.postsKey] || 0) - 3}
           </span>
         )}
@@ -230,7 +230,7 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
           <span
             key={day.dateStr}
             title={getDayTitle(day)}
-            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[9px] font-semibold ${Number(day.count || 0) >= 3 ? 'border-[#34c759] bg-[#34c759] text-white' : 'border-[#d2d2d7] bg-[#f5f5f7] text-[#6e6e73]'}`}
+            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[9px] font-semibold ${Number(day.count || 0) >= 3 ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-white/10 bg-white/5 text-zinc-400'}`}
           >
             {day.count || 0}
           </span>
@@ -239,7 +239,7 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
     );
   }
 
-  return <span className="text-xs text-[#515154]">{numberFormat.format(account[selectedRange.postsKey] || 0)} posts</span>;
+  return <span className="text-xs text-zinc-300">{numberFormat.format(account[selectedRange.postsKey] || 0)} posts</span>;
 };
 
 export const AccountAvatar = ({ account }) => {

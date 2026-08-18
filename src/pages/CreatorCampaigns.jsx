@@ -691,6 +691,28 @@ export const CreatorCampaigns = () => {
     }
     return null;
   };
+  const renderConnectionBadge = (account, camp) => {
+    const notice = getChannelConnectionNotice(account);
+    if (!notice) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          Ready
+        </span>
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={() => navigate('/channels', { state: { campaignId: camp?._id } })}
+        className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold text-amber-300 transition hover:bg-amber-500/25"
+        title={notice.detail}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+        {notice.label}
+      </button>
+    );
+  };
   const campaignConnectionIssues = assignedCampaigns.flatMap((camp) => (
     (camp.channels || []).map((channel) => ({
       camp,
@@ -830,15 +852,14 @@ export const CreatorCampaigns = () => {
       >
         <div className="flex flex-col items-center justify-center gap-1 py-1.5 text-[#8e8e93]">
           <RefreshCw 
-            className={`w-5 h-5 text-[#3478f6] ${
+            className={`w-5 h-5 text-[#c4b5fd] ${
               isRefreshing ? 'animate-spin' : ''
-            }`}
-            style={!isRefreshing ? { transform: `rotate(${pullDistance * 6}deg)` } : undefined}
+            }`} 
           />
           <span className="text-[10px] font-bold tracking-wide uppercase">
             {isRefreshing 
-              ? 'Syncing campaigns...' 
-              : pullDistance >= 60 
+              ? 'Refreshing...' 
+              : pullDistance > PULL_THRESHOLD 
                 ? 'Release to refresh' 
                 : 'Pull to refresh'}
           </span>
@@ -846,39 +867,37 @@ export const CreatorCampaigns = () => {
       </div>
 
       <div className="mx-auto max-w-4xl space-y-2 sm:space-y-3 md:space-y-4">
-       
-
-        {error && (
-          <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+        {syncWarning && (
+          <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-200">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{error}</span>
+            <div className="min-w-0 flex-1">{syncWarning}</div>
           </div>
         )}
 
         {loading ? (
-          <div className="rounded-xl border border-[#d2d2d7] bg-white p-8 text-center text-sm text-[#6e6e73]">
+          <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-8 text-center text-sm text-zinc-400">
             Syncing campaigns and calendar...
           </div>
         ) : (
           <div className="space-y-3 md:space-y-4">
             <section className="space-y-5 md:space-y-6">
               <div className="flex items-center justify-between gap-3 px-1">
-                <h2 className="m-0 text-2xl font-semibold text-black">My Campaigns</h2>
+                <h2 className="m-0 text-2xl font-semibold text-white">My Campaigns</h2>
                 <PwaInstallButton
                   collapsed
                   popoverClassName="right-0"
                 />
               </div>
               {campaignConnectionIssues.length > 0 && (
-                <section className="overflow-hidden rounded-xl border border-[#e5e5ea] bg-white shadow-sm">
-                  <div className="border-b border-[#e5e5ea] px-4 py-4 sm:px-6">
-                    <h3 className="m-0 text-sm font-semibold text-black">Channels To Reconnect</h3>
+                <section className="overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0a] shadow-sm">
+                  <div className="border-b border-white/10 px-4 py-4 sm:px-6">
+                    <h3 className="m-0 text-sm font-semibold text-white">Channels To Reconnect</h3>
                   </div>
                   <div className="grid gap-2 p-3 md:gap-3 md:p-4 lg:grid-cols-2">
                     {campaignConnectionIssues.map(({ camp, channel, notice }) => (
                       <div
                         key={`${camp._id}-${channel._id}`}
-                        className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 md:p-3"
+                        className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 md:p-3"
                       >
                         <div className="flex min-w-0 items-center gap-3">
                           <div className="flex shrink-0 items-center gap-1.5">
@@ -887,29 +906,29 @@ export const CreatorCampaigns = () => {
                               <img
                                 src={channel.avatarUrl}
                                 crossOrigin="anonymous"
-                                className="h-7 w-7 rounded-full border border-amber-200/50 object-cover shadow-sm md:h-8 md:w-8"
+                                className="h-7 w-7 rounded-full border border-amber-500/30 object-cover shadow-sm md:h-8 md:w-8"
                                 alt=""
                               />
                             ) : (
-                              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-amber-200/50 bg-amber-100 text-xs font-bold text-amber-700 md:h-8 md:w-8">
+                              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/20 text-xs font-bold text-amber-300 md:h-8 md:w-8">
                                 {(getAccountLabel(channel).charAt(0) || '@').toUpperCase()}
                               </div>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className="m-0 truncate text-sm font-semibold text-[#1d1d1f]">
+                            <p className="m-0 truncate text-sm font-semibold text-white">
                               {getAccountLabel(channel).startsWith('@')
                                 ? getAccountLabel(channel)
                                 : `@${getAccountLabel(channel)}`}
                             </p>
-                            <p className="m-0 truncate text-xs text-[#8a6b1f]">{camp.name}</p>
-                            <p className="m-0 truncate text-[9px] font-semibold text-red-600">{notice.label}</p>
+                            <p className="m-0 truncate text-xs text-amber-300">{camp.name}</p>
+                            <p className="m-0 truncate text-[9px] font-semibold text-rose-400">{notice.label}</p>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => navigate('/channels', { state: { campaignId: camp._id } })}
-                          className="shrink-0 rounded-lg bg-[#1d1d1f] px-3 py-2 text-xs font-semibold text-white transition hover:bg-black"
+                          className="shrink-0 rounded-lg bg-[#7831d6] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#6825bc] shadow-sm"
                         >
                           Reconnect
                         </button>
@@ -923,18 +942,10 @@ export const CreatorCampaigns = () => {
                   {campaignQueueViews.flatMap(({ camp, accountQueues }) => {
                     if (accountQueues.length === 0) {
                       return (
-                        <div key={`${camp._id}-empty`} className="rounded-lg border border-[#e5e5ea] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
-                          {/* 
-                          <div className="mb-2 flex items-center justify-between gap-3">
-                            <span className="truncate text-xs font-semibold text-[#6e6e73]">{camp.name}</span>
-                            <span className="shrink-0 rounded-full border border-[#e5e5ea] bg-white px-1.5 py-0.5 text-[9px] font-bold capitalize text-[#8e8e93]">
-                              {camp.status || 'active'}
-                            </span>
-                          </div>
-                          */}
+                        <div key={`${camp._id}-empty`} className="rounded-lg border border-white/10 bg-[#0a0a0a] px-4 py-3 shadow-lg">
                           <div className="py-2 text-center">
-                            <p className="m-0 text-[10px] font-bold uppercase text-[#6e6e73]">Videos</p>
-                            <p className="m-0 mt-0.5 text-xs font-semibold text-[#1d1d1f]">No videos yet</p>
+                            <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Videos</p>
+                            <p className="m-0 mt-0.5 text-xs font-semibold text-white">No videos yet</p>
                           </div>
                         </div>
                       );
@@ -946,30 +957,31 @@ export const CreatorCampaigns = () => {
                       const manualPostedToday = shouldShowManualPostedTimes(queue.account)
                         ? getManualPostedToday(queue.posts)
                         : [];
-                      // Always include manually confirmed posts in the cooldown calculation.
-                      // Verified channels can still have a posted_manual queue record, and the
-                      // backend uses that timestamp when deciding whether sharing is allowed.
-                      const latestManualPostedAt = getLatestManualPostedAt(queue.posts);
-                      const postedToday = sortPostsByPublishedAt([
+                      const postedToday = [
                         ...(tracking.posts || []),
                         ...manualPostedToday,
-                      ]);
-                      const awaitingPostedDecision = isAwaitingPostedDecision(queuePost);
-                      const postingCooldown = getPostingCooldown(tracking, latestManualPostedAt, queuePost);
-                      const canConfirmAndContinue = Boolean(queuePost && awaitingPostedDecision);
-                      const canBypassCooldown = Boolean(queuePost && postingCooldown.isLocked);
-                      const showQueueMenu = canConfirmAndContinue || canBypassCooldown;
+                      ].sort((a, b) => new Date(getPostDisplayPublishedAt(b) || 0) - new Date(getPostDisplayPublishedAt(a) || 0));
+
+                      const postingCooldown = getPostingCooldown(queue.account, postedToday);
+                      const awaitingPostedDecision = Boolean(
+                        pendingSharePost &&
+                        pendingSharePost.channelId === queue.accountId &&
+                        pendingSharePost.postId === queuePost?._id
+                      );
+                      const canConfirmAndContinue = queuePost && (
+                        postingCooldown.isLocked ||
+                        queuePost.status === 'awaiting_confirmation'
+                      );
+                      const canBypassCooldown = queuePost && postingCooldown.isLocked;
 
                       return (
-                        <div key={`${camp._id}-${queue.accountId}`} className="rounded-lg border border-[#e5e5ea] bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
-                          {/* 
-                          <div className="mb-2 flex items-center justify-between gap-3 border-b border-[#e5e5ea] pb-2">
-                            <span className="truncate text-xs font-semibold text-[#6e6e73]">{camp.name}</span>
-                            <span className="shrink-0 rounded-full border border-[#e5e5ea] bg-white px-1.5 py-0.5 text-[9px] font-bold capitalize text-[#8e8e93]">
+                        <div key={`${camp._id}-${queue.accountId}`} className="rounded-lg border border-white/10 bg-[#0a0a0a] px-4 py-3 shadow-lg">
+                          <div className="mb-2 flex items-center justify-between gap-3 border-b border-white/10 pb-2">
+                            <span className="truncate text-xs font-semibold text-zinc-400">{camp.name}</span>
+                            <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold capitalize text-zinc-300">
                               {camp.status || 'active'}
                             </span>
                           </div>
-                          */}
 
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <div className="flex min-w-0 items-center gap-3">
@@ -978,45 +990,36 @@ export const CreatorCampaigns = () => {
                                 {queue.account?.avatarUrl ? (
                                   <img 
                                     src={queue.account.avatarUrl} 
-                                    crossOrigin="anonymous" 
-                                    className="h-8 w-8 rounded-full object-cover border border-[#e5e5ea]" 
-                                    alt="" 
+                                    alt={queue.account.name} 
+                                    className="h-8 w-8 rounded-full object-cover border border-white/10" 
                                   />
                                 ) : (
-                                  <div className="h-8 w-8 rounded-full bg-[#f5f5f7] border border-[#e5e5ea] flex items-center justify-center text-xs font-bold text-[#8e8e93]">
-                                    {(getAccountLabel(queue.account)?.charAt(0) || '@').toUpperCase()}
+                                  <div className="h-8 w-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-xs font-bold text-zinc-400">
+                                    {(getAccountLabel(queue.account).charAt(0) || '@').toUpperCase()}
                                   </div>
                                 )}
                               </div>
                               <div className="min-w-0">
-                                <p className="m-0 truncate text-sm font-bold text-[#1d1d1f]">
+                                <p className="m-0 truncate text-sm font-semibold text-white">
                                   {getAccountLabel(queue.account).startsWith('@')
                                     ? getAccountLabel(queue.account)
                                     : `@${getAccountLabel(queue.account)}`}
                                 </p>
-                                {/* 
-                                <p className="m-0 text-[10px] font-semibold text-[#8e8e93]">
-                                  {queue.nextPost ? `Post ${queuePosition}/${queue.actionableQueue.length}` : 'No videos yet'}
+                                <p className="m-0 truncate text-xs text-zinc-400">
+                                  {queue.account?.displayName || queue.account?.name || 'Assigned Channel'}
                                 </p>
-                                */}
                               </div>
                             </div>
-                            <div className="flex shrink-0 items-center gap-1.5">
-                              {queue.nextPost && (
-                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                                  {queue.actionableQueue.length} left
-                                </span>
-                              )}
-                              {showQueueMenu && (
+
+                            <div className="flex items-center gap-1.5">
+                              {renderConnectionBadge(queue.account, camp)}
+                              {(canConfirmAndContinue || canBypassCooldown) && (
                                 <div className="relative">
                                   <button
                                     type="button"
-                                    onClick={() => setOpenQueueMenuId((current) => (
-                                      current === queue.accountId ? null : queue.accountId
-                                    ))}
-                                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#e5e5ea] bg-white text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-black"
-                                    aria-label="More queue actions"
-                                    aria-expanded={openQueueMenuId === queue.accountId}
+                                    onClick={() => setOpenQueueMenuId((current) => current === queue.accountId ? null : queue.accountId)}
+                                    className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                                    aria-label="Queue actions"
                                   >
                                     <MoreVertical className="h-4 w-4" />
                                   </button>
@@ -1028,16 +1031,16 @@ export const CreatorCampaigns = () => {
                                         aria-label="Close queue actions"
                                         onClick={() => setOpenQueueMenuId(null)}
                                       />
-                                      <div className="absolute right-0 top-9 z-30 w-56 overflow-hidden rounded-lg border border-[#d2d2d7] bg-white p-1.5 shadow-[0_14px_36px_rgba(15,23,42,0.18)]">
+                                      <div className="absolute right-0 top-9 z-30 w-56 overflow-hidden rounded-lg border border-white/10 bg-[#0a0a0a] p-1.5 shadow-2xl">
                                         {canConfirmAndContinue && (
                                           <button
                                             type="button"
                                             onClick={() => handleConfirmPostedOverride(queuePost)}
                                             disabled={markingPostId === queuePost._id}
-                                            className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition hover:bg-[#f5f5f7] disabled:opacity-60"
+                                            className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition hover:bg-white/10 disabled:opacity-60"
                                           >
-                                            <SkipForward className="mt-0.5 h-4 w-4 shrink-0 text-[#1d1d1f]" />
-                                            <span className="text-[11px] font-bold text-[#1d1d1f]">Confirm posted & move next</span>
+                                            <SkipForward className="mt-0.5 h-4 w-4 shrink-0 text-[#c4b5fd]" />
+                                            <span className="text-[11px] font-bold text-white">Confirm posted & move next</span>
                                           </button>
                                         )}
                                         {canBypassCooldown && (
@@ -1045,10 +1048,10 @@ export const CreatorCampaigns = () => {
                                             type="button"
                                             onClick={() => handleCooldownBypass(queuePost)}
                                             disabled={bypassingPostId === queuePost._id}
-                                            className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition hover:bg-[#f5f5f7] disabled:opacity-60"
+                                            className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition hover:bg-white/10 disabled:opacity-60"
                                           >
-                                            <TimerOff className="mt-0.5 h-4 w-4 shrink-0 text-[#1d1d1f]" />
-                                            <span className="text-[11px] font-bold text-[#1d1d1f]">Allow next post now</span>
+                                            <TimerOff className="mt-0.5 h-4 w-4 shrink-0 text-[#c4b5fd]" />
+                                            <span className="text-[11px] font-bold text-white">Allow next post now</span>
                                           </button>
                                         )}
                                       </div>
@@ -1059,32 +1062,32 @@ export const CreatorCampaigns = () => {
                             </div>
                           </div>
 
-                          <div className="mb-2 rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-2.5 py-2">
+                          <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-2">
                             {postedToday.length > 0 ? (
                               <div className="flex flex-wrap gap-1.5">
                                 {postedToday.slice(0, 6).map((post) => (
                                   <span
                                     key={post.id}
-                                    className="animate-in fade-in zoom-in-95 inline-flex items-center gap-1 rounded-md border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 transition-all duration-300 ease-out"
+                                    className="animate-in fade-in zoom-in-95 inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300 transition-all duration-300 ease-out"
                                   >
                                     <input
                                       type="checkbox"
                                       checked
                                       readOnly
                                       aria-label={`Posted at ${formatPostTime(getPostDisplayPublishedAt(post))}`}
-                                      className="h-3 w-3 accent-emerald-600"
+                                      className="h-3 w-3 accent-[#7831d6]"
                                     />
                                     {formatPostTime(getPostDisplayPublishedAt(post))}
                                   </span>
                                 ))}
                                 {postedToday.length > 6 && (
-                                  <span className="rounded-md bg-white px-2 py-1 text-[10px] font-bold text-[#6e6e73]">
+                                  <span className="rounded-md bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300">
                                     +{postedToday.length - 6}
                                   </span>
                                 )}
                               </div>
                             ) : (
-                              <p className="m-0 text-[10px] font-semibold text-[#8e8e93]">No live posts detected today</p>
+                              <p className="m-0 text-[10px] font-semibold text-zinc-500">No live posts detected today</p>
                             )}
                           </div>
 
@@ -1094,7 +1097,7 @@ export const CreatorCampaigns = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleNotPosted(queuePost)}
-                                  className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-red-800 bg-red-800 px-3 py-1.5 text-xs font-semibold text-red-50 transition-colors hover:bg-red-900"
+                                  className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-rose-900 bg-rose-900 px-3 py-1.5 text-xs font-semibold text-rose-100 transition-colors hover:bg-rose-950"
                                 >
                                   Not Posted
                                 </button>
@@ -1102,7 +1105,7 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleMarkManualPosted(queuePost)}
                                   disabled={markingPostId === queuePost._id}
-                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg border border-green-800 bg-green-800 px-3 py-1.5 text-xs font-semibold text-green-50 transition-colors hover:bg-green-900 disabled:opacity-60"
+                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg border border-[#7831d6] bg-[#7831d6] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#6825bc] disabled:opacity-60 shadow-sm"
                                 >
                                   <CheckCircle className="h-3.5 w-3.5" />
                                   {markingPostId === queuePost._id ? 'Checking' : 'Mark as Posted'}
@@ -1114,7 +1117,7 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleSharePost(queuePost, postingCooldown)}
                                   disabled={sharingPostId === queuePost._id || postingCooldown.isLocked}
-                                  className="inline-flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-lg bg-[#1d1d1f] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-lg bg-[#7831d6] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
                                 >
                                   <Share2 className="h-3.5 w-3.5" />
                                   {sharingPostId === queuePost._id
@@ -1127,8 +1130,8 @@ export const CreatorCampaigns = () => {
                             )
                           ) : (
                             <div className="py-2 text-center">
-                              <p className="m-0 text-[10px] font-bold uppercase text-[#6e6e73]">Videos</p>
-                              <p className="m-0 mt-0.5 text-xs font-semibold text-[#1d1d1f]">No videos yet</p>
+                              <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Videos</p>
+                              <p className="m-0 mt-0.5 text-xs font-semibold text-white">No videos yet</p>
                             </div>
                           )}
                         </div>
@@ -1137,9 +1140,9 @@ export const CreatorCampaigns = () => {
                   })}
                 </div>
               ) : (
-                <div className="p-5 text-center text-sm text-[#6e6e73] md:p-6">
-                  <Calendar className="mx-auto h-7 w-7 text-[#8e8e93]/60" />
-                  <p className="m-0 mt-2 font-semibold text-[#1d1d1f]">No campaign cards yet</p>
+                <div className="p-5 text-center text-sm text-zinc-400 md:p-6">
+                  <Calendar className="mx-auto h-7 w-7 text-zinc-600" />
+                  <p className="m-0 mt-2 font-semibold text-white">No campaign cards yet</p>
                   <p className="m-0 mt-1 text-xs">Assigned campaigns will appear here.</p>
                 </div>
               )}

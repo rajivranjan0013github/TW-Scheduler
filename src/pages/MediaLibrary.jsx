@@ -231,9 +231,9 @@ const MediaFolderPreview = ({ folder }) => {
 
   return (
     <span className="relative block h-[72px] w-[90px] flex-shrink-0" aria-hidden="true">
-      <span className="absolute left-1 top-0 h-4 w-10 rounded-t-lg bg-[#d7d9de]" />
-      <span className="absolute inset-x-0 bottom-0 top-2 overflow-hidden rounded-xl border border-[#dfe1e6] bg-[#e9eaed] shadow-sm">
-        <span className="absolute inset-x-1.5 bottom-0 top-3 overflow-hidden rounded-t-lg bg-[#e9eaed]">
+      <span className="absolute left-1 top-0 h-4 w-10 rounded-t-lg bg-[#323740]" />
+      <span className="absolute inset-x-0 bottom-0 top-2 overflow-hidden rounded-xl border border-white/10 bg-[#282c33] shadow-sm">
+        <span className="absolute inset-x-1.5 bottom-0 top-3 overflow-hidden rounded-t-lg bg-[#282c33]">
           {previewSource && preview?.type === 'image' && (
             <img
               src={imageSource}
@@ -271,7 +271,7 @@ const MediaFolderPreview = ({ folder }) => {
             </span>
           )}
           {!previewSource && preview?.type !== 'audio' && (
-            <span className="flex h-full w-full items-center justify-center text-[#a1a1a6]">
+            <span className="flex h-full w-full items-center justify-center text-[#666d78]">
               <Folder className="h-6 w-6" />
             </span>
           )}
@@ -2267,7 +2267,7 @@ export const MediaLibrary = () => {
               placeholder="Search files and folders"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-full rounded-lg border border-[#d8d8dd] bg-white pl-9 pr-3 text-sm text-[#1d1d1f] outline-none transition focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/10 placeholder:text-[#9a9aa0]"
+              className="h-9 w-full rounded-lg border border-white/10 bg-[#0a0a0a] pl-9 pr-3 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 placeholder:text-zinc-500"
             />
           </label>
           {canManageFolders && canManageActiveLocation && (
@@ -2275,7 +2275,7 @@ export const MediaLibrary = () => {
               <button
                 type="button"
                 onClick={() => setShowUploadModal(true)}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#0071e3] px-3.5 text-xs font-semibold text-white transition-colors hover:bg-[#147ce5]"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#7831d6] px-3.5 text-xs font-semibold text-white transition-colors hover:bg-[#6825bc] shadow-sm"
               >
                 <Upload className="h-3.5 w-3.5" />
                 <span>Upload Assets</span>
@@ -2283,7 +2283,7 @@ export const MediaLibrary = () => {
               <button
                 type="button"
                 onClick={() => setShowNewFolderModal(true)}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#d8d8dd] bg-white px-3.5 text-xs font-semibold text-[#1d1d1f] transition-colors hover:bg-[#ededf0]"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#7831d6] bg-[#7831d6] px-3.5 text-xs font-semibold text-white transition-colors hover:bg-[#6825bc] shadow-sm"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>New folder</span>
@@ -2294,7 +2294,7 @@ export const MediaLibrary = () => {
       </header>
 
       {errorMessage && (
-        <div className="flex items-start gap-2 rounded-lg border border-[#ff9500]/30 bg-[#fff7ed] px-3 py-2 text-xs font-medium text-[#9a3412]">
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
           <span>{errorMessage}</span>
         </div>
@@ -2303,11 +2303,11 @@ export const MediaLibrary = () => {
       {deleteStatusMessage && (
         <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${
           deletingFolderId
-            ? 'border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]'
-            : 'border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]'
+            ? 'border-purple-500/30 bg-purple-500/10 text-purple-200'
+            : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
         }`}>
           {deletingFolderId ? (
-            <span className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 border-[#0071e3] border-t-transparent animate-spin" />
+            <span className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 border-[#7831d6] border-t-transparent animate-spin" />
           ) : (
             <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
           )}
@@ -2334,30 +2334,30 @@ export const MediaLibrary = () => {
               className={`relative flex min-w-0 items-center gap-4 rounded-xl px-2 py-2.5 group transition-colors ${
                 isFolderBusy
                   ? 'cursor-wait opacity-70'
-                  : 'cursor-pointer hover:bg-black/[0.035]'
+                  : 'cursor-pointer hover:bg-white/[0.06]'
               }`}
             >
               <MediaFolderPreview folder={folder} />
 
               <div className="flex-1 min-w-0 overflow-hidden">
                 <span
-                  className="block truncate text-sm font-bold leading-tight text-[#1d1d1f]"
+                  className="block truncate text-sm font-bold leading-tight text-white"
                   title={folder.name}
                 >
                   {folder.name}
                 </span>
-                <span className="mt-1 block text-xs font-medium text-[#6e6e73]">
+                <span className="mt-1 block text-xs font-medium text-zinc-400">
                   {itemCount} {itemCount === 1 ? 'item' : 'items'}
                 </span>
                 <div className="mt-1.5 flex min-w-0 items-center gap-1.5 overflow-hidden">
                   {folder.kind === 'carousel_set' && (
-                    <span className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-[#eef2ff] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#4f46e5]">
+                    <span className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-[#7831d6]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#c4b5fd]">
                       <Images className="h-2.5 w-2.5" />
                       Carousel
                     </span>
                   )}
                   {normalizeScope(folder.scope) === 'global' && (
-                    <span className="inline-flex flex-shrink-0 rounded bg-[#eef2ff] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#4f46e5]">
+                    <span className="inline-flex flex-shrink-0 rounded bg-[#7831d6]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#c4b5fd]">
                       Global
                     </span>
                   )}
@@ -2366,14 +2366,14 @@ export const MediaLibrary = () => {
                     {(folder.tags || []).slice(0, 2).map((tag) => (
                       <span
                         key={tag}
-                        className="max-w-[76px] truncate rounded bg-[#f2f2f7] px-1.5 py-0.5 text-[9px] font-semibold text-[#6e6e73]"
+                        className="max-w-[76px] truncate rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold text-zinc-300"
                         title={tag}
                       >
                         {tag}
                       </span>
                     ))}
                     {(folder.tags || []).length > 2 && (
-                      <span className="text-[9px] font-semibold text-[#8e8e93]">
+                      <span className="text-[9px] font-semibold text-zinc-400">
                         +{folder.tags.length - 2}
                       </span>
                     )}

@@ -3,40 +3,42 @@
 @import "tailwindcss";
 
 @theme {
-  --color-apple-blue: #0071e3;
-  --color-apple-blue-hover: #147ce5;
-  --color-apple-gray: #f5f5f7;
-  --color-apple-dark-card: #ffffff;
-  --color-apple-dark-bg: #f5f5f7;
-  --color-apple-dark-border: #e5e5ea;
-  --color-apple-light-border: #d2d2d7;
+  --color-apple-blue: #7831d6;
+  --color-apple-blue-hover: #6825bc;
+  --color-apple-gray: #000000;
+  --color-apple-dark-card: #0a0a0a;
+  --color-apple-dark-bg: #000000;
+  --color-apple-dark-border: rgba(255, 255, 255, 0.12);
+  --color-apple-light-border: rgba(255, 255, 255, 0.12);
   
-  --color-brand-50: #f5f5f7;
-  --color-brand-100: #e5e5ea;
-  --color-brand-200: #d1d1d6;
-  --color-brand-300: #c7c7cc;
-  --color-brand-400: #8e8e93;
-  --color-brand-500: #0071e3;
-  --color-brand-600: #0071e3;
-  --color-brand-700: #0071e3;
-  --color-brand-800: #0071e3;
+  --color-brand-50: #0f0b15;
+  --color-brand-100: #1c1527;
+  --color-brand-200: #2d1f40;
+  --color-brand-300: #452a6b;
+  --color-brand-400: #5c3596;
+  --color-brand-500: #7831d6;
+  --color-brand-600: #6825bc;
+  --color-brand-700: #581da2;
+  --color-brand-800: #471585;
   --color-brand-900: #ffffff;
-  --color-brand-950: #f5f5f7;
+  --color-brand-950: #000000;
   
-  --color-darkBg: #f5f5f7;
-  --color-darkCard: #ffffff;
-  --color-darkBorder: #e5e5ea;
+  --color-darkBg: #000000;
+  --color-darkCard: #0a0a0a;
+  --color-darkBorder: rgba(255, 255, 255, 0.12);
 }
 
 html, body {
   height: 100%;
   overflow: hidden;
+  background-color: #000000;
+  color: #ffffff;
 }
 
 body {
   margin: 0;
-  background-color: #f5f5f7;
-  color: #1d1d1f;
+  background-color: #000000;
+  color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -45,15 +47,17 @@ body {
 #root {
   height: 100%;
   width: 100%;
+  background-color: #000000;
+  color: #ffffff;
 }
 
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
   letter-spacing: -0.015em;
-  color: #1d1d1f;
+  color: #ffffff;
 }
 
-/* Custom minimal scrollbar */
+/* Custom minimal dark scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -62,11 +66,11 @@ h1, h2, h3, h4, h5, h6 {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d2d2d7;
+  background: #27272a;
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #8e8e93; 
+  background: #3f3f46; 
 }
 
 .scrollbar-none {
@@ -127,4 +131,188 @@ h1, h2, h3, h4, h5, h6 {
   .mobile-safe-main-padding {
     padding-bottom: calc(3.25rem + env(safe-area-inset-bottom, 0px)) !important;
   }
+}
+
+/* ========================================================= */
+/* UNIVERSAL DARK THEME BLACK + #7831d6 BUTTONS OVERRIDES     */
+/* ========================================================= */
+
+/* Backgrounds */
+.bg-\[\#f5f5f7\],
+.bg-\[\#f8fafc\],
+.bg-\[\#f9fafb\],
+.bg-\[\#f0f2f5\],
+.bg-gray-50,
+.bg-slate-50,
+.bg-zinc-50,
+.bg-\[\#111318\],
+.bg-\[\#171a20\],
+.bg-\[\#1a1d24\],
+.bg-\[\#141820\],
+.bg-\[\#090a0d\],
+.bg-\[\#0d0f13\],
+.bg-\[\#1c1c1e\] {
+  background-color: #000000 !important;
+}
+
+.bg-white,
+.bg-white\/95,
+.bg-white\/90,
+.bg-white\/80,
+.bg-\[\#ffffff\] {
+  background-color: #0a0a0a !important;
+  color: #ffffff !important;
+}
+
+/* Action & Primary Buttons -> #7831d6 */
+.bg-\[\#0071e3\],
+.bg-\[\#ff5500\],
+.bg-\[\#0077ed\],
+.bg-\[\#005bbd\],
+.bg-blue-600,
+.bg-blue-500,
+.bg-indigo-600,
+.bg-indigo-500,
+.bg-violet-600,
+.bg-orange-500,
+.bg-orange-600 {
+  background-color: #7831d6 !important;
+  color: #ffffff !important;
+}
+
+.hover\:bg-\[\#147ce5\]:hover,
+.hover\:bg-\[\#ff6a1a\]:hover,
+.hover\:bg-\[\#0077ed\]:hover,
+.hover\:bg-\[\#005bbd\]:hover,
+.hover\:bg-blue-600:hover,
+.hover\:bg-blue-700:hover,
+.hover\:bg-indigo-700:hover,
+.hover\:bg-violet-700:hover,
+.hover\:bg-orange-600:hover {
+  background-color: #6825bc !important;
+}
+
+/* Light tint backgrounds */
+.bg-blue-50,
+.bg-blue-50\/50,
+.bg-\[\#eef5ff\],
+.bg-\[\#ff5500\]\/10,
+.bg-\[\#ff5500\]\/15,
+.bg-\[\#ff5500\]\/20,
+.bg-\[\#0071e3\]\/10,
+.bg-\[\#0071e3\]\/20 {
+  background-color: rgba(120, 49, 214, 0.15) !important;
+}
+
+/* Text Colors */
+.text-\[\#1d1d1f\],
+.text-\[\#111827\],
+.text-black,
+.text-gray-900,
+.text-gray-800,
+.text-slate-900,
+.text-zinc-900 {
+  color: #ffffff !important;
+}
+
+.text-\[\#515154\],
+.text-\[\#6e6e73\],
+.text-\[\#4b5563\],
+.text-gray-700,
+.text-gray-600,
+.text-slate-600,
+.text-zinc-600 {
+  color: #e4e4e7 !important;
+}
+
+.text-\[\#8e8e93\],
+.text-\[\#8b929d\],
+.text-\[\#9298a3\],
+.text-\[\#727985\],
+.text-\[\#777e89\],
+.text-\[\#9ba1ab\],
+.text-\[\#a6abb4\],
+.text-\[\#b6bbc4\],
+.text-gray-500,
+.text-gray-400,
+.text-slate-400,
+.text-zinc-400 {
+  color: #a1a1aa !important;
+}
+
+.text-\[\#0071e3\],
+.text-\[\#ff5500\],
+.text-\[\#ff6a1a\],
+.text-\[\#ff7043\],
+.text-\[\#ff8a61\],
+.text-\[\#ff7a33\],
+.text-blue-600,
+.text-blue-500 {
+  color: #c4b5fd !important;
+}
+
+/* Borders */
+.border-\[\#e5e5ea\],
+.border-\[\#d2d2d7\],
+.border-gray-100,
+.border-gray-200,
+.border-gray-300,
+.border-slate-200,
+.border-zinc-200 {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.border-\[\#0071e3\],
+.border-\[\#ff5500\] {
+  border-color: #7831d6 !important;
+}
+
+/* Inputs & Form Controls */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  background-color: #050505 !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #71717a !important;
+}
+
+/* Universal Hover Overrides - prevent any white/light flash on hover */
+.hover\:bg-\[\#f5f5f7\]:hover,
+.hover\:bg-\[\#f8fafc\]:hover,
+.hover\:bg-\[\#f9fafb\]:hover,
+.hover\:bg-\[\#ededf0\]:hover,
+.hover\:bg-\[\#fbfbfb\]:hover,
+.hover\:bg-\[\#fbfbfd\]:hover,
+.hover\:bg-gray-50:hover,
+.hover\:bg-gray-100:hover,
+.hover\:bg-slate-50:hover,
+.hover\:bg-slate-100:hover,
+.hover\:bg-zinc-50:hover,
+.hover\:bg-zinc-100:hover,
+.hover\:bg-white:hover,
+.hover\:bg-white\/90:hover,
+.hover\:bg-white\/80:hover,
+.hover\:bg-white\/70:hover,
+.hover\:bg-black\/\[0\.035\]:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+/* Secondary Button Overrides */
+button.bg-white,
+a.bg-white {
+  background-color: #7831d6 !important;
+  color: #ffffff !important;
+  border-color: #7831d6 !important;
+}
+
+button.bg-white:hover,
+a.bg-white:hover {
+  background-color: #6825bc !important;
+  color: #ffffff !important;
 }

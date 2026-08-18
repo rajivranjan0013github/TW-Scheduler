@@ -347,9 +347,9 @@ export const AdminDashboard = () => {
           )}
 
           {/* Table Filters Bar */}
-          <div className="mt-3 grid gap-2.5 rounded-xl border border-[#d2d2d7] bg-white p-3 sm:grid-cols-3">
+          <div className="mt-3 grid gap-2.5 rounded-xl border border-white/10 bg-[#0a0a0a] p-3 sm:grid-cols-3">
             <div className="flex flex-col gap-0.5">
-              <label htmlFor="search-channel" className="text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+              <label htmlFor="search-channel" className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
                 Search Channel
               </label>
               <input
@@ -358,19 +358,19 @@ export const AdminDashboard = () => {
                 value={searchChannel}
                 onChange={(e) => setSearchChannel(e.target.value)}
                 placeholder="Search channel or username..."
-                className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
+                className="h-7 rounded-md border border-white/10 bg-black px-2 text-[11px] font-semibold text-white outline-none transition focus:border-[#7831d6]"
               />
             </div>
 
             <div className="flex flex-col gap-0.5">
-              <label htmlFor="filter-platform" className="text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+              <label htmlFor="filter-platform" className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
                 Filter Channel / Platform
               </label>
               <select
                 id="filter-platform"
                 value={filterPlatform}
                 onChange={(e) => setFilterPlatform(e.target.value)}
-                className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
+                className="h-7 rounded-md border border-white/10 bg-black px-2 text-[11px] font-semibold text-white outline-none transition focus:border-[#7831d6]"
               >
                 <option value="all">All Platforms</option>
                 <option value="youtube">YouTube</option>
@@ -381,7 +381,7 @@ export const AdminDashboard = () => {
             </div>
 
             <div className="flex flex-col gap-0.5">
-              <label htmlFor="search-user" className="text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+              <label htmlFor="search-user" className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
                 Search User (Name/Email)
               </label>
               <input
@@ -390,13 +390,13 @@ export const AdminDashboard = () => {
                 value={searchUser}
                 onChange={(e) => setSearchUser(e.target.value)}
                 placeholder="Search by user name or email..."
-                className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
+                className="h-7 rounded-md border border-white/10 bg-black px-2 text-[11px] font-semibold text-white outline-none transition focus:border-[#7831d6]"
               />
             </div>
           </div>
-          <div className="mt-3 overflow-x-auto rounded-xl border border-[#d2d2d7] bg-white">
+          <div className="mt-3 overflow-x-auto rounded-xl border border-white/10 bg-[#0a0a0a]">
             <div className="min-w-[900px]">
-              <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+              <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] gap-3 border-b border-white/10 bg-black/60 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
                 <span>Channel</span>
                 <span>User</span>
                 <span>{selectedGraphDate ? `Activity (${selectedGraphDate})` : 'Activity'}</span>
@@ -406,11 +406,11 @@ export const AdminDashboard = () => {
                 <span>{selectedGraphDate ? `Engagement (${selectedGraphDate})` : 'Engagement'}</span>
               </div>
               {(activeMetrics.accountRows || []).length === 0 ? (
-                <div className="px-5 py-8 text-center text-sm text-[#6e6e73]">
+                <div className="px-5 py-8 text-center text-sm text-zinc-400">
                   No publishing channels are associated with this campaign.
                 </div>
               ) : filteredAccountRows.length === 0 ? (
-                <div className="px-5 py-8 text-center text-sm text-[#6e6e73]">
+                <div className="px-5 py-8 text-center text-sm text-zinc-400">
                   No publishing channels match the filter criteria.
                 </div>
               ) : (
@@ -424,7 +424,7 @@ export const AdminDashboard = () => {
                       <div
                         key={account._id}
                         onClick={() => openAccountFeed(account)}
-                        className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] items-center gap-3 border-b border-[#e5e5ea] px-3 py-2 text-xs transition hover:bg-[#f5f5f7] last:border-b-0"
+                        className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] items-center gap-3 border-b border-white/10 px-3 py-2 text-xs transition hover:bg-white/[0.08] last:border-b-0 text-white"
                         role="button"
                         tabIndex={0}
                         onKeyDown={(event) => {
@@ -436,8 +436,8 @@ export const AdminDashboard = () => {
                       >
                         <AccountIdentity account={account} />
                         <div className="min-w-0">
-                          <p className="m-0 truncate font-semibold text-[#1d1d1f]">{account.user?.name || 'Unknown user'}</p>
-                          <p className="m-0 truncate text-[10px] text-[#6e6e73]">{account.user?.email || 'No email'}</p>
+                          <p className="m-0 truncate font-semibold text-white">{account.user?.name || 'Unknown user'}</p>
+                          <p className="m-0 truncate text-[10px] text-zinc-400">{account.user?.email || 'No email'}</p>
                         </div>
                         <ActivityCell
                           account={account}
@@ -445,27 +445,27 @@ export const AdminDashboard = () => {
                           selectedRange={selectedRange}
                           selectedGraphDate={selectedGraphDate}
                         />
-                        <span className="text-[#515154]">
+                        <span className="text-zinc-300">
                           {selectedGraphDate ? (dateActivity?.count || 0) : (account[selectedRange.postsKey] || 0)}
                         </span>
                         <div>
                           {selectedGraphDate ? (
-                            <span className="font-semibold text-[#1d1d1f]">
+                            <span className="font-semibold text-white">
                               {numberFormat.format(dateActivity?.views || 0)}
                             </span>
                           ) : (
-                            <span className="text-[#515154]">
+                            <span className="text-zinc-300">
                               {numberFormat.format(account[selectedRange.viewsKey] || 0)}
                               {(account.recentViewDelta || 0) > 0 && (
-                                <span className="ml-1 text-[9px] font-semibold text-green-600">+{numberFormat.format(account.recentViewDelta)}</span>
+                                <span className="ml-1 text-[9px] font-semibold text-emerald-400">+{numberFormat.format(account.recentViewDelta)}</span>
                               )}
                             </span>
                           )}
                         </div>
-                        <span className={(account.upcomingPosts || 0) < 3 ? 'text-[#ff3b30] font-medium' : 'text-[#515154]'}>
+                        <span className={(account.upcomingPosts || 0) < 3 ? 'text-rose-400 font-medium' : 'text-zinc-300'}>
                           {numberFormat.format(account.upcomingPosts || 0)}
                         </span>
-                        <span className="text-[#515154]">
+                        <span className="text-zinc-300">
                           {selectedGraphDate ? (
                             `${numberFormat.format(dateActivity?.likes || 0)} / ${numberFormat.format(dateActivity?.comments || 0)}`
                           ) : (

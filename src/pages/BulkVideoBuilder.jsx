@@ -782,10 +782,10 @@ export const BulkVideoBuilder = () => {
           <button
             type="button"
             onClick={bulk.addRow}
-            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
+            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] active:scale-95 text-white transition-all duration-200 shadow-sm"
             title="Add blank frame"
           >
-            <Plus className="h-3.5 w-3.5 text-[#ff5500] shrink-0" />
+            <Plus className="h-3.5 w-3.5 text-white shrink-0" />
             <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
               Add Frame
             </span>
@@ -797,7 +797,7 @@ export const BulkVideoBuilder = () => {
             className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
             title="Temporary Media Library"
           >
-            <Folder className="h-3.5 w-3.5 text-[#0071e3] shrink-0" />
+            <Folder className="h-3.5 w-3.5 text-[#c4b5fd] shrink-0" />
             <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
               Temp Library
             </span>
@@ -809,7 +809,7 @@ export const BulkVideoBuilder = () => {
             className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
             title="Align Frames"
           >
-            <Layout className="h-3.5 w-3.5 text-[#ff5500] shrink-0" />
+            <Layout className="h-3.5 w-3.5 text-[#c4b5fd] shrink-0" />
             <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
               Align
             </span>
@@ -821,7 +821,7 @@ export const BulkVideoBuilder = () => {
             className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
             title="Fit View"
           >
-            <Crosshair className="h-3.5 w-3.5 text-[#0071e3] shrink-0" />
+            <Crosshair className="h-3.5 w-3.5 text-[#c4b5fd] shrink-0" />
             <span className="text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
               Fit
             </span>
@@ -845,7 +845,7 @@ export const BulkVideoBuilder = () => {
             type="button"
             disabled={readyCount === 0}
             onClick={handleExportAll}
-            className="flex items-center gap-2 rounded-lg bg-[#ff5500] px-4 py-1.5 text-xs font-extrabold tracking-wide text-white transition-all hover:bg-orange-600 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+            className="flex items-center gap-2 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] px-4 py-1.5 text-xs font-extrabold tracking-wide text-white transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
           >
             <Play className="h-4 w-4 fill-white text-white" />
             EXPORT ({readyCount})
@@ -855,17 +855,17 @@ export const BulkVideoBuilder = () => {
 
       {/* Floating Left Layers & Media Library Panel Sidebar */}
       {isSidebarOpen && (
-        <aside className="absolute top-20 left-4 bottom-4 w-80 bg-[#18181b]/95 border border-[#27272a] rounded-xl flex flex-col z-20 shadow-xl backdrop-blur-md overflow-hidden">
+        <aside className="absolute top-20 left-4 bottom-4 w-80 bg-black/95 border border-white/10 rounded-xl flex flex-col z-20 shadow-2xl backdrop-blur-md overflow-hidden text-white">
           {/* Header Tab Switcher */}
-          <div className="p-2.5 border-b border-[#27272a] flex items-center justify-between shrink-0 bg-[#121214]/60">
-            <div className="grid grid-cols-2 gap-1 p-0.5 bg-[#27272a]/60 rounded-lg w-full">
+          <div className="p-2.5 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#0a0a0a]">
+            <div className="grid grid-cols-2 gap-1 p-0.5 bg-white/5 rounded-lg w-full">
               <button
                 type="button"
                 onClick={() => setSidebarTab('frames')}
                 className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[10px] font-extrabold uppercase tracking-wider transition-all ${
                   sidebarTab === 'frames'
-                    ? 'bg-[#ff5500] text-white shadow-sm'
-                    : 'text-gray-400 hover:text-gray-200'
+                    ? 'bg-[#7831d6] text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
                 }`}
               >
                 <Sliders className="w-3 h-3" />
@@ -876,8 +876,8 @@ export const BulkVideoBuilder = () => {
                 onClick={() => setSidebarTab('media')}
                 className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[10px] font-extrabold uppercase tracking-wider transition-all ${
                   sidebarTab === 'media'
-                    ? 'bg-[#0071e3] text-white shadow-sm'
-                    : 'text-gray-400 hover:text-gray-200'
+                    ? 'bg-[#7831d6] text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
                 }`}
               >
                 <Folder className="w-3 h-3" />

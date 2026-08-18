@@ -203,17 +203,17 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
   // ─────────────────────────────────────────────
   if (!loading && campaigns.length === 0) {
     return (
-      <div className="min-h-screen bg-[#f5f5f7] flex items-center justify-center px-6 py-12">
+      <div className="min-h-screen bg-black flex items-center justify-center px-6 py-12 text-white">
         <div className="w-full max-w-lg">
           {/* Welcome hero */}
           <div className="text-center mb-8">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0071e3] to-[#8b5cf6] text-white shadow-lg mb-6">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#7831d6] to-[#9333ea] text-white shadow-lg mb-6 shadow-purple-950/40">
               <Sparkles className="h-7 w-7" />
             </div>
-            <h1 className="m-0 text-3xl font-semibold tracking-tight text-[#1d1d1f]">
+            <h1 className="m-0 text-3xl font-semibold tracking-tight text-white">
               Welcome, {firstName}!
             </h1>
-            <p className="m-0 mt-3 text-sm leading-6 text-[#6e6e73] max-w-md mx-auto">
+            <p className="m-0 mt-3 text-sm leading-6 text-zinc-400 max-w-md mx-auto">
               Let's set up your workspace in under 2 minutes.
               You'll be scheduling your first post in no time.
             </p>
@@ -222,31 +222,31 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
           {/* Workspace creation form */}
           <form
             onSubmit={createCampaign}
-            className="rounded-2xl border border-[#d2d2d7] bg-white p-6 shadow-sm"
+            className="rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 shadow-2xl shadow-black/80"
           >
-            <div className="flex items-center gap-3 border-b border-[#e5e5ea] pb-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef5ff] text-[#0071e3]">
+            <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#7831d6]/20 text-[#c4b5fd]">
                 <Megaphone className="h-4 w-4" />
               </div>
               <div>
-                <h2 className="m-0 text-sm font-semibold text-[#1d1d1f]">
+                <h2 className="m-0 text-sm font-semibold text-white">
                   Name your workspace
                 </h2>
-                <p className="m-0 text-[11px] text-[#8e8e93]">
+                <p className="m-0 text-[11px] text-zinc-400">
                   This is where all your content and channels will live
                 </p>
               </div>
             </div>
 
             {createError && (
-              <div className="mt-4 rounded-lg border border-[#fecaca] bg-[#fff1f2] p-3 text-xs font-semibold text-[#b91c1c]">
+              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-300">
                 {createError}
               </div>
             )}
 
             <div className="mt-5 space-y-4">
               <label className="block">
-                <span className="text-xs font-semibold text-[#515154]">
+                <span className="text-xs font-semibold text-zinc-300">
                   Workspace name
                 </span>
                 <input
@@ -258,15 +258,15 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                     }))
                   }
                   placeholder="e.g. My Brand, Summer Campaign, Client Name..."
-                  className="mt-2 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/10"
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 placeholder:text-zinc-600"
                   autoFocus
                 />
               </label>
 
               <label className="block">
-                <span className="text-xs font-semibold text-[#515154]">
+                <span className="text-xs font-semibold text-zinc-300">
                   Description{' '}
-                  <span className="font-normal text-[#8e8e93]">(optional)</span>
+                  <span className="font-normal text-zinc-500">(optional)</span>
                 </span>
                 <textarea
                   value={campaignForm.description}
@@ -278,7 +278,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                   }
                   placeholder="What will you be posting about?"
                   rows={2}
-                  className="mt-2 w-full resize-none rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/10"
+                  className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 placeholder:text-zinc-600"
                 />
               </label>
             </div>
@@ -286,7 +286,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
             <button
               type="submit"
               disabled={saving}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#005bbd] disabled:opacity-60 active:scale-[0.98]"
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#7831d6] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#6825bc] disabled:opacity-60 active:scale-[0.98] shadow-md"
             >
               {saving ? (
                 <>
@@ -303,8 +303,8 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
           </form>
 
           {/* "What's next" preview */}
-          <div className="mt-6 rounded-xl border border-[#e5e5ea] bg-white/70 p-5">
-            <p className="m-0 text-[10px] font-bold uppercase tracking-wider text-[#8e8e93] mb-3">
+          <div className="mt-6 rounded-xl border border-white/10 bg-[#0a0a0a] p-5">
+            <p className="m-0 text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-3">
               What happens next
             </p>
             <div className="space-y-3">
@@ -312,17 +312,17 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                 {
                   icon: Link2,
                   label: 'Connect your Instagram, Facebook, or YouTube',
-                  color: '#0071e3',
+                  color: '#7831d6',
                 },
                 {
                   icon: Upload,
                   label: 'Upload your videos and images',
-                  color: '#8b5cf6',
+                  color: '#9333ea',
                 },
                 {
                   icon: Clock,
                   label: 'Schedule your first post',
-                  color: '#059669',
+                  color: '#10b981',
                 },
               ].map((item, i) => (
                 <div key={i} className="flex items-center gap-3">
@@ -332,16 +332,16 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                   >
                     <span className="text-[10px] font-bold">{i + 1}</span>
                   </div>
-                  <span className="text-xs text-[#515154]">{item.label}</span>
+                  <span className="text-xs text-zinc-300">{item.label}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Signed-in context */}
-          <p className="m-0 mt-5 text-center text-[11px] text-[#8e8e93]">
+          <p className="m-0 mt-5 text-center text-[11px] text-zinc-500">
             Signed in as{' '}
-            <span className="font-semibold text-[#515154]">{user?.email}</span>
+            <span className="font-semibold text-zinc-300">{user?.email}</span>
           </p>
         </div>
       </div>
@@ -352,19 +352,19 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
   // RETURNING USER: Campaign Picker (2+ campaigns)
   // ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#f5f5f7] px-8 py-7 text-[#1d1d1f]">
+    <div className="min-h-screen bg-black px-8 py-7 text-white">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <div className="flex items-start justify-between gap-4 border-b border-[#d2d2d7] pb-5">
+        <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
           <div>
-            <p className="m-0 text-[11px] font-semibold uppercase tracking-wider text-[#6e6e73]">
-              Workspace
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+              Workspaces
             </p>
-            <h1 className="m-0 mt-1 text-2xl font-semibold tracking-tight">
-              Select a workspace
+            <h1 className="m-0 mt-1 text-2xl font-semibold tracking-tight text-white">
+              Select Workspace
             </h1>
-            <p className="m-0 mt-2 max-w-2xl text-sm leading-6 text-[#6e6e73]">
-              Signed in as{' '}
-              <span className="font-semibold text-[#1d1d1f]">
+            <p className="m-0 mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
+              You are signed in as{' '}
+              <span className="font-semibold text-white">
                 {user?.email}
               </span>
               . Choose the workspace you want to manage.
@@ -374,7 +374,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
             <button
               type="button"
               onClick={fetchCampaigns}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               Refresh
@@ -383,7 +383,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
               <button
                 type="button"
                 onClick={openCreateForm}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#0071e3] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#005bbd]"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#7831d6] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#6825bc] shadow-sm"
               >
                 <Plus className="h-3.5 w-3.5" />
                 New workspace
@@ -395,14 +395,14 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
         {isCreating && (
           <form
             onSubmit={createCampaign}
-            className="rounded-lg border border-[#d2d2d7] bg-white p-5 shadow-sm"
+            className="rounded-lg border border-white/10 bg-[#0a0a0a] p-5 shadow-2xl shadow-black/80"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#8e8e93]">
+                <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                   Workspace setup
                 </p>
-                <h2 className="m-0 mt-1 text-lg font-semibold tracking-tight">
+                <h2 className="m-0 mt-1 text-lg font-semibold tracking-tight text-white">
                   New workspace
                 </h2>
               </div>
@@ -410,7 +410,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                 <button
                   type="button"
                   onClick={closeCreateForm}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white"
                   aria-label="Close workspace form"
                 >
                   <X className="h-4 w-4" />
@@ -419,14 +419,14 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
             </div>
 
             {createError && (
-              <div className="mt-4 rounded-lg border border-[#fecaca] bg-[#fff1f2] p-3 text-xs font-semibold text-[#b91c1c]">
+              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-300">
                 {createError}
               </div>
             )}
 
             <div className="mt-5 grid gap-4">
               <label className="block">
-                <span className="text-xs font-semibold text-[#515154]">
+                <span className="text-xs font-semibold text-zinc-300">
                   Workspace name
                 </span>
                 <input
@@ -438,13 +438,13 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                     }))
                   }
                   placeholder="Workspace name"
-                  className="mt-2 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#3478f6]"
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none focus:border-[#7831d6]"
                 />
               </label>
             </div>
 
             <label className="mt-4 block">
-              <span className="text-xs font-semibold text-[#515154]">
+              <span className="text-xs font-semibold text-zinc-300">
                 Description
               </span>
               <textarea
@@ -457,7 +457,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                 }
                 placeholder="Workspace description"
                 rows={3}
-                className="mt-2 w-full resize-none rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm outline-none focus:border-[#3478f6]"
+                className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none focus:border-[#7831d6]"
               />
             </label>
 
@@ -465,7 +465,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#0071e3] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#005bbd] disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#7831d6] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6825bc] disabled:opacity-60 shadow-sm"
               >
                 <Save className="h-4 w-4" />
                 {saving ? 'Creating...' : 'Create workspace and continue'}
@@ -475,16 +475,16 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
         )}
 
         {loading ? (
-          <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-[#d2d2d7] bg-white">
+          <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-white/10 bg-[#0a0a0a]">
             <div className="flex flex-col items-center gap-3">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0071e3] border-t-transparent" />
-              <span className="text-xs font-semibold tracking-wide text-[#8e8e93]">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#7831d6] border-t-transparent" />
+              <span className="text-xs font-semibold tracking-wide text-zinc-400">
                 Loading workspaces...
               </span>
             </div>
           </div>
         ) : error ? (
-          <div className="rounded-lg border border-[#fecaca] bg-[#fff1f2] p-5 text-sm font-semibold text-[#b91c1c]">
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-5 text-sm font-semibold text-red-300">
             {error}
           </div>
         ) : (
@@ -500,38 +500,38 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                   key={campaign._id}
                   type="button"
                   onClick={() => handleSelect(campaign)}
-                  className={`flex min-h-[220px] flex-col rounded-lg border bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                  className={`flex min-h-[220px] flex-col rounded-lg border bg-[#0a0a0a] p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#7831d6] hover:bg-white/[0.04] ${
                     isActive
-                      ? 'border-[#0071e3] ring-2 ring-[#0071e3]/15'
-                      : 'border-[#d2d2d7]'
+                      ? 'border-[#7831d6] ring-2 ring-[#7831d6]/25'
+                      : 'border-white/10'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#8e8e93]">
+                      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                         Workspace
                       </p>
-                      <h2 className="m-0 mt-1 text-lg font-semibold tracking-tight text-[#1d1d1f]">
+                      <h2 className="m-0 mt-1 text-lg font-semibold tracking-tight text-white">
                         {campaign.name}
                       </h2>
                     </div>
                     {isActive ? (
-                      <CheckCircle2 className="h-5 w-5 text-[#0071e3]" />
+                      <CheckCircle2 className="h-5 w-5 text-[#7831d6]" />
                     ) : (
-                      <ArrowRight className="h-5 w-5 text-[#8e8e93]" />
+                      <ArrowRight className="h-5 w-5 text-zinc-500" />
                     )}
                   </div>
 
-                  <p className="m-0 mt-3 line-clamp-3 text-sm leading-5 text-[#6e6e73]">
+                  <p className="m-0 mt-3 line-clamp-3 text-sm leading-5 text-zinc-400">
                     {campaign.description || 'Workspace'}
                   </p>
 
                   <div className="mt-5 flex flex-1 items-end">
-                    <div className="w-full rounded-lg border border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2">
-                      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-[#8e8e93]">
+                    <div className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                         Main email
                       </p>
-                      <p className="m-0 mt-1 truncate text-xs font-semibold text-[#1d1d1f]">
+                      <p className="m-0 mt-1 truncate text-xs font-semibold text-white">
                         {mainEmail}
                       </p>
                     </div>

@@ -26,12 +26,12 @@ const getQueueStatusLabel = (status) => ({
 }[status] || status || 'Scheduled');
 
 const getQueueStatusClass = (status) => {
-  if (completedStatuses.has(status)) return 'bg-green-100 text-green-700';
-  if (status === 'manual_ready') return 'bg-amber-100 text-amber-700';
-  if (status === 'downloaded') return 'bg-emerald-100 text-emerald-700';
-  if (status === 'paused') return 'bg-slate-200 text-slate-700';
-  if (status === 'publishing') return 'bg-violet-100 text-violet-700';
-  return 'bg-blue-100 text-blue-700';
+  if (completedStatuses.has(status)) return 'border border-emerald-500/30 bg-emerald-500/15 text-emerald-400';
+  if (status === 'manual_ready') return 'border border-amber-500/30 bg-amber-500/15 text-amber-300';
+  if (status === 'downloaded') return 'border border-teal-500/30 bg-teal-500/15 text-teal-300';
+  if (status === 'paused') return 'border border-zinc-700 bg-zinc-800 text-zinc-400';
+  if (status === 'publishing') return 'border border-[#7831d6]/30 bg-[#7831d6]/20 text-[#c4b5fd]';
+  return 'border border-[#7831d6]/30 bg-[#7831d6]/15 text-[#c4b5fd]';
 };
 
 const getCaptionPreview = (caption) => Array.from(caption || 'No caption').slice(0, 10).join('');
@@ -563,13 +563,13 @@ export const PublishedFeed = () => {
 
       {/* Tabs Selector */}
       {!loading && channel && (
-        <div className="mb-3 flex border-b border-[#e5e5ea] gap-4">
+        <div className="mb-3 flex border-b border-white/10 gap-4">
           <button
             onClick={() => setActiveTab('published')}
             className={`pb-2 text-xs font-bold border-b-2 transition-colors ${
               activeTab === 'published'
-                ? 'border-[#0071e3] text-[#0071e3]'
-                : 'border-transparent text-gray-500 hover:text-black'
+                ? 'border-[#7831d6] text-[#c4b5fd]'
+                : 'border-transparent text-zinc-400 hover:text-white'
             }`}
           >
             Published Feed ({selectedGraphDate ? `${displayedPublishedPosts.length} of ${publishedPosts.length}` : publishedPosts.length})
@@ -578,8 +578,8 @@ export const PublishedFeed = () => {
             onClick={() => setActiveTab('queued')}
             className={`pb-2 text-xs font-bold border-b-2 transition-colors ${
               activeTab === 'queued'
-                ? 'border-[#0071e3] text-[#0071e3]'
-                : 'border-transparent text-gray-500 hover:text-black'
+                ? 'border-[#7831d6] text-[#c4b5fd]'
+                : 'border-transparent text-zinc-400 hover:text-white'
             }`}
           >
             Scheduled Queue ({upcomingQueuedCount})
@@ -592,37 +592,37 @@ export const PublishedFeed = () => {
         {activeTab === 'published' ? (
           loading ? (
             <div className="flex flex-col items-center justify-center py-32 gap-3">
-              <div className="w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-xs text-gray-400 font-medium">Loading published posts...</span>
+              <div className="w-6 h-6 border-2 border-[#7831d6] border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-xs text-zinc-400 font-medium">Loading published posts...</span>
             </div>
           ) : errorPosts ? (
-            <div className="bg-white border border-[#e5e5ea] rounded-xl p-8 text-center space-y-2 shadow-sm">
-              <p className="text-sm text-red-500 font-bold m-0">⚠️ Error Fetching Feed</p>
-              <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed m-0">{errorPosts}</p>
+            <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-8 text-center space-y-2 shadow-sm text-white">
+              <p className="text-sm text-rose-400 font-bold m-0">⚠️ Error Fetching Feed</p>
+              <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed m-0">{errorPosts}</p>
             </div>
           ) : publishedPosts.length === 0 ? (
-            <div className="bg-white border border-[#e5e5ea] rounded-xl p-16 text-center text-sm text-gray-400 font-medium shadow-sm">
+            <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-16 text-center text-sm text-zinc-400 font-medium shadow-sm">
               No cached published posts from the last 30 days. Refresh to sync this channel.
             </div>
           ) : (
             <div className="w-full">
               {selectedGraphDate && (
-                <div className="mb-2 flex items-center justify-between rounded-lg border border-[#3478f6]/30 bg-[#f0f7ff] px-3 py-2 text-xs text-[#1d1d1f]">
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-[#7831d6]/30 bg-[#7831d6]/10 px-3 py-2 text-xs text-white">
                   <span>
                     Showing <strong>{displayedPublishedPosts.length}</strong> post{displayedPublishedPosts.length === 1 ? '' : 's'} published on <strong>{selectedGraphDate}</strong>
                   </span>
                   <button
                     type="button"
                     onClick={() => setSelectedGraphDate(null)}
-                    className="font-semibold text-[#3478f6] hover:underline"
+                    className="font-semibold text-[#c4b5fd] hover:underline"
                   >
                     Show all 30 days
                   </button>
                 </div>
               )}
-              <div className="w-full overflow-x-auto rounded-xl border border-[#d2d2d7] bg-white">
+              <div className="w-full overflow-x-auto rounded-xl border border-white/10 bg-[#0a0a0a]">
                 <div className="min-w-[620px]">
-                <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] gap-3 border-b border-[#e5e5ea] bg-[#fbfbfd] px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+                <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] gap-3 border-b border-white/10 bg-black/60 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
                   <span>Published</span>
                   <span>Views</span>
                   <span>Likes</span>
@@ -631,7 +631,7 @@ export const PublishedFeed = () => {
                 </div>
                 <div>
                   {displayedPublishedPosts.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-gray-400">
+                    <div className="p-8 text-center text-xs text-zinc-400">
                       No posts found for {selectedGraphDate}.
                     </div>
                   ) : (
@@ -639,25 +639,25 @@ export const PublishedFeed = () => {
                       const publishedDate = getPublishedDate(post);
                       const publishedDisplay = formatPublishedDate(publishedDate);
                       return (
-                        <div key={post.id} className="border-b border-[#e5e5ea] last:border-b-0">
-                          <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] items-center gap-3 px-3 py-2 text-xs transition hover:bg-[#f5f5f7]">
+                        <div key={post.id} className="border-b border-white/10 last:border-b-0">
+                          <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] items-center gap-3 px-3 py-2 text-xs transition hover:bg-white/[0.06] text-white">
                             <div className="min-w-0">
-                              <p className="m-0 truncate font-semibold text-[#1d1d1f]">{publishedDisplay.date}</p>
+                              <p className="m-0 truncate font-semibold text-white">{publishedDisplay.date}</p>
                               {publishedDisplay.time && (
-                                <p className="m-0 mt-0.5 text-[10px] font-semibold text-[#6e6e73]">{publishedDisplay.time}</p>
+                                <p className="m-0 mt-0.5 text-[10px] font-semibold text-zinc-400">{publishedDisplay.time}</p>
                               )}
                             </div>
-                            <span className="font-semibold text-[#515154]">
+                            <span className="font-semibold text-zinc-300">
                               {post.views === null || post.views === undefined ? '—' : compactNumber(post.views)}
                             </span>
-                            <span className="font-semibold text-[#515154]">{compactNumber(post.likes)}</span>
-                            <span className="font-semibold text-[#515154]">{compactNumber(post.comments)}</span>
+                            <span className="font-semibold text-zinc-300">{compactNumber(post.likes)}</span>
+                            <span className="font-semibold text-zinc-300">{compactNumber(post.comments)}</span>
                             <div className="flex items-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => openLivePost(post)}
                                 disabled={!post.permalink}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#d2d2d7] bg-white text-[#515154] transition hover:border-[#0071e3] hover:text-[#0071e3] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-300 transition hover:border-[#7831d6] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                                 title={post.permalink ? 'Open live post' : 'Live-post link unavailable'}
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
@@ -665,7 +665,7 @@ export const PublishedFeed = () => {
                               <button
                                 type="button"
                                 onClick={() => openInsights(post)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#0071e3] text-white transition hover:bg-[#147ce5]"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#7831d6] text-white transition hover:bg-[#6825bc]"
                                 title="View performance insights"
                               >
                                 <BarChart3 className="h-3.5 w-3.5" />
@@ -684,22 +684,22 @@ export const PublishedFeed = () => {
         ) : (
           loadingQueue ? (
             <div className="flex flex-col items-center justify-center py-32 gap-3">
-              <div className="w-6 h-6 border-2 border-[#0071e3] border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-xs text-gray-400 font-medium">Loading scheduled queue...</span>
+              <div className="w-6 h-6 border-2 border-[#7831d6] border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-xs text-zinc-400 font-medium">Loading scheduled queue...</span>
             </div>
           ) : errorQueue ? (
-            <div className="bg-white border border-[#e5e5ea] rounded-xl p-8 text-center space-y-2 shadow-sm">
-              <p className="text-sm text-red-500 font-bold m-0">⚠️ Error Fetching Queue</p>
-              <p className="text-xs text-gray-500 max-w-md mx-auto leading-relaxed m-0">{errorQueue}</p>
+            <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-8 text-center space-y-2 shadow-sm text-white">
+              <p className="text-sm text-rose-400 font-bold m-0">⚠️ Error Fetching Queue</p>
+              <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed m-0">{errorQueue}</p>
             </div>
           ) : queuedPosts.length === 0 ? (
-            <div className="bg-white border border-[#e5e5ea] rounded-xl p-16 text-center text-sm text-gray-400 font-medium shadow-sm">
+            <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-16 text-center text-sm text-zinc-400 font-medium shadow-sm">
               No posts in this seven-day queue window.
             </div>
           ) : (
-            <div className="w-full overflow-x-auto rounded-xl border border-[#d2d2d7] bg-white">
+            <div className="w-full overflow-x-auto rounded-xl border border-white/10 bg-[#0a0a0a]">
               <table className="w-full min-w-[760px] border-collapse text-left text-xs">
-                <thead className="bg-[#fbfbfd] text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+                <thead className="bg-black/60 border-b border-white/10 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
                   <tr>
                     <th className="px-3 py-2">Media</th>
                     <th className="px-3 py-2">Schedule</th>
@@ -719,31 +719,31 @@ export const PublishedFeed = () => {
                       const isPosted = completedStatuses.has(post.status) || Boolean(post.manualPostedAt);
 
                       return (
-                        <tr key={post._id} className={`border-t border-[#e5e5ea] transition hover:bg-[#f5f5f7] ${isPosted ? 'bg-green-50/60' : ''}`}>
+                        <tr key={post._id} className={`border-t border-white/10 transition hover:bg-white/[0.06] ${isPosted ? 'bg-emerald-950/20 hover:bg-emerald-950/30' : ''}`}>
                           <td className="w-20 px-3 py-2">
-                            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-[#e5e5ea] bg-slate-50">
+                            <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
                               {mediaItem ? (
                                 <MediaPreview item={mediaItem} className="h-full w-full object-cover" />
                               ) : (
-                                <span className="text-[8px] font-medium text-gray-400">No media</span>
+                                <span className="text-[8px] font-medium text-zinc-500">No media</span>
                               )}
                             </div>
                           </td>
                           <td className="whitespace-nowrap px-3 py-2">
-                            <p className="m-0 font-semibold text-[#1d1d1f]">{display.date}</p>
-                            <p className="m-0 mt-0.5 text-[10px] text-[#6e6e73]">{display.time || 'Time unavailable'}</p>
+                            <p className="m-0 font-semibold text-white">{display.date}</p>
+                            <p className="m-0 mt-0.5 text-[10px] text-zinc-400">{display.time || 'Time unavailable'}</p>
                           </td>
                           <td className="max-w-[320px] px-3 py-2">
                             <button
                               type="button"
                               onClick={() => setCaptionPost(post)}
-                              className="block w-full truncate text-left font-medium text-[#515154] hover:text-[#0071e3]"
+                              className="block w-full truncate text-left font-medium text-zinc-200 hover:text-[#c4b5fd]"
                               title="View full caption"
                             >
                               {getCaptionPreview(post.caption)}
                             </button>
                           </td>
-                          <td className="whitespace-nowrap px-3 py-2 capitalize text-[#515154]">{post.scheduleMode || 'auto'}</td>
+                          <td className="whitespace-nowrap px-3 py-2 capitalize text-zinc-300">{post.scheduleMode || 'auto'}</td>
                           <td className="whitespace-nowrap px-3 py-2">
                             <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${getQueueStatusClass(post.status)}`}>
                               {getQueueStatusLabel(post.status)}
@@ -753,7 +753,7 @@ export const PublishedFeed = () => {
                             <button
                               type="button"
                               onClick={() => setCaptionPost(post)}
-                              className="rounded-md border border-[#d2d2d7] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#515154] transition hover:border-[#0071e3] hover:text-[#0071e3]"
+                              className="rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] font-semibold text-zinc-200 transition hover:border-[#7831d6] hover:text-white"
                             >
                               View
                             </button>
@@ -761,7 +761,7 @@ export const PublishedFeed = () => {
                               <button
                                 type="button"
                                 onClick={() => handleDeletePost(post)}
-                                className="ml-2 rounded-md border border-red-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-red-600 transition hover:bg-red-50"
+                                className="ml-2 rounded-md border border-rose-500/30 bg-rose-500/15 px-2.5 py-1.5 text-[10px] font-semibold text-rose-400 transition hover:bg-rose-500/25"
                               >
                                 Delete
                               </button>

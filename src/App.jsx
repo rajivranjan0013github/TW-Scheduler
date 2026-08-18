@@ -35,9 +35,9 @@ import CreatorCampaigns from './pages/CreatorCampaigns';
 const VideoEditorV2 = lazy(() => import('./pages/videoEditorV2/VideoEditorV2'));
 
 const TimelineEditorFallback = () => (
-  <div className="flex h-[100dvh] items-center justify-center bg-[#f5f5f7]">
-    <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 text-xs font-bold text-gray-600 shadow-sm">
-      <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#0071e3] border-t-transparent" />
+  <div className="flex h-[100dvh] items-center justify-center bg-black">
+    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#0a0a0a] px-5 py-4 text-xs font-bold text-white shadow-sm">
+      <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#7831d6] border-t-transparent" />
       Opening Timeline Editor…
     </div>
   </div>
@@ -59,7 +59,7 @@ function MobileNav({ isCreator, canViewAdmin }) {
       ];
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#d2d2d7] bg-white/95 px-1 pt-0.5 shadow-[0_-2px_8px_rgba(0,0,0,0.05)] backdrop-blur md:hidden mobile-safe-nav">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-black/95 px-1 pt-0.5 shadow-[0_-2px_8px_rgba(0,0,0,0.5)] backdrop-blur md:hidden mobile-safe-nav text-white">
       <div className="absolute -top-8 right-2">
         <PwaInstallButton
           collapsed
@@ -74,7 +74,7 @@ function MobileNav({ isCreator, canViewAdmin }) {
             end
             className={({ isActive }) =>
               `flex h-full flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[9px] font-semibold leading-none transition ${
-                isActive ? 'bg-[#1d1d1f] text-white' : 'text-[#6e6e73] active:bg-[#f5f5f7]'
+                isActive ? 'bg-[#7831d6] text-white' : 'text-zinc-400 hover:text-white active:bg-white/10'
               }`
             }
           >
@@ -125,7 +125,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
     || (isCreator ? false : (isBulkBuilderPage || (isOnCampaignPage && !hasActiveCampaign)));
 
   return (
-    <div className="flex bg-[#f5f5f7] h-[100dvh] text-[#1d1d1f] antialiased overflow-x-visible overflow-y-hidden font-sans">
+    <div className="flex bg-black h-[100dvh] text-white antialiased overflow-x-visible overflow-y-hidden font-sans">
       {!hideSidebar && (
         <Sidebar
           selectedAccounts={selectedAccounts}

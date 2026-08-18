@@ -138,19 +138,18 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
       switch (status) {
         case 'published':
         case 'published_auto':
-          return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-        case 'failed':
-          return 'bg-rose-50 text-rose-700 border border-rose-200';
         case 'posted_manual':
-          return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+          return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+        case 'failed':
+          return 'bg-rose-500/15 text-rose-400 border border-rose-500/30';
         case 'manual_ready':
         case 'downloaded':
-          return 'bg-amber-50 text-amber-700 border border-amber-200';
+          return 'bg-amber-500/15 text-amber-300 border border-amber-500/30';
         case 'cancelled':
         case 'paused':
-          return 'bg-slate-50 text-slate-700 border border-slate-200';
+          return 'bg-zinc-800 text-zinc-400 border border-zinc-700';
         default:
-          return 'bg-blue-50 text-blue-700 border border-blue-200';
+          return 'bg-[#7831d6]/20 text-[#c4b5fd] border border-[#7831d6]/35';
       }
     };
 
@@ -158,39 +157,38 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
       switch (status) {
         case 'published':
         case 'published_auto':
-          return 'bg-emerald-500';
-        case 'failed':
-          return 'bg-rose-500';
         case 'posted_manual':
-          return 'bg-emerald-500';
+          return 'bg-emerald-400';
+        case 'failed':
+          return 'bg-rose-400';
         case 'manual_ready':
         case 'downloaded':
-          return 'bg-amber-500';
+          return 'bg-amber-400';
         case 'cancelled':
         case 'paused':
-          return 'bg-slate-500';
+          return 'bg-zinc-500';
         default:
-          return 'bg-blue-500';
+          return 'bg-[#c4b5fd]';
       }
     };
 
     const getModeBadgeStyle = (mode) => {
       switch (mode) {
         case 'manual':
-          return 'bg-amber-50 text-amber-800 border border-amber-100';
+          return 'bg-amber-500/15 text-amber-300 border border-amber-500/30';
         case 'hybrid':
-          return 'bg-indigo-50 text-indigo-800 border border-indigo-100';
+          return 'bg-[#7831d6]/20 text-[#c4b5fd] border border-[#7831d6]/35';
         default:
-          return 'bg-sky-50 text-sky-800 border border-sky-100';
+          return 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30';
       }
     };
 
     const hasMetrics = item.post.latestViews !== undefined || item.post.latestLikes !== undefined || item.post.latestComments !== undefined;
 
     return (
-      <div className="flex flex-col gap-2 rounded-xl border border-slate-100 bg-slate-50/50 p-2.5 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md">
+      <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#0a0a0a] p-2.5 shadow-sm transition-all hover:bg-white/[0.04] hover:shadow-md">
 	        <div className="flex gap-2.5 items-start">
-	          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-slate-200 shadow-inner relative border border-slate-200/60">
+	          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-black shadow-inner relative border border-white/10">
 	            <MediaPreview item={item.mediaItem} className="h-full w-full object-cover block" />
 	          </div>
 
@@ -203,7 +201,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 	                      <PlatformIcon platform={primaryChannel?.platform} className="h-4.5 w-4.5 shrink-0" showFallback={true} />
 	                      <AccountAvatar account={primaryChannel} sizeClass="h-5 w-5" textClass="text-[8px]" />
 	                    </span>
-	                    <span className="text-[11px] font-black text-slate-800 truncate max-w-[120px]">
+	                    <span className="text-[11px] font-black text-white truncate max-w-[120px]">
 	                      @{getAccountLabel(primaryChannel)}
 	                    </span>
 	                  </div>
@@ -211,25 +209,25 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 	              )}
 
 	              {hasMetrics ? (
-	                <div className="grid flex-shrink-0 grid-cols-3 overflow-hidden rounded-lg border border-slate-100 bg-white text-center shadow-sm">
+	                <div className="grid flex-shrink-0 grid-cols-3 overflow-hidden rounded-lg border border-white/10 bg-black text-center shadow-sm">
 	                  {[
 	                    ['Views', item.post.latestViews],
 	                    ['Likes', item.post.latestLikes],
 	                    ['Comments', item.post.latestComments],
 	                  ].map(([label, value], metricIndex) => (
-	                    <div key={label} className={`px-2 py-1 ${metricIndex > 0 ? 'border-l border-slate-100' : ''}`}>
-	                      <span className="block text-[10px] font-black leading-none text-slate-900">
+	                    <div key={label} className={`px-2 py-1 ${metricIndex > 0 ? 'border-l border-white/10' : ''}`}>
+	                      <span className="block text-[10px] font-black leading-none text-white">
 	                        {(value ?? 0).toLocaleString()}
 	                      </span>
-	                      <span className="mt-0.5 block text-[7px] font-bold uppercase tracking-wide text-slate-400">
+	                      <span className="mt-0.5 block text-[7px] font-bold uppercase tracking-wide text-zinc-400">
 	                        {label}
 	                      </span>
 	                    </div>
 	                  ))}
 	                </div>
 	              ) : (
-	                <div className="flex flex-shrink-0 items-center gap-1 rounded-lg border border-slate-100 bg-white/70 px-2 py-1 text-[8px] font-bold text-slate-400">
-	                  <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+	                <div className="flex flex-shrink-0 items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[8px] font-bold text-zinc-400">
+	                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
 	                  Metrics pending
 	                </div>
 	              )}
@@ -249,37 +247,37 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 
         {!hideCaption && (
           item.post.caption ? (
-            <p className="m-0 text-[10px] font-medium text-slate-600 line-clamp-2 bg-white/70 px-2 py-1 rounded border border-slate-100">
+            <p className="m-0 text-[10px] font-medium text-zinc-200 line-clamp-2 bg-white/5 px-2 py-1 rounded border border-white/10">
               {item.post.caption}
             </p>
           ) : (
-            <p className="m-0 text-[10px] font-medium text-slate-400 italic bg-white/50 px-2 py-1 rounded border border-slate-100/50">
+            <p className="m-0 text-[10px] font-medium text-zinc-500 italic bg-white/5 px-2 py-1 rounded border border-white/5">
               No caption
             </p>
           )
         )}
 
-	        <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-t border-slate-100 pt-1.5 text-[9px] font-semibold text-slate-500">
-	          <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-white/70 px-1.5 py-0.5">
+	        <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-t border-white/10 pt-1.5 text-[9px] font-semibold text-zinc-400">
+	          <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-white/5 px-1.5 py-0.5">
 	            <span>Scheduled:</span>
-	            <span className="text-slate-700">{getScheduleTimingLabel(item.post.scheduledAt)}</span>
+	            <span className="text-white">{getScheduleTimingLabel(item.post.scheduledAt)}</span>
 	          </span>
 	          {item.manualPosted && item.post.manualPostedAt && (
-	            <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-purple-50 px-1.5 py-0.5">
+	            <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-[#7831d6]/20 px-1.5 py-0.5 border border-[#7831d6]/30">
 	              <span>Posted:</span>
-	              <span className="text-purple-700">{getScheduleTimingLabel(item.post.manualPostedAt)}</span>
+	              <span className="text-[#c4b5fd]">{getScheduleTimingLabel(item.post.manualPostedAt)}</span>
 	            </span>
 	          )}
 	          {item.post.publishedAt && (
-	            <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5">
+	            <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-emerald-500/15 px-1.5 py-0.5 border border-emerald-500/30">
 	              <span>Published:</span>
-	              <span className="text-emerald-700">{getScheduleTimingLabel(item.post.publishedAt)}</span>
+	              <span className="text-emerald-300">{getScheduleTimingLabel(item.post.publishedAt)}</span>
 	            </span>
 	          )}
-	          <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-white/70 px-1.5 py-0.5">
+	          <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-white/5 px-1.5 py-0.5">
 	            <span>Source:</span>
-	            <Folder className="h-3 w-3 shrink-0 text-slate-400" />
-	            <span className="max-w-[160px] truncate text-slate-600">{item.folderLabel}</span>
+	            <Folder className="h-3 w-3 shrink-0 text-zinc-400" />
+	            <span className="max-w-[160px] truncate text-zinc-300">{item.folderLabel}</span>
 	          </span>
 	        </div>
 
@@ -2729,26 +2727,26 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 h-8 rounded-lg border border-[#dadce0] bg-white px-3">
-                  <svg className="h-3.5 w-3.5 text-[#5f6368]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                  <svg className="h-3.5 w-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
                   <select
                     value={selectedCalendarStatus}
                     onChange={(e) => setSelectedCalendarStatus(e.target.value)}
-                    className="border-0 bg-transparent text-[12px] font-medium text-[#3c4043] outline-none cursor-pointer appearance-none pr-4"
+                    className="border-0 bg-transparent text-[12px] font-medium text-white outline-none cursor-pointer appearance-none pr-4"
                   >
-                    <option value="all">All statuses</option>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="manual">Manual Ready</option>
-                    <option value="done">Published</option>
-                    <option value="failed">Failed</option>
-                    <option value="cancelled">Paused / Cancelled</option>
+                    <option value="all" className="bg-[#0a0a0a] text-white">All statuses</option>
+                    <option value="scheduled" className="bg-[#0a0a0a] text-white">Scheduled</option>
+                    <option value="manual" className="bg-[#0a0a0a] text-white">Manual Ready</option>
+                    <option value="done" className="bg-[#0a0a0a] text-white">Published</option>
+                    <option value="failed" className="bg-[#0a0a0a] text-white">Failed</option>
+                    <option value="cancelled" className="bg-[#0a0a0a] text-white">Paused / Cancelled</option>
                   </select>
-                  <ChevronLeft className="h-3 w-3 -rotate-90 text-[#80868b] -ml-3" />
+                  <ChevronLeft className="h-3 w-3 -rotate-90 text-zinc-400 -ml-3" />
                 </div>
                 {!isViewer && (
                   <button
                     type="button"
                     onClick={openQueueEditor}
-                    className="flex h-8 items-center gap-1.5 rounded-lg border border-[#1a73e8] bg-[#eff6ff] px-3 text-[12px] font-semibold text-[#1a73e8] transition-colors hover:bg-[#dbeafe]"
+                    className="flex h-8 items-center gap-1.5 rounded-lg border border-[#7831d6]/40 bg-[#7831d6]/20 px-3 text-[12px] font-semibold text-[#c4b5fd] transition-colors hover:bg-[#7831d6]/30 hover:text-white"
                   >
                     <Clock className="h-3.5 w-3.5" />
                     <span>Manage Queue</span>
@@ -2758,7 +2756,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 
               <div className="flex flex-shrink-0 items-center gap-1.5">
                 {/* Grouping Mode Toggle */}
-                <div className="flex items-center overflow-hidden rounded-md border border-[#dadce0]">
+                <div className="flex items-center overflow-hidden rounded-md border border-white/10 bg-white/5 p-0.5">
                   {[
                     { mode: 'posts', label: 'Posts View' },
                     { mode: 'accounts', label: 'Accounts View' },
@@ -2770,10 +2768,10 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                         setCalendarGroupingMode(item.mode);
                         localStorage.setItem('calendar-grouping-mode', item.mode);
                       }}
-                      className={`h-6 px-2 text-[10px] font-semibold transition-colors ${
+                      className={`h-6 rounded px-2 text-[10px] font-semibold transition-colors ${
                         calendarGroupingMode === item.mode
-                          ? 'bg-[#1a73e8] text-white'
-                          : 'bg-white text-[#3c4043] hover:bg-[#f8f9fa]'
+                          ? 'bg-[#7831d6] text-white shadow-xs'
+                          : 'bg-transparent text-zinc-400 hover:text-white hover:bg-white/5'
                       }`}
                     >
                       {item.label}
@@ -2781,16 +2779,16 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   ))}
                 </div>
 
-                <div className="flex items-center overflow-hidden rounded-md border border-[#dadce0]">
+                <div className="flex items-center overflow-hidden rounded-md border border-white/10 bg-white/5 p-0.5">
                   {['month', 'week'].map((mode) => (
                     <button
                       key={mode}
                       type="button"
                       onClick={() => setCalendarPreset(mode)}
-                      className={`h-6 px-2.5 text-[10px] font-semibold capitalize transition-colors ${
+                      className={`h-6 rounded px-2.5 text-[10px] font-semibold capitalize transition-colors ${
                         calendarMode === mode
-                          ? 'bg-[#1a73e8] text-white'
-                          : 'bg-white text-[#3c4043] hover:bg-[#f8f9fa]'
+                          ? 'bg-[#7831d6] text-white shadow-xs'
+                          : 'bg-transparent text-zinc-400 hover:text-white hover:bg-white/5'
                       }`}
                     >
                       {mode}
@@ -2817,13 +2815,13 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   const isFullyPostedDay = dayQueueCount > 1 && dayQueueCount === dayPostedCount;
 
                   const getStatusRowStyle = (group, manualPosted = false) => {
-                    if (manualPosted) return 'bg-[#ecfdf5] text-[#047857] border border-[#a7f3d0]';
+                    if (manualPosted) return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
                     switch (group) {
-                      case 'manual': return 'bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa]';
-                      case 'done': return 'bg-[#ecfdf5] text-[#047857] border border-[#a7f3d0]';
-                      case 'failed': return 'bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca]';
-                      case 'cancelled': return 'bg-[#f9fafb] text-[#6b7280] border border-[#e5e7eb]';
-                      default: return 'bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]';
+                      case 'manual': return 'bg-amber-500/15 text-amber-300 border border-amber-500/30';
+                      case 'done': return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+                      case 'failed': return 'bg-rose-500/15 text-rose-400 border border-rose-500/30';
+                      case 'cancelled': return 'bg-zinc-800 text-zinc-400 border border-zinc-700';
+                      default: return 'bg-[#7831d6]/20 text-[#c4b5fd] border border-[#7831d6]/35';
                     }
                   };
 
@@ -2852,17 +2850,19 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 		                    <div
 		                      key={day.key}
 		                      onClick={() => setSelectedCalendarDate(day.key)}
-		                      className={`relative border-b border-r border-[#e8eaed] text-left transition-colors flex flex-col cursor-pointer ${
+		                      className={`relative border-b border-r border-white/10 text-left transition-colors flex flex-col cursor-pointer ${
 			                        calendarMode === 'week' ? 'min-h-full' : 'min-h-0'
 			                      } ${
 	                        isTooltipOpen ? 'z-[9999] overflow-visible shadow-md' : 'z-0 overflow-hidden'
 	                      } ${
 	                        day.isSelected
-	                          ? 'bg-[#e8f0fe]'
-                          : day.inRange
-                            ? 'bg-white hover:bg-[#f8f9fa]'
-                            : 'bg-[#f8f9fa]'
-                      }`}
+		                            ? 'bg-[#7831d6]/10 ring-1 ring-[#7831d6]/30'
+		                            : day.isToday
+		                            ? 'bg-[#7831d6]/5'
+		                            : day.inRange
+		                            ? 'bg-black hover:bg-white/[0.04]'
+		                            : 'bg-zinc-950/60'
+		                      }`}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
@@ -2874,20 +2874,20 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 		                      {/* Date Label + Queue Summary */}
 			                      <div className={`mb-2 flex flex-col gap-1 border-b px-2 py-1.5 ${
 		                        day.isToday
-		                          ? 'border-blue-200 bg-blue-50'
+		                          ? 'border-[#7831d6]/30 bg-[#7831d6]/15'
 		                          : day.inRange
-		                            ? 'border-[#edf0f4] bg-[#f8fafc]'
-		                            : 'border-[#edf0f4] bg-[#f1f3f4]'
+		                            ? 'border-white/10 bg-[#0a0a0a]'
+		                            : 'border-white/10 bg-zinc-950/80'
 		                      }`}>
                               <div className="flex min-w-0 items-center justify-center gap-2">
 				                        <span className={`inline-flex min-w-0 items-center justify-center rounded-md px-1.5 py-0.5 text-xs font-extrabold ${
 		                          day.isToday
-		                            ? 'bg-[#1a73e8] text-white'
+		                            ? 'bg-[#7831d6] text-white'
 		                            : day.inRange
-		                              ? 'text-[#202124]'
-		                              : 'text-[#bdc1c6]'
+		                              ? 'text-white'
+		                              : 'text-zinc-500'
 		                        }`}>
-		                          {`${day.date.toLocaleDateString([], { month: 'long', day: 'numeric' })}, ${day.date.toLocaleDateString([], { weekday: 'short' })}`}
+		                          {`${day.date.toLocaleDateString([], { month: 'long', day: 'numeric' })}`}
 		                        </span>
                               </div>
                         {dayQueueCount > 0 ? (
@@ -2895,8 +2895,8 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                             <span
                               className={`rounded-full border px-1.5 py-0.5 text-[10px] font-extrabold leading-none ${
                                 isFullyPostedDay
-                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                  : 'border-slate-200 bg-white text-slate-700'
+                                  ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400'
+                                  : 'border-white/10 bg-white/10 text-zinc-200'
                               }`}
                               title={`${dayQueueCount} queued, ${dayPostedCount} posted`}
                             >
@@ -2935,19 +2935,19 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 	                                title={`${queueCount} queue, ${postedCount} posted`}
 	                                className={`flex h-8 min-w-0 items-center justify-between gap-1 rounded-md border px-1.5 shadow-sm transition-all hover:scale-[1.02] cursor-pointer ${
 	                                  isFullyPostedGroup
-	                                    ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'
-	                                    : 'border-slate-100 bg-white hover:bg-slate-50'
+	                                    ? 'border-emerald-500/30 bg-emerald-950/30 hover:bg-emerald-950/50'
+	                                    : 'border-white/10 bg-white/5 hover:bg-white/10 text-white'
 	                                }`}
                               >
                                 <div className="flex items-center gap-1 min-w-0">
                                   <PlatformIcon platform={group.channel?.platform} className="h-4 w-4 flex-shrink-0" showFallback={true} />
                                   <AccountAvatar account={group.channel} sizeClass="h-4.5 w-4.5" textClass="text-[8px]" />
                                   <div className="min-w-0 flex flex-col leading-none">
-                                    <span className="truncate text-[10px] font-bold text-slate-800 leading-tight">
+                                    <span className="truncate text-[10px] font-bold text-white leading-tight">
                                       {getAccountLabel(group.channel)}
 	                                    </span>
 		                                    <span className={`text-[10px] font-extrabold mt-0.5 leading-none ${
-		                                      isFullyPostedGroup ? 'text-emerald-700' : 'text-slate-700'
+		                                      isFullyPostedGroup ? 'text-emerald-400' : 'text-zinc-400'
 		                                    }`}>
 		                                      {queueCount} - {postedCount}
 		                                    </span>
@@ -2987,8 +2987,8 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 	                            >
 	                              <PlatformIcon platform={primaryChannel?.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
 	                              <AccountAvatar account={primaryChannel} sizeClass="h-5 w-5" textClass="text-[8px]" />
-	                              <span className={`truncate text-[11px] font-bold ${item.manualPosted ? 'text-purple-700' : ''}`}>
-                                   {item.manualPosted ? item.manualPostedTimeLabel : item.timeLabel}
+	                              <span className="truncate text-[11px] font-bold text-white">
+                                    {item.manualPosted ? item.manualPostedTimeLabel : item.timeLabel}
                                 </span>
 	                            </div>
                           );
@@ -3000,27 +3000,27 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                           onWheel={(e) => e.stopPropagation()}
                           onMouseEnter={cancelCloseTimeout}
                           onMouseLeave={startCloseTimeout}
-                          className="fixed z-[9999] flex max-h-[460px] w-[360px] flex-col rounded-xl border border-[#dfe3ea] bg-white p-3 shadow-[0_18px_48px_rgba(15,23,42,0.2)]"
+                          className="fixed z-[9999] flex max-h-[460px] w-[360px] flex-col rounded-xl border border-white/10 bg-[#0a0a0a] p-3 text-white shadow-2xl"
                           style={{
                             top: `${tooltipPosition.top}px`,
                             left: `${tooltipPosition.left}px`,
                           }}
                         >
-                          <div className="mb-2.5 flex flex-shrink-0 items-center justify-between gap-2 border-b border-[#eef1f5] pb-2">
+                          <div className="mb-2.5 flex flex-shrink-0 items-center justify-between gap-2 border-b border-white/10 pb-2">
                             <div className="min-w-0">
-                              <p className="m-0 truncate text-[12px] font-black text-[#202124]">
+                              <p className="m-0 truncate text-[12px] font-black text-white">
                                 {day.date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
                               </p>
                               {activeTooltip.type === 'day-account' && (
-                                <div className="mt-1 flex items-center gap-1.5 min-w-0 bg-slate-50 border border-slate-100 rounded-lg p-1.5">
+                                <div className="mt-1 flex items-center gap-1.5 min-w-0 bg-white/5 border border-white/10 rounded-lg p-1.5">
                                   <PlatformIcon platform={activeTooltip.data.group.channel?.platform} className="h-4.5 w-4.5 flex-shrink-0" showFallback={true} />
                                   <AccountAvatar account={activeTooltip.data.group.channel} sizeClass="h-5.5 w-5.5" textClass="text-[8px]" />
-                                  <span className="truncate text-[11px] font-black text-slate-800">
+                                  <span className="truncate text-[11px] font-black text-white">
                                     @{getAccountLabel(activeTooltip.data.group.channel)}
                                   </span>
                                 </div>
                               )}
-                              <p className="m-0 mt-1 text-[10px] font-semibold text-[#70757a]">
+                              <p className="m-0 mt-1 text-[10px] font-semibold text-zinc-400">
                                 {activeTooltip.type === 'day'
                                   ? `${activeTooltip.data.posts.length} scheduled item${activeTooltip.data.posts.length === 1 ? '' : 's'}`
                                   : activeTooltip.type === 'day-account'
@@ -3034,7 +3034,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                               onClick={() => {
                                 setActiveTooltip(null);
                               }}
-                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#70757a] hover:bg-[#f1f3f4] hover:text-[#202124]"
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-white/10 hover:text-white"
                               title="Close"
                             >
                               <X className="h-3.5 w-3.5" />
@@ -3071,36 +3071,36 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 
               {activeTooltip?.type === 'day-account' && (
                 <div
-                  className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/35 px-4 py-6"
+                  className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 py-6"
                   onClick={() => setActiveTooltip(null)}
                 >
                   <div
-                    className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-[#dfe3ea] bg-white shadow-[0_24px_72px_rgba(15,23,42,0.28)]"
+                    className="flex max-h-[82vh] w-full max-w-2xl flex-col rounded-xl border border-white/10 bg-[#0a0a0a] text-white shadow-2xl"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <div className="flex flex-shrink-0 items-start justify-between gap-3 border-b border-[#eef1f5] px-4 py-3">
+                    <div className="flex flex-shrink-0 items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
                       <div className="min-w-0">
-                        <p className="m-0 truncate text-sm font-black text-[#202124]">
+                        <p className="m-0 truncate text-sm font-black text-white">
                           {(activeTooltip.data.date || parseInputDate(activeTooltip.dayKey) || new Date()).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
                         </p>
                         <div className="mt-1.5 flex min-w-0 flex-wrap items-stretch gap-2">
-                          <div className="flex min-w-0 items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50 p-1.5">
+                          <div className="flex min-w-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 p-1.5">
                             <PlatformIcon platform={activeTooltip.data.group.channel?.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
                             <AccountAvatar account={activeTooltip.data.group.channel} sizeClass="h-6 w-6" textClass="text-[8px]" />
-                            <span className="max-w-[220px] truncate text-xs font-black text-slate-800">
+                            <span className="max-w-[220px] truncate text-xs font-black text-white">
                               @{getAccountLabel(activeTooltip.data.group.channel)}
                             </span>
                           </div>
-                          <div className="min-w-0 rounded-lg border border-blue-100 bg-blue-50/70 px-2 py-1">
-                            <p className="m-0 truncate text-[11px] font-bold text-slate-800">
+                          <div className="min-w-0 rounded-lg border border-[#7831d6]/30 bg-[#7831d6]/10 px-2 py-1">
+                            <p className="m-0 truncate text-[11px] font-bold text-white">
                               {activeTooltip.data.group.channel?.assignedHandlerName || 'Unassigned handler'}
                             </p>
-                            <p className="m-0 mt-0.5 truncate text-[10px] font-medium text-slate-600">
+                            <p className="m-0 mt-0.5 truncate text-[10px] font-medium text-zinc-400">
                               {activeTooltip.data.group.channel?.assignedHandlerEmail || 'No email assigned'}
                             </p>
                           </div>
                         </div>
-                        <p className="m-0 mt-1 text-[11px] font-semibold text-[#70757a]">
+                        <p className="m-0 mt-1 text-[11px] font-semibold text-zinc-400">
                           {activeTooltip.data.group.posts.length} post{activeTooltip.data.group.posts.length === 1 ? '' : 's'} scheduled
                         </p>
                       </div>
@@ -3113,10 +3113,10 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                               href={profileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[12px] font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                              className="flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] font-semibold text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"
                               title="Open social channel in new tab"
                             >
-                              <ExternalLink className="h-3.5 w-3.5 text-slate-500" />
+                              <ExternalLink className="h-3.5 w-3.5 text-zinc-400" />
                               <span>View Channel</span>
                             </a>
                           );
@@ -3125,7 +3125,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                           <button
                             type="button"
                             onClick={() => openQueueEditorForAccount(activeTooltip.data.accountId)}
-                            className="flex h-8 items-center gap-1.5 rounded-lg border border-[#1a73e8] bg-[#eff6ff] px-3 text-[12px] font-semibold text-[#1a73e8] transition-colors hover:bg-[#dbeafe]"
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-[#7831d6]/40 bg-[#7831d6]/20 px-3 text-[12px] font-semibold text-[#c4b5fd] transition-colors hover:bg-[#7831d6]/30 hover:text-white"
                           >
                             <Clock className="h-3.5 w-3.5" />
                             <span>Edit Queue</span>
@@ -3134,7 +3134,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                         <button
                           type="button"
                           onClick={() => setActiveTooltip(null)}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#70757a] hover:bg-[#f1f3f4] hover:text-[#202124]"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-white/10 hover:text-white"
                           title="Close"
                         >
                           <X className="h-4 w-4" />
@@ -3156,56 +3156,56 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
               )}
 
 	              {/* Status Legend */}
-	              <div className="flex items-center gap-4 px-4 py-2 border-t border-[#e8eaed] bg-white flex-shrink-0">
+	              <div className="flex items-center gap-4 px-4 py-2 border-t border-white/10 bg-[#0a0a0a] flex-shrink-0">
                 {[
-                  ['Scheduled', 'bg-[#1a73e8]'],
-                  ['Manual Ready', 'bg-[#f59e0b]'],
-                  ['Published', 'bg-[#34a853]'],
-                  ['Manual Posted', 'bg-[#34a853]'],
-                  ['Failed', 'bg-[#ea4335]'],
-                  ['Paused / Cancelled', 'bg-[#9aa0a6]'],
+                  ['Scheduled', 'bg-[#7831d6]'],
+                  ['Manual Ready', 'bg-amber-400'],
+                  ['Published', 'bg-emerald-400'],
+                  ['Manual Posted', 'bg-emerald-400'],
+                  ['Failed', 'bg-rose-500'],
+                  ['Paused / Cancelled', 'bg-zinc-500'],
                 ].map(([label, dotColor]) => (
                   <div key={label} className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full ${dotColor}`} />
-                    <span className="text-[11px] font-medium text-[#5f6368]">{label}</span>
+                    <span className="text-[11px] font-medium text-zinc-400">{label}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Right Sidebar — Selected Date Detail */}
-            <aside className={`min-h-0 flex flex-col overflow-hidden bg-white flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-10' : 'w-[260px] xl:w-[300px]'}`}>
+            <aside className={`min-h-0 flex flex-col overflow-hidden bg-[#0a0a0a] border-l border-white/10 flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-10' : 'w-[260px] xl:w-[300px]'}`}>
               {/* Collapse/Expand Toggle */}
               {sidebarCollapsed ? (
                 <div className="flex-1 flex flex-col items-center pt-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setSidebarCollapsed(false)}
-                    className="h-7 w-7 rounded-full hover:bg-[#f1f3f4] flex items-center justify-center text-[#5f6368] transition-colors"
+                    className="h-7 w-7 rounded-full hover:bg-white/10 flex items-center justify-center text-zinc-400 transition-colors"
                     title="Expand sidebar"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
-                  <span className="text-[10px] font-bold text-[#5f6368] [writing-mode:vertical-lr] rotate-180">
+                  <span className="text-[10px] font-bold text-zinc-400 [writing-mode:vertical-lr] rotate-180">
                     {(() => {
                       const d = parseInputDate(selectedCalendarDate) || new Date();
                       return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
                     })()}
                   </span>
-                  <span className="rounded-full bg-[#1a73e8] text-white text-[9px] font-bold px-1.5 py-0.5">{selectedDayPosts.length}</span>
+                  <span className="rounded-full bg-[#7831d6] text-white text-[9px] font-bold px-1.5 py-0.5">{selectedDayPosts.length}</span>
                 </div>
               ) : (
                 <>
               {/* Sidebar Header */}
-              <div className="border-b border-[#e8eaed] px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0">
+              <div className="border-b border-white/10 px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0">
                 <div className="min-w-0 flex items-center gap-2">
-                  <h3 className="m-0 text-[13px] font-bold text-[#1a1a2e] truncate">
+                  <h3 className="m-0 text-[13px] font-bold text-white truncate">
                     {(() => {
                       const d = parseInputDate(selectedCalendarDate) || new Date();
                       return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
                     })()}
                   </h3>
-                  <span className="rounded-full border border-[#dadce0] bg-[#f8f9fa] px-1.5 py-0.5 text-[10px] font-semibold text-[#5f6368]">
+                  <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-300">
                     {selectedDayPosts.length}
                   </span>
                 </div>
@@ -3213,7 +3213,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                 <button
                   type="button"
                   onClick={() => setSidebarCollapsed(true)}
-                  className="h-6 w-6 rounded-full hover:bg-[#f1f3f4] flex items-center justify-center text-[#5f6368] transition-colors flex-shrink-0"
+                  className="h-6 w-6 rounded-full hover:bg-white/10 flex items-center justify-center text-zinc-400 transition-colors flex-shrink-0"
                   title="Collapse sidebar"
                 >
                   <ChevronLeft className="h-3.5 w-3.5 rotate-180" />
@@ -3224,8 +3224,8 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
               <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
                 {selectedDayGroups.length === 0 && (
 	                  <div className="h-32 flex flex-col items-center justify-center gap-1.5 text-center px-3">
-	                    <Clock className="h-6 w-6 text-[#dadce0]" />
-	                    <p className="m-0 text-[12px] font-semibold text-[#5f6368]">No posts</p>
+	                    <Clock className="h-6 w-6 text-zinc-600" />
+	                    <p className="m-0 text-[12px] font-semibold text-zinc-400">No posts</p>
 	                  </div>
                 )}
 
@@ -3240,16 +3240,16 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   const deletingAccountQueue = deletingAccountQueueIds.includes(group.id);
 
                   return (
-                    <div key={group.id} className="rounded-lg border border-[#dadce0] overflow-hidden">
+                    <div key={group.id} className="rounded-lg border border-white/10 overflow-hidden bg-black">
                       {/* Account Header */}
-	                      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[#e8eaed]">
+	                      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[#0a0a0a] border-b border-white/10">
 	                        <div className="min-w-0 flex items-center gap-2">
 	                          <PlatformIcon platform={group.channel?.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
 	                          <AccountAvatar account={group.channel} sizeClass="h-8 w-8" textClass="text-[10px]" />
-	                          <span className="text-[12px] font-bold text-[#202124] truncate">{getAccountLabel(group.channel)}</span>
+	                          <span className="text-[12px] font-bold text-white truncate">{getAccountLabel(group.channel)}</span>
 	                        </div>
 	                        <div className="flex items-center gap-1.5">
-	                          <span className="text-[10px] font-bold text-white bg-[#1a73e8] rounded-full px-1.5 py-0.5">{group.posts.length}</span>
+	                          <span className="text-[10px] font-bold text-white bg-[#7831d6] rounded-full px-1.5 py-0.5">{group.posts.length}</span>
                           {(() => {
                             const profileUrl = getChannelProfileUrl(group.channel);
                             if (!profileUrl) return null;
@@ -3258,7 +3258,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                                 href={profileUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[#5f6368] hover:text-[#1a73e8] transition-colors"
+                                className="text-zinc-400 hover:text-white transition-colors"
                                 title="Open social channel in new tab"
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
@@ -3270,7 +3270,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                               type="button"
                               onClick={() => handleDeleteAccountQueue(group.id, getAccountLabel(group.channel))}
                               disabled={deletingAccountQueue}
-                              className="text-[#5f6368] hover:text-[#ea4335] transition-colors"
+                              className="text-zinc-400 hover:text-rose-400 transition-colors"
                               title="Delete queue"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -3280,28 +3280,28 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                       </div>
 
                       {/* Posts List */}
-                      <div className="flex flex-wrap gap-1 p-2 bg-white">
+                      <div className="flex flex-wrap gap-1 p-2 bg-black">
                         {group.posts.map((item) => {
                           const getStatusDotBg = (statusGroup, manualPosted = false) => {
-                            if (manualPosted) return 'bg-[#34a853]';
+                            if (manualPosted) return 'bg-emerald-400';
                             switch (statusGroup) {
-                              case 'manual': return 'bg-[#f59e0b]';
-                              case 'done': return 'bg-[#34a853]';
-                              case 'failed': return 'bg-[#ea4335]';
-                              case 'cancelled': return 'bg-[#9aa0a6]';
-                              default: return 'bg-[#1a73e8]';
+                              case 'manual': return 'bg-amber-400';
+                              case 'done': return 'bg-emerald-400';
+                              case 'failed': return 'bg-rose-500';
+                              case 'cancelled': return 'bg-zinc-500';
+                              default: return 'bg-[#7831d6]';
                             }
                           };
 
                           return (
 	                            <div key={`${group.id}-${item.post._id}`} className="flex flex-col items-center gap-0.5 py-1.5" title={item.mediaLabel}>
 	                              {/* Media Thumbnail */}
-	                              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-[#f1f3f4] relative">
+	                              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-white/5 border border-white/10 relative">
 	                                <MediaPreview item={item.mediaItem} />
 	                              </div>
 	                              <div className="flex items-center gap-1">
 	                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusDotBg(item.statusGroup, item.manualPosted)}`} title={getPostStatusLabel(item.post)} />
-	                                <span className={`text-[9px] font-semibold ${item.manualPosted ? 'text-purple-700' : 'text-[#5f6368]'}`}>
+	                                <span className={`text-[9px] font-semibold ${item.manualPosted ? 'text-[#c4b5fd]' : 'text-zinc-300'}`}>
                                     {item.manualPosted ? item.manualPostedTimeLabel : item.timeLabel}
                                   </span>
 	                              </div>
@@ -3316,8 +3316,8 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 
               {/* Full selected-day count */}
               {selectedDayPosts.length > 0 && (
-	                <div className="border-t border-[#e8eaed] px-3 py-2 flex-shrink-0">
-	                  <div className="flex h-7 items-center justify-center rounded-md border border-[#dadce0] bg-[#f8f9fa] text-[11px] font-semibold text-[#3c4043]">
+	                <div className="border-t border-white/10 px-3 py-2 flex-shrink-0">
+	                  <div className="flex h-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-[11px] font-semibold text-zinc-300">
 	                    {selectedDayPosts.length} item{selectedDayPosts.length === 1 ? '' : 's'}
 	                  </div>
 	                </div>

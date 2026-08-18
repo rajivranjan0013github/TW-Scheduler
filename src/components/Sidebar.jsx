@@ -202,16 +202,16 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   const campaignTitle = activeCampaign?.name || (isAdminViewingUser ? (adminViewContext.userName || 'Campaign View') : 'Select campaign');
 
   return (
-    <aside className={`relative z-50 w-20 overflow-visible ${isAdminViewingUser ? 'bg-[#111827] border-black/10 text-[#cbd5e1]' : 'bg-white border-[#e5e5ea] text-[#8e8e93]'} hidden border-r md:flex flex-col h-screen sticky top-0 transition-all duration-300`}>
+    <aside className={`relative z-50 w-20 overflow-visible ${isAdminViewingUser ? 'bg-[#0f172a] border-white/10 text-zinc-300' : 'bg-black border-white/10 text-zinc-400'} hidden border-r md:flex flex-col h-screen sticky top-0 transition-all duration-300`}>
       
       {/* Workspace header */}
-      <div className={`relative flex min-h-[56px] flex-shrink-0 items-center justify-center border-b px-2 py-2 ${isAdminViewingUser ? 'border-white/10 bg-[#111827]' : 'border-[#e5e5ea] bg-white'}`}>
+      <div className={`relative flex min-h-[56px] flex-shrink-0 items-center justify-center border-b px-2 py-2 ${isAdminViewingUser ? 'border-white/10 bg-[#0f172a]' : 'border-white/10 bg-black'}`}>
         {isCreator ? (
           <div
-            className={`flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl ${isAdminViewingUser ? 'bg-white/5 text-white' : 'bg-[#f5f5f7] text-[#1d1d1f]'}`}
+            className="flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-white/5 text-white"
             title="Creator Hub"
           >
-            <Megaphone className="h-5 w-5" />
+            <Megaphone className="h-5 w-5 text-[#7831d6]" />
             <span className="max-w-full truncate text-[10px] font-semibold leading-none">Home</span>
           </div>
         ) : (
@@ -221,26 +221,22 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                 onClick={() => setIsCampaignMenuOpen((current) => !current)}
                 className={`group flex h-12 w-14 flex-col items-center justify-center gap-0.5 rounded-xl border transition ${
                   isAdminViewingUser
-                    ? 'border-white/10 bg-white/5 hover:bg-white/10'
-                    : 'border-[#d2d2d7] bg-[#f5f5f7] hover:border-[#a1a1aa] hover:bg-white'
+                    ? 'border-white/10 bg-white/5 hover:bg-white/10 text-white'
+                    : 'border-white/10 bg-[#0a0a0a] hover:border-[#7831d6] hover:bg-white/5 text-white'
                 }`}
                 title={campaignTitle}
               >
-                <Megaphone className={`h-5 w-5 ${isAdminViewingUser ? 'text-[#cbd5e1]' : 'text-[#0071e3]'}`} />
-                <span className={`max-w-full truncate text-[10px] font-semibold leading-none ${isAdminViewingUser ? 'text-[#cbd5e1]' : 'text-[#4b5563]'}`}>
+                <Megaphone className="h-5 w-5 text-[#7831d6]" />
+                <span className="max-w-full truncate text-[10px] font-semibold leading-none text-zinc-300">
                   {campaignTitle}
                 </span>
-                <ChevronDown className={`absolute bottom-1 right-1 h-3 w-3 transition ${isCampaignMenuOpen ? 'rotate-180' : ''} ${isAdminViewingUser ? 'text-[#cbd5e1]' : 'text-[#4b5563]'}`} />
+                <ChevronDown className={`absolute bottom-1 right-1 h-3 w-3 transition text-zinc-400 ${isCampaignMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isCampaignMenuOpen && (
-                <div className={`absolute left-[calc(100%+0.75rem)] top-0 z-[999] w-72 overflow-hidden rounded-xl border shadow-2xl ring-1 ring-black/5 ${
-                  isAdminViewingUser
-                    ? 'border-white/10 bg-[#0f172a] text-[#cbd5e1] shadow-black/30'
-                    : 'border-[#d2d2d7] bg-white text-[#1d1d1f] shadow-black/20'
-                }`}>
-                  <div className={`border-b px-3 py-2 ${isAdminViewingUser ? 'border-white/10' : 'border-[#f1f5f9]'}`}>
-                    <p className={`m-0 text-[9px] font-bold uppercase tracking-wider ${isAdminViewingUser ? 'text-[#93c5fd]' : 'text-[#8e8e93]'}`}>
+                <div className="absolute left-[calc(100%+0.75rem)] top-0 z-[999] w-72 overflow-hidden rounded-xl border border-white/10 bg-black text-white shadow-2xl shadow-black/80 ring-1 ring-white/10">
+                  <div className="border-b border-white/10 px-3 py-2">
+                    <p className="m-0 text-[9px] font-bold uppercase tracking-wider text-[#c4b5fd]">
                       Switch campaign
                     </p>
                   </div>
@@ -254,15 +250,15 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                           onClick={() => selectCampaign(campaign)}
                           className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition ${
                             isSelected
-                              ? (isAdminViewingUser ? 'bg-white text-[#111827]' : 'bg-[#f5f5f7] text-[#1d1d1f]')
-                              : (isAdminViewingUser ? 'hover:bg-white/10 hover:text-white' : 'hover:bg-[#f8fafc]')
+                              ? 'bg-[#7831d6] text-white'
+                              : 'text-zinc-300 hover:bg-white/10 hover:text-white'
                           }`}
                         >
-                          <span className={`h-2 w-2 flex-shrink-0 rounded-full ${isSelected ? 'bg-emerald-500' : (isAdminViewingUser ? 'bg-white/20' : 'bg-[#d1d5db]')}`} />
+                          <span className={`h-2 w-2 flex-shrink-0 rounded-full ${isSelected ? 'bg-white' : 'bg-zinc-600'}`} />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-xs font-bold">{campaign.name || 'Untitled campaign'}</span>
                             {(campaign.mainEmail || campaign.createdBy?.email) && (
-                              <span className={`mt-0.5 block truncate text-[9px] ${isSelected ? 'text-inherit opacity-70' : (isAdminViewingUser ? 'text-[#9ca3af]' : 'text-[#8e8e93]')}`}>
+                              <span className={`mt-0.5 block truncate text-[9px] ${isSelected ? 'text-inherit opacity-70' : 'text-zinc-400'}`}>
                                 {campaign.mainEmail || campaign.createdBy?.email}
                               </span>
                             )}
@@ -271,7 +267,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                         </button>
                       );
                     }) : (
-                      <div className={`px-2 py-4 text-center text-[10px] ${isAdminViewingUser ? 'text-[#9ca3af]' : 'text-[#8e8e93]'}`}>
+                      <div className="px-2 py-4 text-center text-[10px] text-zinc-400">
                         No campaigns available
                       </div>
                     )}
@@ -283,7 +279,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
       </div>
 
       {/* Navigation */}
-      <nav className={`flex-1 space-y-1 overflow-y-auto p-2 ${isAdminViewingUser ? 'bg-[#111827]' : 'bg-white'}`}>
+      <nav className={`flex-1 space-y-1 overflow-y-auto p-2 ${isAdminViewingUser ? 'bg-[#0f172a]' : 'bg-black'}`}>
         {navItems.map((item) => (
           <NavLink
             key={item.name}
@@ -293,8 +289,8 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
             className={({ isActive }) =>
               `flex h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 transition-all duration-150 ${
                 isActive
-                  ? (isAdminViewingUser ? 'bg-white text-[#111827] font-semibold' : 'bg-[#f5f5f7] text-[#1d1d1f] font-semibold')
-                  : (isAdminViewingUser ? 'text-[#cbd5e1] hover:bg-white/10 hover:text-white' : 'text-[#8e8e93] hover:bg-[#f5f5f7]/50 hover:text-[#1d1d1f]')
+                  ? 'bg-[#7831d6] text-white font-semibold shadow-sm'
+                  : 'text-zinc-400 hover:bg-white/10 hover:text-white'
               }`
             }
           >
@@ -306,7 +302,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
         ))}
 
         {managerItems.length > 0 && (
-          <div className={`mt-2 pt-2 border-t ${isAdminViewingUser ? 'border-white/10' : 'border-[#e5e5ea]'}`}>
+          <div className="mt-2 pt-2 border-t border-white/10">
             {managerItems.map((item) => (
               <NavLink
                 key={item.name}
@@ -316,8 +312,8 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                 className={({ isActive }) =>
                   `flex h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 transition-all duration-150 ${
                     isActive
-                      ? (isAdminViewingUser ? 'bg-white text-[#111827] font-semibold' : 'bg-[#f5f5f7] text-[#1d1d1f] font-semibold')
-                      : (isAdminViewingUser ? 'text-[#cbd5e1] hover:bg-white/10 hover:text-white' : 'text-[#8e8e93] hover:bg-[#f5f5f7]/50 hover:text-[#1d1d1f]')
+                      ? 'bg-[#7831d6] text-white font-semibold shadow-sm'
+                      : 'text-zinc-400 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
@@ -333,15 +329,15 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
       </nav>
 
       {/* Sidebar Footer */}
-      <div className={`relative flex-shrink-0 space-y-2 border-t p-2 text-[10px] ${isAdminViewingUser ? 'border-white/10 bg-[#111827] text-[#9ca3af]' : 'border-[#e5e5ea] bg-white text-[#8e8e93]'}`}>
+      <div className={`relative flex-shrink-0 space-y-2 border-t border-white/10 p-2 text-[10px] ${isAdminViewingUser ? 'bg-[#0f172a] text-zinc-400' : 'bg-black text-zinc-400'}`}>
         <PwaInstallButton
           collapsed
-          dark={isAdminViewingUser}
+          dark={true}
           className="flex justify-center"
           popoverClassName="left-0"
         />
 
-        <div className={`flex items-center justify-center rounded-xl p-1 ${isAdminViewingUser ? 'bg-white/5' : 'bg-[#f5f5f7]'}`}>
+        <div className="flex items-center justify-center rounded-xl p-1 bg-white/5">
             <button
               type="button"
               onClick={logout}
@@ -351,7 +347,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
               <img
                 src={displayedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
                 crossOrigin="anonymous"
-                className="h-6 w-6 rounded-full object-cover border border-black/10"
+                className="h-6 w-6 rounded-full object-cover border border-white/20"
                 alt=""
               />
             </button>
@@ -362,7 +358,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
             type="button"
             onClick={exitAdminUserView}
             title="Exit manager view"
-            className="flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#cbd5e1] transition hover:bg-white/10 hover:text-white"
+            className="flex h-10 w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
