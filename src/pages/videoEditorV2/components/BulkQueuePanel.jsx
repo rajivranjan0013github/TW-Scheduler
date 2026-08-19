@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -14,6 +14,7 @@ import {
   UploadCloud,
   X,
 } from 'lucide-react';
+import { getMediaUrl } from '../../../utils/mediaUrls';
 
 const STATUS_ALIASES = {
   ready: 'ready',
@@ -88,8 +89,10 @@ const STATUS_META = {
 };
 
 const getStringUrl = (value) => {
-  if (typeof value === 'string') return value;
-  if (value && typeof value.url === 'string') return value.url;
+  if (typeof value === 'string' && value.trim()) return getMediaUrl(value.trim());
+  if (value && typeof value.url === 'string' && value.url.trim()) {
+    return getMediaUrl(value.originalUrl || value.url);
+  }
   return '';
 };
 
@@ -127,27 +130,63 @@ const getRowName = (row, index) => (
 );
 
 const getRowPreview = (row) => {
-  const completedVideoUrl = getStringUrl(row.queueResultUrl)
+  if (!row) return null;
+
+  // 1. Completed/rendered export video
+  const completedUrl = getStringUrl(row.queueResultUrl)
     || getStringUrl(row.resultVideoUrl)
     || getStringUrl(row.resultMediaUrl);
-  if (getRowStatus(row) === 'done' && completedVideoUrl) {
-    return { type: 'video', url: completedVideoUrl };
+  if (getRowStatus(row) === 'done' && completedUrl) {
+    return { type: 'video', url: completedUrl };
   }
+
+  // 2. Direct poster/thumbnail images
   const imageUrl = getStringUrl(row.thumbnailUrl)
     || getStringUrl(row.thumbnail)
     || getStringUrl(row.posterUrl)
     || getStringUrl(row.poster)
     || getStringUrl(row.video1?.thumbnailUrl)
-    || getStringUrl(row.video1?.thumbnail);
+    || getStringUrl(row.video1?.thumbnail)
+    || getStringUrl(row.video1?.posterUrl)
+    || getStringUrl(row.video1?.poster)
+    || getStringUrl(row.video2?.thumbnailUrl)
+    || getStringUrl(row.video2?.thumbnail)
+    || getStringUrl(row.video2?.posterUrl)
+    || getStringUrl(row.video2?.poster);
 
   if (imageUrl) return { type: 'image', url: imageUrl };
 
-  const videoUrl = getStringUrl(row.previewVideoUrl)
+  // 3. Source videos
+  let videoUrl = getStringUrl(row.video1)
     || getStringUrl(row.video1Url)
-    || getStringUrl(row.video1)
+    || getStringUrl(row.previewVideoUrl)
+    || getStringUrl(row.video2)
+    || getStringUrl(row.video2Url)
     || getStringUrl(row.video?.url)
     || getStringUrl(row.resultVideoUrl)
     || getStringUrl(row.resultMediaUrl);
+
+  // 4. If row has an editorProject attached, extract clip video asset
+  if (!videoUrl && row.editorProject) {
+    try {
+      const proj = typeof row.editorProject === 'string' ? JSON.parse(row.editorProject) : row.editorProject;
+      const allClips = (proj?.tracks || []).flatMap((t) => t.clips || []);
+      const videoClip = allClips.find((c) => c?.asset?.url || c?.url);
+      if (videoClip?.asset) {
+        if (videoClip.asset.thumbnailUrl || videoClip.asset.posterUrl) {
+          return {
+            type: 'image',
+            url: getStringUrl(videoClip.asset.thumbnailUrl || videoClip.asset.posterUrl),
+          };
+        }
+        videoUrl = getStringUrl(videoClip.asset.originalUrl || videoClip.asset.url);
+      } else if (videoClip?.url) {
+        videoUrl = getStringUrl(videoClip.url);
+      }
+    } catch {
+      // Ignore JSON parse error
+    }
+  }
 
   return videoUrl ? { type: 'video', url: videoUrl } : null;
 };
@@ -173,6 +212,60 @@ const QueueCheckbox = ({ checked, mixed = false, disabled, label, onChange }) =>
   );
 };
 
+const QueueRowThumbnail = ({ preview }) => {
+  const [failedUrl, setFailedUrl] = useState(null);
+  const videoRef = useRef(null);
+  const previewUrl = preview?.url || '';
+  const hasError = Boolean(previewUrl && failedUrl === previewUrl);
+
+  if (!previewUrl || hasError) {
+    return (
+      <span className="flex h-10 w-7.5 shrink-0 items-center justify-center rounded-md bg-[#0b0d10] text-[#727985] ring-1 ring-white/10">
+        <Film className="h-3.5 w-3.5" />
+      </span>
+    );
+  }
+
+  if (preview.type === 'image') {
+    return (
+      <span className="relative flex h-10 w-7.5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#0b0d10] ring-1 ring-white/10">
+        <img
+          src={previewUrl}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setFailedUrl(previewUrl)}
+        />
+      </span>
+    );
+  }
+
+  const videoSrc = previewUrl.includes('#') ? previewUrl : `${previewUrl}#t=0.001`;
+
+  return (
+    <span className="relative flex h-10 w-7.5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#0b0d10] ring-1 ring-white/10">
+      <video
+        ref={videoRef}
+        src={videoSrc}
+        muted
+        playsInline
+        preload="metadata"
+        crossOrigin="anonymous"
+        className="h-full w-full object-cover"
+        onLoadedMetadata={(e) => {
+          try {
+            if (e.currentTarget.currentTime === 0) {
+              e.currentTarget.currentTime = 0.001;
+            }
+          } catch {
+            // Ignore seek error
+          }
+        }}
+        onError={() => setFailedUrl(previewUrl)}
+      />
+    </span>
+  );
+};
+
 const QueueRow = ({
   entry,
   checked,
@@ -195,14 +288,10 @@ const QueueRow = ({
 
   return (
     <div
-      className={`group relative flex min-h-12 items-center gap-2 border-b border-white/[0.07] px-1.5 py-1.5 transition ${current
-        ? 'bg-[#ff5500]/[0.08]'
-        : 'hover:bg-white/[0.035]'}`}
+      className={`group relative flex min-h-[52px] items-center gap-2.5 rounded-xl px-2.5 py-2 transition ${current
+        ? 'bg-[#7831d6]/15'
+        : 'hover:bg-white/[0.04]'}`}
     >
-      {current && (
-        <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-r-full bg-[#ff5500]" />
-      )}
-
       <QueueCheckbox
         checked={checked}
         disabled={selectionDisabled}
@@ -212,26 +301,16 @@ const QueueRow = ({
 
       <button
         type="button"
-        onClick={() => onOpen(entry)}
+        onPointerDown={(event) => event.preventDefault()}
+        onClick={(event) => {
+          event.currentTarget.blur();
+          onOpen(entry);
+        }}
         disabled={interactionDisabled || !onOpen}
         aria-current={current ? 'true' : undefined}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-default"
+        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:cursor-default"
       >
-        <span className="relative flex h-9 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#0b0d10] text-[#727985] ring-1 ring-white/10">
-          {preview?.type === 'image' && (
-            <img src={preview.url} alt="" className="h-full w-full object-cover" />
-          )}
-          {preview?.type === 'video' && (
-            <video
-              src={preview.url}
-              muted
-              playsInline
-              preload="metadata"
-              className="h-full w-full object-cover"
-            />
-          )}
-          {!preview && <Film className="h-4 w-4" />}
-        </span>
+        <QueueRowThumbnail preview={preview} />
 
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-[10px] font-bold ${current ? 'text-white' : 'text-[#d7dbe2]'}`}>
@@ -264,19 +343,6 @@ const QueueRow = ({
     </div>
   );
 };
-
-const ActionButton = ({ children, disabled, onClick, primary = false, wide = false }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    className={`${wide ? 'col-span-3' : ''} flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500]/70 disabled:cursor-not-allowed disabled:opacity-40 ${primary
-      ? 'border-[#ff5500] bg-[#ff5500] text-white hover:border-[#ff6a1a] hover:bg-[#ff6a1a]'
-      : 'border-white/10 bg-[#171a20] text-[#d7dbe2] hover:border-white/20 hover:bg-[#20242c] hover:text-white'}`}
-  >
-    {children}
-  </button>
-);
 
 /**
  * Controlled bulk-export queue UI for the Timeline Editor's bulk mode.
@@ -358,7 +424,7 @@ export const BulkQueuePanel = ({
       aria-label="Bulk export queue"
       className={`flex h-full min-h-0 flex-col text-[#f5f7fa] ${className}`}
     >
-      <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-white/[0.08]">
+      <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-white/[0.08] px-3.5">
         <div className="flex min-w-0 items-baseline gap-2">
           <h3 className="text-[11px] font-extrabold !text-[#f5f7fa]">Bulk queue</h3>
           <span className="text-[8px] font-semibold tabular-nums text-[#777e89]">
@@ -377,7 +443,7 @@ export const BulkQueuePanel = ({
         <div
           role="status"
           aria-live="polite"
-          className="mt-2 shrink-0 border-b border-[#ff7043]/15 bg-[#ff5500]/[0.05] px-2 py-1.5"
+          className="shrink-0 border-b border-[#ff7043]/15 bg-[#ff5500]/[0.05] px-3.5 py-2"
         >
           <div className="flex items-center gap-2">
             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#ff7043]" />
@@ -408,7 +474,7 @@ export const BulkQueuePanel = ({
         </div>
       )}
 
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-white/[0.08] px-1.5">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-white/[0.08] px-3.5">
         <label className="flex min-w-0 items-center gap-2 text-[9px] font-bold text-[#aeb3bc]">
           <QueueCheckbox
             checked={allSelected}
@@ -428,7 +494,7 @@ export const BulkQueuePanel = ({
         </span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto p-2 space-y-1">
         {entries.map((entry) => (
           <QueueRow
             key={entry.key}
@@ -456,53 +522,63 @@ export const BulkQueuePanel = ({
       </div>
 
       {hasActions && (
-        <div className="grid shrink-0 grid-cols-3 gap-1.5 border-t border-white/[0.08] bg-[#111318] pt-2">
-          {onExportCurrent && (
-            <ActionButton
-              primary
-              disabled={exportDisabled || !currentEntry}
-              onClick={() => onExportCurrent(currentEntry.id, currentEntry.row)}
-            >
-              <Play className="h-3.5 w-3.5 fill-current" />
-              Current
-            </ActionButton>
-          )}
-          {onExportSelected && (
-            <ActionButton
-              disabled={exportDisabled || selectedEntries.length === 0}
-              onClick={() => onExportSelected(
-                selectedEntries.map((entry) => entry.id),
-                selectedEntries.map((entry) => entry.row),
-              )}
-            >
-              <ListChecks className="h-3.5 w-3.5" />
-              <span className="truncate">Selected</span>
-            </ActionButton>
-          )}
-          {onExportAll && (
-            <ActionButton
-              disabled={exportDisabled || entries.length === 0}
-              onClick={() => onExportAll(
-                entries.map((entry) => entry.id),
-                entries.map((entry) => entry.row),
-              )}
-            >
-              <Layers3 className="h-3.5 w-3.5" />
-              All ({entries.length})
-            </ActionButton>
-          )}
+        <div className="flex shrink-0 flex-col gap-2 border-t border-white/[0.08] bg-[#0c0d12] p-3">
+          <button
+            type="button"
+            disabled={exportDisabled || entries.length === 0}
+            onClick={() => {
+              if (selectedEntries.length > 0) {
+                onExportSelected?.(
+                  selectedEntries.map((entry) => entry.id),
+                  selectedEntries.map((entry) => entry.row),
+                );
+              } else if (currentEntry) {
+                onExportCurrent?.(currentEntry.id, currentEntry.row);
+              } else if (entries.length > 0) {
+                onExportAll?.(
+                  entries.map((entry) => entry.id),
+                  entries.map((entry) => entry.row),
+                );
+              }
+            }}
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#7831d6] hover:bg-[#6825bc] active:scale-[0.99] px-3 text-[10px] font-bold text-white shadow-md transition-all disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {allSelected ? (
+              <>
+                <Layers3 className="h-3.5 w-3.5" />
+                <span>Export All ({entries.length})</span>
+              </>
+            ) : selectedEntries.length > 0 ? (
+              <>
+                <ListChecks className="h-3.5 w-3.5" />
+                <span>Export Selected ({selectedEntries.length})</span>
+              </>
+            ) : currentEntry ? (
+              <>
+                <Play className="h-3.5 w-3.5 fill-current" />
+                <span>Export Current Video</span>
+              </>
+            ) : (
+              <>
+                <Layers3 className="h-3.5 w-3.5" />
+                <span>Export All ({entries.length})</span>
+              </>
+            )}
+          </button>
+
           {onRetryFailed && failedEntries.length > 0 && (
-            <ActionButton
-              wide
+            <button
+              type="button"
               disabled={exportDisabled}
               onClick={() => onRetryFailed(
                 failedEntries.map((entry) => entry.id),
                 failedEntries.map((entry) => entry.row),
               )}
+              className="flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-300 text-[9px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Retry failed ({failedEntries.length})
-            </ActionButton>
+              <RefreshCw className="h-3 w-3" />
+              <span>Retry Failed ({failedEntries.length})</span>
+            </button>
           )}
         </div>
       )}

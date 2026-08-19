@@ -1149,14 +1149,14 @@ export const InspectorPanel = ({
 }) => {
   if (!selectedClip) {
     return (
-      <aside className={`flex min-h-0 flex-col overflow-hidden border-l border-white/10 bg-[#111318] ${className}`}>
+      <aside className={`flex min-h-0 flex-col overflow-hidden border-l border-white/10 bg-[#0c0d12] ${className}`}>
         <div className="flex h-12 items-center gap-2 border-b border-white/10 px-4">
-          <SlidersHorizontal className="h-4 w-4 text-[#ff5500]" />
+          <SlidersHorizontal className="h-4 w-4 text-[#7831d6]" />
           <h2 className="text-xs font-bold text-[#f5f7fa]">Clip properties</h2>
         </div>
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center">
           <div className="max-w-xs">
-            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ff5500]/10 text-[#ff6a1a]">
+            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#7831d6]/15 text-[#c4b5fd]">
               <SlidersHorizontal className="h-5 w-5" />
             </span>
             <p className="mt-3 text-xs font-bold text-[#e6e8ec]">Select a timeline clip</p>
@@ -1197,8 +1197,8 @@ export const InspectorPanel = ({
   };
 
   return (
-    <aside className={`min-h-0 overflow-y-auto border-l border-white/10 bg-[#111318] text-[#e6e8ec] [color-scheme:dark] ${className}`}>
-      <div className="sticky top-0 z-10 flex h-12 items-center justify-between border-b border-white/10 bg-[#111318] px-4">
+    <aside className={`min-h-0 overflow-y-auto border-l border-white/10 bg-[#0c0d12] text-[#e6e8ec] [color-scheme:dark] ${className}`}>
+      <div className="sticky top-0 z-10 flex h-12 items-center justify-between border-b border-white/10 bg-[#0c0d12] px-4">
         <div className="min-w-0">
           <p className="text-[9px] font-bold uppercase tracking-wider !text-[#aeb4bd]">{selectedClip.type} properties</p>
           <h2 className="truncate text-xs font-bold !text-[#f5f7fa]">{selectedClip.name || selectedClip.text || 'Selected clip'}</h2>

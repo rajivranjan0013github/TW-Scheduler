@@ -63,6 +63,7 @@ const getSourceBoxMetrics = (text, settings) => {
 export const BulkVideoRow = ({
   row,
   rowIndex,
+  isSelected = false,
   isActiveCaption,
   isCaptionTarget = false,
   inverseZoomScale = 1,
@@ -76,7 +77,6 @@ export const BulkVideoRow = ({
   onCaptionOverlayClick,
   onUpdateCaption,
   onUpdateTextSettings,
-  onUpdateDragPos,
   onUpdateTextClip,
   onCloseCaptionControls,
   onRemove,
@@ -98,47 +98,37 @@ export const BulkVideoRow = ({
   const resizeCleanupRef = useRef(null);
   const didDragCaptionRef = useRef(false);
   const suppressTextSelectionRef = useRef(false);
-  const [isEditingCaption, setIsEditingCaption] = useState(false);
-  const [isDraggingCaption, setIsDraggingCaption] = useState(false);
-  const [dragOverSlot, setDragOverSlot] = useState(null); // 'video1' | 'video2' | 'audio' | null
-  const [alignmentGuides, setAlignmentGuides] = useState({
-    vertical: false,
-    horizontal: false,
-  });
-  const [resizeDraft, setResizeDraft] = useState(null);
-  const [dragDraft, setDragDraft] = useState(null);
-  const dragDraftRef = useRef(null);
   const [video1TileSize, setVideo1TileSize] = useState({
     width: SOURCE_PREVIEW_WIDTH,
     height: SOURCE_PREVIEW_HEIGHT,
   });
+  const [isEditingCaption, setIsEditingCaption] = useState(false);
+  const [isDraggingCaption, setIsDraggingCaption] = useState(false);
+  const [alignmentGuides, setAlignmentGuides] = useState({ horizontal: false, vertical: false });
+  const [dragOverSlot, setDragOverSlot] = useState(null); // 'video1' | 'video2' | 'audio' | null
+  const [resizeDraft, setResizeDraft] = useState(null);
+  const [dragDraft, setDragDraft] = useState(null);
+  const dragDraftRef = useRef(null);
 
-  // Calculate layout sizes on mount/resize
+  // Keep live rendered pixel dimensions of Video 1 slot to map relative % positions
   useEffect(() => {
     if (!video1TileRef.current) return undefined;
-
-    const updateTileSize = () => {
-      const tile = video1TileRef.current;
-      if (!tile?.clientWidth || !tile?.clientHeight) return;
-      setVideo1TileSize({ width: tile.clientWidth, height: tile.clientHeight });
+    const updateSize = () => {
+      if (video1TileRef.current) {
+        setVideo1TileSize({
+          width: video1TileRef.current.offsetWidth || SOURCE_PREVIEW_WIDTH,
+          height: video1TileRef.current.offsetHeight || SOURCE_PREVIEW_HEIGHT,
+        });
+      }
     };
-
-    updateTileSize();
-
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', updateTileSize);
-      return () => window.removeEventListener('resize', updateTileSize);
-    }
-
-    const resizeObserver = new ResizeObserver(updateTileSize);
+    updateSize();
+    const resizeObserver = new ResizeObserver(updateSize);
     resizeObserver.observe(video1TileRef.current);
     return () => resizeObserver.disconnect();
   }, []);
 
   useEffect(() => () => resizeCleanupRef.current?.(), []);
 
-  const previewScaleX = video1TileSize.width / SOURCE_PREVIEW_WIDTH;
-  const previewScaleY = video1TileSize.height / SOURCE_PREVIEW_HEIGHT;
   const previewProject = useMemo(() => bulkRowToProject(row), [row]);
   const previewTextClip = useMemo(() => {
     const textClips = getAllClips(previewProject).filter((clip) => (
@@ -566,10 +556,90 @@ export const BulkVideoRow = ({
     }, 10);
   };
 
+  const isDragItemAudio = () => {
+    const dragItem = getActiveEditorDragItem();
+    if (!dragItem?.asset) return false;
+    const { mediaType, type, category, kind } = dragItem.asset;
+    return mediaType === 'audio' || type === 'audio' || category === 'audio' || kind === 'audio';
+  };
+
+  const handleCardDragOver = (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    if (isDragItemAudio()) {
+      if (dragOverSlot !== 'card-audio') {
+        setDragOverSlot('card-audio');
+      }
+    }
+  };
+
+  const handleCardDragLeave = (event) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    if (dragOverSlot === 'card-audio') {
+      setDragOverSlot(null);
+    }
+  };
+
+  const handleCardDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragOverSlot(null);
+
+    const dragItem = getActiveEditorDragItem() || readEditorDragData(event.dataTransfer);
+    if (dragItem?.asset) {
+      const asset = dragItem.asset;
+      const isAudio = asset.mediaType === 'audio' || asset.type === 'audio' || asset.category === 'audio';
+      if (isAudio) {
+        onDropAudio?.(asset);
+        return;
+      }
+      if (!row.video1) {
+        onDropVideo1?.(asset);
+      } else if (isDualVideo && !row.video2) {
+        onDropVideo2?.(asset);
+      } else {
+        onDropVideo1?.(asset);
+      }
+      return;
+    }
+
+    const files = Array.from(event.dataTransfer.files || []);
+    if (files.length > 0) {
+      const file = files[0];
+      const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm|m4v|mkv)$/i.test(file.name);
+      const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|aac|m4a|ogg)$/i.test(file.name);
+      const url = URL.createObjectURL(file);
+      const asset = {
+        id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: file.name,
+        url,
+        originalUrl: url,
+        sourceType: 'local',
+        type: isVideo ? 'video' : isAudio ? 'audio' : 'file',
+        mediaType: isVideo ? 'video' : isAudio ? 'audio' : 'file',
+        file,
+      };
+
+      if (isAudio) {
+        onDropAudio?.(asset);
+      } else if (isVideo) {
+        if (!row.video1) onDropVideo1?.(asset);
+        else if (isDualVideo && !row.video2) onDropVideo2?.(asset);
+        else onDropVideo1?.(asset);
+      }
+    }
+  };
+
   const handleSlotDragOver = (event, slot) => {
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = 'copy';
+    if (isDragItemAudio()) {
+      if (dragOverSlot !== 'card-audio') {
+        setDragOverSlot('card-audio');
+      }
+      return;
+    }
     if (dragOverSlot !== slot) {
       setDragOverSlot(slot);
     }
@@ -591,12 +661,15 @@ export const BulkVideoRow = ({
     const dragItem = getActiveEditorDragItem() || readEditorDragData(event.dataTransfer);
     if (dragItem?.asset) {
       const asset = dragItem.asset;
+      const isAudio = asset.mediaType === 'audio' || asset.type === 'audio' || asset.category === 'audio';
+      if (isAudio || slot === 'audio') {
+        onDropAudio?.(asset);
+        return;
+      }
       if (slot === 'video1') {
         onDropVideo1?.(asset);
       } else if (slot === 'video2') {
         onDropVideo2?.(asset);
-      } else if (slot === 'audio') {
-        onDropAudio?.(asset);
       }
       return;
     }
@@ -614,38 +687,59 @@ export const BulkVideoRow = ({
         originalUrl: url,
         sourceType: 'local',
         type: isVideo ? 'video' : isAudio ? 'audio' : 'file',
+        mediaType: isVideo ? 'video' : isAudio ? 'audio' : 'file',
         file,
       };
 
-      if (isVideo && slot === 'video1') onDropVideo1?.(asset);
-      else if (isVideo && slot === 'video2') onDropVideo2?.(asset);
-      else if (isAudio || slot === 'audio') onDropAudio?.(asset);
+      if (isAudio || slot === 'audio') {
+        onDropAudio?.(asset);
+      } else if (isVideo && slot === 'video1') {
+        onDropVideo1?.(asset);
+      } else if (isVideo && slot === 'video2') {
+        onDropVideo2?.(asset);
+      }
     }
   };
 
   return (
-    <div className={`w-[340px] bg-[#1c1c1e] border rounded-2xl p-4 shadow-xl select-none transition-colors flex flex-col gap-3 relative z-10 pointer-events-auto ${
-      isCaptionTarget
-        ? 'border-[#ff5500]'
-        : 'border-[#2d2d30] hover:border-[#3a3a3c]'
-    }`}>
+    <div
+      onDragOver={handleCardDragOver}
+      onDragLeave={handleCardDragLeave}
+      onDrop={handleCardDrop}
+      className={`${isDualVideo ? "w-[300px]" : "w-[175px]"} bg-[#181924] border rounded-2xl p-2.5 select-none transition-all flex flex-col gap-2 relative z-10 pointer-events-auto ${
+        isSelected || isCaptionTarget
+          ? 'border-[#7831d6] ring-1 ring-[#7831d6]/60 shadow-[0_0_14px_rgba(120,49,214,0.4)]'
+          : 'border-white/15 hover:border-white/30 shadow-[0_16px_48px_rgba(0,0,0,0.65)]'
+      }`}
+    >
+      {/* Full-Card Audio Drop Overlay */}
+      {dragOverSlot === 'card-audio' && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-[#7831d6]/25 backdrop-blur-[2px] rounded-2xl border-2 border-dashed border-[#7831d6] pointer-events-none animate-pulse">
+          <div className="flex items-center gap-2 bg-black/90 px-3 py-1.5 rounded-xl shadow-2xl border border-[#7831d6]/60">
+            <Music className="h-3.5 w-3.5 text-purple-300 animate-bounce" />
+            <span className="text-[9px] font-extrabold uppercase text-white tracking-wider">
+              Drop Audio #{rowIndex + 1}
+            </span>
+          </div>
+        </div>
+      )}
       
       {/* Node Header (Acts as Canvas Drag Handle) */}
       <div
         onPointerDown={handleNodePointerDown}
         onDoubleClick={onHeaderDoubleClick}
-        className="flex items-center justify-between pb-2 border-b border-[#2d2d30] cursor-grab active:cursor-grabbing"
+        className="flex items-center justify-between pb-2 border-b border-white/10 cursor-grab active:cursor-grabbing"
       >
-        <div className="flex items-center gap-1.5 truncate mr-2">
+        <div className="flex items-center gap-1.5 truncate mr-1.5 min-w-0">
           <Move className="h-3 w-3 text-gray-500 shrink-0" />
           <span className="text-[10px] font-mono font-bold text-gray-400 shrink-0">
             #{rowIndex + 1}
           </span>
-          <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${statusColors[status]}`}>
+          <span className={`text-[7.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-full shrink-0 ${statusColors[status]}`}>
             {statusLabels[status]}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={(event) => {
@@ -659,26 +753,7 @@ export const BulkVideoRow = ({
             <Pencil className="h-2.5 w-2.5" />
             Edit
           </button>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenCaptionDrawer();
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className={`flex items-center gap-1 bg-[#121214] border hover:bg-[#1a1a1e] px-2 py-0.5 rounded-md text-[8px] font-bold uppercase truncate max-w-[80px] transition-all ${
-                caption
-                  ? 'border-[#ff5500]/30 text-[#ff5500]'
-                  : 'border-[#2d2d30] text-gray-500'
-              }`}
-            >
-              <Type className="h-2.5 w-2.5 shrink-0" />
-              <span className="truncate">
-                Text
-              </span>
-            </button>
-          </div>
+
 
           <div
             onDragOver={(e) => handleSlotDragOver(e, 'audio')}
@@ -692,7 +767,7 @@ export const BulkVideoRow = ({
               type="button"
               onClick={onPickAudio}
               onPointerDown={(e) => e.stopPropagation()}
-              className={`flex items-center gap-1 bg-[#121214] border hover:bg-[#1a1a1e] px-2 py-0.5 rounded-md text-[8px] font-bold uppercase truncate max-w-[100px] transition-all ${
+              className={`flex items-center gap-1 bg-[#121214] border hover:bg-[#1a1a1e] px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase truncate max-w-[80px] transition-all ${
                 audio
                   ? 'border-[#ff5500]/30 text-[#ff5500]'
                   : 'border-[#2d2d30] text-gray-500'
@@ -734,14 +809,14 @@ export const BulkVideoRow = ({
       )}
 
       {/* Video Cards Grid */}
-      <div className={isDualVideo ? "grid grid-cols-2 gap-2.5" : "flex justify-center"}>
+      <div className={isDualVideo ? "grid grid-cols-2 gap-2" : "flex flex-col"}>
         
         {/* Video 1 Preview Card */}
         <div
           onDragOver={(e) => handleSlotDragOver(e, 'video1')}
           onDragLeave={(e) => handleSlotDragLeave(e, 'video1')}
           onDrop={(e) => handleSlotDrop(e, 'video1')}
-          className={`relative transition-all ${isDualVideo ? "" : "w-[145px]"} ${
+          className={`relative transition-all w-full ${
             dragOverSlot === 'video1'
               ? 'ring-2 ring-[#ff5500] ring-offset-2 ring-offset-[#1c1c1e] scale-[1.02] rounded-xl z-20 shadow-[0_0_15px_rgba(255,85,0,0.5)]'
               : ''
@@ -766,7 +841,7 @@ export const BulkVideoRow = ({
                     handleTogglePreviewPlayback(event, 'video1');
                   }
                 }}
-                className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] transition-all hover:bg-[#1a1a1e]"
+                className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-white/10 bg-[#0f1016] transition-all hover:bg-[#14161f]"
               >
                 <LoadingVideoPreview
                   ref={video1PreviewRef}
@@ -790,10 +865,29 @@ export const BulkVideoRow = ({
                     onPickVideo1();
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="flex h-6 w-6 items-center justify-center rounded-full bg-black/60 border border-[#2d2d30] text-gray-300 hover:text-white hover:bg-black/85 transition-all shadow-md"
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 border border-white/15 text-gray-300 hover:text-white hover:bg-black/90 transition-all shadow-md"
                   title="Change Video 1"
                 >
                   <Pencil className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {/* Text Overlay Button on Top Right */}
+              <div className="absolute top-2 right-2 z-20">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenCaptionDrawer();
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className={`flex h-6 w-6 items-center justify-center rounded-full bg-black/70 border transition-all shadow-md ${
+                    caption
+                      ? 'border-[#ff5500]/70 text-[#ff5500] bg-black/90'
+                      : 'border-white/15 text-gray-300 hover:text-white hover:bg-black/90'
+                  }`}
+                  title={caption ? 'Edit Text Overlay' : 'Add Text Overlay'}
+                >
+                  <Type className="h-3.5 w-3.5" />
                 </button>
               </div>
             </>
@@ -802,11 +896,11 @@ export const BulkVideoRow = ({
               type="button"
               onClick={onPickVideo1}
               ref={video1TileRef}
-              className="relative w-full aspect-[9/16] rounded-xl border border-[#2d2d30] bg-[#121214] flex flex-col items-center justify-center gap-1.5 overflow-hidden transition-all hover:bg-[#1a1a1e] group"
+              className="relative w-full aspect-[9/16] rounded-xl border border-white/10 bg-[#0f1016] flex flex-col items-center justify-center gap-1.5 overflow-hidden transition-all hover:bg-[#14161f] hover:border-white/20 group"
             >
               <>
-                <Video className="h-5 w-5 text-gray-600 group-hover:text-[#ff5500]" />
-                <span className="text-[9px] font-bold text-gray-500 uppercase">Video 1</span>
+                <Video className="h-5 w-5 text-gray-500 group-hover:text-[#ff5500]" />
+                <span className="text-[9px] font-bold text-gray-400 uppercase">Video 1</span>
               </>
             </button>
           )}
@@ -992,12 +1086,7 @@ export const BulkVideoRow = ({
             />
           )}
 
-          {/* Bottom Title Label */}
-          {video1 && (
-            <p className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] rounded text-[8px] font-semibold text-gray-300 truncate px-1 py-0.5 text-center" title={video1.name}>
-              {video1.name}
-            </p>
-          )}
+
         </div>
 
         {/* Video 2 Preview Card */}
@@ -1030,7 +1119,7 @@ export const BulkVideoRow = ({
                       handleTogglePreviewPlayback(event, 'video2');
                     }
                   }}
-                  className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-[#2d2d30] bg-[#121214] transition-all hover:bg-[#1a1a1e]"
+                  className="group relative flex w-full aspect-[9/16] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-white/10 bg-[#0f1016] transition-all hover:bg-[#14161f]"
                 >
                   <LoadingVideoPreview
                     ref={video2PreviewRef}
@@ -1054,7 +1143,7 @@ export const BulkVideoRow = ({
                       onPickVideo2();
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-black/60 border border-[#2d2d30] text-gray-300 hover:text-white hover:bg-black/85 transition-all shadow-md"
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 border border-white/15 text-gray-300 hover:text-white hover:bg-black/90 transition-all shadow-md"
                     title="Change Video 2"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -1065,19 +1154,15 @@ export const BulkVideoRow = ({
               <button
                 type="button"
                 onClick={onPickVideo2}
-                className="w-full aspect-[9/16] rounded-xl border border-[#2d2d30] bg-[#121214] flex flex-col items-center justify-center gap-1.5 overflow-hidden transition-all hover:bg-[#1a1a1e] group"
+                className="w-full aspect-[9/16] rounded-xl border border-white/10 bg-[#0f1016] flex flex-col items-center justify-center gap-1.5 overflow-hidden transition-all hover:bg-[#14161f] hover:border-white/20 group"
               >
                 <>
-                  <Video className="h-5 w-5 text-gray-600 group-hover:text-[#ff5500]" />
-                  <span className="text-[9px] font-bold text-gray-500 uppercase">Video 2</span>
+                  <Video className="h-5 w-5 text-gray-500 group-hover:text-[#ff5500]" />
+                  <span className="text-[9px] font-bold text-gray-400 uppercase">Video 2</span>
                 </>
               </button>
             )}
-            {video2 && (
-              <p className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-[2px] rounded text-[8px] font-semibold text-gray-300 truncate px-1 py-0.5 text-center" title={video2.name}>
-                {video2.name}
-              </p>
-            )}
+
           </div>
         )}
 

@@ -203,16 +203,20 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   const campaignTitle = activeCampaign?.name || (isAdminViewingUser ? (adminViewContext.userName || 'Campaign View') : 'Select campaign');
 
   return (
-    <aside className={`relative z-50 w-20 overflow-visible ${isAdminViewingUser ? 'bg-[#0f172a] border-white/10 text-zinc-300' : 'bg-black border-white/10 text-zinc-400'} hidden border-r md:flex flex-col h-screen sticky top-0 transition-all duration-300`}>
+    <aside className={`relative z-50 w-20 overflow-visible ${
+      isAdminViewingUser
+        ? 'bg-gradient-to-b from-[#0f1d38] via-[#091122] to-[#050811] text-zinc-300 border-white/[0.08]'
+        : 'bg-gradient-to-b from-[#130b22] via-[#09060e] to-[#040306] text-zinc-400 border-white/[0.08]'
+    } hidden border-r md:flex flex-col h-screen sticky top-0 transition-all duration-300 shadow-[1px_0_30px_rgba(120,49,214,0.07)] backdrop-blur-xl`}>
       
       {/* Workspace header */}
-      <div className={`relative flex min-h-[56px] flex-shrink-0 items-center justify-center border-b px-2 py-2 ${isAdminViewingUser ? 'border-white/10 bg-[#0f172a]' : 'border-white/10 bg-black'}`}>
+      <div className="relative flex min-h-[56px] flex-shrink-0 items-center justify-center border-b border-white/[0.08] px-2 py-2">
         {isCreator ? (
           <div
-            className="flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-white/5 text-white"
+            className="flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white shadow-inner"
             title="Creator Hub"
           >
-            <Megaphone className="h-5 w-5 text-[#7831d6]" />
+            <Megaphone className="h-5 w-5 text-[#9d5ce6]" />
             <span className="max-w-full truncate text-[10px] font-semibold leading-none">Home</span>
           </div>
         ) : (
@@ -220,28 +224,28 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
               <button
                 type="button"
                 onClick={() => setIsCampaignMenuOpen((current) => !current)}
-                className={`group flex h-12 w-14 flex-col items-center justify-center gap-0.5 rounded-xl border transition ${
+                className={`group flex h-12 w-14 flex-col items-center justify-center gap-0.5 rounded-xl border transition-all duration-200 ${
                   isAdminViewingUser
-                    ? 'border-white/10 bg-white/5 hover:bg-white/10 text-white'
-                    : 'border-white/10 bg-[#0a0a0a] hover:border-[#7831d6] hover:bg-white/5 text-white'
+                    ? 'border-white/10 bg-white/[0.06] hover:bg-white/[0.12] text-white'
+                    : 'border-white/[0.08] bg-white/[0.04] hover:border-[#7831d6]/60 hover:bg-white/[0.08] hover:shadow-[0_0_15px_rgba(120,49,214,0.25)] text-white'
                 }`}
                 title={campaignTitle}
               >
-                <Megaphone className="h-5 w-5 text-[#7831d6]" />
+                <Megaphone className="h-5 w-5 text-[#9d5ce6] transition-transform group-hover:scale-110" />
                 <span className="max-w-full truncate text-[10px] font-semibold leading-none text-zinc-300">
                   {campaignTitle}
                 </span>
-                <ChevronDown className={`absolute bottom-1 right-1 h-3 w-3 transition text-zinc-400 ${isCampaignMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`absolute bottom-1 right-1 h-3 w-3 transition-transform text-zinc-400 ${isCampaignMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isCampaignMenuOpen && (
-                <div className="absolute left-[calc(100%+0.75rem)] top-0 z-[999] w-72 overflow-hidden rounded-xl border border-white/10 bg-black text-white shadow-2xl shadow-black/80 ring-1 ring-white/10">
-                  <div className="border-b border-white/10 px-3 py-2">
+                <div className="absolute left-[calc(100%+0.75rem)] top-0 z-[999] w-72 overflow-hidden rounded-2xl border border-white/[0.12] bg-[#0c0717]/95 backdrop-blur-2xl text-white shadow-2xl shadow-black/90 ring-1 ring-white/10">
+                  <div className="border-b border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5">
                     <p className="m-0 text-[9px] font-bold uppercase tracking-wider text-[#c4b5fd]">
                       Switch campaign
                     </p>
                   </div>
-                  <div className="max-h-72 overflow-y-auto p-1">
+                  <div className="max-h-72 overflow-y-auto p-1.5 space-y-0.5">
                     {campaigns.length > 0 ? campaigns.map((campaign) => {
                       const isSelected = campaign._id === activeCampaignId;
                       return (
@@ -249,17 +253,17 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                           key={campaign._id}
                           type="button"
                           onClick={() => selectCampaign(campaign)}
-                          className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition ${
+                          className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-all ${
                             isSelected
-                              ? 'bg-[#7831d6] text-white'
-                              : 'text-zinc-300 hover:bg-white/10 hover:text-white'
+                              ? 'bg-[#7831d6] text-white shadow-md shadow-[#7831d6]/30 font-semibold'
+                              : 'text-zinc-300 hover:bg-white/[0.08] hover:text-white'
                           }`}
                         >
-                          <span className={`h-2 w-2 flex-shrink-0 rounded-full ${isSelected ? 'bg-white' : 'bg-zinc-600'}`} />
+                          <span className={`h-2 w-2 flex-shrink-0 rounded-full ${isSelected ? 'bg-white shadow-[0_0_6px_#fff]' : 'bg-zinc-600'}`} />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs font-bold">{campaign.name || 'Untitled campaign'}</span>
+                            <span className="block truncate text-xs">{campaign.name || 'Untitled campaign'}</span>
                             {(campaign.mainEmail || campaign.createdBy?.email) && (
-                              <span className={`mt-0.5 block truncate text-[9px] ${isSelected ? 'text-inherit opacity-70' : 'text-zinc-400'}`}>
+                              <span className={`mt-0.5 block truncate text-[9px] ${isSelected ? 'text-inherit opacity-80' : 'text-zinc-400'}`}>
                                 {campaign.mainEmail || campaign.createdBy?.email}
                               </span>
                             )}
@@ -280,7 +284,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
       </div>
 
       {/* Navigation */}
-      <nav className={`flex-1 space-y-1 overflow-y-auto p-2 ${isAdminViewingUser ? 'bg-[#0f172a]' : 'bg-black'}`}>
+      <nav className="flex-1 space-y-1.5 overflow-y-auto p-2 scrollbar-none">
         {navItems.map((item) => (
           <NavLink
             key={item.name}
@@ -288,14 +292,14 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
             end
             title={item.name}
             className={({ isActive }) =>
-              `flex h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 transition-all duration-150 ${
+              `flex h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 transition-all duration-200 ${
                 isActive
-                  ? 'bg-[#7831d6] text-white font-semibold shadow-sm'
-                  : 'text-zinc-400 hover:bg-white/10 hover:text-white'
+                  ? 'bg-gradient-to-b from-[#8a3ff2] to-[#6d24cf] text-white font-semibold shadow-[0_0_18px_rgba(120,49,214,0.45)] ring-1 ring-white/20 scale-[1.02]'
+                  : 'text-zinc-400 hover:bg-white/[0.08] hover:text-white hover:scale-[1.02]'
               }`
             }
           >
-            <item.icon className="h-5 w-5 flex-shrink-0" />
+            <item.icon className="h-5 w-5 flex-shrink-0 transition-transform" />
             <span className="max-w-full truncate text-[10px] font-semibold leading-none">
               {item.label}
             </span>
@@ -303,7 +307,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
         ))}
 
         {managerItems.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-white/10">
+          <div className="mt-2.5 pt-2 border-t border-white/[0.08] space-y-1.5">
             {managerItems.map((item) => (
               <NavLink
                 key={item.name}
@@ -311,14 +315,14 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                 end
                 title={item.name}
                 className={({ isActive }) =>
-                  `flex h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 transition-all duration-150 ${
+                  `flex h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 transition-all duration-200 ${
                     isActive
-                      ? 'bg-[#7831d6] text-white font-semibold shadow-sm'
-                      : 'text-zinc-400 hover:bg-white/10 hover:text-white'
+                      ? 'bg-gradient-to-b from-[#8a3ff2] to-[#6d24cf] text-white font-semibold shadow-[0_0_18px_rgba(120,49,214,0.45)] ring-1 ring-white/20 scale-[1.02]'
+                      : 'text-zinc-400 hover:bg-white/[0.08] hover:text-white hover:scale-[1.02]'
                   }`
                 }
               >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
+                <item.icon className="h-5 w-5 flex-shrink-0 transition-transform" />
                 <span className="max-w-full truncate text-[10px] font-semibold leading-none">
                   {item.label}
                 </span>
@@ -330,7 +334,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
       </nav>
 
       {/* Sidebar Footer */}
-      <div className={`relative flex-shrink-0 space-y-2 border-t border-white/10 p-2 text-[10px] ${isAdminViewingUser ? 'bg-[#0f172a] text-zinc-400' : 'bg-black text-zinc-400'}`}>
+      <div className="relative flex-shrink-0 space-y-2 border-t border-white/[0.08] p-2 text-[10px]">
         <PwaInstallButton
           collapsed
           dark={true}
@@ -338,17 +342,17 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
           popoverClassName="left-0"
         />
 
-        <div className="flex items-center justify-center rounded-xl p-1 bg-white/5">
+        <div className="flex items-center justify-center rounded-xl p-1 bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.15] transition-all">
             <button
               type="button"
               onClick={logout}
-              className="rounded-full transition hover:opacity-80"
+              className="rounded-full transition hover:opacity-80 hover:scale-105"
               title={`Logout ${displayedUserEmail || user?.email || ''}`.trim()}
             >
               <img
                 src={displayedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
                 crossOrigin="anonymous"
-                className="h-6 w-6 rounded-full object-cover border border-white/20"
+                className="h-6 w-6 rounded-full object-cover border border-white/20 shadow-sm"
                 alt=""
               />
             </button>

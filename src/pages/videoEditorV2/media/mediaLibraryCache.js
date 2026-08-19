@@ -6,12 +6,17 @@ export const MEDIA_LIBRARY_GC_TIME = 60 * 60 * 1000;
 const LAST_FOLDER_PREFIX = 'tw-editor-media-last-folder';
 const LAST_FOLDER_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
-const requestHeaders = (token) => (
-  token ? { Authorization: `Bearer ${token}` } : {}
-);
+const requestHeaders = (token) => {
+  const effectiveToken = token
+    || (typeof window !== 'undefined' ? (localStorage.getItem('tw_token') || localStorage.getItem('token')) : null);
+  return effectiveToken ? { Authorization: `Bearer ${effectiveToken}` } : {};
+};
 
 const readJson = async (response, fallbackMessage) => {
   if (!response.ok) {
+    if (response.status === 404 || response.status === 401 || response.status === 403) {
+      return [];
+    }
     const payload = await response.json().catch(() => ({}));
     throw new Error(payload.message || fallbackMessage);
   }
@@ -21,12 +26,13 @@ const readJson = async (response, fallbackMessage) => {
 export const mediaLibraryKeys = {
   root: ['media-library', 'editor'],
   folders: (campaignId) => ['media-library', 'editor', 'folders', campaignId || ''],
-  media: (campaignId, folderId) => [
+  media: (campaignId, folderId, includeSubfolders) => [
     'media-library',
     'editor',
     'media',
     campaignId || '',
     folderId || 'root',
+    Boolean(includeSubfolders),
   ],
 };
 
@@ -38,6 +44,9 @@ export const fetchMediaLibraryFolders = async ({ token, campaignId, signal }) =>
     `${API_BASE_URL}/api/media/folders${query ? `?${query}` : ''}`,
     { headers: requestHeaders(token), signal },
   );
+  if (response.status === 401 || response.status === 403 || response.status === 404) {
+    return [];
+  }
   const payload = await readJson(response, 'Unable to load Media Library folders.');
   return Array.isArray(payload) ? payload : [];
 };
@@ -46,14 +55,24 @@ export const fetchMediaLibraryFolder = async ({
   token,
   campaignId,
   folderId = 'root',
+  includeSubfolders = false,
   signal,
 }) => {
-  const params = new URLSearchParams({ folderId: folderId || 'root' });
+  const params = new URLSearchParams();
+  if (folderId && folderId !== 'all') {
+    params.set('folderId', folderId);
+  }
+  if (includeSubfolders) {
+    params.set('includeSubfolders', 'true');
+  }
   if (campaignId) params.set('campaignId', campaignId);
   const response = await fetch(`${API_BASE_URL}/api/media?${params.toString()}`, {
     headers: requestHeaders(token),
     signal,
   });
+  if (response.status === 401 || response.status === 403 || response.status === 404) {
+    return [];
+  }
   const payload = await readJson(response, 'Unable to load Media Library files.');
   return Array.isArray(payload)
     ? payload.filter((item) => ['video', 'image', 'audio'].includes(item.type) && item.url)

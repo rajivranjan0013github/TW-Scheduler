@@ -59,7 +59,7 @@ function MobileNav({ isCreator, canViewAdmin }) {
       ];
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-black/95 px-1 pt-0.5 shadow-[0_-2px_8px_rgba(0,0,0,0.5)] backdrop-blur md:hidden mobile-safe-nav text-white">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#09060e]/95 backdrop-blur-2xl px-1 pt-0.5 shadow-[0_-4px_25px_rgba(120,49,214,0.12)] md:hidden mobile-safe-nav text-white">
       <div className="absolute -top-8 right-2">
         <PwaInstallButton
           collapsed
@@ -73,8 +73,10 @@ function MobileNav({ isCreator, canViewAdmin }) {
             to={item.path}
             end
             className={({ isActive }) =>
-              `flex h-full flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[9px] font-semibold leading-none transition ${
-                isActive ? 'bg-[#7831d6] text-white' : 'text-zinc-400 hover:text-white active:bg-white/10'
+              `flex h-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[9px] font-semibold leading-none transition-all ${
+                isActive
+                  ? 'bg-gradient-to-b from-[#8a3ff2] to-[#6d24cf] text-white shadow-[0_0_12px_rgba(120,49,214,0.4)] font-bold'
+                  : 'text-zinc-400 hover:text-white active:bg-white/[0.08]'
               }`
             }
           >

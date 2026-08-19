@@ -54,6 +54,7 @@ import {
   createInitialEditorState,
   createTextClip,
   createVideoClip,
+  deserializeProject,
   editorActions,
   editorReducer,
   findClipById,
@@ -170,6 +171,24 @@ const loadInitialContext = ({ bulkRowId, isBulkProject }) => {
       projectPersisted: false,
       warning: 'This Bulk Planning Board row no longer exists. Choose another project from Bulk Queue or return to the board.',
     };
+  }
+
+  try {
+    const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (savedDraft) {
+      const parsed = deserializeProject(savedDraft);
+      if (parsed && Array.isArray(parsed.tracks)) {
+        return {
+          project: parsed,
+          bulkRow: null,
+          contextKey: 'draft',
+          projectPersisted: true,
+          warning: '',
+        };
+      }
+    }
+  } catch (error) {
+    console.warn('Could not restore saved video draft:', error);
   }
 
   return {
@@ -307,9 +326,7 @@ export const VideoEditorV2 = () => {
   const [bulkExportDialog, setBulkExportDialog] = useState(createEmptyBulkExportDialog);
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [savingResult, setSavingResult] = useState(false);
-  const [selectedBulkRowIds, setSelectedBulkRowIds] = useState(() => (
-    isBulkProject && bulkRowId ? [bulkRowId] : []
-  ));
+  const [selectedBulkRowIds, setSelectedBulkRowIds] = useState([]);
   const [timelineHeight, setTimelineHeight] = useState(getInitialTimelineHeight);
   const [timelineExpandedToLeft, setTimelineExpandedToLeft] = useState(false);
   const [timelineMaximum, setTimelineMaximum] = useState(getInitialTimelineMaximum);
@@ -465,13 +482,6 @@ export const VideoEditorV2 = () => {
   }, [isBulkProject]);
 
   useEffect(() => {
-    if (!isBulkProject || !bulkRowId) return;
-    queueMicrotask(() => setSelectedBulkRowIds((current) => (
-      current.length > 0 ? current : [bulkRowId]
-    )));
-  }, [bulkRowId, isBulkProject]);
-
-  useEffect(() => {
     if (!isBulkProject || !bulkRowId) return undefined;
     return subscribeToBulkRows(({ source, rowId }) => {
       if (source === 'editor-v2') return;
@@ -576,6 +586,37 @@ export const VideoEditorV2 = () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
   }, [isBulkProject, project]);
+
+  // Intercept browser back button in standalone mode to show exit confirmation dialog
+  useEffect(() => {
+    if (isBulkProject) return undefined;
+
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href);
+      setShowExitDialog(true);
+    };
+
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isBulkProject]);
+
+  // Prevent accidental tab closure or refresh in standalone mode
+  useEffect(() => {
+    if (isBulkProject) return undefined;
+    const handleBeforeUnload = (event) => {
+      const currentProject = projectRef.current;
+      const snapshot = serializeProject(currentProject);
+      if (snapshot !== savedProjectRef.current) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isBulkProject]);
 
   const setCurrentTime = useCallback((time) => {
     dispatch(editorActions.setCurrentTime(time));
@@ -893,6 +934,9 @@ export const VideoEditorV2 = () => {
 
       if (event.code === 'Space') {
         event.preventDefault();
+        if (target instanceof HTMLElement) {
+          target.blur();
+        }
         if (!event.repeat) setPlaying(!isPlaying);
       } else if (
         (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
@@ -1360,53 +1404,59 @@ export const VideoEditorV2 = () => {
       });
       return;
     }
+
+    // Smooth direct switching when editing a frame from Bulk Video Builder
+    if (isBulkProject) {
+      if (bulkRowId) {
+        const currentProject = projectRef.current;
+        const snapshot = serializeProject(currentProject);
+        if (snapshot !== bulkSyncedProjectRef.current) {
+          try {
+            const savedSnapshot = persistProjectToBulkRow(currentProject, bulkRowId, {
+              clearResult: true,
+            });
+            savedProjectRef.current = savedSnapshot;
+            bulkSyncedProjectRef.current = savedSnapshot;
+          } catch (error) {
+            setStatus({
+              type: 'error',
+              text: error.message || 'Changes could not be synced to the Bulk Planning Board.',
+            });
+            return;
+          }
+        }
+      }
+      navigate('/media/bulk-builder', { replace: true });
+      return;
+    }
+
+    // When opened directly as standalone video editor from tab: show confirmation alert dialog
     setShowExitDialog(true);
   }, [
     bulkQueueState.running,
     exportState.exporting,
     extractingAudioClipId,
     savingResult,
-  ]);
-
-  const handleConfirmExit = useCallback(() => {
-    setShowExitDialog(false);
-    if (isBulkProject && bulkRowId) {
-      const currentProject = projectRef.current;
-      const snapshot = serializeProject(currentProject);
-      if (snapshot !== bulkSyncedProjectRef.current) {
-        try {
-          const savedSnapshot = persistProjectToBulkRow(currentProject, bulkRowId, {
-            clearResult: true,
-          });
-          savedProjectRef.current = savedSnapshot;
-          bulkSyncedProjectRef.current = savedSnapshot;
-        } catch (error) {
-          setStatus({
-            type: 'error',
-            text: error.message || 'Changes could not be synced to the Bulk Planning Board.',
-          });
-          return;
-        }
-      }
-    } else {
-      try {
-        const snapshot = serializeProject(projectRef.current);
-        localStorage.setItem(DRAFT_STORAGE_KEY, snapshot);
-        savedProjectRef.current = snapshot;
-      } catch {
-        setStatus({
-          type: 'error',
-          text: 'This browser could not save the project before leaving the editor.',
-        });
-        return;
-      }
-    }
-    navigate(isBulkProject ? '/media/bulk-builder' : '/media', { replace: true });
-  }, [
     bulkRowId,
     isBulkProject,
     navigate,
   ]);
+
+  const handleConfirmExit = useCallback(() => {
+    setShowExitDialog(false);
+    try {
+      const snapshot = serializeProject(projectRef.current);
+      localStorage.setItem(DRAFT_STORAGE_KEY, snapshot);
+      savedProjectRef.current = snapshot;
+    } catch {
+      setStatus({
+        type: 'error',
+        text: 'This browser could not save the project before leaving the editor.',
+      });
+      return;
+    }
+    navigate('/media', { replace: true });
+  }, [navigate]);
 
   const openBulkVideoBuilder = useCallback(() => {
     if (bulkQueueState.running || exportState.exporting || savingResult || extractingAudioClipId) {
@@ -1453,11 +1503,6 @@ export const VideoEditorV2 = () => {
       const nextParams = new URLSearchParams(searchParams);
       nextParams.set('mode', 'bulk');
       nextParams.set('rowId', String(nextRowId));
-      setSelectedBulkRowIds((current) => (
-        current.some((rowId) => String(rowId) === String(nextRowId))
-          ? current
-          : [...current, nextRowId]
-      ));
       navigate(`/media/editor?${nextParams.toString()}`, { replace: true });
     } catch (error) {
       setStatus({ type: 'error', text: error.message || 'Could not open that bulk project.' });
@@ -2087,7 +2132,7 @@ export const VideoEditorV2 = () => {
         onClose={closeBulkExportDialog}
       />
 
-      {/* Exit Confirmation Dialog Modal */}
+      {/* Exit Confirmation Dialog Modal for Standalone Editor */}
       {showExitDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#121214] p-6 shadow-2xl text-white">
@@ -2100,13 +2145,13 @@ export const VideoEditorV2 = () => {
                   Exit Video Editor
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  Return to {isBulkProject ? 'Bulk Video Builder' : 'Media Library'}
+                  Return to Media Library
                 </p>
               </div>
             </div>
 
             <p className="text-xs text-zinc-300 mb-6 leading-relaxed">
-              Your current project changes will be automatically saved before exiting. Are you sure you want to leave?
+              Your current project changes will be automatically saved as a draft. Are you sure you want to leave the editor?
             </p>
 
             <div className="flex items-center justify-end gap-2.5">
