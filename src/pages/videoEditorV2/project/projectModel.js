@@ -11,7 +11,6 @@ import {
   MIN_CLIP_DURATION,
   MIN_CROP_SIZE,
   MIN_PLAYBACK_RATE,
-  PROJECT_HARD_MAX_DURATION,
   PROJECT_SCHEMA_VERSION,
   TRACK_TYPES,
   TRACK_TYPE_VALUES,
@@ -339,9 +338,10 @@ export const normalizeOutputSettings = (output = {}) => ({
   maxDuration: clampNumber(
     output.maxDuration,
     MIN_CLIP_DURATION,
-    PROJECT_HARD_MAX_DURATION,
+    Number.POSITIVE_INFINITY,
     DEFAULT_OUTPUT_SETTINGS.maxDuration,
   ),
+  exportFormat: output.exportFormat === 'audio' ? 'audio' : 'video',
   backgroundColor: normalizeColor(output.backgroundColor, DEFAULT_OUTPUT_SETTINGS.backgroundColor),
 });
 

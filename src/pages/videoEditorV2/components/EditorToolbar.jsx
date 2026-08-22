@@ -17,23 +17,24 @@ export const EditorToolbar = ({
   onRedo,
   onOpenProjectSettings,
   onExport,
+  exportLabel = 'Export',
   onOpenBulkBuilder,
   onBack,
   backLabel,
 }) => (
-  <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 bg-black px-2.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] sm:px-3">
+  <header className="flex h-12 shrink-0 items-center justify-between border-b border-[#303034] bg-[#151517] px-2.5 shadow-[0_1px_0_rgba(255,255,255,0.02)] sm:px-3">
     <div className="flex min-w-0 items-center gap-2">
       <button
         type="button"
         onClick={onBack}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white transition hover:bg-[#7831d6]/20 hover:text-white"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white transition hover:bg-white/[0.08] hover:text-white"
         aria-label={backLabel || (isBulkProject ? 'Back to Bulk Planning Board' : 'Back to Media Library')}
         title={backLabel || (isBulkProject ? 'Back to Bulk Planning Board' : 'Back to Media Library')}
       >
         <ArrowLeft className="h-3.5 w-3.5" />
       </button>
 
-      <div className="hidden h-5 w-px bg-white/10 sm:block" />
+      <div className="hidden h-5 w-px bg-[#303034] sm:block" />
       <div className="min-w-0 flex items-center">
         <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#7831d6]">
           Timeline Editor
@@ -42,7 +43,7 @@ export const EditorToolbar = ({
 
       {isBulkProject && (
         <>
-          <div className="hidden h-5 w-px bg-white/10 sm:block" />
+          <div className="hidden h-5 w-px bg-[#303034] sm:block" />
           <button
             type="button"
             onClick={onOpenBulkBuilder}
@@ -64,7 +65,7 @@ export const EditorToolbar = ({
           type="button"
           onClick={onUndo}
           disabled={!canUndo}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-white transition hover:bg-[#7831d6]/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-white transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Undo"
           title="Undo (Ctrl/Cmd + Z)"
         >
@@ -74,7 +75,7 @@ export const EditorToolbar = ({
           type="button"
           onClick={onRedo}
           disabled={!canRedo}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-white transition hover:bg-[#7831d6]/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-white transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Redo"
           title="Redo (Ctrl/Cmd + Shift + Z)"
         >
@@ -82,7 +83,7 @@ export const EditorToolbar = ({
         </button>
       </div>
 
-      <div className="hidden h-5 w-px bg-white/10 sm:block" />
+      <div className="hidden h-5 w-px bg-[#303034] sm:block" />
 
       <button
         type="button"
@@ -99,9 +100,11 @@ export const EditorToolbar = ({
         onClick={onExport}
         disabled={isExporting}
         className="flex h-8 items-center gap-1.5 rounded-lg bg-[#7831d6] px-3 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#6825bc] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55"
+        aria-label={isExporting ? 'Exporting' : exportLabel}
+        title={isExporting ? 'Exporting' : exportLabel}
       >
         {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-        {isExporting ? 'Exporting' : 'Export'}
+        {isExporting ? 'Exporting' : exportLabel}
       </button>
     </div>
   </header>

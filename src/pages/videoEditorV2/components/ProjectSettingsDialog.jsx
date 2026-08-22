@@ -1,5 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { AlertTriangle, Check, MonitorSmartphone, SlidersHorizontal, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  Film,
+  MonitorSmartphone,
+  Music2,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
 
 const RESOLUTION_PRESETS = [
   { label: 'Standard', detail: '9:16', width: 720, height: 1280 },
@@ -23,7 +31,8 @@ const createDraft = (output = {}) => ({
   backgroundColor: HEX_COLOR_PATTERN.test(output.backgroundColor || '')
     ? output.backgroundColor
     : '#000000',
-  maxDuration: Math.round(clampNumber(output.maxDuration, 1, 30, 30)),
+  maxDuration: Math.round(clampNumber(output.maxDuration, 1, Number.POSITIVE_INFINITY, 30)),
+  exportFormat: output.exportFormat === 'audio' ? 'audio' : 'video',
 });
 
 const FieldLabel = ({ htmlFor, children }) => (
@@ -114,11 +123,11 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-[#111318] text-[#e6e8ec] shadow-2xl shadow-black/50 ring-1 ring-white/10"
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#303034] bg-[#151517] text-[#e6e8ec] shadow-2xl shadow-black/50"
       >
-        <div className="flex shrink-0 items-start justify-between border-b border-white/10 px-5 py-4">
+        <div className="flex shrink-0 items-start justify-between border-b border-[#303034] bg-[#1a1a1d] px-5 py-4">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#ff5500]/10 text-[#ff6a1a]">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#7831d6]/20 text-[#c4b5fd]">
               <SlidersHorizontal className="h-4.5 w-4.5" />
             </span>
             <div className="min-w-0">
@@ -132,7 +141,7 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#727985] outline-none transition hover:bg-white/10 hover:text-white focus:ring-2 focus:ring-[#ff5500]/40"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#727985] outline-none transition hover:bg-white/10 hover:text-white focus:ring-2 focus:ring-[#7831d6]/40"
             aria-label="Close project settings"
           >
             <X className="h-4 w-4" />
@@ -166,14 +175,14 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
                         width: preset.width,
                         height: preset.height,
                       }))}
-                      className={`relative flex items-center gap-3 rounded-xl border p-3 text-left outline-none transition focus:ring-2 focus:ring-[#ff5500]/20 ${
+                      className={`relative flex items-center gap-3 rounded-xl border p-3 text-left outline-none transition focus:ring-2 focus:ring-[#7831d6]/20 ${
                         selected
-                          ? 'border-[#ff5500] bg-[#ff5500]/10 text-[#ff7a33]'
-                          : 'border-white/10 bg-[#171a20] text-[#aeb3bc] hover:border-white/20 hover:bg-[#1b1f27]'
+                          ? 'border-[#7831d6] bg-[#7831d6]/20 text-[#c4b5fd]'
+                          : 'border-[#35353a] bg-[#1c1c1f] text-[#aeb3bc] hover:border-[#4a4a50] hover:bg-[#232326]'
                       }`}
                       aria-pressed={selected}
                     >
-                      <span className={`flex h-10 w-7 shrink-0 items-center justify-center rounded-md border ${selected ? 'border-[#ff5500]/60 bg-[#211810]' : 'border-white/15 bg-[#1d2027]'}`}>
+                      <span className={`flex h-10 w-7 shrink-0 items-center justify-center rounded-md border ${selected ? 'border-[#7831d6]/60 bg-[#7831d6]/15' : 'border-[#35353a] bg-[#232326]'}`}>
                         <MonitorSmartphone className="h-4 w-4" />
                       </span>
                       <span className="min-w-0">
@@ -183,7 +192,7 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
                         </span>
                       </span>
                       {selected && (
-                        <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-[#ff5500] text-white">
+                        <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-[#7831d6] text-white">
                           <Check className="h-2.5 w-2.5" />
                         </span>
                       )}
@@ -195,7 +204,7 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div>
                   <FieldLabel htmlFor={widthId}>Custom width</FieldLabel>
-                  <div className="flex h-10 items-center rounded-xl border border-white/10 bg-[#171a20] px-3 focus-within:border-[#ff5500]/60 focus-within:bg-[#1b1f27]">
+                  <div className="flex h-10 items-center rounded-xl border border-[#35353a] bg-[#1c1c1f] px-3 focus-within:border-[#7831d6]/60 focus-within:bg-[#232326]">
                     <input
                       id={widthId}
                       type="number"
@@ -213,7 +222,7 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
                 </div>
                 <div>
                   <FieldLabel htmlFor={heightId}>Custom height</FieldLabel>
-                  <div className="flex h-10 items-center rounded-xl border border-white/10 bg-[#171a20] px-3 focus-within:border-[#ff5500]/60 focus-within:bg-[#1b1f27]">
+                  <div className="flex h-10 items-center rounded-xl border border-[#35353a] bg-[#1c1c1f] px-3 focus-within:border-[#7831d6]/60 focus-within:bg-[#232326]">
                     <input
                       id={heightId}
                       type="number"
@@ -240,16 +249,16 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
                   Frame rate
                 </h3>
                 <p className="mt-0.5 text-[9px] font-medium text-[#727985]">Higher FPS creates smoother motion and larger exports.</p>
-                <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-[#0c0e12] p-1">
+                <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-[#141416] p-1">
                   {FPS_OPTIONS.map((fps) => (
                     <button
                       key={fps}
                       type="button"
                       onClick={() => setDraft((current) => ({ ...current, fps }))}
-                      className={`h-9 rounded-lg text-[10px] font-extrabold outline-none transition focus:ring-2 focus:ring-[#ff5500]/20 ${
+                      className={`h-9 rounded-lg text-[10px] font-extrabold outline-none transition focus:ring-2 focus:ring-[#7831d6]/30 ${
                         draft.fps === fps
-                          ? 'bg-[#242832] text-[#ff6a1a] shadow-sm shadow-black/20'
-                          : 'text-[#8b929d] hover:text-white'
+                          ? 'bg-[#7831d6] text-white shadow-sm'
+                          : 'text-zinc-400 hover:text-white'
                       }`}
                       aria-pressed={draft.fps === fps}
                     >
@@ -266,7 +275,7 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
                 <p className="mt-0.5 text-[9px] font-medium text-[#727985]">Visible wherever a video or image does not cover the canvas.</p>
                 <label
                   htmlFor={colorId}
-                  className="mt-3 flex h-11 cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-[#171a20] px-2.5 transition hover:bg-[#1b1f27]"
+                  className="mt-3 flex h-11 cursor-pointer items-center gap-3 rounded-xl border border-[#35353a] bg-[#1c1c1f] px-2.5 transition hover:bg-[#232326]"
                 >
                   <input
                     id={colorId}
@@ -280,41 +289,62 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
               </section>
             </div>
 
-            <div className="h-px bg-white/10" />
+            <div className="h-px bg-[#303034]" />
+
+            <section aria-labelledby={`${titleId}-export-format`}>
+              <h3 id={`${titleId}-export-format`} className="text-[10px] font-extrabold uppercase tracking-[0.14em] !text-[#d7dbe2]">
+                Export format
+              </h3>
+              <p className="mt-0.5 text-[9px] font-medium text-[#727985]">The Export button will use this format automatically.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {[
+                  { id: 'video', label: 'Video', detail: 'MP4', Icon: Film },
+                  { id: 'audio', label: 'Audio', detail: 'MP3', Icon: Music2 },
+                ].map(({ id, label, detail, Icon }) => {
+                  const selected = draft.exportFormat === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setDraft((current) => ({ ...current, exportFormat: id }))}
+                      aria-pressed={selected}
+                      className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-[10px] font-extrabold outline-none transition focus:ring-2 focus:ring-[#7831d6]/30 ${selected
+                        ? 'border-[#7831d6] bg-[#7831d6]/20 text-[#c4b5fd]'
+                        : 'border-[#35353a] bg-[#1c1c1f] text-[#8b929d] hover:border-[#4a4a50] hover:text-white'}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{label}</span>
+                      <span className="text-[8px] opacity-60">{detail}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <div className="h-px bg-[#303034]" />
 
             <section aria-labelledby={`${titleId}-duration`}>
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <h3 id={`${titleId}-duration`} className="text-[10px] font-extrabold uppercase tracking-[0.14em] !text-[#d7dbe2]">
-                    Maximum duration
+                    Timeline duration
                   </h3>
-                  <p className="mt-0.5 text-[9px] font-medium text-[#727985]">Set the editable timeline length from 1 to 30 seconds.</p>
+                  <p className="mt-0.5 text-[9px] font-medium text-[#727985]">Set any timeline length in seconds. Added media can extend it automatically.</p>
                 </div>
-                <label htmlFor={durationId} className="flex h-9 w-24 items-center rounded-xl border border-white/10 bg-[#171a20] px-2.5 focus-within:border-[#ff5500]/60">
+                <label htmlFor={durationId} className="flex h-9 w-24 items-center rounded-xl border border-[#35353a] bg-[#1c1c1f] px-2.5 focus-within:border-[#7831d6]/60">
                   <input
                     id={durationId}
                     type="number"
                     min="1"
-                    max="30"
                     step="1"
                     value={draft.maxDuration}
                     onChange={(event) => setNumberInput('maxDuration', event.target.value)}
-                    onBlur={(event) => updateNumber('maxDuration', event.target.value, 1, 30)}
+                    onBlur={(event) => updateNumber('maxDuration', event.target.value, 1, Number.POSITIVE_INFINITY)}
                     className="min-w-0 flex-1 bg-transparent text-right text-xs font-bold tabular-nums text-[#e6e8ec] outline-none"
                   />
                   <span className="ml-1 text-[9px] font-bold text-[#727985]">sec</span>
                 </label>
               </div>
-              <input
-                type="range"
-                min="1"
-                max="30"
-                step="1"
-                value={draft.maxDuration}
-                onChange={(event) => updateNumber('maxDuration', event.target.value, 1, 30)}
-                className="mt-3 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/10 accent-[#ff5500]"
-                aria-label="Maximum project duration"
-              />
               <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-amber-200">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <p className="text-[9px] font-semibold leading-relaxed">
@@ -324,17 +354,17 @@ export const ProjectSettingsDialog = ({ output, onApply, onClose }) => {
             </section>
           </div>
 
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-white/10 bg-[#0d0f13] px-5 py-3.5">
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[#303034] bg-[#1a1a1d] px-5 py-3.5">
             <button
               type="button"
               onClick={onClose}
-              className="h-9 rounded-xl border border-white/10 bg-[#171a20] px-4 text-[10px] font-bold text-[#b6bbc4] outline-none transition hover:bg-[#20242c] hover:text-white focus:ring-2 focus:ring-white/15"
+              className="h-9 rounded-xl border border-[#35353a] bg-[#232326] px-4 text-[10px] font-bold text-[#b6bbc4] outline-none transition hover:bg-[#2a2a2e] hover:text-white focus:ring-2 focus:ring-white/15"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-9 rounded-xl bg-[#0071e3] px-5 text-[10px] font-bold text-white shadow-sm outline-none transition hover:bg-[#147ce5] active:scale-[0.98] focus:ring-2 focus:ring-blue-200"
+              className="h-9 rounded-xl bg-[#7831d6] px-5 text-[10px] font-bold text-white shadow-sm outline-none transition hover:bg-[#6825bc] active:scale-[0.98] focus:ring-2 focus:ring-[#c4b5fd]"
             >
               Apply settings
             </button>

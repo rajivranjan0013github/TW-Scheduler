@@ -586,8 +586,8 @@ export const MediaLibraryPanel = ({
   };
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-[#0c0d12]" aria-label="Media Library">
-      <div className="shrink-0 space-y-2.5 border-b border-white/10 p-3">
+    <section className="flex h-full min-h-0 flex-col bg-[#151517]" aria-label="Media Library">
+      <div className="shrink-0 space-y-2.5 border-b border-[#303034] p-3">
         {isAudioLibrary && (
           <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/[0.05] p-0.5 text-[10px] font-bold">
             <button
@@ -624,7 +624,7 @@ export const MediaLibraryPanel = ({
         )}
 
         <div className="relative rounded-xl p-[1px] bg-gradient-to-r from-[#7831d6]/50 via-purple-500/30 to-indigo-500/30 transition-all duration-300 focus-within:from-[#7831d6] focus-within:via-purple-500 focus-within:to-indigo-500 focus-within:shadow-[0_0_12px_rgba(120,49,214,0.25)]">
-          <label className="flex h-9 items-center gap-2 rounded-[11px] bg-[#12141c] px-2.5">
+          <label className="flex h-9 items-center gap-2 rounded-[11px] bg-[#1c1c1f] px-2.5">
             <Search className="h-3.5 w-3.5 shrink-0 text-[#8b929d]" />
             <input
               value={search}
@@ -653,7 +653,7 @@ export const MediaLibraryPanel = ({
             <button
               type="button"
               onClick={() => openFolder('root')}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#7e8692] transition hover:bg-white/10 hover:text-[#ff6a1a]"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#7e8692] transition hover:bg-white/10 hover:text-[#c4b5fd]"
               aria-label="Open library root"
               title="Library root"
             >
@@ -728,7 +728,7 @@ export const MediaLibraryPanel = ({
 
         {loadingMedia && media.length === 0 ? (
           <div className="flex min-h-32 items-center justify-center gap-2 text-[10px] font-bold text-[#a6abb4]">
-            <Loader2 className="h-4 w-4 animate-spin text-[#ff5500]" />
+            <Loader2 className="h-4 w-4 animate-spin text-[#7831d6]" />
             Loading {isAudioLibrary ? (audioScope === 'global' ? 'Trending songs' : 'Uploaded audio') : 'files'}…
           </div>
         ) : (
@@ -756,7 +756,7 @@ export const MediaLibraryPanel = ({
                           onDragStart={(event) => handleDragStart(event, item)}
                           onClick={() => handleSelect(item)}
                           disabled={Boolean(selectingId)}
-                          className="group min-w-0 cursor-grab overflow-hidden rounded-xl border border-white/10 bg-[#171a20] text-left transition hover:border-[#ff5500]/60 hover:bg-[#1d2027] active:cursor-grabbing disabled:cursor-wait disabled:opacity-60"
+                          className="group min-w-0 cursor-grab overflow-hidden rounded-xl border border-[#35353a] bg-[#1c1c1f] text-left transition hover:border-[#7831d6]/60 hover:bg-[#232326] active:cursor-grabbing disabled:cursor-wait disabled:opacity-60"
                           title={`Drag ${item.name || item.type || 'media'} to the timeline, or click to add it`}
                         >
                           <span className="relative block aspect-[9/16] overflow-hidden bg-[#0b0c0f]">

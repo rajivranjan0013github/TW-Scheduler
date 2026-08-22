@@ -16,6 +16,7 @@ import { loadBrowserFFmpeg } from '../export/loadFFmpeg.js';
 import {
   BULK_EXPORT_ITEM_STATUS,
   BulkExportQueueError,
+  ensureHydratedBulkProject,
   getCanonicalBulkProject,
   getCanonicalBulkRowIds,
   isCanonicalBulkRowExportable,
@@ -367,7 +368,8 @@ export const useBulkExportQueue = ({
           const row = await getRow(rowId);
           if (!row) throw new BulkExportQueueError('The planning-board row no longer exists.', { code: 'ROW_NOT_FOUND' });
           previousStatus = ['ready', 'draft', 'done', 'error'].includes(row.status) ? row.status : 'ready';
-          const project = getCanonicalBulkProject(row);
+          let project = getCanonicalBulkProject(row);
+          project = await ensureHydratedBulkProject(project);
           const projectSnapshot = JSON.stringify(project);
           await updateRow(rowId, (latest) => ({ ...latest, status: 'processing', bulkExportError: '' }));
           updateQueueItem({ rowId, status: BULK_EXPORT_ITEM_STATUS.PROCESSING, phase: 'rendering', progress: 0, message: 'Rendering video…', error: '' });
@@ -387,7 +389,8 @@ export const useBulkExportQueue = ({
             }),
           });
           const latest = await getRow(rowId);
-          if (!latest || JSON.stringify(getCanonicalBulkProject(latest)) !== projectSnapshot) {
+          const latestProject = latest ? await ensureHydratedBulkProject(getCanonicalBulkProject(latest)) : null;
+          if (!latest || JSON.stringify(latestProject) !== projectSnapshot) {
             throw new BulkExportQueueError('This timeline changed during rendering. Render it again.', { code: 'PROJECT_CHANGED_DURING_EXPORT' });
           }
           const objectUrl = URL.createObjectURL(result.blob);

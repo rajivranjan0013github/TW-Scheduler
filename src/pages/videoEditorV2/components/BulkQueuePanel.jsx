@@ -6,10 +6,8 @@ import {
   ExternalLink,
   Film,
   Layers3,
-  ListChecks,
   Loader2,
   PencilLine,
-  Play,
   RefreshCw,
   UploadCloud,
   X,
@@ -65,8 +63,8 @@ const STATUS_META = {
   exporting: {
     label: 'Exporting',
     Icon: Loader2,
-    badgeClass: 'border-[#ff7043]/25 bg-[#ff5500]/10 text-[#ff8a61]',
-    iconClass: 'animate-spin text-[#ff7043]',
+    badgeClass: 'border-[#7831d6]/30 bg-[#7831d6]/15 text-[#c4b5fd]',
+    iconClass: 'animate-spin text-[#c4b5fd]',
   },
   uploading: {
     label: 'Uploading',
@@ -207,7 +205,7 @@ const QueueCheckbox = ({ checked, mixed = false, disabled, label, onChange }) =>
       onClick={(event) => event.stopPropagation()}
       onChange={(event) => onChange(event.target.checked)}
       aria-label={label}
-      className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-white/20 bg-[#0d0f13] accent-[#ff5500] disabled:cursor-not-allowed disabled:opacity-40"
+      className="h-3.5 w-3.5 shrink-0 cursor-pointer rounded border-[#35353a] bg-[#151517] accent-[#7831d6] disabled:cursor-not-allowed disabled:opacity-40"
     />
   );
 };
@@ -288,9 +286,9 @@ const QueueRow = ({
 
   return (
     <div
-      className={`group relative flex min-h-[52px] items-center gap-2.5 rounded-xl px-2.5 py-2 transition ${current
-        ? 'bg-[#7831d6]/15'
-        : 'hover:bg-white/[0.04]'}`}
+      className={`group relative flex min-h-[52px] items-center gap-2.5 rounded-xl px-2.5 py-2 border transition ${current
+        ? 'bg-[#7831d6]/20 border-[#7831d6]/50 shadow-sm'
+        : 'border-transparent hover:bg-white/[0.04]'}`}
     >
       <QueueCheckbox
         checked={checked}
@@ -358,9 +356,6 @@ export const BulkQueuePanel = ({
   className = '',
   onSelectionChange,
   onOpenRow,
-  onExportCurrent,
-  onExportSelected,
-  onExportAll,
   onRetryFailed,
   onCancel,
 }) => {
@@ -384,7 +379,6 @@ export const BulkQueuePanel = ({
       .map((id) => String(id)),
   ), [selectedRowIds]);
   const currentKey = currentRowId == null ? '' : String(currentRowId);
-  const currentEntry = entries.find((entry) => entry.key === currentKey) || null;
   const selectedEntries = entries.filter((entry) => selectedKeys.has(entry.key));
   const failedEntries = entries.filter((entry) => entry.status === 'failed');
   const completedCount = entries.filter((entry) => entry.status === 'done').length;
@@ -395,9 +389,6 @@ export const BulkQueuePanel = ({
   const allSelected = entries.length > 0 && selectedEntries.length === entries.length;
   const someSelected = selectedEntries.length > 0 && !allSelected;
   const exportDisabled = disabled || queueRunning;
-  const hasActions = Boolean(
-    onExportCurrent || onExportSelected || onExportAll || onRetryFailed,
-  );
 
   if (!isBulkMode) return null;
 
@@ -424,7 +415,7 @@ export const BulkQueuePanel = ({
       aria-label="Bulk export queue"
       className={`flex h-full min-h-0 flex-col text-[#f5f7fa] ${className}`}
     >
-      <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-white/[0.08] px-3.5">
+      <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-[#303034] bg-[#1a1a1d] px-3.5">
         <div className="flex min-w-0 items-baseline gap-2">
           <h3 className="text-[11px] font-extrabold !text-[#f5f7fa]">Bulk queue</h3>
           <span className="text-[8px] font-semibold tabular-nums text-[#777e89]">
@@ -432,7 +423,7 @@ export const BulkQueuePanel = ({
           </span>
         </div>
         {queueRunning && (
-          <span className="inline-flex shrink-0 items-center gap-1 text-[8px] font-bold text-[#ff8a61]">
+          <span className="inline-flex shrink-0 items-center gap-1 text-[8px] font-bold text-[#c4b5fd]">
             <Loader2 className="h-3 w-3 animate-spin" />
             Running
           </span>
@@ -443,14 +434,14 @@ export const BulkQueuePanel = ({
         <div
           role="status"
           aria-live="polite"
-          className="shrink-0 border-b border-[#ff7043]/15 bg-[#ff5500]/[0.05] px-3.5 py-2"
+          className="shrink-0 border-b border-[#7831d6]/20 bg-[#7831d6]/[0.08] px-3.5 py-2"
         >
           <div className="flex items-center gap-2">
-            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#ff7043]" />
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#c4b5fd]" />
             <span className="min-w-0 flex-1 truncate text-[9px] font-bold text-[#e6e8ec]">
               {queueState?.message || 'Processing bulk queue…'}
             </span>
-            <span className="shrink-0 text-[8px] font-extrabold tabular-nums text-[#ff8a61]">
+            <span className="shrink-0 text-[8px] font-extrabold tabular-nums text-[#c4b5fd]">
               {Math.round(queueProgress)}%
             </span>
             {onCancel && (
@@ -467,14 +458,14 @@ export const BulkQueuePanel = ({
           </div>
           <div className="mt-1.5 h-0.5 overflow-hidden rounded-full bg-black/35">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-[#ff4d00] to-[#ff7a45] transition-[width] duration-300"
+              className="h-full rounded-full bg-gradient-to-r from-[#7831d6] to-[#a855f7] transition-[width] duration-300"
               style={{ width: `${queueProgress}%` }}
             />
           </div>
         </div>
       )}
 
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-white/[0.08] px-3.5">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-[#303034] bg-[#1a1a1d] px-3.5">
         <label className="flex min-w-0 items-center gap-2 text-[9px] font-bold text-[#aeb3bc]">
           <QueueCheckbox
             checked={allSelected}
@@ -511,7 +502,7 @@ export const BulkQueuePanel = ({
         ))}
 
         {entries.length === 0 && (
-          <div className="border-b border-dashed border-white/10 px-4 py-8 text-center">
+          <div className="border-b border-dashed border-[#303034] px-4 py-8 text-center">
             <Layers3 className="mx-auto h-5 w-5 text-[#555c67]" />
             <p className="mt-2 text-[10px] font-bold text-[#a6abb4]">No planned videos</p>
             <p className="mt-1 text-[9px] font-medium text-[#666d78]">
@@ -521,65 +512,20 @@ export const BulkQueuePanel = ({
         )}
       </div>
 
-      {hasActions && (
-        <div className="flex shrink-0 flex-col gap-2 border-t border-white/[0.08] bg-[#0c0d12] p-3">
+      {onRetryFailed && failedEntries.length > 0 && (
+        <div className="shrink-0 border-t border-[#303034] bg-[#1a1a1d] p-3">
           <button
             type="button"
-            disabled={exportDisabled || entries.length === 0}
-            onClick={() => {
-              if (selectedEntries.length > 0) {
-                onExportSelected?.(
-                  selectedEntries.map((entry) => entry.id),
-                  selectedEntries.map((entry) => entry.row),
-                );
-              } else if (currentEntry) {
-                onExportCurrent?.(currentEntry.id, currentEntry.row);
-              } else if (entries.length > 0) {
-                onExportAll?.(
-                  entries.map((entry) => entry.id),
-                  entries.map((entry) => entry.row),
-                );
-              }
-            }}
-            className="flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-[#7831d6] hover:bg-[#6825bc] active:scale-[0.99] px-3 text-[10px] font-bold text-white shadow-md transition-all disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {allSelected ? (
-              <>
-                <Layers3 className="h-3.5 w-3.5" />
-                <span>Export All ({entries.length})</span>
-              </>
-            ) : selectedEntries.length > 0 ? (
-              <>
-                <ListChecks className="h-3.5 w-3.5" />
-                <span>Export Selected ({selectedEntries.length})</span>
-              </>
-            ) : currentEntry ? (
-              <>
-                <Play className="h-3.5 w-3.5 fill-current" />
-                <span>Export Current Video</span>
-              </>
-            ) : (
-              <>
-                <Layers3 className="h-3.5 w-3.5" />
-                <span>Export All ({entries.length})</span>
-              </>
+            disabled={exportDisabled}
+            onClick={() => onRetryFailed(
+              failedEntries.map((entry) => entry.id),
+              failedEntries.map((entry) => entry.row),
             )}
+            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-300 text-[9px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <RefreshCw className="h-3 w-3" />
+            <span>Retry Failed ({failedEntries.length})</span>
           </button>
-
-          {onRetryFailed && failedEntries.length > 0 && (
-            <button
-              type="button"
-              disabled={exportDisabled}
-              onClick={() => onRetryFailed(
-                failedEntries.map((entry) => entry.id),
-                failedEntries.map((entry) => entry.row),
-              )}
-              className="flex h-8 w-full items-center justify-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-300 text-[9px] font-bold transition-all disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <RefreshCw className="h-3 w-3" />
-              <span>Retry Failed ({failedEntries.length})</span>
-            </button>
-          )}
         </div>
       )}
     </section>

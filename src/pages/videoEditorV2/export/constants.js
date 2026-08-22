@@ -1,4 +1,3 @@
-export const MAX_EXPORT_DURATION_SECONDS = 30;
 export const MAX_OUTPUT_EDGE = 1920;
 export const MAX_OUTPUT_PIXELS = 1280 * 1920;
 

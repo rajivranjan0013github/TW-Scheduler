@@ -208,26 +208,39 @@ export function editorReducer(state, action) {
           && payload.placement !== 'main'
           && (mainVideoTrack?.clips.length || 0) > 0
         );
-      let projectWithTarget = state.project;
+      const requiredDuration = Math.max(
+        state.project.output.maxDuration,
+        Number(draftClip.timelineStart || 0) + Number(draftClip.duration || 0),
+      );
+      let projectWithTarget = requiredDuration > state.project.output.maxDuration
+        ? {
+          ...state.project,
+          output: normalizeOutputSettings({
+            ...state.project.output,
+            maxDuration: requiredDuration,
+          }),
+        }
+        : state.project;
       let targetTrack = shouldUseOverlay
-        ? getAvailableOverlayTrack(state.project, draftClip, { preferLast: true })
+        ? getAvailableOverlayTrack(projectWithTarget, draftClip, { preferLast: true })
         : payload.trackId
-          ? getTrackById(state.project, payload.trackId)
-          : getPrimaryTrackByType(state.project, requestedType);
+          ? getTrackById(projectWithTarget, payload.trackId)
+          : getPrimaryTrackByType(projectWithTarget, requestedType);
 
       if (!targetTrack && shouldUseOverlay) {
-        const overlayCount = state.project.tracks.filter(
+        const overlayCount = projectWithTarget.tracks.filter(
           (track) => track.type === TRACK_TYPES.OVERLAY,
         ).length;
-        const audioTrackIndex = state.project.tracks.findIndex(
+        const audioTrackIndex = projectWithTarget.tracks.findIndex(
           (track) => track.type === TRACK_TYPES.AUDIO,
         );
-        projectWithTarget = addTrackToProject(state.project, TRACK_TYPES.OVERLAY, {
+        const projectBeforeTrackAdd = projectWithTarget;
+        projectWithTarget = addTrackToProject(projectWithTarget, TRACK_TYPES.OVERLAY, {
           name: `Overlay ${overlayCount + 1}`,
-          index: audioTrackIndex >= 0 ? audioTrackIndex : state.project.tracks.length,
+          index: audioTrackIndex >= 0 ? audioTrackIndex : projectWithTarget.tracks.length,
         });
         targetTrack = projectWithTarget.tracks.find((track) => (
-          !state.project.tracks.some((currentTrack) => currentTrack.id === track.id)
+          !projectBeforeTrackAdd.tracks.some((currentTrack) => currentTrack.id === track.id)
         ));
       }
       if (!targetTrack || targetTrack.locked) return state;

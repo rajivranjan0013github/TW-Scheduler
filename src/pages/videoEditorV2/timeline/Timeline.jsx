@@ -36,11 +36,11 @@ const ToolButton = ({ disabled = false, label, danger = false, iconOnly = false,
     type="button"
     disabled={disabled}
     onClick={onClick}
-    className={`inline-flex h-6 items-center rounded-md border text-[9px] font-bold outline-none transition-colors focus-visible:ring-1 focus-visible:ring-orange-400 disabled:cursor-not-allowed disabled:opacity-40 ${iconOnly ? 'w-6 justify-center px-0' : 'gap-1 px-2'} ${
+    className={`inline-flex h-6 items-center rounded-md border text-[9px] font-bold outline-none transition-colors focus-visible:ring-1 focus-visible:ring-[#7831d6] disabled:cursor-not-allowed disabled:opacity-40 ${iconOnly ? 'w-6 justify-center px-0' : 'gap-1 px-2'} ${
       danger
         ? 'border-red-900/60 bg-red-950/25 text-red-400 hover:border-red-800 hover:bg-red-950/45 hover:text-red-300'
         : pressed
-          ? 'border-[#ff5500]/60 bg-[#ff5500]/15 text-orange-300 hover:border-[#ff5500]/80 hover:bg-[#ff5500]/20'
+          ? 'border-[#7831d6]/70 bg-[#7831d6]/20 text-[#c4b5fd] hover:border-[#7831d6] hover:bg-[#7831d6]/30'
         : 'border-[#35353a] bg-[#232326] text-zinc-300 hover:border-[#4a4a50] hover:bg-[#2a2a2e] hover:text-white'
     }`}
     title={label}
@@ -375,7 +375,7 @@ export const Timeline = ({
 
           {Number.isFinite(activeSnapTime) && (
             <div
-              className="pointer-events-none absolute inset-y-0 z-[35] w-px bg-[#ff6a1a] shadow-[0_0_7px_rgba(255,85,0,0.9)]"
+              className="pointer-events-none absolute inset-y-0 z-[35] w-px bg-[#c4b5fd] shadow-[0_0_8px_rgba(120,49,214,0.9)]"
               style={{ left: TIMELINE_LANE_INSET + (activeSnapTime * pixelsPerSecond) }}
               aria-hidden="true"
             />
@@ -444,7 +444,7 @@ export const Timeline = ({
           <ZoomIn className="h-3.5 w-3.5 text-zinc-500" aria-hidden="true" />
           <button
             type="button"
-            className="grid h-6 w-6 place-items-center rounded-md text-zinc-400 outline-none transition hover:bg-white/[0.06] hover:text-white focus-visible:ring-1 focus-visible:ring-orange-400 disabled:opacity-35"
+            className="grid h-6 w-6 place-items-center rounded-md text-zinc-400 outline-none transition hover:bg-white/[0.06] hover:text-white focus-visible:ring-1 focus-visible:ring-[#7831d6] disabled:opacity-35"
             onClick={() => setZoom(effectiveZoom - ZOOM_STEP)}
             disabled={effectiveZoom <= minZoom}
             aria-label="Zoom timeline out"
@@ -459,13 +459,13 @@ export const Timeline = ({
             step="0.05"
             value={effectiveZoom}
             onChange={(event) => setZoom(Number(event.target.value))}
-            className="h-1.5 w-36 cursor-pointer accent-[#ff5500]"
+            className="h-1.5 w-36 cursor-pointer accent-[#7831d6]"
             aria-label="Timeline zoom"
             aria-valuetext={`${Math.round(effectiveZoom * 100)} percent`}
           />
           <button
             type="button"
-            className="grid h-6 w-6 place-items-center rounded-md text-zinc-400 outline-none transition hover:bg-white/[0.06] hover:text-white focus-visible:ring-1 focus-visible:ring-orange-400 disabled:opacity-35"
+            className="grid h-6 w-6 place-items-center rounded-md text-zinc-400 outline-none transition hover:bg-white/[0.06] hover:text-white focus-visible:ring-1 focus-visible:ring-[#7831d6] disabled:opacity-35"
             onClick={() => setZoom(effectiveZoom + ZOOM_STEP)}
             disabled={effectiveZoom >= maxZoom}
             aria-label="Zoom timeline in"

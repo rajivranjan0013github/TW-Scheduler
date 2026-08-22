@@ -480,10 +480,10 @@ export const BulkVideoBuilder = () => {
         onPointerUp={handleCanvasPointerUp}
         onPointerCancel={handleCanvasPointerUp}
         onClick={() => setSelectedRowId(null)}
-        className={`absolute inset-0 z-0 overflow-hidden bg-[#0d0d0e] outline-none select-none transition-colors duration-150 ${isSpacePressed ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
+        className={`absolute inset-0 z-0 overflow-hidden bg-[#141416] outline-none select-none transition-colors duration-150 ${isSpacePressed ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
           }`}
         style={{
-          backgroundImage: 'radial-gradient(circle, #27272a 1px, transparent 1px)',
+          backgroundImage: 'radial-gradient(circle, #303034 1px, transparent 1px)',
           backgroundSize: '24px 24px',
           backgroundPosition: `${pan.x}px ${pan.y}px`,
         }}
@@ -557,6 +557,7 @@ export const BulkVideoBuilder = () => {
                   }}
                   zoomScale={pageZoom}
                   onUpdateCanvasPos={(canvasPos) => bulk.updateRow(row.id, { canvasPos })}
+                  onVideoDurationLoaded={(slot, duration) => bulk.updateRowVideoDuration(row.id, slot, duration)}
                   onHeaderDoubleClick={() => focusAndZoomOnRow(row)}
                   onEditTimeline={() => navigate(`/media/editor?mode=bulk&rowId=${encodeURIComponent(row.id)}`)}
                 />
@@ -567,27 +568,27 @@ export const BulkVideoBuilder = () => {
 
         {/* Floating zoom & status HUD (bottom right) */}
         <div
-          className="absolute bottom-4 right-4 z-10 flex items-center gap-2 rounded-lg border border-[#27272a] bg-[#18181b]/95 p-1.5 shadow-lg backdrop-blur-sm"
+          className="absolute bottom-4 right-4 z-10 flex items-center gap-2 rounded-xl border border-[#303034] bg-[#1c1c1f]/95 p-1.5 shadow-lg backdrop-blur-sm text-zinc-300"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-2 py-1 text-[9px] font-mono text-gray-400 border-r border-[#27272a]">
+          <div className="px-2 py-1 text-[9px] font-mono text-zinc-400 border-r border-[#303034]">
             Pan: X={Math.round(pan.x)}, Y={Math.round(pan.y)}
           </div>
           <button
             type="button"
             onClick={() => setPageZoom((zoom) => clamp(zoom - 0.1, 0.15, 3.0))}
-            className="flex h-7 w-7 items-center justify-center rounded text-gray-400 transition-all hover:bg-[#27272a] hover:text-white active:scale-95"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-[#232326] hover:text-white active:scale-95"
             title="Zoom out"
           >
             <Minus className="h-3.5 w-3.5" />
           </button>
-          <span className="min-w-10 text-center text-[10px] font-bold text-gray-300">
+          <span className="min-w-10 text-center text-[10px] font-bold text-zinc-300">
             {Math.round(pageZoom * 100)}%
           </span>
           <button
             type="button"
             onClick={() => setPageZoom((zoom) => clamp(zoom + 0.1, 0.15, 3.0))}
-            className="flex h-7 w-7 items-center justify-center rounded text-gray-400 transition-all hover:bg-[#27272a] hover:text-white active:scale-95"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-[#232326] hover:text-white active:scale-95"
             title="Zoom in"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -598,7 +599,7 @@ export const BulkVideoBuilder = () => {
               setPageZoom(0.8);
               setPan({ x: 80, y: 60 });
             }}
-            className="flex h-7 w-7 items-center justify-center rounded text-gray-500 transition-all hover:bg-[#27272a] hover:text-white active:scale-95"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-[#232326] hover:text-white active:scale-95"
             title="Reset Zoom Layout"
           >
             <RotateCcw className="h-3.5 w-3.5" />
@@ -610,17 +611,17 @@ export const BulkVideoBuilder = () => {
       <header className="absolute top-4 left-4 right-4 h-14 flex items-center justify-end px-5 z-30 pointer-events-none">
         {/* Global Toolbar buttons */}
         <div className="flex items-center gap-2 pointer-events-auto">
-          <label className="flex items-center gap-1.5 cursor-pointer bg-[#27272a] border border-[#3f3f46] hover:bg-[#3f3f46] px-2.5 py-1.5 rounded-lg text-white select-none transition-all">
+          <label className="flex items-center gap-1.5 cursor-pointer bg-[#232326] border border-[#35353a] hover:bg-[#2a2a2e] px-2.5 py-1.5 rounded-lg text-white select-none transition-all">
             <input
               type="checkbox"
               checked={bulk.isDualVideo}
               onChange={(e) => bulk.toggleDualVideo(e.target.checked)}
               className="hidden"
             />
-            <div className={`relative w-7 h-4 rounded-full transition-colors ${bulk.isDualVideo ? 'bg-[#ff5500]' : 'bg-zinc-700'}`}>
+            <div className={`relative w-7 h-4 rounded-full transition-colors ${bulk.isDualVideo ? 'bg-[#7831d6]' : 'bg-zinc-700'}`}>
               <div className={`absolute top-[2px] left-[2px] w-3 h-3 rounded-full bg-white transition-transform duration-200 ${bulk.isDualVideo ? 'translate-x-3' : 'translate-x-0'}`} />
             </div>
-            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-300">Dual Mode</span>
+            <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-300">Dual Mode</span>
           </label>
 
           <button
@@ -638,7 +639,7 @@ export const BulkVideoBuilder = () => {
           <button
             type="button"
             onClick={alignAllCards}
-            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:scale-95 border border-[#3f3f46] text-white transition-all duration-200"
+            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#232326] hover:bg-[#2a2a2e] active:scale-95 border border-[#35353a] text-white transition-all duration-200"
             title="Align & Fit Frames"
           >
             <Layout className="h-3.5 w-3.5 text-[#c4b5fd] shrink-0" />
@@ -647,7 +648,7 @@ export const BulkVideoBuilder = () => {
             </span>
           </button>
 
-          <div className="w-px h-5 bg-[#27272a] mx-1" />
+          <div className="w-px h-5 bg-[#303034] mx-1" />
 
           <button
             type="button"
@@ -670,16 +671,14 @@ export const BulkVideoBuilder = () => {
             <Play className="h-4 w-4 fill-white text-white" />
             EXPORT ({readyCount})
           </button>
-
-
         </div>
       </header>
 
       {/* Docked Left Layers & Media Library Panel Sidebar */}
       {isSidebarOpen && (
-        <aside className="absolute inset-y-0 left-0 w-80 bg-[#0c0d12] border-r border-white/10 flex flex-col z-20 shadow-2xl text-white">
+        <aside className="absolute inset-y-0 left-0 w-80 bg-[#151517] border-r border-[#303034] flex flex-col z-20 shadow-2xl text-white">
           {/* Header Tab Switcher */}
-          <div className="p-2.5 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#0c0d12]">
+          <div className="p-2.5 border-b border-[#303034] flex items-center justify-between shrink-0 bg-[#1a1a1d]">
             <div className="grid grid-cols-3 gap-1 p-0.5 bg-white/5 rounded-lg w-full">
               <button
                 type="button"
@@ -767,7 +766,7 @@ export const BulkVideoBuilder = () => {
           )}
 
           {sidebarTab === 'media' ? (
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-[#0c0d12]">
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-[#151517]">
               <MediaLibraryPanel
                 token={token}
                 initialMediaType="video"
@@ -775,7 +774,7 @@ export const BulkVideoBuilder = () => {
               />
             </div>
           ) : sidebarTab === 'audio' ? (
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-[#0c0d12]">
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-[#151517]">
               <MediaLibraryPanel
                 token={token}
                 initialMediaType="audio"
@@ -783,7 +782,7 @@ export const BulkVideoBuilder = () => {
               />
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto p-2.5 space-y-1 bg-[#0c0d12]">
+            <div className="flex-1 overflow-y-auto p-2.5 space-y-1 bg-[#151517]">
               {bulk.rows.map((row, idx) => {
                 const isSelected = selectedRowId === row.id;
                 const hasVideo = bulk.isDualVideo ? (row.video1 && row.video2) : row.video1;
@@ -836,7 +835,7 @@ export const BulkVideoBuilder = () => {
             </div>
           )}
 
-          <div className="p-2.5 bg-[#0c0d12] border-t border-white/10 shrink-0 text-[10px] text-gray-400 leading-normal font-medium">
+          <div className="p-2.5 bg-[#1a1a1d] border-t border-[#303034] shrink-0 text-[10px] text-gray-400 leading-normal font-medium">
             💡 <strong className="text-gray-300">Space + Drag</strong> to pan canvas. <strong className="text-gray-300">Pinch trackpad</strong> to zoom.
           </div>
         </aside>
@@ -846,7 +845,7 @@ export const BulkVideoBuilder = () => {
       <button
         type="button"
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className={`absolute top-3.5 z-30 p-2 bg-[#18181b] hover:bg-[#27272a] text-gray-400 hover:text-white border border-white/10 shadow-lg transition-all duration-200 active:scale-95 flex items-center justify-center ${isSidebarOpen ? 'left-[320px] rounded-r-lg border-l-0' : 'left-3 rounded-lg'
+        className={`absolute top-3.5 z-30 p-2 bg-[#1c1c1f] hover:bg-[#232326] text-gray-400 hover:text-white border border-[#303034] shadow-lg transition-all duration-200 active:scale-95 flex items-center justify-center ${isSidebarOpen ? 'left-[320px] rounded-r-lg border-l-0' : 'left-3 rounded-lg'
           }`}
         title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
       >
@@ -881,7 +880,7 @@ export const BulkVideoBuilder = () => {
       {/* Clear Confirmation Dialog Modal */}
       {showClearDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#121214] p-6 shadow-2xl text-white">
+          <div className="w-full max-w-md rounded-2xl border border-[#303034] bg-[#151517] p-6 shadow-2xl text-white">
             <div className="flex items-center gap-3 text-red-400 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-950/40 border border-red-800/40 shrink-0">
                 <Trash2 className="h-5 w-5 text-red-400" />

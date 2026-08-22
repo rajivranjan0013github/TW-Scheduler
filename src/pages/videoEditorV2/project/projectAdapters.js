@@ -523,7 +523,12 @@ export const bulkRowToProject = (row = {}, options = {}) => {
         getDurationOption(options, entry.slot),
       ),
     }));
-  const durationBudget = clampNumber(output.maxDuration, 0.1, 30, 30);
+  const durationBudget = clampNumber(
+    output.maxDuration,
+    0.1,
+    Number.POSITIVE_INFINITY,
+    LEGACY_OUTPUT.maxDuration,
+  );
   const unknownDurationCount = legacyVideos.filter((entry) => !entry.knownDuration).length;
   const knownDurationTotal = legacyVideos.reduce(
     (total, entry) => total + entry.knownDuration,
@@ -540,9 +545,12 @@ export const bulkRowToProject = (row = {}, options = {}) => {
     ? knownDurationBudget / knownDurationTotal
     : 1;
   const distributedUnknownDuration = unknownDurationCount > 0
-    ? Math.max(
-        minimumEstimatedDuration,
-        (durationBudget - knownDurationTotal * knownDurationScale) / unknownDurationCount,
+    ? Math.min(
+        defaultClipDuration,
+        Math.max(
+          minimumEstimatedDuration,
+          (durationBudget - knownDurationTotal * knownDurationScale) / unknownDurationCount,
+        ),
       )
     : 0;
 

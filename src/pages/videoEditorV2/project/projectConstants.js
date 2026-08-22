@@ -1,6 +1,6 @@
 export const PROJECT_SCHEMA_VERSION = 1;
 
-export const PROJECT_HARD_MAX_DURATION = 30;
+export const DEFAULT_PROJECT_DURATION = 30;
 export const MIN_CLIP_DURATION = 0.1;
 export const MIN_CROP_SIZE = 0.01;
 export const MIN_PLAYBACK_RATE = 0.25;
@@ -45,7 +45,8 @@ export const DEFAULT_OUTPUT_SETTINGS = Object.freeze({
   width: 1080,
   height: 1920,
   fps: 30,
-  maxDuration: PROJECT_HARD_MAX_DURATION,
+  maxDuration: DEFAULT_PROJECT_DURATION,
+  exportFormat: 'video',
   backgroundColor: '#000000',
 });
 
