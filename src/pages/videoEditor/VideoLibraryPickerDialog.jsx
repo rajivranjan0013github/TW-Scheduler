@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Folder, Loader2, Music, Play, X, Search } from 'lucide-react';
 import { API_BASE_URL } from './videoEditorConstants';
+import {
+  MEDIA_LIBRARY_STALE_TIME,
+  MEDIA_LIBRARY_GC_TIME,
+  mediaLibraryKeys,
+} from '../videoEditorV2/media/mediaLibraryCache';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
 import { getMediaUrl } from '../../utils/mediaUrls';
 import LoadingVideoPreview from '../../components/LoadingVideoPreview';
@@ -101,10 +107,19 @@ export const VideoLibraryPickerDialog = ({
   mediaType = 'video',
   theme = 'light',
 }) => {
-  const [folders, setFolders] = useState([]);
+  const queryClient = useQueryClient();
+  const campaignId = getActiveCampaignId();
+
+  const [folders, setFolders] = useState(() => {
+    const cached = queryClient.getQueryData(mediaLibraryKeys.folders(campaignId));
+    return Array.isArray(cached) ? cached : [];
+  });
   const [activeFolderId, setActiveFolderId] = useState(null);
   const [media, setMedia] = useState([]);
-  const [loadingFolders, setLoadingFolders] = useState(false);
+  const [loadingFolders, setLoadingFolders] = useState(() => {
+    const cached = queryClient.getQueryData(mediaLibraryKeys.folders(campaignId));
+    return !Array.isArray(cached) || cached.length === 0;
+  });
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [error, setError] = useState('');
   const [folderSearchQuery, setFolderSearchQuery] = useState('');
@@ -151,14 +166,26 @@ export const VideoLibraryPickerDialog = ({
 
   useEffect(() => {
     const loadFolders = async () => {
-      setLoadingFolders(true);
+      const queryKey = mediaLibraryKeys.folders(campaignId);
+      const cached = queryClient.getQueryData(queryKey);
+      if (!cached || cached.length === 0) {
+        setLoadingFolders(true);
+      } else {
+        setFolders(cached);
+      }
       setError('');
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, { headers });
-        if (!response.ok) throw new Error('Unable to load folders.');
-
-        const folderData = await response.json();
+        const folderData = await queryClient.fetchQuery({
+          queryKey,
+          queryFn: async () => {
+            const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, { headers });
+            if (!response.ok) throw new Error('Unable to load folders.');
+            return response.json();
+          },
+          staleTime: MEDIA_LIBRARY_STALE_TIME,
+          gcTime: MEDIA_LIBRARY_GC_TIME,
+        });
         setFolders(Array.isArray(folderData) ? folderData : []);
       } catch (err) {
         setError(err.message || 'Unable to load folders.');
@@ -168,22 +195,36 @@ export const VideoLibraryPickerDialog = ({
     };
 
     void loadFolders();
-  }, [headers]);
+  }, [campaignId, headers, queryClient]);
 
   const openFolder = useCallback(async (folderId) => {
     setActiveFolderId(folderId);
-    setLoadingMedia(true);
+    const queryKey = mediaLibraryKeys.media(campaignId, folderId);
+    const cached = queryClient.getQueryData(queryKey);
+    if (!cached || cached.length === 0) {
+      setLoadingMedia(true);
+    } else {
+      const filtered = cached.filter((item) => (
+        (mediaType === 'all' ? ['video', 'audio'] : [mediaType]).includes(item.type) && item.url
+      ));
+      setMedia(filtered);
+    }
     setError('');
 
     try {
-      const params = new URLSearchParams();
-      const campaignId = getActiveCampaignId();
-      if (campaignId) params.set('campaignId', campaignId);
-      params.set('folderId', folderId);
-      const response = await fetch(`${API_BASE_URL}/api/media?${params.toString()}`, { headers });
-      if (!response.ok) throw new Error('Unable to load folder content.');
-
-      const mediaData = await response.json();
+      const mediaData = await queryClient.fetchQuery({
+        queryKey,
+        queryFn: async () => {
+          const params = new URLSearchParams();
+          if (campaignId) params.set('campaignId', campaignId);
+          params.set('folderId', folderId);
+          const response = await fetch(`${API_BASE_URL}/api/media?${params.toString()}`, { headers });
+          if (!response.ok) throw new Error('Unable to load folder content.');
+          return response.json();
+        },
+        staleTime: MEDIA_LIBRARY_STALE_TIME,
+        gcTime: MEDIA_LIBRARY_GC_TIME,
+      });
       const mediaItems = Array.isArray(mediaData)
         ? mediaData.filter((item) => (
             (mediaType === 'all' ? ['video', 'audio'] : [mediaType]).includes(item.type) && item.url
@@ -192,11 +233,11 @@ export const VideoLibraryPickerDialog = ({
       setMedia(mediaItems);
     } catch (err) {
       setError(err.message || 'Unable to load folder content.');
-      setMedia([]);
+      if (!cached) setMedia([]);
     } finally {
       setLoadingMedia(false);
     }
-  }, [headers, mediaType]);
+  }, [campaignId, headers, mediaType, queryClient]);
 
   const handleSelectVideo = useCallback((item) => {
     onSelectVideo({

@@ -22,12 +22,11 @@ const editorMediaPersister = createSyncStoragePersister({
 export const editorMediaPersistOptions = {
   persister: editorMediaPersister,
   maxAge: 24 * 60 * 60 * 1000,
-  buster: 'editor-media-v2-folder-covers',
+  buster: 'media-library-unified-v1',
   dehydrateOptions: {
     shouldDehydrateQuery: (query) => (
       query.state.status === 'success'
       && query.queryKey[0] === 'media-library'
-      && query.queryKey[1] === 'editor'
     ),
   },
 };

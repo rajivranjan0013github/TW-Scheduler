@@ -6,10 +6,16 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getActiveCampaignId, withCampaignScope } from '../../utils/campaignScope';
+import {
+  MEDIA_LIBRARY_STALE_TIME,
+  MEDIA_LIBRARY_GC_TIME,
+  mediaLibraryKeys,
+} from './media/mediaLibraryCache';
 import { getMediaUrl } from '../../utils/mediaUrls';
 import {
   API_BASE_URL,
@@ -248,6 +254,7 @@ const getClipTrack = (project, clipId) => project.tracks.find((track) => (
 ));
 
 export const VideoEditorV2 = () => {
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { token } = useAuth();
@@ -1634,18 +1641,29 @@ export const VideoEditorV2 = () => {
   }, [bulkRowId, exportState.format, exportState.resultFileName, exportState.resultMimeType, isBulkProject, project, token]);
 
   const loadExportFolders = useCallback(async () => {
+    const campaignId = getActiveCampaignId();
+    const queryKey = mediaLibraryKeys.folders(campaignId);
+    const cached = queryClient.getQueryData(queryKey);
     setExportState((current) => ({
       ...current,
-      foldersLoading: true,
+      folders: Array.isArray(cached) ? cached : (current.folders || []),
+      foldersLoading: !Array.isArray(cached) || cached.length === 0,
       folderError: '',
       error: '',
     }));
     try {
-      const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const payload = await queryClient.fetchQuery({
+        queryKey,
+        queryFn: async () => {
+          const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          if (!response.ok) throw new Error('Unable to load Media Library folders.');
+          return response.json();
+        },
+        staleTime: MEDIA_LIBRARY_STALE_TIME,
+        gcTime: MEDIA_LIBRARY_GC_TIME,
       });
-      if (!response.ok) throw new Error('Unable to load Media Library folders.');
-      const payload = await response.json();
       const folders = Array.isArray(payload) ? payload : (payload.folders || []);
       setExportState((current) => ({
         ...current,
@@ -1655,25 +1673,36 @@ export const VideoEditorV2 = () => {
     } catch (error) {
       setExportState((current) => ({
         ...current,
-        folders: [],
+        folders: cached || [],
         foldersLoading: false,
         folderError: error.message || 'Unable to load Media Library folders.',
       }));
     }
-  }, [token]);
+  }, [queryClient, token]);
 
   const loadBulkExportFolders = useCallback(async () => {
+    const campaignId = getActiveCampaignId();
+    const queryKey = mediaLibraryKeys.folders(campaignId);
+    const cached = queryClient.getQueryData(queryKey);
     setBulkExportDialog((current) => ({
       ...current,
-      foldersLoading: true,
+      folders: Array.isArray(cached) ? cached : (current.folders || []),
+      foldersLoading: !Array.isArray(cached) || cached.length === 0,
       folderError: '',
     }));
     try {
-      const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const payload = await queryClient.fetchQuery({
+        queryKey,
+        queryFn: async () => {
+          const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          if (!response.ok) throw new Error('Unable to load Media Library folders.');
+          return response.json();
+        },
+        staleTime: MEDIA_LIBRARY_STALE_TIME,
+        gcTime: MEDIA_LIBRARY_GC_TIME,
       });
-      if (!response.ok) throw new Error('Unable to load Media Library folders.');
-      const payload = await response.json();
       const folders = Array.isArray(payload) ? payload : (payload.folders || []);
       setBulkExportDialog((current) => ({
         ...current,
@@ -1683,12 +1712,12 @@ export const VideoEditorV2 = () => {
     } catch (error) {
       setBulkExportDialog((current) => ({
         ...current,
-        folders: [],
+        folders: cached || [],
         foldersLoading: false,
         folderError: error.message || 'Unable to load Media Library folders.',
       }));
     }
-  }, [token]);
+  }, [queryClient, token]);
 
   const openBulkExportDialog = useCallback(async (requestedRowIds = null) => {
     if (!isBulkProject || bulkExportQueue.isRunning) return;

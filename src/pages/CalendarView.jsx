@@ -5,6 +5,11 @@ import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search, Trash2, Loader2, ExternalLink } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
+import {
+  MEDIA_LIBRARY_STALE_TIME,
+  MEDIA_LIBRARY_GC_TIME,
+  mediaLibraryKeys,
+} from './videoEditorV2/media/mediaLibraryCache';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
 import PlatformIcon from '../components/PlatformIcon';
@@ -49,7 +54,10 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
   // Composer data
   const [showComposer, setShowComposer] = useState(composerOnly);
   const [mediaList, setMediaList] = useState([]);
-  const [folders, setFolders] = useState([]);
+  const [folders, setFolders] = useState(() => {
+    const cached = queryClient.getQueryData(mediaLibraryKeys.folders(getActiveCampaignId()));
+    return Array.isArray(cached) ? cached : [];
+  });
   const [channels, setChannels] = useState([]);
   const [queueError, setQueueError] = useState('');
   const [deletingAccountQueueIds, setDeletingAccountQueueIds] = useState([]);
@@ -1168,9 +1176,10 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
           staleTime: 60 * 1000,
         }),
         queryClient.fetchQuery({
-          queryKey: ['scheduler', 'folders', scope],
+          queryKey: mediaLibraryKeys.folders(activeCampaignId),
           queryFn: () => fetchJson(`${API_BASE_URL}/api/media/folders${scope}`),
-          staleTime: 2 * 60 * 1000,
+          staleTime: MEDIA_LIBRARY_STALE_TIME,
+          gcTime: MEDIA_LIBRARY_GC_TIME,
         }),
       ]);
       const normalizedChannels = accData.map(normalizeSchedulingChannel);

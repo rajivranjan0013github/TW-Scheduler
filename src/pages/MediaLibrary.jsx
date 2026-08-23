@@ -5,9 +5,16 @@ import { AlertTriangle, CheckCircle2, FileText, Folder, Images, Info, MessageSqu
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from './videoEditor/videoEditorConstants';
+import {
+  MEDIA_LIBRARY_STALE_TIME,
+  MEDIA_LIBRARY_GC_TIME,
+  mediaLibraryKeys,
+} from './videoEditorV2/media/mediaLibraryCache';
 import { getMediaUrl } from '../utils/mediaUrls';
 import { generateVideoThumbnailBlob } from '../utils/videoThumbnail';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
+
+const PAGE_SIZE = 18;
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 const getProxiedAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL, proxy: true });
@@ -352,11 +359,22 @@ export const MediaLibrary = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { user, token } = useAuth();
-  const [folders, setFolders] = useState([]);
-  const [media, setMedia] = useState([]);
-  const [activeFolderId, setActiveFolderId] = useState(() => {
-    return location.state?.preselectedFolderId || 'root';
+
+  const campaignId = getActiveCampaignId();
+  const initialFolderId = location.state?.preselectedFolderId || 'root';
+
+  const [folders, setFolders] = useState(() => {
+    const cached = queryClient.getQueryData(mediaLibraryKeys.folders(campaignId));
+    return Array.isArray(cached) ? cached : [];
   });
+  const [media, setMedia] = useState(() => {
+    if (initialFolderId === 'root') return [];
+    const cached = queryClient.getQueryData(
+      mediaLibraryKeys.media(campaignId, initialFolderId, 1, PAGE_SIZE)
+    );
+    return Array.isArray(cached) ? cached : [];
+  });
+  const [activeFolderId, setActiveFolderId] = useState(initialFolderId);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -385,9 +403,17 @@ export const MediaLibrary = () => {
   const [taggingMedia, setTaggingMedia] = useState(null);
   const [mediaTagDrafts, setMediaTagDrafts] = useState([]);
   const [mediaTagInput, setMediaTagInput] = useState('');
-  const [savingMediaTagsId, setSavingMediaTagsId] = useState(null);
-  const [loadingFolders, setLoadingFolders] = useState(false);
-  const [loadingMedia, setLoadingMedia] = useState(false);
+  const [loadingFolders, setLoadingFolders] = useState(() => {
+    const cached = queryClient.getQueryData(mediaLibraryKeys.folders(campaignId));
+    return !Array.isArray(cached) || cached.length === 0;
+  });
+  const [loadingMedia, setLoadingMedia] = useState(() => {
+    if (initialFolderId === 'root') return false;
+    const cached = queryClient.getQueryData(
+      mediaLibraryKeys.media(campaignId, initialFolderId, 1, PAGE_SIZE)
+    );
+    return !Array.isArray(cached) || cached.length === 0;
+  });
   const [generatingCaption, setGeneratingCaption] = useState(false);
   const [renamingMedia, setRenamingMedia] = useState(null);
   const [renameMediaName, setRenameMediaName] = useState('');
@@ -436,7 +462,7 @@ export const MediaLibrary = () => {
   ]);
   const updateEditorFolderCache = (folderId, updates) => {
     queryClient.setQueriesData(
-      { queryKey: ['media-library', 'editor', 'folders'] },
+      { queryKey: mediaLibraryKeys.allFolders },
       (current) => (Array.isArray(current)
         ? current.map((folder) => (
             String(folder._id) === String(folderId) ? { ...folder, ...updates } : folder
@@ -668,13 +694,22 @@ export const MediaLibrary = () => {
     return { failedFiles, uploadedMedia };
   };
 
-  const fetchFolders = useCallback(async () => {
-    setLoadingFolders(true);
+  const fetchFolders = useCallback(async ({ force = false } = {}) => {
+    const currentCampaignId = getActiveCampaignId();
+    const queryKey = mediaLibraryKeys.folders(currentCampaignId);
+    const cached = queryClient.getQueryData(queryKey);
+    if (!cached || cached.length === 0) {
+      setLoadingFolders(true);
+    } else {
+      setFolders(cached);
+    }
     setErrorMessage('');
     try {
-      const campaignId = getActiveCampaignId();
+      if (force) {
+        await queryClient.invalidateQueries({ queryKey });
+      }
       const data = await queryClient.fetchQuery({
-        queryKey: ['media-library', 'folders', campaignId],
+        queryKey,
         queryFn: async () => {
           const response = await fetch(`${API_BASE_URL}/api/media/folders${withCampaignScope()}`, {
             headers: {
@@ -686,17 +721,14 @@ export const MediaLibrary = () => {
           }
           return response.json();
         },
-        staleTime: 2 * 60 * 1000,
+        staleTime: force ? 0 : MEDIA_LIBRARY_STALE_TIME,
+        gcTime: MEDIA_LIBRARY_GC_TIME,
       });
       const nextFolders = Array.isArray(data) ? data : [];
       setFolders(nextFolders);
-      queryClient.setQueriesData(
-        { queryKey: ['media-library', 'editor', 'folders'] },
-        (current) => (Array.isArray(current) ? nextFolders : current),
-      );
     } catch (error) {
       console.error('Failed to load folders:', error);
-      setFolders([]);
+      if (!cached) setFolders([]);
       setErrorMessage(error.message || 'Failed to load folders.');
     } finally {
       setLoadingFolders(false);
@@ -829,27 +861,35 @@ export const MediaLibrary = () => {
     }
   };
 
-  const PAGE_SIZE = 18;
-
-  const fetchMedia = useCallback(async (targetPage = 1) => {
+  const fetchMedia = useCallback(async (targetPage = 1, { force = false } = {}) => {
     const isFirstPage = targetPage === 1;
+    const currentCampaignId = getActiveCampaignId();
+    const queryKey = mediaLibraryKeys.media(currentCampaignId, activeFolderId, targetPage, PAGE_SIZE);
+    const cached = isFirstPage ? queryClient.getQueryData(queryKey) : null;
+
     if (isFirstPage) {
-      setLoadingMedia(true);
+      if (!cached || cached.length === 0) {
+        setLoadingMedia(true);
+      } else {
+        setMedia(cached);
+      }
     } else {
       setLoadingMore(true);
     }
     setErrorMessage('');
     try {
+      if (force) {
+        await queryClient.invalidateQueries({ queryKey });
+      }
       const params = new URLSearchParams();
-      const campaignId = getActiveCampaignId();
-      if (campaignId) params.set('campaignId', campaignId);
+      if (currentCampaignId) params.set('campaignId', currentCampaignId);
       if (activeFolderId) params.set('folderId', activeFolderId);
       params.set('page', String(targetPage));
       params.set('limit', String(PAGE_SIZE));
       const url = `${API_BASE_URL}/api/media?${params.toString()}`;
 
       const data = await queryClient.fetchQuery({
-        queryKey: ['media-library', 'media', campaignId || '', activeFolderId, targetPage, PAGE_SIZE],
+        queryKey,
         queryFn: async () => {
           const response = await fetch(url, {
             headers: {
@@ -861,7 +901,8 @@ export const MediaLibrary = () => {
           }
           return response.json();
         },
-        staleTime: 60 * 1000,
+        staleTime: force ? 0 : MEDIA_LIBRARY_STALE_TIME,
+        gcTime: MEDIA_LIBRARY_GC_TIME,
       });
       const items = Array.isArray(data) ? data : [];
       if (isFirstPage) {
@@ -873,7 +914,7 @@ export const MediaLibrary = () => {
       setPage(targetPage);
     } catch (error) {
       console.error('Failed to load media:', error);
-      if (isFirstPage) {
+      if (isFirstPage && !cached) {
         setMedia([]);
       }
       setErrorMessage(error.message || 'Failed to load media.');
@@ -897,8 +938,13 @@ export const MediaLibrary = () => {
   }, [fetchFolders]);
 
   useEffect(() => {
-    queueMicrotask(() => void fetchMedia());
-  }, [fetchMedia]);
+    if (activeFolderId !== 'root') {
+      queueMicrotask(() => void fetchMedia());
+    } else {
+      setMedia([]);
+      setLoadingMedia(false);
+    }
+  }, [activeFolderId, fetchMedia]);
 
   const handleFileUpload = async (e) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -2566,9 +2612,10 @@ export const MediaLibrary = () => {
         </div>
       )}
 
-      {/* Media Files Grid */}
-      <div className="space-y-3">
-          {canSchedule && (
+      {/* Media Files Grid - only inside folders */}
+      {activeFolderId !== 'root' && (
+        <div className="space-y-3">
+          {canSchedule && filteredMedia.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/[0.08] bg-[#0a0a0a] px-3 py-2 shadow-sm text-white">
               <div className="min-w-0">
                 <p className="m-0 text-[11px] font-bold text-white">
@@ -2864,9 +2911,9 @@ export const MediaLibrary = () => {
               );
             })}
 
-            {!loadingMedia && filteredMedia.length === 0 && (
+            {!loadingMedia && filteredMedia.length === 0 && visibleFolders.length === 0 && (
               <div className="col-span-full border border-dashed border-white/[0.08] p-12 rounded-xl text-center text-zinc-500 text-xs bg-[#0a0a0a] shadow-sm">
-                No media assets found.
+                No media assets found in this folder.
               </div>
             )}
           </div>
@@ -2890,7 +2937,8 @@ export const MediaLibrary = () => {
               </button>
             </div>
           )}
-      </div>
+        </div>
+      )}
 
       {/* New Folder Modal */}
       {showNewFolderModal && (

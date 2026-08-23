@@ -19,15 +19,15 @@ const readJson = async (response, fallbackMessage) => {
 };
 
 export const mediaLibraryKeys = {
-  root: ['media-library', 'editor'],
-  folders: (campaignId) => ['media-library', 'editor', 'folders', campaignId || ''],
-  media: (campaignId, folderId) => [
-    'media-library',
-    'editor',
-    'media',
-    campaignId || '',
-    folderId || 'root',
-  ],
+  root: ['media-library'],
+  allFolders: ['media-library', 'folders'],
+  folders: (campaignId) => ['media-library', 'folders', campaignId || ''],
+  allMedia: ['media-library', 'media'],
+  media: (campaignId, folderId, page, limit) => (
+    page !== undefined
+      ? ['media-library', 'media', campaignId || '', folderId || 'root', page, limit || 50]
+      : ['media-library', 'media', campaignId || '', folderId || 'root']
+  ),
 };
 
 export const fetchMediaLibraryFolders = async ({ token, campaignId, signal }) => {
