@@ -21,6 +21,18 @@ const MAX_TEXT_BOX_WIDTH = 1.0;
 const MIN_TEXT_SCALE = 0.25;
 const MAX_TEXT_SCALE = 3;
 const CENTER_GUIDE_THRESHOLD_PX = 6;
+const isAudioAsset = (asset) => (
+  asset?.mediaType === 'audio'
+  || asset?.type === 'audio'
+  || asset?.category === 'audio'
+  || asset?.kind === 'audio'
+);
+const isVideoAsset = (asset) => (
+  asset?.mediaType === 'video'
+  || asset?.type === 'video'
+  || asset?.category === 'video'
+  || asset?.kind === 'video'
+);
 const TEXT_RESIZE_HANDLES = [
   { mode: 'left', label: 'Resize text box from left', className: '-left-2 top-1/2 h-7 w-4 -translate-y-1/2 cursor-ew-resize', indicatorClassName: 'w-2 h-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
   { mode: 'right', label: 'Resize text box from right', className: '-right-2 top-1/2 h-7 w-4 -translate-y-1/2 cursor-ew-resize', indicatorClassName: 'w-2 h-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
@@ -97,6 +109,7 @@ export const BulkVideoRow = ({
   const dragSessionRef = useRef(null);
   const resizeDraftRef = useRef(null);
   const resizeCleanupRef = useRef(null);
+  const nodeDragCleanupRef = useRef(null);
   const didDragCaptionRef = useRef(false);
   const suppressTextSelectionRef = useRef(false);
   const [video1TileSize, setVideo1TileSize] = useState({
@@ -109,6 +122,8 @@ export const BulkVideoRow = ({
   const [dragOverSlot, setDragOverSlot] = useState(null); // 'video1' | 'video2' | 'audio' | null
   const [resizeDraft, setResizeDraft] = useState(null);
   const [dragDraft, setDragDraft] = useState(null);
+  const [nodeDragOffset, setNodeDragOffset] = useState(null);
+  const [isDraggingNode, setIsDraggingNode] = useState(false);
   const dragDraftRef = useRef(null);
 
   // Keep live rendered pixel dimensions of Video 1 slot to map relative % positions
@@ -128,7 +143,10 @@ export const BulkVideoRow = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  useEffect(() => () => resizeCleanupRef.current?.(), []);
+  useEffect(() => () => {
+    resizeCleanupRef.current?.();
+    nodeDragCleanupRef.current?.();
+  }, []);
 
   const previewProject = useMemo(() => bulkRowToProject(row), [row]);
   const previewTextClip = useMemo(() => {
@@ -191,8 +209,11 @@ export const BulkVideoRow = ({
   const statusColors = {
     draft: 'bg-zinc-800 text-zinc-400 border border-zinc-700/60',
     ready: 'bg-blue-950/40 text-blue-400 border border-blue-900/40',
+    queued: 'bg-sky-950/40 text-sky-400 border border-sky-900/40',
     processing: 'bg-amber-950/40 text-amber-400 border border-amber-900/40 animate-pulse',
+    exporting: 'bg-amber-950/40 text-amber-400 border border-amber-900/40 animate-pulse',
     saving: 'bg-purple-950/40 text-purple-400 border border-purple-900/40 animate-pulse',
+    uploading: 'bg-purple-950/40 text-purple-400 border border-purple-900/40 animate-pulse',
     done: 'bg-green-950/40 text-green-400 border border-green-900/40',
     error: 'bg-red-950/40 text-red-400 border border-red-900/40',
   };
@@ -200,8 +221,11 @@ export const BulkVideoRow = ({
   const statusLabels = {
     draft: 'Draft',
     ready: 'Ready',
+    queued: 'Queued',
     processing: 'Processing',
+    exporting: 'Exporting',
     saving: 'Saving',
+    uploading: 'Uploading',
     done: 'Done ✓',
     error: 'Error',
   };
@@ -268,33 +292,58 @@ export const BulkVideoRow = ({
   // Node Drag Handler (Header bar drag movement)
   const handleNodePointerDown = (event) => {
     // Avoid drag trigger on input selectors or buttons
-    if (event.target.closest('button') || event.target.closest('a')) return;
+    if (
+      event.button !== 0
+      || event.target.closest('button')
+      || event.target.closest('a')
+    ) return;
     
     event.preventDefault();
     event.stopPropagation();
 
+    nodeDragCleanupRef.current?.();
+
     const startX = event.clientX;
     const startY = event.clientY;
     const initialPos = { ...(row.canvasPos || { x: 100, y: 80 }) };
+    let finalPos = initialPos;
+
+    setIsDraggingNode(true);
+    setNodeDragOffset({ x: 0, y: 0 });
 
     const handlePointerMove = (moveEvent) => {
       // Scale translation by the page's current zoom factor
       const dx = (moveEvent.clientX - startX) / zoomScale;
       const dy = (moveEvent.clientY - startY) / zoomScale;
 
-      onUpdateCanvasPos?.({
+      finalPos = {
         x: Math.round(initialPos.x + dx),
         y: Math.round(initialPos.y + dy)
+      };
+      setNodeDragOffset({
+        x: finalPos.x - initialPos.x,
+        y: finalPos.y - initialPos.y,
       });
     };
 
-    const handlePointerUp = () => {
+    const cleanup = () => {
       document.removeEventListener('pointermove', handlePointerMove);
       document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('pointercancel', handlePointerUp);
+      nodeDragCleanupRef.current = null;
     };
 
+    const handlePointerUp = () => {
+      cleanup();
+      setIsDraggingNode(false);
+      setNodeDragOffset(null);
+      onUpdateCanvasPos?.(finalPos);
+    };
+
+    nodeDragCleanupRef.current = cleanup;
     document.addEventListener('pointermove', handlePointerMove);
     document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('pointercancel', handlePointerUp);
   };
 
   // Caption inline overlay dragging
@@ -559,9 +608,7 @@ export const BulkVideoRow = ({
 
   const isDragItemAudio = () => {
     const dragItem = getActiveEditorDragItem();
-    if (!dragItem?.asset) return false;
-    const { mediaType, type, category, kind } = dragItem.asset;
-    return mediaType === 'audio' || type === 'audio' || category === 'audio' || kind === 'audio';
+    return isAudioAsset(dragItem?.asset);
   };
 
   const handleCardDragOver = (event) => {
@@ -589,11 +636,11 @@ export const BulkVideoRow = ({
     const dragItem = getActiveEditorDragItem() || readEditorDragData(event.dataTransfer);
     if (dragItem?.asset) {
       const asset = dragItem.asset;
-      const isAudio = asset.mediaType === 'audio' || asset.type === 'audio' || asset.category === 'audio';
-      if (isAudio) {
+      if (isAudioAsset(asset)) {
         onDropAudio?.(asset);
         return;
       }
+      if (!isVideoAsset(asset)) return;
       if (!row.video1) {
         onDropVideo1?.(asset);
       } else if (isDualVideo && !row.video2) {
@@ -609,6 +656,7 @@ export const BulkVideoRow = ({
       const file = files[0];
       const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm|m4v|mkv)$/i.test(file.name);
       const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|aac|m4a|ogg)$/i.test(file.name);
+      if (!isVideo && !isAudio) return;
       const url = URL.createObjectURL(file);
       const asset = {
         id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -641,6 +689,12 @@ export const BulkVideoRow = ({
       }
       return;
     }
+    const activeAsset = getActiveEditorDragItem()?.asset;
+    if (activeAsset && !isVideoAsset(activeAsset)) {
+      event.dataTransfer.dropEffect = 'none';
+      setDragOverSlot(null);
+      return;
+    }
     if (dragOverSlot !== slot) {
       setDragOverSlot(slot);
     }
@@ -662,11 +716,11 @@ export const BulkVideoRow = ({
     const dragItem = getActiveEditorDragItem() || readEditorDragData(event.dataTransfer);
     if (dragItem?.asset) {
       const asset = dragItem.asset;
-      const isAudio = asset.mediaType === 'audio' || asset.type === 'audio' || asset.category === 'audio';
-      if (isAudio || slot === 'audio') {
+      if (isAudioAsset(asset)) {
         onDropAudio?.(asset);
         return;
       }
+      if (!isVideoAsset(asset)) return;
       if (slot === 'video1') {
         onDropVideo1?.(asset);
       } else if (slot === 'video2') {
@@ -680,6 +734,7 @@ export const BulkVideoRow = ({
       const file = files[0];
       const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm|m4v|mkv)$/i.test(file.name);
       const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|aac|m4a|ogg)$/i.test(file.name);
+      if (!isVideo && !isAudio) return;
       const url = URL.createObjectURL(file);
       const asset = {
         id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -692,7 +747,7 @@ export const BulkVideoRow = ({
         file,
       };
 
-      if (isAudio || slot === 'audio') {
+      if (isAudio) {
         onDropAudio?.(asset);
       } else if (isVideo && slot === 'video1') {
         onDropVideo1?.(asset);
@@ -707,11 +762,16 @@ export const BulkVideoRow = ({
       onDragOver={handleCardDragOver}
       onDragLeave={handleCardDragLeave}
       onDrop={handleCardDrop}
-      className={`${isDualVideo ? "w-[300px]" : "w-[175px]"} bg-[#1c1c1f] border rounded-2xl p-2.5 select-none transition-all flex flex-col gap-2 relative z-10 pointer-events-auto ${
+      className={`${isDualVideo ? "w-[300px]" : "w-[175px]"} bg-[#1c1c1f] border rounded-2xl p-2.5 select-none flex flex-col gap-2 relative z-10 pointer-events-auto ${isDraggingNode ? 'transition-none' : 'transition-all'} ${
         isSelected || isCaptionTarget
           ? 'border-[#7831d6] ring-1 ring-[#7831d6]/60 shadow-[0_0_14px_rgba(120,49,214,0.4)]'
           : 'border-[#35353a] hover:border-zinc-500 shadow-[0_16px_48px_rgba(0,0,0,0.65)]'
       }`}
+      style={{
+        transform: nodeDragOffset
+          ? `translate(${nodeDragOffset.x}px, ${nodeDragOffset.y}px)`
+          : undefined,
+      }}
     >
       {/* Full-Card Audio Drop Overlay */}
       {dragOverSlot === 'card-audio' && (

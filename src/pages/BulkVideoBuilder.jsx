@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { memo, useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Minus, Plus, Play, RotateCcw, Trash2, Folder, Sliders, Layout, ChevronLeft, ChevronRight, X, Music } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -11,8 +11,26 @@ import { PREVIEW_FRAME_HEIGHT, PREVIEW_FRAME_WIDTH } from './videoEditor/videoEd
 
 const SOURCE_PREVIEW_WIDTH = PREVIEW_FRAME_WIDTH;
 const SOURCE_PREVIEW_HEIGHT = PREVIEW_FRAME_HEIGHT;
+const DUAL_CARD_WIDTH = 300;
+const SINGLE_CARD_WIDTH = 175;
+const CARD_HEIGHT = 350;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const getCardWidth = (isDualVideo) => (
+  isDualVideo ? DUAL_CARD_WIDTH : SINGLE_CARD_WIDTH
+);
+const isVideoAsset = (asset) => (
+  asset?.mediaType === 'video'
+  || asset?.type === 'video'
+  || asset?.category === 'video'
+  || asset?.kind === 'video'
+);
+const isAudioAsset = (asset) => (
+  asset?.mediaType === 'audio'
+  || asset?.type === 'audio'
+  || asset?.category === 'audio'
+  || asset?.kind === 'audio'
+);
 
 const getCenteredDragPos = (text, settings = DEFAULT_TEXT_SETTINGS) => {
   const mergedSettings = { ...DEFAULT_TEXT_SETTINGS, ...settings };
@@ -41,10 +59,101 @@ const getCenteredDragPos = (text, settings = DEFAULT_TEXT_SETTINGS) => {
   };
 };
 
+const BulkVideoNode = memo(({
+  row,
+  rowIndex,
+  isSelected,
+  isDualVideo,
+  pageZoom,
+  isActiveCaption,
+  isCaptionTarget,
+  onSelectRow,
+  onPickVideo1,
+  onPickVideo2,
+  onPickAudio,
+  onDropVideo1,
+  onDropVideo2,
+  onDropAudio,
+  onOpenCaptionDrawer,
+  onToggleCaptionControls,
+  onUpdateCaption,
+  onUpdateTextSettings,
+  onUpdateTextClip,
+  onCloseCaptionControls,
+  onRemoveRow,
+  onUpdateCanvasPos,
+  onVideoDurationLoaded,
+  onFocusRow,
+  onEditTimeline,
+}) => (
+  <div
+    className="rounded-xl"
+    data-bulk-row-id={row.id}
+    style={{
+      position: 'absolute',
+      left: `${row.canvasPos?.x ?? 100}px`,
+      top: `${row.canvasPos?.y ?? 80}px`,
+      zIndex: isSelected || isActiveCaption ? 20 : 10,
+    }}
+    onClick={(event) => {
+      event.stopPropagation();
+      onSelectRow(row.id);
+    }}
+  >
+    <BulkVideoRow
+      row={row}
+      rowIndex={rowIndex}
+      isSelected={isSelected}
+      isDualVideo={isDualVideo}
+      inverseZoomScale={1 / pageZoom}
+      isActiveCaption={isActiveCaption}
+      isCaptionTarget={isCaptionTarget}
+      onPickVideo1={() => onPickVideo1(row.id)}
+      onPickVideo2={() => onPickVideo2(row.id)}
+      onPickAudio={() => onPickAudio(row.id)}
+      onDropVideo1={(asset) => onDropVideo1(row.id, asset)}
+      onDropVideo2={(asset) => onDropVideo2(row.id, asset)}
+      onDropAudio={(asset) => onDropAudio(row.id, asset)}
+      onOpenCaptionDrawer={() => onOpenCaptionDrawer(row.id)}
+      onCaptionOverlayClick={() => onToggleCaptionControls(row.id)}
+      onUpdateCaption={(caption, dragPos) => onUpdateCaption(row, caption, dragPos)}
+      onUpdateTextSettings={(partialSettings, dragPos) => (
+        onUpdateTextSettings(row, partialSettings, dragPos)
+      )}
+      onUpdateTextClip={(clipId, changes) => onUpdateTextClip(row.id, clipId, changes)}
+      onCloseCaptionControls={onCloseCaptionControls}
+      onRemove={() => onRemoveRow(row.id)}
+      zoomScale={pageZoom}
+      onUpdateCanvasPos={(canvasPos) => onUpdateCanvasPos(row.id, canvasPos)}
+      onVideoDurationLoaded={(slot, duration) => (
+        onVideoDurationLoaded(row.id, slot, duration)
+      )}
+      onHeaderDoubleClick={() => onFocusRow(row)}
+      onEditTimeline={() => onEditTimeline(row.id)}
+    />
+  </div>
+));
+
+BulkVideoNode.displayName = 'BulkVideoNode';
+
 export const BulkVideoBuilder = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
-  const bulk = useBulkRows();
+  const {
+    rows,
+    addRow,
+    removeRow,
+    updateRow,
+    updateRowCanvasPositions,
+    updateRowVideoDuration,
+    updateRowTextSettings,
+    updateRowEditorClip,
+    getReadyRows,
+    clearAllRows,
+    isDualVideo,
+    toggleDualVideo,
+    persistenceError,
+  } = useBulkRows();
 
   // Canvas Pan & Zoom states
   const [pan, setPan] = useState({ x: 80, y: 60 });
@@ -63,10 +172,14 @@ export const BulkVideoBuilder = () => {
   });
 
   useEffect(() => {
-    localStorage.setItem('tw_bulk_builder_sidebar_open', String(isSidebarOpen));
+    try {
+      localStorage.setItem('tw_bulk_builder_sidebar_open', String(isSidebarOpen));
+    } catch {
+      // The sidebar preference is optional when browser storage is unavailable.
+    }
   }, [isSidebarOpen]);
 
-  const [sidebarTab, setSidebarTab] = useState('frames'); // 'frames' | 'media'
+  const [sidebarTab, setSidebarTab] = useState('frames'); // 'frames' | 'media' | 'audio'
 
   // Keyboard navigation & drag statuses
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -74,7 +187,7 @@ export const BulkVideoBuilder = () => {
   const dragStartRef = useRef({ x: 0, y: 0 });
   const panStartRef = useRef({ x: 0, y: 0 });
 
-  // Selected row/node state for Right Inspector
+  // Selected row and active inline-caption controls.
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [activeCaptionRowId, setActiveCaptionRowId] = useState(null);
 
@@ -122,11 +235,14 @@ export const BulkVideoBuilder = () => {
         setIsSpacePressed(false);
       }
     };
+    const handleWindowBlur = () => setIsSpacePressed(false);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleWindowBlur);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleWindowBlur);
     };
   }, []);
 
@@ -165,65 +281,88 @@ export const BulkVideoBuilder = () => {
     }
   };
 
-  // Track pageZoom and pan in ref to keep global non-passive event handler fast and up to date
+  // Track pageZoom and pan in a ref to keep the native wheel handler up to date.
   const zoomStateRef = useRef({ pageZoom, pan });
   useEffect(() => {
     zoomStateRef.current = { pageZoom, pan };
   }, [pageZoom, pan]);
 
-  // Zoom centered on mouse viewport coordinates using global non-passive wheel events
-  useEffect(() => {
-    const handleGlobalWheel = (event) => {
-      const { pageZoom: currentZoom, pan: currentPan } = zoomStateRef.current;
-      const target = event.target;
-      const scrollable = target.closest('.overflow-y-auto') || target.closest('.overflow-x-auto');
-      const isInsideScrollable = scrollable && !scrollable.contains(canvasViewportRef.current);
+  const applyZoomAtPoint = useCallback((requestedZoom, pointX, pointY) => {
+    const { pageZoom: currentZoom, pan: currentPan } = zoomStateRef.current;
+    const nextZoom = clamp(requestedZoom, 0.15, 3.0);
+    if (Math.abs(nextZoom - currentZoom) < 0.0001) return;
 
-      if (event.ctrlKey || event.metaKey) {
-        // Prevent default native page zoom scaling
-        event.preventDefault();
-
-        const rect = canvasViewportRef.current?.getBoundingClientRect();
-        if (!rect) return;
-
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
-
-        const canvasX = (mouseX - currentPan.x) / currentZoom;
-        const canvasY = (mouseY - currentPan.y) / currentZoom;
-
-        const zoomFactor = 1.08;
-        const nextZoom = event.deltaY < 0
-          ? Math.min(currentZoom * zoomFactor, 3.0)
-          : Math.max(currentZoom / zoomFactor, 0.15);
-
-        const nextPan = {
-          x: mouseX - canvasX * nextZoom,
-          y: mouseY - canvasY * nextZoom,
-        };
-
-        setPageZoom(nextZoom);
-        setPan(nextPan);
-      } else {
-        // Let scrollable panels (like Layers Sidebar list) scroll normally
-        if (isInsideScrollable) {
-          return;
-        }
-
-        // Otherwise, pan the canvas viewport
-        event.preventDefault();
-        setPan((prev) => ({
-          x: prev.x - event.deltaX,
-          y: prev.y - event.deltaY,
-        }));
-      }
+    const canvasX = (pointX - currentPan.x) / currentZoom;
+    const canvasY = (pointY - currentPan.y) / currentZoom;
+    const nextPan = {
+      x: pointX - canvasX * nextZoom,
+      y: pointY - canvasY * nextZoom,
     };
 
-    window.addEventListener('wheel', handleGlobalWheel, { passive: false });
-    return () => {
-      window.removeEventListener('wheel', handleGlobalWheel);
-    };
+    zoomStateRef.current = { pageZoom: nextZoom, pan: nextPan };
+    setPageZoom(nextZoom);
+    setPan(nextPan);
   }, []);
+
+  const handleStepZoom = useCallback((step) => {
+    const rect = canvasViewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const sidebarOffset = isSidebarOpen ? Math.min(320, Math.max(0, rect.width - 200)) : 0;
+    const topOffset = 90;
+    const bottomOffset = 50;
+    const pointX = sidebarOffset + (rect.width - sidebarOffset) / 2;
+    const pointY = topOffset + Math.max(0, rect.height - topOffset - bottomOffset) / 2;
+    const currentZoom = zoomStateRef.current.pageZoom;
+
+    applyZoomAtPoint(currentZoom + step, pointX, pointY);
+  }, [applyZoomAtPoint, isSidebarOpen]);
+
+  const handleResetView = useCallback(() => {
+    const nextPan = { x: 80, y: 60 };
+    zoomStateRef.current = { pageZoom: 0.8, pan: nextPan };
+    setPageZoom(0.8);
+    setPan(nextPan);
+  }, []);
+
+  // Normal wheel input zooms around the cursor. Horizontal/Shift+wheel pans.
+  useEffect(() => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) return undefined;
+
+    const handleCanvasWheel = (event) => {
+      const { pageZoom: currentZoom, pan: currentPan } = zoomStateRef.current;
+      const target = event.target instanceof Element ? event.target : null;
+      const scrollable = target?.closest('.overflow-y-auto, .overflow-x-auto, .overflow-auto');
+      if (scrollable && viewport.contains(scrollable)) return;
+
+      const isHorizontalPan = event.shiftKey
+        || Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.5;
+      if (isHorizontalPan) {
+        event.preventDefault();
+        const nextPan = {
+          x: currentPan.x - (event.deltaX || event.deltaY),
+          y: currentPan.y,
+        };
+        zoomStateRef.current = { pageZoom: currentZoom, pan: nextPan };
+        setPan(nextPan);
+        return;
+      }
+
+      if (event.deltaY === 0) return;
+      event.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      const zoomFactor = Math.exp(-event.deltaY * 0.0015);
+      applyZoomAtPoint(currentZoom * zoomFactor, mouseX, mouseY);
+    };
+
+    viewport.addEventListener('wheel', handleCanvasWheel, { passive: false });
+    return () => {
+      viewport.removeEventListener('wheel', handleCanvasWheel);
+    };
+  }, [applyZoomAtPoint]);
 
   // Center canvas view on specific node safely below top floating bar
   const centerOnRow = useCallback((row) => {
@@ -239,11 +378,13 @@ export const BulkVideoBuilder = () => {
 
     const targetCenterX = sidebarOffset + availableWidth / 2;
     const targetCenterY = topOffset + availableHeight / 2;
+    const cardWidth = getCardWidth(isDualVideo);
+    const position = row.canvasPos || { x: 100, y: 80 };
 
-    const targetPanX = targetCenterX - (row.canvasPos.x + 170) * pageZoom;
-    const targetPanY = targetCenterY - (row.canvasPos.y + 170) * pageZoom;
+    const targetPanX = targetCenterX - (position.x + cardWidth / 2) * pageZoom;
+    const targetPanY = targetCenterY - (position.y + CARD_HEIGHT / 2) * pageZoom;
     setPan({ x: targetPanX, y: targetPanY });
-  }, [isSidebarOpen, pageZoom]);
+  }, [isDualVideo, isSidebarOpen, pageZoom]);
 
   // Center and zoom in to 150% on double clicking card header
   const focusAndZoomOnRow = useCallback((row) => {
@@ -251,9 +392,7 @@ export const BulkVideoBuilder = () => {
     const rect = canvasViewportRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    // Card dimensions: width = 340, height = 400
-    const cardWidth = 340;
-    const cardHeight = 400;
+    const cardWidth = getCardWidth(isDualVideo);
     const nextZoom = 1.5;
 
     const sidebarOffset = isSidebarOpen ? 320 : 0;
@@ -264,31 +403,31 @@ export const BulkVideoBuilder = () => {
 
     const targetCenterX = sidebarOffset + availableWidth / 2;
     const targetCenterY = topOffset + availableHeight / 2;
+    const position = row.canvasPos || { x: 100, y: 80 };
 
-    const targetPanX = targetCenterX - (row.canvasPos.x + cardWidth / 2) * nextZoom;
-    const targetPanY = targetCenterY - (row.canvasPos.y + cardHeight / 2) * nextZoom;
+    const targetPanX = targetCenterX - (position.x + cardWidth / 2) * nextZoom;
+    const targetPanY = targetCenterY - (position.y + CARD_HEIGHT / 2) * nextZoom;
 
     setPageZoom(nextZoom);
     setPan({ x: targetPanX, y: targetPanY });
-  }, [isSidebarOpen]);
+  }, [isDualVideo, isSidebarOpen]);
 
   // Fit all nodes inside viewport bounds taking sidebar and floating top toolbar into account
-  const fitView = useCallback(() => {
-    if (bulk.rows.length === 0) return;
+  const fitRows = useCallback((rowsToFit) => {
+    if (rowsToFit.length === 0) return;
 
     // Calculate bounding rect of all nodes
     let minX = Infinity, minY = Infinity;
     let maxX = -Infinity, maxY = -Infinity;
 
-    const cardW = bulk.isDualVideo ? 300 : 175;
-    const cardH = 350;
+    const cardW = getCardWidth(isDualVideo);
 
-    bulk.rows.forEach(r => {
+    rowsToFit.forEach(r => {
       const pos = r.canvasPos || { x: 100, y: 100 };
       if (pos.x < minX) minX = pos.x;
       if (pos.y < minY) minY = pos.y;
       if (pos.x + cardW > maxX) maxX = pos.x + cardW;
-      if (pos.y + cardH > maxY) maxY = pos.y + cardH;
+      if (pos.y + CARD_HEIGHT > maxY) maxY = pos.y + CARD_HEIGHT;
     });
 
     const rect = canvasViewportRef.current?.getBoundingClientRect();
@@ -318,27 +457,35 @@ export const BulkVideoBuilder = () => {
       x: targetCenterX - centerX * nextZoom,
       y: targetCenterY - centerY * nextZoom,
     });
-  }, [bulk.rows, bulk.isDualVideo, isSidebarOpen]);
+  }, [isDualVideo, isSidebarOpen]);
+
+  const fitView = useCallback(() => fitRows(rows), [fitRows, rows]);
 
   // Align all frames in a grid with up to 6 columns
   const alignAllCards = useCallback(() => {
-    const colW = bulk.isDualVideo ? 330 : 205;
+    const colW = isDualVideo ? 330 : 205;
     const rowH = 380;
-    bulk.rows.forEach((row, index) => {
+    const positionsByRowId = {};
+    const alignedRows = rows.map((row, index) => {
       const r = Math.floor(index / 6);
       const c = index % 6;
-      bulk.updateRow(row.id, {
-        canvasPos: {
-          x: 50 + c * colW,
-          y: 100 + r * rowH
-        }
-      });
+      const canvasPos = {
+        x: 50 + c * colW,
+        y: 100 + r * rowH,
+      };
+      positionsByRowId[row.id] = canvasPos;
+      return { ...row, canvasPos };
     });
-    setTimeout(fitView, 100);
-  }, [bulk, fitView]);
+    updateRowCanvasPositions(positionsByRowId);
+    fitRows(alignedRows);
+  }, [fitRows, isDualVideo, rows, updateRowCanvasPositions]);
 
   // Video picker callbacks (Directly opens MediaLibraryPanel in sidebar)
   const handlePickVideo1 = useCallback((rowId) => {
+    setSelectedRowId(rowId);
+    setShowAudioPickerRowId(null);
+    setCaptionDrawerRowId(null);
+    setActiveCaptionRowId(null);
     setActivePickerRowId(rowId);
     setPickerSlot('video1');
     setIsSidebarOpen(true);
@@ -346,6 +493,10 @@ export const BulkVideoBuilder = () => {
   }, []);
 
   const handlePickVideo2 = useCallback((rowId) => {
+    setSelectedRowId(rowId);
+    setShowAudioPickerRowId(null);
+    setCaptionDrawerRowId(null);
+    setActiveCaptionRowId(null);
     setActivePickerRowId(rowId);
     setPickerSlot('video2');
     setIsSidebarOpen(true);
@@ -353,59 +504,61 @@ export const BulkVideoBuilder = () => {
   }, []);
 
   const handleSelectLibraryVideo = useCallback((selectedVideo) => {
-    const targetRowId = activePickerRowId || selectedRowId;
+    if (!isVideoAsset(selectedVideo)) return;
+    const requestedRowId = activePickerRowId || selectedRowId;
+    const targetRowId = rows.some((row) => row.id === requestedRowId)
+      ? requestedRowId
+      : rows[0]?.id;
     const targetSlot = pickerSlot || 'video1';
-    if (!targetRowId) {
-      if (bulk.rows.length > 0) {
-        bulk.updateRow(bulk.rows[0].id, {
-          video1: selectedVideo,
-          video1Url: selectedVideo.url || selectedVideo.originalUrl,
-        });
-      }
-      return;
-    }
+    if (!targetRowId) return;
     const field = targetSlot === 'video1'
       ? { video1: selectedVideo, video1Url: selectedVideo.url || selectedVideo.originalUrl }
       : { video2: selectedVideo, video2Url: selectedVideo.url || selectedVideo.originalUrl };
-    bulk.updateRow(targetRowId, field);
+    updateRow(targetRowId, field);
     setActivePickerRowId(null);
     setPickerSlot(null);
-  }, [activePickerRowId, pickerSlot, selectedRowId, bulk]);
+  }, [activePickerRowId, pickerSlot, rows, selectedRowId, updateRow]);
 
   // Drop handlers for Drag & Drop onto canvas card slots
   const handleDropVideo1 = useCallback((rowId, asset) => {
-    bulk.updateRow(rowId, {
+    if (!isVideoAsset(asset)) return;
+    updateRow(rowId, {
       video1: asset,
       video1Url: asset.url || asset.originalUrl,
     });
-  }, [bulk]);
+  }, [updateRow]);
 
   const handleDropVideo2 = useCallback((rowId, asset) => {
-    bulk.updateRow(rowId, {
+    if (!isVideoAsset(asset)) return;
+    updateRow(rowId, {
       video2: asset,
       video2Url: asset.url || asset.originalUrl,
     });
-  }, [bulk]);
+  }, [updateRow]);
 
   const handleDropAudio = useCallback((rowId, asset) => {
-    bulk.updateRow(rowId, {
-      audio: asset,
-    });
-  }, [bulk]);
+    if (!isAudioAsset(asset)) return;
+    updateRow(rowId, { audio: asset });
+  }, [updateRow]);
 
   const handleSelectLibraryAudio = useCallback((asset) => {
-    const targetRowId = showAudioPickerRowId || selectedRowId;
-    if (targetRowId) {
-      bulk.updateRow(targetRowId, { audio: asset });
-      setShowAudioPickerRowId(null);
-    } else if (bulk.rows.length > 0) {
-      bulk.updateRow(bulk.rows[0].id, { audio: asset });
-    }
-  }, [showAudioPickerRowId, selectedRowId, bulk]);
+    if (!isAudioAsset(asset)) return;
+    const requestedRowId = showAudioPickerRowId || selectedRowId;
+    const targetRowId = rows.some((row) => row.id === requestedRowId)
+      ? requestedRowId
+      : rows[0]?.id;
+    if (!targetRowId) return;
+    updateRow(targetRowId, { audio: asset });
+    setShowAudioPickerRowId(null);
+  }, [rows, selectedRowId, showAudioPickerRowId, updateRow]);
 
   // Audio picker callbacks
   const handleOpenAudioPicker = useCallback((rowId) => {
     setSelectedRowId(rowId);
+    setActivePickerRowId(null);
+    setPickerSlot(null);
+    setCaptionDrawerRowId(null);
+    setActiveCaptionRowId(null);
     setShowAudioPickerRowId(rowId);
     setSidebarTab('audio');
     setIsSidebarOpen(true);
@@ -418,57 +571,148 @@ export const BulkVideoBuilder = () => {
   const handleClearAudio = useCallback(() => {
     const rowId = showAudioPickerRowId || selectedRowId;
     if (!rowId) return;
-    bulk.updateRow(rowId, { audio: null });
+    updateRow(rowId, { audio: null });
     setShowAudioPickerRowId(null);
-  }, [showAudioPickerRowId, selectedRowId, bulk]);
+  }, [selectedRowId, showAudioPickerRowId, updateRow]);
+
+  const handleSidebarTabChange = useCallback((nextTab) => {
+    setSidebarTab(nextTab);
+    if (nextTab !== 'media') {
+      setActivePickerRowId(null);
+      setPickerSlot(null);
+    }
+    if (nextTab !== 'audio') {
+      setShowAudioPickerRowId(null);
+    }
+  }, []);
+
+  const handleSelectRow = useCallback((rowId) => {
+    setSelectedRowId(rowId);
+    if (captionDrawerRowId !== null) {
+      setCaptionDrawerRowId(rowId);
+      setGeneratedSuggestions([]);
+    }
+  }, [captionDrawerRowId]);
+
+  const handleOpenCaptionDrawer = useCallback((rowId) => {
+    setSelectedRowId(rowId);
+    setActivePickerRowId(null);
+    setPickerSlot(null);
+    setShowAudioPickerRowId(null);
+    setActiveCaptionRowId(null);
+    setGeneratedSuggestions([]);
+    setCaptionDrawerRowId(rowId);
+  }, []);
+
+  const handleToggleCaptionControls = useCallback((rowId) => {
+    setActiveCaptionRowId((currentRowId) => currentRowId === rowId ? null : rowId);
+  }, []);
+
+  const handleCloseCaptionControls = useCallback(() => {
+    setActiveCaptionRowId(null);
+  }, []);
+
+  const handleUpdateCaption = useCallback((row, caption, dragPos) => {
+    const nextDragPos = dragPos
+      || (!row.caption ? getCenteredDragPos(caption, row.textSettings) : null);
+    updateRow(
+      row.id,
+      nextDragPos ? { caption, dragPos: nextDragPos } : { caption },
+    );
+  }, [updateRow]);
+
+  const handleUpdateTextSettings = useCallback((row, partialSettings, dragPos) => {
+    if (dragPos) {
+      updateRow(row.id, {
+        textSettings: { ...row.textSettings, ...partialSettings },
+        dragPos,
+      });
+      return;
+    }
+    updateRowTextSettings(row.id, partialSettings);
+  }, [updateRow, updateRowTextSettings]);
+
+  const handleUpdateTextClip = useCallback((rowId, clipId, changes) => {
+    updateRowEditorClip(rowId, clipId, changes);
+  }, [updateRowEditorClip]);
+
+  const handleRemoveRow = useCallback((rowId) => {
+    removeRow(rowId);
+    setSelectedRowId((currentRowId) => currentRowId === rowId ? null : currentRowId);
+    setActivePickerRowId(null);
+    setPickerSlot(null);
+    setShowAudioPickerRowId(null);
+    setCaptionDrawerRowId(null);
+    setActiveCaptionRowId(null);
+    setGeneratedSuggestions([]);
+  }, [removeRow]);
+
+  const handleUpdateCanvasPos = useCallback((rowId, canvasPos) => {
+    updateRow(rowId, { canvasPos });
+  }, [updateRow]);
+
+  const handleVideoDurationLoaded = useCallback((rowId, slot, duration) => {
+    updateRowVideoDuration(rowId, slot, duration);
+  }, [updateRowVideoDuration]);
+
+  const handleEditTimeline = useCallback((rowId) => {
+    navigate(`/media/editor?mode=bulk&rowId=${encodeURIComponent(rowId)}`);
+  }, [navigate]);
 
   const handleClearAll = useCallback(() => {
-    if (bulk.rows.length === 0) return;
+    if (rows.length === 0) return;
     setShowClearDialog(true);
-  }, [bulk.rows.length]);
+  }, [rows.length]);
 
   const handleConfirmClear = useCallback(() => {
-    bulk.clearAllRows();
+    clearAllRows();
     setSelectedRowId(null);
+    setActivePickerRowId(null);
+    setPickerSlot(null);
+    setShowAudioPickerRowId(null);
+    setCaptionDrawerRowId(null);
+    setActiveCaptionRowId(null);
+    setGeneratedSuggestions([]);
     setShowClearDialog(false);
-  }, [bulk]);
+    fitRows([{ canvasPos: { x: 50, y: 80 } }]);
+  }, [clearAllRows, fitRows]);
 
   // Caption apply callback
   const handleApplyCaption = useCallback((text) => {
     const rowId = captionDrawerRowId || selectedRowId;
     if (!rowId) return;
-    const row = bulk.rows.find((item) => item.id === rowId);
-    bulk.updateRow(rowId, {
+    const row = rows.find((item) => item.id === rowId);
+    if (!row) return;
+    updateRow(rowId, {
       caption: text,
       dragPos: getCenteredDragPos(text, row?.textSettings),
     });
-  }, [captionDrawerRowId, selectedRowId, bulk]);
+  }, [captionDrawerRowId, rows, selectedRowId, updateRow]);
 
   const handleExportAll = useCallback(() => {
-    const readyRows = bulk.getReadyRows();
+    const readyRows = getReadyRows();
     if (readyRows.length === 0) return;
     navigate(`/media/editor?mode=bulk&rowId=${encodeURIComponent(readyRows[0].id)}&panel=bulk`);
-  }, [bulk, navigate]);
+  }, [getReadyRows, navigate]);
 
   // Auto center view on mount if nodes exist
   useEffect(() => {
-    if (didInitialFitRef.current || bulk.rows.length === 0) return undefined;
+    if (didInitialFitRef.current || rows.length === 0) return undefined;
     const timeoutId = window.setTimeout(() => {
       didInitialFitRef.current = true;
       fitView();
     }, 150);
     return () => window.clearTimeout(timeoutId);
-  }, [bulk.rows.length, fitView]);
+  }, [fitView, rows.length]);
 
-  // Compute references for right inspector panel values
-  const selectedRow = bulk.rows.find(r => r.id === selectedRowId);
-  const readyCount = bulk.getReadyRows().length;
+  const readyCount = getReadyRows().length;
+  const captionDrawerRow = rows.find((row) => row.id === captionDrawerRowId) || null;
 
   return (
     <div className="h-full w-full relative bg-[#0e0e10] text-[#e0e0e5] overflow-hidden select-none font-sans">
-      {bulk.persistenceError && (
+      {persistenceError && (
         <div className="absolute left-1/2 top-20 z-50 w-[min(520px,calc(100%-32px))] -translate-x-1/2 rounded-xl border border-red-800/60 bg-red-950/95 px-4 py-3 text-xs font-semibold text-red-200 shadow-2xl">
-          {bulk.persistenceError}
+          {persistenceError}
         </div>
       )}
 
@@ -498,77 +742,43 @@ export const BulkVideoBuilder = () => {
           className="absolute inset-0 pointer-events-none"
         >
           <div className="relative pointer-events-auto">
-            {bulk.rows.map((row, idx) => (
-              <div
+            {rows.map((row, idx) => (
+              <BulkVideoNode
                 key={row.id}
-                className="rounded-xl"
-                style={{
-                  position: 'absolute',
-                  left: `${row.canvasPos?.x || 100}px`,
-                  top: `${row.canvasPos?.y || 80}px`,
-                  zIndex: selectedRowId === row.id || activeCaptionRowId === row.id ? 20 : 10,
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedRowId(row.id);
-                  if (captionDrawerRowId !== null) {
-                    setCaptionDrawerRowId(row.id);
-                  }
-                }}
-              >
-                <BulkVideoRow
-                  row={row}
-                  rowIndex={idx}
-                  isSelected={selectedRowId === row.id}
-                  isDualVideo={bulk.isDualVideo}
-                  inverseZoomScale={1 / pageZoom}
-                  isActiveCaption={activeCaptionRowId === row.id}
-                  isCaptionTarget={captionDrawerRowId === row.id}
-                  onPickVideo1={() => handlePickVideo1(row.id)}
-                  onPickVideo2={() => handlePickVideo2(row.id)}
-                  onPickAudio={() => handlePickAudio(row.id)}
-                  onDropVideo1={(asset) => handleDropVideo1(row.id, asset)}
-                  onDropVideo2={(asset) => handleDropVideo2(row.id, asset)}
-                  onDropAudio={(asset) => handleDropAudio(row.id, asset)}
-                  onOpenCaptionDrawer={() => setCaptionDrawerRowId(row.id)}
-                  onCaptionOverlayClick={() => setActiveCaptionRowId(prev => prev === row.id ? null : row.id)}
-                  onUpdateCaption={(caption, dragPos) => {
-                    const nextDragPos = dragPos || (!row.caption ? getCenteredDragPos(caption, row.textSettings) : null);
-                    bulk.updateRow(row.id, nextDragPos ? { caption, dragPos: nextDragPos } : { caption });
-                  }}
-                  onUpdateTextSettings={(partialSettings, dragPos) => {
-                    if (dragPos) {
-                      bulk.updateRow(row.id, {
-                        textSettings: { ...row.textSettings, ...partialSettings },
-                        dragPos,
-                      });
-                      return;
-                    }
-                    bulk.updateRowTextSettings(row.id, partialSettings);
-                  }}
-                  onUpdateDragPos={(dragPos) => bulk.updateRowDragPos(row.id, dragPos)}
-                  onUpdateTextClip={(clipId, changes) => (
-                    bulk.updateRowEditorClip(row.id, clipId, changes)
-                  )}
-                  onCloseCaptionControls={() => setActiveCaptionRowId(null)}
-                  onRemove={() => {
-                    bulk.removeRow(row.id);
-                    if (selectedRowId === row.id) setSelectedRowId(null);
-                  }}
-                  zoomScale={pageZoom}
-                  onUpdateCanvasPos={(canvasPos) => bulk.updateRow(row.id, { canvasPos })}
-                  onVideoDurationLoaded={(slot, duration) => bulk.updateRowVideoDuration(row.id, slot, duration)}
-                  onHeaderDoubleClick={() => focusAndZoomOnRow(row)}
-                  onEditTimeline={() => navigate(`/media/editor?mode=bulk&rowId=${encodeURIComponent(row.id)}`)}
-                />
-              </div>
+                row={row}
+                rowIndex={idx}
+                isSelected={selectedRowId === row.id}
+                isDualVideo={isDualVideo}
+                pageZoom={pageZoom}
+                isActiveCaption={activeCaptionRowId === row.id}
+                isCaptionTarget={captionDrawerRowId === row.id}
+                onSelectRow={handleSelectRow}
+                onPickVideo1={handlePickVideo1}
+                onPickVideo2={handlePickVideo2}
+                onPickAudio={handlePickAudio}
+                onDropVideo1={handleDropVideo1}
+                onDropVideo2={handleDropVideo2}
+                onDropAudio={handleDropAudio}
+                onOpenCaptionDrawer={handleOpenCaptionDrawer}
+                onToggleCaptionControls={handleToggleCaptionControls}
+                onUpdateCaption={handleUpdateCaption}
+                onUpdateTextSettings={handleUpdateTextSettings}
+                onUpdateTextClip={handleUpdateTextClip}
+                onCloseCaptionControls={handleCloseCaptionControls}
+                onRemoveRow={handleRemoveRow}
+                onUpdateCanvasPos={handleUpdateCanvasPos}
+                onVideoDurationLoaded={handleVideoDurationLoaded}
+                onFocusRow={focusAndZoomOnRow}
+                onEditTimeline={handleEditTimeline}
+              />
             ))}
           </div>
         </div>
 
         {/* Floating zoom & status HUD (bottom right) */}
         <div
-          className="absolute bottom-4 right-4 z-10 flex items-center gap-2 rounded-xl border border-[#303034] bg-[#1c1c1f]/95 p-1.5 shadow-lg backdrop-blur-sm text-zinc-300"
+          className="absolute bottom-4 right-4 z-40 flex items-center gap-2 rounded-xl border border-[#303034] bg-[#1c1c1f]/95 p-1.5 shadow-lg backdrop-blur-sm text-zinc-300"
+          onPointerDown={(event) => event.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-2 py-1 text-[9px] font-mono text-zinc-400 border-r border-[#303034]">
@@ -576,7 +786,7 @@ export const BulkVideoBuilder = () => {
           </div>
           <button
             type="button"
-            onClick={() => setPageZoom((zoom) => clamp(zoom - 0.1, 0.15, 3.0))}
+            onClick={() => handleStepZoom(-0.1)}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-[#232326] hover:text-white active:scale-95"
             title="Zoom out"
           >
@@ -587,7 +797,7 @@ export const BulkVideoBuilder = () => {
           </span>
           <button
             type="button"
-            onClick={() => setPageZoom((zoom) => clamp(zoom + 0.1, 0.15, 3.0))}
+            onClick={() => handleStepZoom(0.1)}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-[#232326] hover:text-white active:scale-95"
             title="Zoom in"
           >
@@ -595,10 +805,7 @@ export const BulkVideoBuilder = () => {
           </button>
           <button
             type="button"
-            onClick={() => {
-              setPageZoom(0.8);
-              setPan({ x: 80, y: 60 });
-            }}
+            onClick={handleResetView}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-[#232326] hover:text-white active:scale-95"
             title="Reset Zoom Layout"
           >
@@ -614,19 +821,19 @@ export const BulkVideoBuilder = () => {
           <label className="flex items-center gap-1.5 cursor-pointer bg-[#232326] border border-[#35353a] hover:bg-[#2a2a2e] px-2.5 py-1.5 rounded-lg text-white select-none transition-all">
             <input
               type="checkbox"
-              checked={bulk.isDualVideo}
-              onChange={(e) => bulk.toggleDualVideo(e.target.checked)}
+              checked={isDualVideo}
+              onChange={(e) => toggleDualVideo(e.target.checked)}
               className="hidden"
             />
-            <div className={`relative w-7 h-4 rounded-full transition-colors ${bulk.isDualVideo ? 'bg-[#7831d6]' : 'bg-zinc-700'}`}>
-              <div className={`absolute top-[2px] left-[2px] w-3 h-3 rounded-full bg-white transition-transform duration-200 ${bulk.isDualVideo ? 'translate-x-3' : 'translate-x-0'}`} />
+            <div className={`relative w-7 h-4 rounded-full transition-colors ${isDualVideo ? 'bg-[#7831d6]' : 'bg-zinc-700'}`}>
+              <div className={`absolute top-[2px] left-[2px] w-3 h-3 rounded-full bg-white transition-transform duration-200 ${isDualVideo ? 'translate-x-3' : 'translate-x-0'}`} />
             </div>
             <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-300">Dual Mode</span>
           </label>
 
           <button
             type="button"
-            onClick={bulk.addRow}
+            onClick={addRow}
             className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] active:scale-95 text-white transition-all duration-200 shadow-sm"
             title="Add blank frame"
           >
@@ -682,7 +889,7 @@ export const BulkVideoBuilder = () => {
             <div className="grid grid-cols-3 gap-1 p-0.5 bg-white/5 rounded-lg w-full">
               <button
                 type="button"
-                onClick={() => setSidebarTab('frames')}
+                onClick={() => handleSidebarTabChange('frames')}
                 className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-[9px] font-extrabold uppercase tracking-wider transition-all ${sidebarTab === 'frames'
                     ? 'bg-[#7831d6] text-white shadow-sm'
                     : 'text-zinc-400 hover:text-white'
@@ -693,7 +900,7 @@ export const BulkVideoBuilder = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setSidebarTab('media')}
+                onClick={() => handleSidebarTabChange('media')}
                 className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-[9px] font-extrabold uppercase tracking-wider transition-all ${sidebarTab === 'media'
                     ? 'bg-[#7831d6] text-white shadow-sm'
                     : 'text-zinc-400 hover:text-white'
@@ -704,7 +911,7 @@ export const BulkVideoBuilder = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setSidebarTab('audio')}
+                onClick={() => handleSidebarTabChange('audio')}
                 className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-[9px] font-extrabold uppercase tracking-wider transition-all ${sidebarTab === 'audio'
                     ? 'bg-[#7831d6] text-white shadow-sm'
                     : 'text-zinc-400 hover:text-white'
@@ -717,11 +924,11 @@ export const BulkVideoBuilder = () => {
           </div>
 
           {/* Active Target Banner (When picking a specific slot) */}
-          {activePickerRowId && pickerSlot && (
+          {activePickerRowId && pickerSlot && rows.some((row) => row.id === activePickerRowId) && (
             <div className="px-3 py-2 bg-blue-950/50 border-b border-blue-800/40 flex items-center justify-between gap-2 shrink-0">
               <div className="min-w-0">
                 <span className="text-[10px] font-bold text-blue-300 block truncate">
-                  Picking {pickerSlot === 'video1' ? 'First Video' : 'Second Video'} for Frame #{bulk.rows.findIndex((r) => r.id === activePickerRowId) + 1}
+                  Picking {pickerSlot === 'video1' ? 'First Video' : 'Second Video'} for Frame #{rows.findIndex((r) => r.id === activePickerRowId) + 1}
                 </span>
               </div>
               <button
@@ -738,13 +945,13 @@ export const BulkVideoBuilder = () => {
             </div>
           )}
 
-          {showAudioPickerRowId && sidebarTab === 'audio' && (
+          {showAudioPickerRowId && sidebarTab === 'audio' && rows.some((row) => row.id === showAudioPickerRowId) && (
             <div className="px-3 py-2 bg-[#7831d6]/20 border-b border-[#7831d6]/40 flex items-center justify-between gap-2 shrink-0">
               <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-bold text-purple-300 block truncate">
-                  Selecting audio for Frame #{bulk.rows.findIndex((r) => r.id === showAudioPickerRowId) + 1}
+                  Selecting audio for Frame #{rows.findIndex((r) => r.id === showAudioPickerRowId) + 1}
                 </span>
-                {bulk.rows.find((r) => r.id === showAudioPickerRowId)?.audio && (
+                {rows.find((r) => r.id === showAudioPickerRowId)?.audio && (
                   <button
                     type="button"
                     onClick={handleClearAudio}
@@ -768,14 +975,17 @@ export const BulkVideoBuilder = () => {
           {sidebarTab === 'media' ? (
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-[#151517]">
               <MediaLibraryPanel
+                key="bulk-video-library"
                 token={token}
                 initialMediaType="video"
+                restrictToInitialMediaType
                 onSelect={handleSelectLibraryVideo}
               />
             </div>
           ) : sidebarTab === 'audio' ? (
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-[#151517]">
               <MediaLibraryPanel
+                key="bulk-audio-library"
                 token={token}
                 initialMediaType="audio"
                 onSelect={handleSelectLibraryAudio}
@@ -783,9 +993,9 @@ export const BulkVideoBuilder = () => {
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto p-2.5 space-y-1 bg-[#151517]">
-              {bulk.rows.map((row, idx) => {
+              {rows.map((row, idx) => {
                 const isSelected = selectedRowId === row.id;
-                const hasVideo = bulk.isDualVideo ? (row.video1 && row.video2) : row.video1;
+                const hasVideo = isDualVideo ? (row.video1 && row.video2) : row.video1;
                 return (
                   <div
                     key={row.id}
@@ -810,8 +1020,7 @@ export const BulkVideoBuilder = () => {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          bulk.removeRow(row.id);
-                          if (selectedRowId === row.id) setSelectedRowId(null);
+                          handleRemoveRow(row.id);
                         }}
                         className="opacity-0 group-hover:opacity-100 flex h-5 w-5 items-center justify-center rounded-md hover:bg-red-950/40 text-gray-400 hover:text-red-400 transition-all"
                         title="Remove frame"
@@ -826,7 +1035,7 @@ export const BulkVideoBuilder = () => {
               {/* Quick add card trigger */}
               <button
                 type="button"
-                onClick={bulk.addRow}
+                onClick={addRow}
                 className="w-full mt-2 rounded-lg border border-dashed border-white/15 bg-transparent py-2.5 flex items-center justify-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider transition-all hover:border-[#7831d6]/60 hover:bg-[#7831d6]/10 hover:text-white"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -836,7 +1045,7 @@ export const BulkVideoBuilder = () => {
           )}
 
           <div className="p-2.5 bg-[#1a1a1d] border-t border-[#303034] shrink-0 text-[10px] text-gray-400 leading-normal font-medium">
-            💡 <strong className="text-gray-300">Space + Drag</strong> to pan canvas. <strong className="text-gray-300">Pinch trackpad</strong> to zoom.
+            💡 <strong className="text-gray-300">Scroll or pinch</strong> to zoom. <strong className="text-gray-300">Space + Drag</strong> to pan.
           </div>
         </aside>
       )}
@@ -844,7 +1053,7 @@ export const BulkVideoBuilder = () => {
       {/* Sidebar toggle button (docked on sidebar right edge or top left) */}
       <button
         type="button"
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        onClick={() => setIsSidebarOpen((open) => !open)}
         className={`absolute top-3.5 z-30 p-2 bg-[#1c1c1f] hover:bg-[#232326] text-gray-400 hover:text-white border border-[#303034] shadow-lg transition-all duration-200 active:scale-95 flex items-center justify-center ${isSidebarOpen ? 'left-[320px] rounded-r-lg border-l-0' : 'left-3 rounded-lg'
           }`}
         title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
@@ -853,23 +1062,13 @@ export const BulkVideoBuilder = () => {
       </button>
 
       {/* Caption AI generator Drawer */}
-      {captionDrawerRowId && (
+      {captionDrawerRow && (
         <CaptionDrawer
-          targetRowId={captionDrawerRowId}
+          targetRowId={captionDrawerRow.id}
           token={token}
-          currentCaption={bulk.rows.find((r) => r.id === captionDrawerRowId)?.caption || ''}
+          currentCaption={captionDrawerRow.caption || ''}
           suggestions={generatedSuggestions}
-          onSuggestionsChange={onSuggestions => {
-            setGeneratedSuggestions(onSuggestions);
-            // Center caption after AI updates
-            if (onSuggestions && onSuggestions.length > 0 && selectedRowId) {
-              const text = onSuggestions[0];
-              bulk.updateRow(selectedRowId, {
-                caption: text,
-                dragPos: getCenteredDragPos(text, selectedRow?.textSettings)
-              });
-            }
-          }}
+          onSuggestionsChange={setGeneratedSuggestions}
           vibe={suggestionsVibe}
           onVibeChange={setSuggestionsVibe}
           onApply={handleApplyCaption}
@@ -880,23 +1079,28 @@ export const BulkVideoBuilder = () => {
       {/* Clear Confirmation Dialog Modal */}
       {showClearDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl border border-[#303034] bg-[#151517] p-6 shadow-2xl text-white">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bulk-clear-dialog-title"
+            className="w-full max-w-md rounded-2xl border border-[#303034] bg-[#151517] p-6 shadow-2xl text-white"
+          >
             <div className="flex items-center gap-3 text-red-400 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-950/40 border border-red-800/40 shrink-0">
                 <Trash2 className="h-5 w-5 text-red-400" />
               </div>
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-white">
+                <h3 id="bulk-clear-dialog-title" className="text-sm font-bold uppercase tracking-wider text-white">
                   Clear All Frames
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  {bulk.rows.length} {bulk.rows.length === 1 ? 'frame' : 'frames'} on planning board
+                  {rows.length} {rows.length === 1 ? 'frame' : 'frames'} on planning board
                 </p>
               </div>
             </div>
 
             <p className="text-xs text-zinc-300 mb-6 leading-relaxed">
-              Are you sure you want to clear all planned frames from the canvas? This action cannot be undone.
+              This removes every planned frame and replaces the board with one new blank frame. This action cannot be undone.
             </p>
 
             <div className="flex items-center justify-end gap-2.5">

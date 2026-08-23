@@ -283,6 +283,23 @@ export const useBulkRows = () => {
     );
   }, []);
 
+  const updateRowCanvasPositions = useCallback((positionsByRowId) => {
+    setRows((prev) => prev.map((row) => {
+      const nextCanvasPos = positionsByRowId?.[row.id];
+      if (!nextCanvasPos) return row;
+      if (
+        row.canvasPos?.x === nextCanvasPos.x
+        && row.canvasPos?.y === nextCanvasPos.y
+      ) {
+        return row;
+      }
+      return sanitizeBulkRowForStorage({
+        ...row,
+        canvasPos: nextCanvasPos,
+      });
+    }));
+  }, []);
+
   const updateRowTextSettings = useCallback((rowId, partialSettings) => {
     setRows((prev) =>
       prev.map((r) => {
@@ -417,6 +434,7 @@ export const useBulkRows = () => {
     addRow,
     removeRow,
     updateRow,
+    updateRowCanvasPositions,
     updateRowVideoDuration,
     updateRowTextSettings,
     updateRowDragPos,

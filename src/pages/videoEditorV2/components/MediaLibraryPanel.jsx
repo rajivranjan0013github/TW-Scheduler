@@ -377,6 +377,7 @@ const FolderPreview = ({ summary }) => {
 export const MediaLibraryPanel = ({
   token,
   initialMediaType = 'all',
+  restrictToInitialMediaType = false,
   onSelect,
 }) => {
   const campaignId = getActiveCampaignId();
@@ -386,7 +387,11 @@ export const MediaLibraryPanel = ({
   const [activeFolderId, setActiveFolderId] = useState(() => (
     readLastMediaFolder(campaignId)
   ));
-  const mediaType = isAudioLibrary ? 'audio' : 'all';
+  const mediaType = isAudioLibrary
+    ? 'audio'
+    : restrictToInitialMediaType && initialMediaType === 'video'
+      ? 'video'
+      : 'all';
   const [search, setSearch] = useState('');
   const [selectingId, setSelectingId] = useState('');
   const activeAudioPreviewRef = useRef(null);

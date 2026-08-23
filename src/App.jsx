@@ -118,7 +118,6 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   // Returning users with 2+ campaigns still see sidebar on the campaign picker.
   const hasActiveCampaign = Boolean(localStorage.getItem('active-campaign-id'));
   const isOnCampaignPage = location.pathname === '/' || location.pathname === '/campaigns';
-  const isBulkBuilderPage = location.pathname === '/media/bulk-builder';
   const isTimelineEditorPage = location.pathname === '/media/editor'
     || location.pathname === '/media/editor-v2';
   
