@@ -198,6 +198,32 @@ const getUploadedMediaSummary = (media) => ({
   resultMediaName: media?.name || media?.filename || '',
 });
 
+const getProjectSourceUsage = (editorProject) => {
+  const clips = (editorProject?.tracks || [])
+    .flatMap((track) => track.clips || [])
+    .filter((clip) => clip?.enabled !== false)
+    .sort((left, right) => Number(left.timelineStart || 0) - Number(right.timelineStart || 0));
+  const videoClips = clips.filter((clip) => clip.type === 'video');
+  const audioClips = clips.filter((clip) => clip.type === 'audio');
+  const textClips = clips.filter((clip) => clip.type === 'text');
+  const firstVideo = videoClips.find((clip) => clip.metadata?.bulkSlot === 'video1')
+    || videoClips[0];
+  const secondVideo = videoClips.find((clip) => (
+    clip.metadata?.bulkSlot === 'video2' && clip.id !== firstVideo?.id
+  )) || videoClips.find((clip) => clip.id !== firstVideo?.id);
+  const music = audioClips.find((clip) => clip.metadata?.bulkAudio === true)
+    || audioClips[0];
+  const text = textClips.find((clip) => clip.metadata?.bulkCaption === true)
+    || textClips[0];
+
+  return {
+    firstVideoId: String(firstVideo?.mediaId || ''),
+    secondVideoId: String(secondVideo?.mediaId || ''),
+    musicId: String(music?.mediaId || ''),
+    text: String(text?.text || '').trim(),
+  };
+};
+
 const hasBulkQueueVideo = (row) => Boolean(
   row?.video1
   || row?.video1Url
@@ -339,6 +365,7 @@ export const VideoEditorV2 = () => {
 
   const uploadBulkQueueResult = useCallback(async ({
     row,
+    project: renderedProject,
     blob,
     fileName,
     mimeType,
@@ -376,6 +403,7 @@ export const VideoEditorV2 = () => {
     formData.append('folderId', folderId === 'root' ? 'null' : folderId);
     formData.append('tags', 'editor,timeline,bulk');
     formData.append('campaignId', getActiveCampaignId());
+    formData.append('sourceUsage', JSON.stringify(getProjectSourceUsage(renderedProject)));
     if (generatedCaption) formData.append('caption', generatedCaption);
     onProgress?.(0.5, 'Uploading to Media Library…');
     const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
@@ -1901,6 +1929,9 @@ export const VideoEditorV2 = () => {
       formData.append('folderId', folderId && folderId !== 'root' ? String(folderId) : 'null');
       formData.append('tags', isAudioExport ? 'editor,timeline,audio' : 'editor,timeline');
       formData.append('campaignId', getActiveCampaignId());
+      if (!isAudioExport) {
+        formData.append('sourceUsage', JSON.stringify(getProjectSourceUsage(project)));
+      }
       const generatedCaption = isAudioExport
         ? ''
         : String(exportState.generatedCaption || '').trim();

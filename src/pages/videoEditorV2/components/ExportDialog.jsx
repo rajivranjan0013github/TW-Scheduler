@@ -14,6 +14,8 @@ import {
   UploadCloud,
   X,
 } from 'lucide-react';
+import { getMediaUrl } from '../../../utils/mediaUrls';
+import { API_BASE_URL } from '../../videoEditor/videoEditorConstants';
 
 const STATUS_META = {
   queued: { label: 'Waiting', className: 'text-violet-300', Icon: Loader2 },
@@ -29,6 +31,7 @@ const STATUS_META = {
 const normalizeFolderId = (folderId) => String(folderId?._id || folderId || '');
 const getFolderId = (folder) => normalizeFolderId(folder?._id || folder?.id);
 const getFolderParentId = (folder) => normalizeFolderId(folder?.parentFolderId) || 'root';
+const resolveFolderPreview = (folder) => folder?.coverMedia || folder?.previewMedia || null;
 const getItemStatus = (item) => String(item.queueStatus || item.status || 'ready').toLowerCase();
 const getItemPreviewUrl = (item) => (
   item.renderedVideoUrl
@@ -38,6 +41,40 @@ const getItemPreviewUrl = (item) => (
   || item.resultMediaUrl
   || ''
 );
+
+const FolderCoverPreview = ({ folder }) => {
+  const preview = resolveFolderPreview(folder);
+  const previewSource = preview?.type === 'video'
+    ? preview.thumbnailUrl
+    : preview?.thumbnailUrl || preview?.url;
+  const [useProxy, setUseProxy] = useState(false);
+  const imageSource = previewSource
+    ? getMediaUrl(previewSource, { proxy: useProxy, apiBaseUrl: API_BASE_URL })
+    : '';
+
+  return (
+    <span className="relative block h-9 w-11 shrink-0" aria-hidden="true">
+      <span className="absolute left-0.5 top-0 h-2.5 w-5 rounded-t-md bg-[#323740]" />
+      <span className="absolute inset-x-0 bottom-0 top-1 overflow-hidden rounded-lg border border-white/10 bg-[#282c33] shadow-sm">
+        <span className="absolute inset-x-1 bottom-0 top-1.5 overflow-hidden rounded-t-md bg-[#282c33]">
+          {imageSource ? (
+            <img
+              src={imageSource}
+              alt=""
+              loading="lazy"
+              className="relative z-[1] mx-auto h-full w-3/4 rounded-t-md object-cover object-[center_40%]"
+              onError={() => setUseProxy(true)}
+            />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center text-[#666d78]">
+              <Folder className="h-3.5 w-3.5" />
+            </span>
+          )}
+        </span>
+      </span>
+    </span>
+  );
+};
 
 const BulkExportCard = ({ item, index, savingDisabled, onSave }) => {
   const status = getItemStatus(item);
@@ -202,7 +239,7 @@ export const ExportDialog = ({
     setFolderSearch('');
     setExpandedFolderIds(new Set());
     setFolderPickerTargetId(String(itemId || ''));
-    onFolderChange?.('root');
+    onFolderChange?.('');
     onLoadFolders?.();
     setFolderPickerOpen(true);
   };
@@ -260,11 +297,11 @@ export const ExportDialog = ({
             <button
               type="button"
               onClick={() => onFolderChange?.(id)}
-              className={`flex min-w-0 flex-1 items-center gap-2 text-left text-[11px] font-bold ${selected
+              className={`flex min-w-0 flex-1 items-center gap-2.5 text-left text-[11px] font-bold ${selected
                 ? 'text-[#ff8a61]'
                 : 'text-[#b5bac3] hover:text-white'}`}
             >
-              <Folder className="h-4 w-4 shrink-0" />
+              <FolderCoverPreview folder={folder} />
               <span className="truncate">{folder.name || 'Untitled folder'}</span>
             </button>
           </div>
@@ -430,14 +467,11 @@ export const ExportDialog = ({
       {folderPickerOpen && !exporting && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
           <section role="dialog" aria-modal="true" aria-labelledby="export-folder-title" className="flex h-[520px] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#15171c] text-white shadow-2xl">
-            <header className="flex items-start justify-between border-b border-white/10 px-5 py-4">
+            <header className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
               <div>
                 <h3 id="export-folder-title" className="text-sm font-extrabold !text-white">Choose Save Folder</h3>
-                <p className="mt-1 text-[10px] font-semibold !text-[#aeb4bd]">
-                  {isBulk ? choosingFolderForOne ? `Select where Video ${folderPickerTargetIndex + 1} should be saved.` : 'Select where all rendered videos should be saved.' : `Select where the exported ${outputLabel} should be saved.`}
-                </p>
               </div>
-              <button type="button" onClick={closeFolderPicker} disabled={saving} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#858c97] hover:bg-white/10 hover:text-white disabled:opacity-40" aria-label="Close folder picker"><X className="h-4 w-4" /></button>
+              <button type="button" onClick={closeFolderPicker} disabled={saving} className="flex h-7 w-7 items-center justify-center rounded-lg text-[#858c97] hover:bg-white/10 hover:text-white disabled:opacity-40" aria-label="Close folder picker"><X className="h-3.5 w-3.5" /></button>
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
@@ -453,7 +487,7 @@ export const ExportDialog = ({
                   const id = getFolderId(folder);
                   const selected = String(selectedFolderId) === id;
                   return (
-                    <button key={id} type="button" onClick={() => onFolderChange?.(id)} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] font-bold ${selected ? 'border-[#ff5500]/50 bg-[#ff5500]/10 text-[#ff8a61]' : 'border-transparent bg-white/[0.035] text-[#b5bac3] hover:bg-white/[0.07] hover:text-white'}`}><Folder className="h-4 w-4 shrink-0" /><span className="truncate">{folder.name || 'Untitled folder'}</span></button>
+                    <button key={id} type="button" onClick={() => onFolderChange?.(id)} className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-1.5 text-left text-[11px] font-bold ${selected ? 'border-[#ff5500]/50 bg-[#ff5500]/10 text-[#ff8a61]' : 'border-transparent bg-white/[0.035] text-[#b5bac3] hover:bg-white/[0.07] hover:text-white'}`}><FolderCoverPreview folder={folder} /><span className="truncate">{folder.name || 'Untitled folder'}</span></button>
                   );
                 }) : renderFolderTree('root'))}
                 {!foldersLoading && folderSearch.trim() && searchedRootFolders.length === 0 && !folderError && <p className="p-4 text-center text-[10px] font-semibold text-[#666d78]">No root folders found.</p>}
@@ -461,9 +495,9 @@ export const ExportDialog = ({
               </div>
             </div>
 
-            <footer className="flex justify-end gap-2 border-t border-white/10 bg-black/15 px-5 py-4">
-              <button type="button" onClick={closeFolderPicker} disabled={saving} className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-[11px] font-extrabold text-[#b7bcc5] hover:bg-white/[0.08] disabled:opacity-40">Cancel</button>
-              <button type="button" onClick={saveToSelectedFolder} disabled={foldersLoading || saving} className="flex items-center gap-2 rounded-xl bg-[#0071e3] px-4 py-2 text-[11px] font-extrabold text-white hover:bg-blue-600 disabled:opacity-40">
+            <footer className="flex justify-end gap-2 border-t border-white/10 bg-black/15 px-4 py-2.5">
+              <button type="button" onClick={closeFolderPicker} disabled={saving} className="h-7 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-[10px] font-extrabold text-[#b7bcc5] hover:bg-white/[0.08] disabled:opacity-40">Cancel</button>
+              <button type="button" onClick={saveToSelectedFolder} disabled={foldersLoading || saving || !selectedFolderId} className="flex h-7 items-center gap-1.5 rounded-lg bg-[#0071e3] px-3 text-[10px] font-extrabold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40">
                 {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{saving ? 'Saving…' : isBulk && !choosingFolderForOne ? 'Save All Here' : 'Save Here'}
               </button>
             </footer>
