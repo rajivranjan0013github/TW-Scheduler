@@ -1,6 +1,5 @@
 import {
   DEFAULT_EXPORT_OPTIONS,
-  MAX_EXPORT_DURATION_SECONDS,
   MAX_OUTPUT_EDGE,
   MAX_OUTPUT_PIXELS,
   SUPPORTED_PRESETS,
@@ -232,21 +231,6 @@ export const normalizeProject = (project, exportOptions = {}) => {
     throw new VideoExportError('The project has no timed content to export.', {
       code: 'EMPTY_PROJECT',
     });
-  }
-
-  const projectLimit = positiveNumber(
-    project.output?.maxDuration,
-    MAX_EXPORT_DURATION_SECONDS,
-  );
-  const maximumDuration = Math.min(projectLimit, MAX_EXPORT_DURATION_SECONDS);
-  if (duration > maximumDuration + 0.001) {
-    throw new VideoExportError(
-      `This editor exports at most ${maximumDuration} seconds. Shorten the timeline before exporting.`,
-      {
-        code: 'PROJECT_TOO_LONG',
-        details: { duration, maximumDuration },
-      },
-    );
   }
 
   const width = evenInteger(

@@ -51,22 +51,22 @@ const MAX_MEDIA_SCALE = 10;
 const MIN_PREVIEW_ZOOM = 0.5;
 const MAX_PREVIEW_ZOOM = 3;
 const MEDIA_RESIZE_HANDLES = [
-  { mode: 'nw', label: 'Resize media from top left', className: '-left-3 -top-3 cursor-nwse-resize', markerClassName: 'h-3.5 w-3.5 rounded-full' },
-  { mode: 'n', label: 'Resize media from top', className: 'left-1/2 -top-2.5 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-2 w-8 rounded-full' },
-  { mode: 'ne', label: 'Resize media from top right', className: '-right-3 -top-3 cursor-nesw-resize', markerClassName: 'h-3.5 w-3.5 rounded-full' },
-  { mode: 'e', label: 'Resize media from right', className: '-right-2.5 top-1/2 -translate-y-1/2 cursor-ew-resize', markerClassName: 'h-8 w-2 rounded-full' },
-  { mode: 'se', label: 'Resize media from bottom right', className: '-bottom-3 -right-3 cursor-nwse-resize', markerClassName: 'h-3.5 w-3.5 rounded-full' },
-  { mode: 's', label: 'Resize media from bottom', className: '-bottom-2.5 left-1/2 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-2 w-8 rounded-full' },
-  { mode: 'sw', label: 'Resize media from bottom left', className: '-bottom-3 -left-3 cursor-nesw-resize', markerClassName: 'h-3.5 w-3.5 rounded-full' },
-  { mode: 'w', label: 'Resize media from left', className: '-left-2.5 top-1/2 -translate-y-1/2 cursor-ew-resize', markerClassName: 'h-8 w-2 rounded-full' },
+  { mode: 'nw', label: 'Resize media from top left', className: '-left-2.5 -top-2.5 cursor-nwse-resize', markerClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'n', label: 'Resize media from top', className: 'left-1/2 -top-2.5 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-2 w-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'ne', label: 'Resize media from top right', className: '-right-2.5 -top-2.5 cursor-nesw-resize', markerClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'e', label: 'Resize media from right', className: '-right-2.5 top-1/2 -translate-y-1/2 cursor-ew-resize', markerClassName: 'w-2 h-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'se', label: 'Resize media from bottom right', className: '-bottom-2.5 -right-2.5 cursor-nwse-resize', markerClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 's', label: 'Resize media from bottom', className: '-bottom-2.5 left-1/2 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-2 w-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'sw', label: 'Resize media from bottom left', className: '-bottom-2.5 -left-2.5 cursor-nesw-resize', markerClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'w', label: 'Resize media from left', className: '-left-2.5 top-1/2 -translate-y-1/2 cursor-ew-resize', markerClassName: 'w-2 h-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
 ];
 const TEXT_RESIZE_HANDLES = [
-  { mode: 'left', label: 'Resize text box from left', className: '-left-2 top-1/2 h-7 w-4 -translate-y-1/2 cursor-ew-resize', indicatorClassName: 'h-4 w-1 rounded-full' },
-  { mode: 'right', label: 'Resize text box from right', className: '-right-2 top-1/2 h-7 w-4 -translate-y-1/2 cursor-ew-resize', indicatorClassName: 'h-4 w-1 rounded-full' },
-  { mode: 'nw', label: 'Scale text from top left', className: '-left-2.5 -top-2.5 h-5 w-5 cursor-nwse-resize', indicatorClassName: 'h-2 w-2 rounded-[2px]' },
-  { mode: 'ne', label: 'Scale text from top right', className: '-right-2.5 -top-2.5 h-5 w-5 cursor-nesw-resize', indicatorClassName: 'h-2 w-2 rounded-[2px]' },
-  { mode: 'sw', label: 'Scale text from bottom left', className: '-bottom-2.5 -left-2.5 h-5 w-5 cursor-nesw-resize', indicatorClassName: 'h-2 w-2 rounded-[2px]' },
-  { mode: 'se', label: 'Scale text from bottom right', className: '-bottom-2.5 -right-2.5 h-5 w-5 cursor-nwse-resize', indicatorClassName: 'h-2 w-2 rounded-[2px]' },
+  { mode: 'left', label: 'Resize text box from left', className: '-left-2 top-1/2 h-7 w-4 -translate-y-1/2 cursor-ew-resize', indicatorClassName: 'w-2 h-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'right', label: 'Resize text box from right', className: '-right-2 top-1/2 h-7 w-4 -translate-y-1/2 cursor-ew-resize', indicatorClassName: 'w-2 h-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'nw', label: 'Scale text from top left', className: '-left-2.5 -top-2.5 h-5 w-5 cursor-nwse-resize', indicatorClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'ne', label: 'Scale text from top right', className: '-right-2.5 -top-2.5 h-5 w-5 cursor-nesw-resize', indicatorClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'sw', label: 'Scale text from bottom left', className: '-bottom-2.5 -left-2.5 h-5 w-5 cursor-nesw-resize', indicatorClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'se', label: 'Scale text from bottom right', className: '-bottom-2.5 -right-2.5 h-5 w-5 cursor-nwse-resize', indicatorClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
 ];
 
 const isClipActive = (clip, currentTime) => (
@@ -112,7 +112,6 @@ const getVisualGeometry = ({ clip, crop, transform, mediaSize, stageSize }) => {
     1,
     mediaSize.height || Number(clip.metadata?.height || clip.height) || stageHeight,
   );
-  const sourceAspect = Math.max(0.001, sourceWidth / sourceHeight);
   const croppedAspect = Math.max(
     0.001,
     (sourceWidth * crop.width) / (sourceHeight * crop.height),
@@ -127,19 +126,17 @@ const getVisualGeometry = ({ clip, crop, transform, mediaSize, stageSize }) => {
       : 'contain';
 
   if (fit === 'contain') {
-    const fittedWidth = sourceAspect >= targetAspect
+    const fittedWidth = croppedAspect >= targetAspect
       ? targetWidth
-      : targetHeight * sourceAspect;
-    const fittedHeight = sourceAspect >= targetAspect
-      ? targetWidth / sourceAspect
+      : targetHeight * croppedAspect;
+    const fittedHeight = croppedAspect >= targetAspect
+      ? targetWidth / croppedAspect
       : targetHeight;
-    const width = fittedWidth * crop.width;
-    const height = fittedHeight * crop.height;
     return {
-      layerWidth: width,
-      layerHeight: height,
-      contentWidth: width,
-      contentHeight: height,
+      layerWidth: fittedWidth,
+      layerHeight: fittedHeight,
+      contentWidth: fittedWidth,
+      contentHeight: fittedHeight,
       contentLeft: 0,
       contentTop: 0,
     };
@@ -785,7 +782,7 @@ const PatchMaskEditor = ({ patchRemoval, geometry, onPreviewChange, onChange }) 
               cy={targetCenter.y * 1000}
               rx={4 * dotScaleX}
               ry={4 * dotScaleY}
-              fill="#8b5cf6"
+              fill="#7831d6"
               stroke="white"
               strokeWidth="3"
               vectorEffect="non-scaling-stroke"
@@ -1026,7 +1023,7 @@ const PreviewVideoLayer = ({
           onPointerDown={(event) => startResize(event, handle.mode)}
           title={handle.label}
         >
-          <span className={`pointer-events-none border border-zinc-400 bg-white shadow-[0_1px_5px_rgba(0,0,0,0.55)] ${handle.markerClassName}`} />
+          <span className={`pointer-events-none ${handle.markerClassName}`} />
         </span>
       ))}
     </button>
@@ -1074,7 +1071,7 @@ const PreviewImageLayer = ({ clip, selected, stageSize, onSelect, onUpdate }) =>
           onPointerDown={(event) => startResize(event, handle.mode)}
           title={handle.label}
         >
-          <span className={`pointer-events-none border border-zinc-400 bg-white shadow-[0_1px_5px_rgba(0,0,0,0.55)] ${handle.markerClassName}`} />
+          <span className={`pointer-events-none ${handle.markerClassName}`} />
         </span>
       ))}
     </button>
@@ -1519,7 +1516,7 @@ const PreviewTextLayer = ({
         }
       }}
       title={isEditing ? 'Editing text — drag the top or bottom edge to move' : 'Double-click to edit text'}
-      className={`absolute flex max-w-[92%] items-center justify-center whitespace-pre-wrap text-center [overflow-wrap:anywhere] ${selected || isEditing ? 'z-[60]' : 'z-50'} ${isEditing ? 'cursor-move outline outline-2 outline-[#ff5500]' : `cursor-move ${selected ? 'outline outline-1 outline-dashed outline-white/80' : ''}`}`}
+      className={`absolute flex max-w-[92%] items-center justify-center whitespace-pre-wrap text-center [overflow-wrap:anywhere] ${selected || isEditing ? 'z-[60]' : 'z-50'} ${isEditing ? 'cursor-move outline outline-2 outline-[#7831d6]' : `cursor-move ${selected ? 'outline outline-1 outline-dashed outline-white/80' : ''}`}`}
       style={{
         left: `${visibleTransform.x * 100}%`,
         top: `${visibleTransform.y * 100}%`,
@@ -1620,7 +1617,7 @@ const PreviewTextLayer = ({
           }}
           onClick={(event) => event.stopPropagation()}
           onDoubleClick={(event) => event.stopPropagation()}
-          className={`absolute left-4 right-4 z-[65] h-3 touch-none cursor-move rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#ff5500] ${edge === 'top' ? '-top-2.5' : '-bottom-2.5'}`}
+          className={`absolute left-4 right-4 z-[65] h-3 touch-none cursor-move rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[#7831d6] ${edge === 'top' ? '-top-2.5' : '-bottom-2.5'}`}
         />
       ))}
 
@@ -1638,7 +1635,7 @@ const PreviewTextLayer = ({
             onDoubleClick={(event) => event.stopPropagation()}
             className={`absolute z-[70] grid touch-none place-items-center bg-transparent outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white ${handle.className}`}
           >
-            <span className={`pointer-events-none border border-white bg-[#ff5500] shadow-[0_1px_5px_rgba(0,0,0,0.65)] ${handle.indicatorClassName}`} />
+            <span className={`pointer-events-none ${handle.indicatorClassName}`} />
           </button>
         ))}
     </div>
@@ -1646,14 +1643,14 @@ const PreviewTextLayer = ({
 };
 
 const CROP_HANDLES = [
-  { mode: 'nw', label: 'Resize crop from top left', className: '-left-2 -top-2 cursor-nwse-resize', markerClassName: 'h-2.5 w-2.5 rounded-[2px]' },
-  { mode: 'n', label: 'Resize crop from top', className: 'left-1/2 -top-2 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-1.5 w-4 rounded-full' },
-  { mode: 'ne', label: 'Resize crop from top right', className: '-right-2 -top-2 cursor-nesw-resize', markerClassName: 'h-2.5 w-2.5 rounded-[2px]' },
-  { mode: 'e', label: 'Resize crop from right', className: '-right-2 top-1/2 -translate-y-1/2 cursor-ew-resize', markerClassName: 'h-4 w-1.5 rounded-full' },
-  { mode: 'se', label: 'Resize crop from bottom right', className: '-bottom-2 -right-2 cursor-nwse-resize', markerClassName: 'h-2.5 w-2.5 rounded-[2px]' },
-  { mode: 's', label: 'Resize crop from bottom', className: '-bottom-2 left-1/2 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-1.5 w-4 rounded-full' },
-  { mode: 'sw', label: 'Resize crop from bottom left', className: '-bottom-2 -left-2 cursor-nesw-resize', markerClassName: 'h-2.5 w-2.5 rounded-[2px]' },
-  { mode: 'w', label: 'Resize crop from left', className: '-left-2 top-1/2 -translate-y-1/2 cursor-ew-resize', markerClassName: 'h-4 w-1.5 rounded-full' },
+  { mode: 'nw', label: 'Resize crop from top left', className: '-left-2.5 -top-2.5 cursor-nwse-resize', markerClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'n', label: 'Resize crop from top', className: 'left-1/2 -top-2.5 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-2 w-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'ne', label: 'Resize crop from top right', className: '-right-2.5 -top-2.5 cursor-nesw-resize', markerClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'e', label: 'Resize crop from right', className: '-right-2.5 top-1/2 -translate-y-1/2 cursor-ew-resize', markerClassName: 'w-2 h-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'se', label: 'Resize crop from bottom right', className: '-bottom-2.5 -right-2.5 cursor-nwse-resize', markerClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 's', label: 'Resize crop from bottom', className: '-bottom-2.5 left-1/2 -translate-x-1/2 cursor-ns-resize', markerClassName: 'h-2 w-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'sw', label: 'Resize crop from bottom left', className: '-bottom-2.5 -left-2.5 cursor-nesw-resize', markerClassName: 'h-3.5 w-3.5 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
+  { mode: 'w', label: 'Resize crop from left', className: '-left-2.5 top-1/2 -translate-y-1/2 cursor-ew-resize', markerClassName: 'w-2 h-6 rounded-full bg-[#8b5cf6] border-2 border-white shadow-[0_1px_5px_rgba(0,0,0,0.65)]' },
 ];
 
 const updateCropFromDelta = (initialCrop, mode, deltaX, deltaY) => {
@@ -1738,7 +1735,11 @@ const CropWorkspace = ({
   }, [onCancel]);
 
   const sourceReady = mediaSize.width > 0 && mediaSize.height > 0;
-  const workspacePadding = Math.min(12, stageSize.width * 0.035, stageSize.height * 0.035);
+  const workspacePadding = clamp(
+    Math.min(stageSize.width, stageSize.height) * 0.08,
+    12,
+    24,
+  );
   const availableWidth = Math.max(1, stageSize.width - workspacePadding * 2);
   const availableHeight = Math.max(1, stageSize.height - workspacePadding * 2);
   const sourceScale = sourceReady
@@ -1827,36 +1828,38 @@ const CropWorkspace = ({
       {sourceReady ? (
         <div
           ref={sourceViewportRef}
-          className="absolute overflow-hidden bg-black shadow-[0_12px_45px_rgba(0,0,0,0.65)] ring-1 ring-white/25"
+          className="absolute overflow-visible"
           style={sourceViewport}
         >
-          {clip.type === 'video' ? (
-            <video
-              ref={mediaRef}
-              src={sourceUrl}
-              crossOrigin="anonymous"
-              playsInline
-              muted
-              preload="auto"
-              onLoadedMetadata={(event) => updateIntrinsicSize(
-                event.currentTarget.videoWidth,
-                event.currentTarget.videoHeight,
-              )}
-              className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill"
-            />
-          ) : (
-            <img
-              ref={mediaRef}
-              src={sourceUrl}
-              alt=""
-              draggable="false"
-              onLoad={(event) => updateIntrinsicSize(
-                event.currentTarget.naturalWidth,
-                event.currentTarget.naturalHeight,
-              )}
-              className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill"
-            />
-          )}
+          <span className="absolute inset-0 overflow-hidden bg-black shadow-[0_12px_45px_rgba(0,0,0,0.65)] ring-1 ring-white/25">
+            {clip.type === 'video' ? (
+              <video
+                ref={mediaRef}
+                src={sourceUrl}
+                crossOrigin="anonymous"
+                playsInline
+                muted
+                preload="auto"
+                onLoadedMetadata={(event) => updateIntrinsicSize(
+                  event.currentTarget.videoWidth,
+                  event.currentTarget.videoHeight,
+                )}
+                className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill"
+              />
+            ) : (
+              <img
+                ref={mediaRef}
+                src={sourceUrl}
+                alt=""
+                draggable="false"
+                onLoad={(event) => updateIntrinsicSize(
+                  event.currentTarget.naturalWidth,
+                  event.currentTarget.naturalHeight,
+                )}
+                className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill"
+              />
+            )}
+          </span>
 
           <div
             role="group"
@@ -1864,7 +1867,7 @@ const CropWorkspace = ({
             aria-label="Crop selection. Drag to move; use arrow keys for precise movement."
             onKeyDown={(event) => handleKeyboardMove(event, 'move')}
             onPointerDown={(event) => startInteraction(event, 'move')}
-            className="absolute z-10 cursor-move touch-none border-2 border-[#ff5a1f] shadow-[0_0_0_999px_rgba(0,0,0,0.58)] outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="absolute z-10 cursor-move touch-none border-2 border-[#7831d6] shadow-[0_0_0_999px_rgba(0,0,0,0.58)] outline-none focus-visible:ring-2 focus-visible:ring-white"
             style={{
               left: `${crop.x * 100}%`,
               top: `${crop.y * 100}%`,
@@ -1885,7 +1888,7 @@ const CropWorkspace = ({
                 onClick={(event) => event.stopPropagation()}
                 className={`absolute z-20 grid h-5 w-5 touch-none place-items-center bg-transparent outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-white ${handle.className}`}
               >
-                <span className={`pointer-events-none border border-white bg-[#ff5a1f] shadow-[0_1px_5px_rgba(0,0,0,0.7)] ${handle.markerClassName}`} />
+                <span className={`pointer-events-none ${handle.markerClassName}`} />
               </button>
             ))}
           </div>
@@ -2368,7 +2371,7 @@ export const PreviewStage = ({
 
       <div className={`${isFullscreen
         ? 'absolute bottom-4 left-1/2 z-[80] -translate-x-1/2'
-        : 'mx-auto mb-3 shrink-0'} flex h-11 w-fit items-center gap-2 rounded-xl border border-white/10 bg-[#1a1b20]/95 px-2 shadow-[0_12px_30px_rgba(0,0,0,0.32)] backdrop-blur-md`}>
+        : 'mx-auto mb-3 shrink-0'} flex h-11 w-fit items-center gap-2 rounded-xl border border-[#303034] bg-[#1c1c1f]/95 px-2 shadow-[0_12px_30px_rgba(0,0,0,0.32)] backdrop-blur-md`}>
         {isPatchEditing ? (
           <>
             <span className="px-1 text-[10px] font-bold text-zinc-300">
@@ -2405,7 +2408,7 @@ export const PreviewStage = ({
                     : selectedPatchRemoval.pathClosed,
                 },
               })}
-              className="flex h-8 items-center gap-1.5 rounded-lg bg-violet-500 px-3 text-[10px] font-extrabold text-white shadow-[0_5px_14px_rgba(139,92,246,0.3)] transition hover:bg-violet-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1a1b20]"
+              className="flex h-8 items-center gap-1.5 rounded-lg bg-[#7831d6] px-3 text-[10px] font-extrabold text-white shadow-[0_5px_14px_rgba(120,49,214,0.3)] transition hover:bg-[#6825bc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c4b5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1c1c1f]"
             >
               <Check className="h-3.5 w-3.5" />
               Done
@@ -2436,7 +2439,7 @@ export const PreviewStage = ({
             <button
               type="button"
               onClick={applyCropping}
-              className="flex h-8 items-center gap-1.5 rounded-lg bg-[#ff5a1f] px-3 text-[10px] font-extrabold text-white shadow-[0_5px_14px_rgba(255,90,31,0.28)] transition hover:bg-[#ff6a33] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff8a61] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1a1b20]"
+              className="flex h-8 items-center gap-1.5 rounded-lg bg-[#7831d6] px-3 text-[10px] font-extrabold text-white shadow-[0_5px_14px_rgba(120,49,214,0.28)] transition hover:bg-[#6825bc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c4b5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1c1c1f]"
             >
               <Check className="h-3.5 w-3.5" />
               Done
@@ -2453,7 +2456,7 @@ export const PreviewStage = ({
             <button
               type="button"
               onClick={onTogglePlay}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#ff5a1f] text-white shadow-[0_5px_14px_rgba(255,90,31,0.28)] transition hover:bg-[#ff6a33] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff8a61] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1a1b20]"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#7831d6] text-white shadow-[0_5px_14px_rgba(120,49,214,0.28)] transition hover:bg-[#6825bc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c4b5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1c1c1f]"
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? <Pause className="h-3.5 w-3.5 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
@@ -2462,8 +2465,8 @@ export const PreviewStage = ({
               type="button"
               onClick={() => setShowGuides((visible) => !visible)}
               className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${showGuides
-                ? 'bg-[#ff5a1f]/15 text-[#ff7043] ring-1 ring-[#ff7043]/40'
-                : 'text-zinc-400 hover:bg-white/10 hover:text-white'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]/70`}
+                ? 'bg-[#7831d6]/20 text-[#c4b5fd] ring-1 ring-[#7831d6]/40'
+                : 'text-zinc-400 hover:bg-white/10 hover:text-white'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7831d6]/70`}
               aria-label={showGuides ? 'Hide preview guides' : 'Show preview guides'}
               aria-pressed={showGuides}
               title={showGuides ? 'Hide guides' : 'Show guides'}
@@ -2474,7 +2477,7 @@ export const PreviewStage = ({
               type="button"
               onClick={() => setPreviewZoom(1)}
               disabled={Math.abs(previewZoom - 1) < 0.001}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]/70 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7831d6]/70 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-400"
               aria-label="Reset preview zoom to 100 percent"
               title="Reset preview zoom (Z)"
             >
@@ -2483,7 +2486,7 @@ export const PreviewStage = ({
             <button
               type="button"
               onClick={toggleFullscreen}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff5a1f]/70"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7831d6]/70"
               aria-label={isFullscreen ? 'Exit full-screen preview' : 'Full-screen preview'}
               title={isFullscreen ? 'Exit full screen' : 'Full screen'}
             >

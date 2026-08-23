@@ -8,11 +8,14 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ChevronRight,
+  Cloud,
   Folder,
+  Globe,
   Loader2,
   Pause,
   Play,
   Search,
+  X,
 } from 'lucide-react';
 import { getActiveCampaignId } from '../../../utils/campaignScope';
 import { getMediaUrl } from '../../../utils/mediaUrls';
@@ -53,6 +56,30 @@ const mediaItemToEditorAsset = (item) => ({
   height: item.height || item.metadata?.height || 0,
   mimeType: item.mimeType || item.mimetype || '',
 });
+
+const isAudioFolder = (folder, folderMap) => {
+  if (!folder) return false;
+  const name = String(folder.name || '').trim().toLowerCase();
+  if (name === 'audio' || name === 'trending songs' || name === 'my own audios' || name === 'my audio') {
+    return true;
+  }
+  if (Array.isArray(folder.tags) && folder.tags.includes('audio')) {
+    return true;
+  }
+  let parentId = getFolderParentId(folder);
+  const visited = new Set();
+  while (parentId && parentId !== 'root' && !visited.has(parentId)) {
+    visited.add(parentId);
+    const parent = folderMap?.get(parentId);
+    if (!parent) break;
+    const parentName = String(parent.name || '').trim().toLowerCase();
+    if (parentName === 'audio' || (Array.isArray(parent.tags) && parent.tags.includes('audio'))) {
+      return true;
+    }
+    parentId = getFolderParentId(parent);
+  }
+  return false;
+};
 
 const naturalFileCollator = new Intl.Collator(undefined, {
   numeric: true,
@@ -355,8 +382,9 @@ export const MediaLibraryPanel = ({
   const campaignId = getActiveCampaignId();
   const queryClient = useQueryClient();
   const isAudioLibrary = initialMediaType === 'audio';
+  const [audioScope, setAudioScope] = useState('global');
   const [activeFolderId, setActiveFolderId] = useState(() => (
-    isAudioLibrary ? PLATFORM_AUDIO_FOLDER_ID : readLastMediaFolder(campaignId)
+    readLastMediaFolder(campaignId)
   ));
   const mediaType = isAudioLibrary ? 'audio' : 'all';
   const [search, setSearch] = useState('');
@@ -377,65 +405,123 @@ export const MediaLibraryPanel = ({
     }
   }, []);
 
+  const authToken = token
+    || (typeof window !== 'undefined' ? (localStorage.getItem('tw_token') || localStorage.getItem('token')) : '');
+
   const foldersQuery = useQuery({
     queryKey: mediaLibraryKeys.folders(campaignId),
-    queryFn: ({ signal }) => fetchMediaLibraryFolders({ token, campaignId, signal }),
+    queryFn: ({ signal }) => fetchMediaLibraryFolders({ token: authToken, campaignId, signal }),
     staleTime: MEDIA_LIBRARY_STALE_TIME,
     gcTime: MEDIA_LIBRARY_GC_TIME,
-    enabled: Boolean(token) && !isAudioLibrary,
+    enabled: Boolean(authToken),
   });
 
+  const folders = useMemo(() => foldersQuery.data || [], [foldersQuery.data]);
+
+  const targetAudioFolderId = useMemo(() => {
+    if (!isAudioLibrary) return null;
+
+    if (audioScope === 'global') {
+      const trending = folders.find((f) => f.name.toLowerCase().includes('trending'));
+      if (trending) return normalizeFolderId(trending._id);
+
+      const globalAudio = folders.find((f) => (
+        f.scope === 'global' && f.name.toLowerCase() === 'audio'
+      ));
+      if (globalAudio) return normalizeFolderId(globalAudio._id);
+
+      return PLATFORM_AUDIO_FOLDER_ID;
+    }
+
+    // audioScope === 'uploaded'
+    const myOwn = folders.find((f) => (
+      f.name.toLowerCase().includes('my own') || f.name.toLowerCase().includes('my audio')
+    ));
+    if (myOwn) return normalizeFolderId(myOwn._id);
+
+    const campaignAudio = folders.find((f) => (
+      f.scope !== 'global' && f.name.toLowerCase() === 'audio'
+    ));
+    if (campaignAudio) return normalizeFolderId(campaignAudio._id);
+
+    return 'root';
+  }, [audioScope, folders, isAudioLibrary]);
+
+  const effectiveFolderId = useMemo(() => {
+    if (isAudioLibrary) return targetAudioFolderId;
+    if (activeFolderId === 'root') return 'root';
+    const folderMap = new Map(folders.map((folder) => [normalizeFolderId(folder._id), folder]));
+    const currentFolder = folderMap.get(activeFolderId);
+    if (!currentFolder && foldersQuery.isSuccess) {
+      return 'root';
+    }
+    if (currentFolder && isAudioFolder(currentFolder, folderMap)) {
+      return 'root';
+    }
+    return activeFolderId;
+  }, [activeFolderId, folders, foldersQuery.isSuccess, isAudioLibrary, targetAudioFolderId]);
+
   const mediaQuery = useQuery({
-    queryKey: mediaLibraryKeys.media(campaignId, activeFolderId),
+    queryKey: mediaLibraryKeys.media(campaignId, effectiveFolderId, isAudioLibrary),
     queryFn: ({ signal }) => fetchMediaLibraryFolder({
-      token,
+      token: authToken,
       campaignId,
-      folderId: activeFolderId,
+      folderId: effectiveFolderId,
+      includeSubfolders: isAudioLibrary,
       signal,
     }),
     staleTime: MEDIA_LIBRARY_STALE_TIME,
     gcTime: MEDIA_LIBRARY_GC_TIME,
-    enabled: Boolean(token),
+    enabled: Boolean(authToken),
   });
 
-  const folders = useMemo(() => foldersQuery.data || [], [foldersQuery.data]);
   const media = useMemo(() => mediaQuery.data || [], [mediaQuery.data]);
-  const loadingFolders = !isAudioLibrary && foldersQuery.isPending && !foldersQuery.data;
-  const loadingMedia = mediaQuery.isPending && !mediaQuery.data;
+  const loadingFolders = foldersQuery.isLoading && !foldersQuery.data;
+  const loadingMedia = mediaQuery.isLoading && !mediaQuery.data;
   const error = foldersQuery.error?.message || mediaQuery.error?.message || '';
 
   const openFolder = useCallback((folderId) => {
-    if (isAudioLibrary) {
-      setActiveFolderId(PLATFORM_AUDIO_FOLDER_ID);
-      return;
-    }
     const normalizedFolderId = normalizeFolderId(folderId) || 'root';
     setActiveFolderId(normalizedFolderId);
     saveLastMediaFolder(campaignId, normalizedFolderId);
-  }, [campaignId, isAudioLibrary]);
+  }, [campaignId]);
 
   const prefetchFolder = useCallback((folderId) => {
-    if (isAudioLibrary) return;
     const normalizedFolderId = normalizeFolderId(folderId) || 'root';
     void queryClient.prefetchQuery({
-      queryKey: mediaLibraryKeys.media(campaignId, normalizedFolderId),
+      queryKey: mediaLibraryKeys.media(campaignId, normalizedFolderId, false),
       queryFn: ({ signal }) => fetchMediaLibraryFolder({
         token,
         campaignId,
         folderId: normalizedFolderId,
+        includeSubfolders: false,
         signal,
       }),
       staleTime: MEDIA_LIBRARY_STALE_TIME,
       gcTime: MEDIA_LIBRARY_GC_TIME,
     });
-  }, [campaignId, isAudioLibrary, queryClient, token]);
+  }, [campaignId, queryClient, token]);
 
-  const childFolders = useMemo(() => folders
-    .filter((folder) => getFolderParentId(folder) === activeFolderId)
-    .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || '')), [activeFolderId, folders]);
+  const childFolders = useMemo(() => {
+    if (isAudioLibrary) return [];
+
+    const folderMap = new Map(folders.map((folder) => [normalizeFolderId(folder._id), folder]));
+    const query = search.trim().toLowerCase();
+
+    return folders
+      .filter((folder) => {
+        if (getFolderParentId(folder) !== activeFolderId) return false;
+        if (isAudioFolder(folder, folderMap)) return false;
+        if (!query) return true;
+        const folderName = String(folder.name || '').toLowerCase();
+        const folderTags = (Array.isArray(folder.tags) ? folder.tags : []).join(' ').toLowerCase();
+        return folderName.includes(query) || folderTags.includes(query);
+      })
+      .sort((a, b) => naturalFileCollator.compare(a.name || '', b.name || ''));
+  }, [activeFolderId, folders, isAudioLibrary, search]);
 
   const breadcrumbPath = useMemo(() => {
-    if (activeFolderId === 'root') return [];
+    if (isAudioLibrary || activeFolderId === 'root') return [];
     const folderMap = new Map(folders.map((folder) => [normalizeFolderId(folder._id), folder]));
     const branch = [];
     const visited = new Set();
@@ -453,7 +539,7 @@ export const MediaLibraryPanel = ({
     }
 
     return branch;
-  }, [activeFolderId, folders]);
+  }, [activeFolderId, folders, isAudioLibrary]);
 
   const filteredMedia = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -462,6 +548,11 @@ export const MediaLibraryPanel = ({
       if (!query) return true;
       const searchableText = [
         item.name,
+        item.originalName,
+        item.title,
+        item.caption,
+        item.description,
+        item.type,
         ...(Array.isArray(item.tags) ? item.tags : []),
       ].filter(Boolean).join(' ').toLowerCase();
       return searchableText.includes(query);
@@ -495,19 +586,66 @@ export const MediaLibraryPanel = ({
   };
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-[#111318]" aria-label="Media Library">
-      <div className="shrink-0 space-y-2.5 border-b border-white/10 p-3">
-        <label className="flex h-9 items-center gap-2 rounded-xl border border-white/10 bg-[#171a20] px-2.5 focus-within:border-[#ff5500]/60">
-          <Search className="h-3.5 w-3.5 shrink-0 text-[#727985]" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search names and tags"
-            className="min-w-0 flex-1 bg-transparent text-[10px] font-semibold text-[#e6e8ec] outline-none placeholder:text-[#666d78]"
-          />
-        </label>
+    <section className="flex h-full min-h-0 flex-col bg-[#151517]" aria-label="Media Library">
+      <div className="shrink-0 space-y-2.5 border-b border-[#303034] p-3">
+        {isAudioLibrary && (
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/[0.05] p-0.5 text-[10px] font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setAudioScope('global');
+                setActiveFolderId('root');
+              }}
+              className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 transition ${
+                audioScope === 'global'
+                  ? 'bg-[#7831d6] text-white shadow-sm'
+                  : 'text-[#8b929d] hover:text-white'
+              }`}
+            >
+              <Globe className="h-3.5 w-3.5" />
+              Global
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAudioScope('uploaded');
+                setActiveFolderId('root');
+              }}
+              className={`flex items-center justify-center gap-1.5 rounded-lg py-1.5 transition ${
+                audioScope === 'uploaded'
+                  ? 'bg-[#7831d6] text-white shadow-sm'
+                  : 'text-[#8b929d] hover:text-white'
+              }`}
+            >
+              <Cloud className="h-3.5 w-3.5" />
+              Uploaded
+            </button>
+          </div>
+        )}
 
-        {breadcrumbPath.length > 0 && (
+        <div className="relative rounded-xl p-[1px] bg-gradient-to-r from-[#7831d6]/50 via-purple-500/30 to-indigo-500/30 transition-all duration-300 focus-within:from-[#7831d6] focus-within:via-purple-500 focus-within:to-indigo-500 focus-within:shadow-[0_0_12px_rgba(120,49,214,0.25)]">
+          <label className="flex h-9 items-center gap-2 rounded-[11px] bg-[#1c1c1f] px-2.5">
+            <Search className="h-3.5 w-3.5 shrink-0 text-[#8b929d]" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={isAudioLibrary ? "Search songs and tags" : "Search names and tags"}
+              className="min-w-0 flex-1 !bg-transparent !border-0 text-[10px] font-semibold text-[#e6e8ec] outline-none placeholder:text-[#666d78]"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[#727985] hover:bg-white/10 hover:text-white"
+                aria-label="Clear search"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </label>
+        </div>
+
+        {!isAudioLibrary && breadcrumbPath.length > 0 && (
           <nav
             className="flex min-w-0 items-center gap-1 overflow-x-auto text-[9px]"
             aria-label="Folder breadcrumb"
@@ -515,7 +653,7 @@ export const MediaLibraryPanel = ({
             <button
               type="button"
               onClick={() => openFolder('root')}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#7e8692] transition hover:bg-white/10 hover:text-[#ff6a1a]"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#7e8692] transition hover:bg-white/10 hover:text-[#c4b5fd]"
               aria-label="Open library root"
               title="Library root"
             >
@@ -552,48 +690,59 @@ export const MediaLibraryPanel = ({
           </div>
         )}
 
-        {loadingFolders || loadingMedia ? (
-          <div className="flex min-h-40 items-center justify-center gap-2 text-[10px] font-bold text-[#a6abb4]">
+        {loadingFolders && folders.length === 0 ? (
+          <div className="flex min-h-32 items-center justify-center gap-2 text-[10px] font-bold text-[#a6abb4]">
             <Loader2 className="h-4 w-4 animate-spin text-[#ff5500]" />
-            Loading Media Library…
+            Loading folders…
           </div>
         ) : (
-          <>
-            {childFolders.length > 0 && (
-              <div className="mb-4">
-                <div className="grid grid-cols-1 gap-2">
-                  {childFolders.map((folder) => (
-                    <button
-                      key={normalizeFolderId(folder._id)}
-                      type="button"
-                      onClick={() => openFolder(folder._id)}
-                      onMouseEnter={() => prefetchFolder(folder._id)}
-                      onFocus={() => prefetchFolder(folder._id)}
-                      className="group flex min-w-0 items-center gap-4 rounded-xl px-2 py-2.5 text-left transition hover:bg-white/[0.05]"
-                    >
-                      <FolderPreview summary={{ preview: folder.coverMedia || folder.previewMedia }} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[11px] font-bold text-[#f0f2f5]">
-                          {folder.name || 'Untitled'}
-                        </span>
-                        <span className="mt-1 block text-[9px] font-medium text-[#8b929d]">
-                          {Number(folder.subfolderCount || 0) > 0 && Number(folder.itemCount || 0) === 0
-                            ? `${folder.subfolderCount} ${folder.subfolderCount === 1 ? 'folder' : 'folders'}`
-                            : `${Number(folder.itemCount || 0)} items`}
-                        </span>
+          childFolders.length > 0 && (
+            <div className="mb-4">
+              <div className="grid grid-cols-1 gap-2">
+                {childFolders.map((folder) => (
+                  <button
+                    key={normalizeFolderId(folder._id)}
+                    type="button"
+                    onClick={() => openFolder(folder._id)}
+                    onMouseEnter={() => prefetchFolder(folder._id)}
+                    onFocus={() => prefetchFolder(folder._id)}
+                    className="group flex min-w-0 items-center gap-4 rounded-xl px-2 py-2.5 text-left transition hover:bg-white/[0.05]"
+                  >
+                    <FolderPreview summary={{ preview: folder.coverMedia || folder.previewMedia }} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[11px] font-bold text-[#f0f2f5]">
+                        {folder.name || 'Untitled'}
                       </span>
-                    </button>
-                  ))}
-                </div>
+                      <span className="mt-1 block text-[9px] font-medium text-[#8b929d]">
+                        {Number(folder.subfolderCount || 0) > 0 && Number(folder.itemCount || 0) === 0
+                          ? `${folder.subfolderCount} ${folder.subfolderCount === 1 ? 'folder' : 'folders'}`
+                          : `${Number(folder.itemCount || 0)} items`}
+                      </span>
+                    </span>
+                  </button>
+                ))}
               </div>
-            )}
-
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#666d78]">Files</p>
-              <span className="text-[8px] font-semibold tabular-nums text-[#666d78]">{filteredMedia.length} items</span>
             </div>
+          )
+        )}
 
-            {filteredMedia.length > 0 ? (
+        {loadingMedia && media.length === 0 ? (
+          <div className="flex min-h-32 items-center justify-center gap-2 text-[10px] font-bold text-[#a6abb4]">
+            <Loader2 className="h-4 w-4 animate-spin text-[#7831d6]" />
+            Loading {isAudioLibrary ? (audioScope === 'global' ? 'Trending songs' : 'Uploaded audio') : 'files'}…
+          </div>
+        ) : (
+          filteredMedia.length > 0 && (
+            <>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#666d78]">
+                  {isAudioLibrary ? (audioScope === 'global' ? 'Trending Songs' : 'My Audio') : 'Files'}
+                </p>
+                <span className="text-[8px] font-semibold tabular-nums text-[#666d78]">
+                  {filteredMedia.length} {isAudioLibrary ? (filteredMedia.length === 1 ? 'song' : 'songs') : `${filteredMedia.length === 1 ? 'item' : 'items'}`}
+                </span>
+              </div>
+
               <div className="space-y-3">
                 {visualMedia.length > 0 && (
                   <div className="grid grid-cols-4 gap-2">
@@ -607,7 +756,7 @@ export const MediaLibraryPanel = ({
                           onDragStart={(event) => handleDragStart(event, item)}
                           onClick={() => handleSelect(item)}
                           disabled={Boolean(selectingId)}
-                          className="group min-w-0 cursor-grab overflow-hidden rounded-xl border border-white/10 bg-[#171a20] text-left transition hover:border-[#ff5500]/60 hover:bg-[#1d2027] active:cursor-grabbing disabled:cursor-wait disabled:opacity-60"
+                          className="group min-w-0 cursor-grab overflow-hidden rounded-xl border border-[#35353a] bg-[#1c1c1f] text-left transition hover:border-[#7831d6]/60 hover:bg-[#232326] active:cursor-grabbing disabled:cursor-wait disabled:opacity-60"
                           title={`Drag ${item.name || item.type || 'media'} to the timeline, or click to add it`}
                         >
                           <span className="relative block aspect-[9/16] overflow-hidden bg-[#0b0c0f]">
@@ -635,19 +784,21 @@ export const MediaLibraryPanel = ({
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 px-4 text-center">
-                <p className="text-[10px] font-bold text-[#a6abb4]">No matching files</p>
-                <p className="mt-1 text-[9px] font-medium text-[#666d78]">
-                  {search
-                    ? 'Try another search.'
-                    : isAudioLibrary
-                      ? 'No global audio tracks are available.'
-                      : 'Open another folder or change the file type.'}
-                </p>
-              </div>
-            )}
-          </>
+            </>
+          )
+        )}
+
+        {!loadingFolders && !loadingMedia && childFolders.length === 0 && filteredMedia.length === 0 && (
+          <div className="flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 px-4 text-center">
+            <p className="text-[10px] font-bold text-[#a6abb4]">No matching files</p>
+            <p className="mt-1 text-[9px] font-medium text-[#666d78]">
+              {search
+                ? 'Try another search.'
+                : isAudioLibrary
+                  ? (audioScope === 'global' ? 'No trending songs available.' : 'No uploaded audio files found.')
+                  : 'Open another folder or change the file type.'}
+            </p>
+          </div>
         )}
       </div>
     </section>

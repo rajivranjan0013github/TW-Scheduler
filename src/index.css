@@ -287,10 +287,18 @@ h1, h2, h3, h4, h5, h6 {
   border-color: #7831d6 !important;
 }
 
+.bg-transparent,
+input.bg-transparent,
+textarea.bg-transparent,
+[class*="bg-transparent"] {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
 /* Inputs & Form Controls */
-input:not([type="checkbox"]):not([type="radio"]),
-textarea,
-select {
+input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent):not([class*="bg-transparent"]):not([class*="!bg-transparent"]),
+textarea:not(.bg-transparent):not([class*="bg-transparent"]):not([class*="!bg-transparent"]),
+select:not(.bg-transparent):not([class*="bg-transparent"]):not([class*="!bg-transparent"]) {
   background-color: #050505 !important;
   color: #ffffff !important;
   border-color: rgba(255, 255, 255, 0.12) !important;

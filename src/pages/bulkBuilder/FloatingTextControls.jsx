@@ -36,7 +36,7 @@ export const FloatingTextControls = ({
   return (
     <div
       data-text-controls="true"
-      className="absolute z-40 bg-[#18181b]/95 border border-[#2d2d30] rounded-xl shadow-2xl p-3 space-y-2.5 w-[240px] text-[#e0e0e5] backdrop-blur-md"
+      className="absolute z-40 bg-[#1c1c1f]/95 border border-[#303034] rounded-xl shadow-2xl p-3 space-y-2.5 w-[240px] text-[#e0e0e5] backdrop-blur-md"
       style={{
         top: '50%',
         left: 'calc(100% + 10px)',
@@ -58,7 +58,7 @@ export const FloatingTextControls = ({
         <button
           type="button"
           onClick={onClose}
-          className="text-[10px] font-bold text-gray-400 hover:text-white transition-colors uppercase"
+          className="text-[10px] font-bold text-zinc-400 hover:text-white transition-colors uppercase"
         >
           Done
         </button>
@@ -69,12 +69,12 @@ export const FloatingTextControls = ({
         <select
           value={fontFamily}
           onChange={(e) => onUpdate({ fontFamily: e.target.value })}
-          className="w-full text-[10px] font-medium border border-[#2d2d30] rounded-lg p-1.5 bg-[#121214] text-white outline-none cursor-pointer appearance-none"
+          className="w-full text-[10px] font-medium border border-[#35353a] rounded-lg p-1.5 bg-[#232326] text-white outline-none cursor-pointer appearance-none"
         >
-          <option className="bg-[#1e1e24] text-white" value="TikTok Sans">TikTok Sans</option>
-          <option className="bg-[#1e1e24] text-white" value="Roboto">Roboto</option>
-          <option className="bg-[#1e1e24] text-white" value="Impact">Impact</option>
-          <option className="bg-[#1e1e24] text-white" value="Arial">Arial</option>
+          <option className="bg-[#232326] text-white" value="TikTok Sans">TikTok Sans</option>
+          <option className="bg-[#232326] text-white" value="Roboto">Roboto</option>
+          <option className="bg-[#232326] text-white" value="Impact">Impact</option>
+          <option className="bg-[#232326] text-white" value="Arial">Arial</option>
         </select>
         <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
           <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,7 +86,7 @@ export const FloatingTextControls = ({
       {/* Weight */}
       <div className="space-y-1">
         <span
-          className="cursor-default text-[10px] font-bold text-gray-400"
+          className="cursor-default text-[10px] font-bold text-zinc-400"
           title="Double-click to reset weight"
           onDoubleClick={() => onUpdate({ fontWeight: DEFAULT_TEXT_SETTINGS.fontWeight })}
         >
@@ -96,8 +96,8 @@ export const FloatingTextControls = ({
           type="range" min="0" max="5" step="1"
           value={weightIdx}
           onChange={(e) => onUpdate({ fontWeight: FONT_WEIGHTS[Number(e.target.value)] })}
-          className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
-          style={{ background: `linear-gradient(to right, #ff5500 ${(weightIdx / 5) * 100}%, #2d2d30 ${(weightIdx / 5) * 100}%)` }}
+          className="w-full accent-[#7831d6] h-1 appearance-none rounded-lg cursor-pointer"
+          style={{ background: `linear-gradient(to right, #7831d6 ${(weightIdx / 5) * 100}%, #35353a ${(weightIdx / 5) * 100}%)` }}
         />
       </div>
 
@@ -105,13 +105,13 @@ export const FloatingTextControls = ({
       <div className="flex gap-2">
         <div className="flex-1 space-y-1">
           <span
-            className="cursor-default text-[10px] font-bold text-gray-400"
+            className="cursor-default text-[10px] font-bold text-zinc-400"
             title="Double-click to reset color"
             onDoubleClick={() => onUpdate({ fontColor: DEFAULT_TEXT_SETTINGS.fontColor })}
           >
             Color
           </span>
-          <div className="relative w-full h-6 rounded-lg overflow-hidden border border-[#2d2d30] cursor-pointer">
+          <div className="relative w-full h-6 rounded-lg overflow-hidden border border-[#35353a] cursor-pointer">
             <input
               type="color"
               value={fontColor.toLowerCase()}
@@ -122,13 +122,13 @@ export const FloatingTextControls = ({
         </div>
         <div className="flex-1 space-y-1">
           <span
-            className="cursor-default text-[10px] font-bold text-gray-400"
+            className="cursor-default text-[10px] font-bold text-zinc-400"
             title="Double-click to reset stroke color"
             onDoubleClick={() => onUpdate({ strokeColor: DEFAULT_TEXT_SETTINGS.strokeColor })}
           >
             Stroke
           </span>
-          <div className="relative w-full h-6 rounded-lg overflow-hidden border border-[#2d2d30] cursor-pointer">
+          <div className="relative w-full h-6 rounded-lg overflow-hidden border border-[#35353a] cursor-pointer">
             <input
               type="color"
               value={strokeColor.toLowerCase()}
@@ -142,7 +142,7 @@ export const FloatingTextControls = ({
       {/* Stroke Width */}
       <div className="space-y-1">
         <span
-          className="cursor-default text-[10px] font-bold text-gray-400"
+          className="cursor-default text-[10px] font-bold text-zinc-400"
           title="Double-click to reset stroke width"
           onDoubleClick={() => onUpdate({ strokeWidth: DEFAULT_TEXT_SETTINGS.strokeWidth })}
         >
@@ -152,8 +152,8 @@ export const FloatingTextControls = ({
           type="range" min="0" max="10" step="0.125"
           value={strokeWidth}
           onChange={(e) => onUpdate({ strokeWidth: Number(e.target.value) })}
-          className="w-full accent-[#ff5500] h-1 appearance-none rounded-lg cursor-pointer"
-          style={{ background: `linear-gradient(to right, #ff5500 ${(strokeWidth / 10) * 100}%, #2d2d30 ${(strokeWidth / 10) * 100}%)` }}
+          className="w-full accent-[#7831d6] h-1 appearance-none rounded-lg cursor-pointer"
+          style={{ background: `linear-gradient(to right, #7831d6 ${(strokeWidth / 10) * 100}%, #35353a ${(strokeWidth / 10) * 100}%)` }}
         />
       </div>
 
@@ -177,8 +177,8 @@ export const FloatingTextControls = ({
               onClick={() => handleBgTypeClick(type)}
               className={`flex-1 py-1 text-[9px] font-semibold rounded-full border transition-all ${
                 bgType === type
-                  ? 'bg-[#ff5500] border-[#ff5500] text-white shadow-md'
-                  : 'bg-[#27272a] border-[#2d2d30] text-gray-300 hover:bg-[#3e3e42] hover:text-white'
+                  ? 'bg-[#7831d6] border-[#7831d6] text-white shadow-md'
+                  : 'bg-[#232326] border-[#35353a] text-zinc-300 hover:bg-[#2a2a2e] hover:text-white'
               }`}
             >
               {type}

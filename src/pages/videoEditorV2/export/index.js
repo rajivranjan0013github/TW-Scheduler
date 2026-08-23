@@ -14,5 +14,4 @@ export { VideoExportError } from './errors.js';
 export {
   DEFAULT_EXPORT_OPTIONS,
   DEFAULT_FFMPEG_CORE_BASE_URL,
-  MAX_EXPORT_DURATION_SECONDS,
 } from './constants.js';

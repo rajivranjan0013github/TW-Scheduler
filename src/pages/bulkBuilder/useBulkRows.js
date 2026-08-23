@@ -380,11 +380,44 @@ export const useBulkRows = () => {
     });
   }, []);
 
+  const updateRowVideoDuration = useCallback((rowId, slot, duration) => {
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.id !== rowId) return r;
+        const currentMedia = r[slot];
+        if (currentMedia && Math.abs((Number(currentMedia.duration) || 0) - duration) < 0.05) {
+          return r;
+        }
+        const updatedMedia = currentMedia
+          ? { ...currentMedia, duration }
+          : { url: r[`${slot}Url`] || '', duration };
+        const isDual = getIsDualVideoFromStorage();
+        const updatedRow = {
+          ...r,
+          [slot]: updatedMedia,
+          [`${slot}Url`]: updatedMedia.url || r[`${slot}Url`] || '',
+        };
+        const synchronized = syncBulkRowContent(
+          updatedRow,
+          { [slot]: updatedMedia },
+          {
+            isDualVideo: isDual,
+            videoDurations: { [slot]: duration },
+            clearResult: false,
+          },
+        );
+        return sanitizeBulkRowForStorage(synchronized);
+      })
+    );
+  }, []);
+
   return {
     rows,
     addRow,
     removeRow,
     updateRow,
+    updateRowVideoDuration,
     updateRowTextSettings,
     updateRowDragPos,
     updateRowEditorClip,

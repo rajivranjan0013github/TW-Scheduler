@@ -3,7 +3,7 @@ import {
   MAX_PLAYBACK_RATE,
   MIN_CLIP_DURATION,
   MIN_PLAYBACK_RATE,
-  PROJECT_HARD_MAX_DURATION,
+  DEFAULT_PROJECT_DURATION,
   TRACK_TYPES,
   TRACK_TYPE_VALUES,
   trackAcceptsClipType,
@@ -343,10 +343,6 @@ export const retimeClipPlaybackRate = (
       : currentDuration * currentRate,
     availableSourceSpan,
   );
-  const projectDuration = Math.max(
-    MIN_CLIP_DURATION,
-    Number(project?.output?.maxDuration) || PROJECT_HARD_MAX_DURATION,
-  );
   const currentClipEnd = getClipEnd(clip);
   const shouldRippleFollowingClips = options.rippleFollowingClips === true;
   const followingClips = shouldRippleFollowingClips
@@ -359,24 +355,13 @@ export const retimeClipPlaybackRate = (
     (latestEnd, candidate) => Math.max(latestEnd, getClipEnd(candidate)),
     currentClipEnd,
   );
-  const rippleLimitedDuration = currentDuration + Math.max(
-    0,
-    projectDuration - latestFollowingEnd,
-  );
-  const availableTimelineDuration = Math.min(
-    shouldRippleFollowingClips ? rippleLimitedDuration : Number.POSITIVE_INFINITY,
-    Math.max(0, projectDuration - Number(clip.timelineStart || 0)),
-  );
   const minimumDuration = Math.min(MIN_CLIP_DURATION, currentDuration);
 
-  if (sourceSpan <= 0 || availableTimelineDuration <= 0 || minimumDuration <= 0) {
+  if (sourceSpan <= 0 || minimumDuration <= 0) {
     return project;
   }
 
-  const minimumRate = Math.max(
-    MIN_PLAYBACK_RATE,
-    sourceSpan / availableTimelineDuration,
-  );
+  const minimumRate = MIN_PLAYBACK_RATE;
   const maximumRate = Math.min(
     MAX_PLAYBACK_RATE,
     sourceSpan / minimumDuration,
@@ -397,8 +382,25 @@ export const retimeClipPlaybackRate = (
     return project;
   }
 
-  const retimedProject = updateClipById(project, clipId, { playbackRate, duration });
   const durationDelta = roundTimelineTime(duration - currentDuration);
+  const requiredDuration = Math.max(
+    Number(project.output.maxDuration) || DEFAULT_PROJECT_DURATION,
+    Number(clip.timelineStart || 0) + duration,
+    shouldRippleFollowingClips && durationDelta > 0
+      ? latestFollowingEnd + durationDelta
+      : 0,
+  );
+  const projectWithDuration = requiredDuration > Number(project.output.maxDuration || 0)
+    ? {
+      ...project,
+      output: { ...project.output, maxDuration: roundTimelineTime(requiredDuration) },
+    }
+    : project;
+  const retimedProject = updateClipById(
+    projectWithDuration,
+    clipId,
+    { playbackRate, duration },
+  );
   if (!shouldRippleFollowingClips || followingClips.length === 0 || Math.abs(durationDelta) < 0.000001) {
     return retimedProject;
   }

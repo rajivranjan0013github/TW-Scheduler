@@ -7,27 +7,47 @@ const getMediaType = (file) => {
   return null;
 };
 
-const readTimedMediaMetadata = (url, type) => new Promise((resolve, reject) => {
+export const readTimedMediaMetadata = (url, type = 'video') => new Promise((resolve) => {
+  if (!url) {
+    resolve({ duration: 0, width: 0, height: 0 });
+    return;
+  }
   const element = document.createElement(type === 'audio' ? 'audio' : 'video');
   element.preload = 'metadata';
-  element.crossOrigin = 'anonymous';
+  let settled = false;
+  const timeoutId = setTimeout(() => {
+    if (!settled) {
+      settled = true;
+      cleanup();
+      resolve({ duration: 0, width: 0, height: 0 });
+    }
+  }, 10000);
+
   const cleanup = () => {
+    clearTimeout(timeoutId);
     element.removeAttribute('src');
     element.load?.();
   };
+
   element.onloadedmetadata = () => {
+    if (settled) return;
+    settled = true;
     const metadata = {
       duration: Number.isFinite(element.duration) ? element.duration : 0,
-      width: type === 'video' ? element.videoWidth : 0,
-      height: type === 'video' ? element.videoHeight : 0,
+      width: type === 'video' ? (element.videoWidth || 0) : 0,
+      height: type === 'video' ? (element.videoHeight || 0) : 0,
     };
     cleanup();
     resolve(metadata);
   };
+
   element.onerror = () => {
+    if (settled) return;
+    settled = true;
     cleanup();
-    reject(new Error('Unable to read media metadata.'));
+    resolve({ duration: 0, width: 0, height: 0 });
   };
+
   element.src = url;
 });
 

@@ -3,6 +3,8 @@ import {
   deserializeProject,
   serializeProject,
 } from '../project/projectModel.js';
+import { hydrateBulkProjectDurations } from '../project/projectAdapters.js';
+import { readTimedMediaMetadata } from '../media/mediaRegistry.js';
 
 export const BULK_EXPORT_ITEM_STATUS = Object.freeze({
   QUEUED: 'queued',
@@ -132,6 +134,30 @@ export const getCanonicalBulkRowIds = (rows, options) => (
     .filter((row) => isCanonicalBulkRowExportable(row, options))
     .map((row) => toRowId(row.id))
 );
+
+export const ensureHydratedBulkProject = async (projectInput) => {
+  let project = projectInput;
+  const estimatedClips = (project?.tracks || []).flatMap((track) => (
+    track.type === 'video'
+      ? (track.clips || []).filter((clip) => clip.metadata?.durationEstimated && clip.sourceUrl)
+      : []
+  ));
+  if (estimatedClips.length === 0) return project;
+
+  const videoDurations = {};
+  await Promise.allSettled(estimatedClips.map(async (clip) => {
+    const slot = clip.metadata?.bulkSlot || 'video1';
+    const metadata = await readTimedMediaMetadata(clip.sourceUrl, 'video');
+    if (metadata.duration > 0) {
+      videoDurations[slot] = metadata.duration;
+    }
+  }));
+
+  if (Object.keys(videoDurations).length > 0) {
+    project = hydrateBulkProjectDurations(project, videoDurations);
+  }
+  return project;
+};
 
 /**
  * Runs canonical bulk projects one at a time against a single FFmpeg engine.
@@ -301,7 +327,8 @@ export const runSequentialBulkExport = async ({
       previousStatus = ['ready', 'draft', 'done', 'error'].includes(row.status)
         ? row.status
         : 'ready';
-      const project = getCanonicalBulkProject(row);
+      let project = getCanonicalBulkProject(row);
+      project = await ensureHydratedBulkProject(project);
       canonicalSnapshot = serializeProject(project);
       throwIfCancelled(signal);
 

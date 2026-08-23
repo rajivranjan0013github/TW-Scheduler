@@ -84,10 +84,10 @@ const AssetCard = ({ asset, onAdd }) => {
         onClick={() => onAdd(asset)}
         onMouseEnter={startAudioPreview}
         onMouseLeave={stopAudioPreview}
-        className="group flex min-w-0 cursor-grab items-center gap-3 rounded-xl border border-white/10 bg-[#171a20] p-2.5 text-left transition hover:border-emerald-400/50 hover:bg-[#1b1f27] hover:shadow-lg hover:shadow-black/20 active:cursor-grabbing"
+        className="group flex min-w-0 cursor-grab items-center gap-3 rounded-xl border border-[#35353a] bg-[#1c1c1f] p-2.5 text-left transition hover:border-[#7831d6]/50 hover:bg-[#232326] hover:shadow-lg hover:shadow-black/20 active:cursor-grabbing"
         title={`Drag ${asset.name} to the audio track, or click to add it`}
       >
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/25 to-teal-500/10 text-emerald-400 ring-1 ring-emerald-400/20 ${isPreviewing ? 'animate-pulse' : ''
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#7831d6]/20 text-[#c4b5fd] ring-1 ring-[#7831d6]/30 ${isPreviewing ? 'animate-pulse' : ''
           }`}>
           <Music2 className="h-4 w-4" />
         </span>
@@ -132,7 +132,7 @@ const AssetCard = ({ asset, onAdd }) => {
       onDragStart={handleDragStart}
       onMouseEnter={isVideo ? startVideoPreview : undefined}
       onMouseLeave={isVideo ? stopVideoPreview : undefined}
-      className="group relative cursor-grab overflow-hidden rounded-xl border border-white/10 bg-[#171a20] transition hover:border-[#ff5500]/60 hover:bg-[#1b1f27] hover:shadow-lg hover:shadow-black/20 active:cursor-grabbing"
+      className="group relative cursor-grab overflow-hidden rounded-xl border border-[#35353a] bg-[#1c1c1f] transition hover:border-[#7831d6]/60 hover:bg-[#232326] hover:shadow-lg hover:shadow-black/20 active:cursor-grabbing"
     >
       <button
         type="button"
@@ -176,7 +176,7 @@ const AssetCard = ({ asset, onAdd }) => {
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-[8px] font-bold text-white">▶</span>
             </span>
           )}
-          <span className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-lg bg-white/95 text-[#ff5500] opacity-0 shadow-sm transition group-hover:opacity-100">
+          <span className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-lg bg-[#7831d6] text-white opacity-0 shadow-sm transition group-hover:opacity-100">
             <Plus className="h-3.5 w-3.5" />
           </span>
         </div>
@@ -223,8 +223,8 @@ export const MediaPanel = ({
   }, [activeTab, promoAssets, search]);
 
   return (
-    <aside className={`flex h-full min-h-0 border-r border-white/10 bg-[#111318] ${className}`}>
-      <nav className="flex w-16 shrink-0 flex-col gap-1 border-r border-white/10 px-1.5 py-2" aria-label="Editor assets">
+    <aside className={`flex h-full min-h-0 border-r border-[#303034] bg-[#151517] ${className}`}>
+      <nav className="flex w-16 shrink-0 flex-col gap-1.5 border-r border-[#303034] bg-[#1a1a1d] px-1.5 py-2.5" aria-label="Editor assets">
         {[...TABS, ...(bulkQueue ? [{ id: 'bulk', label: 'Queue', icon: ListVideo }] : [])].map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
@@ -240,12 +240,15 @@ export const MediaPanel = ({
                   onCloseLibrary?.();
                 }
               }}
-              className={`relative flex flex-col items-center gap-1 rounded-lg px-1 py-3 text-[9px] font-bold transition ${active ? 'bg-[#ff5500]/10 text-[#ff6a1a]' : 'text-[#727985] hover:bg-white/5 hover:text-[#d7dbe2]'}`}
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl px-1 py-2.5 text-[9px] font-bold transition-all duration-200 ${
+                active
+                  ? 'bg-gradient-to-b from-[#8a3ff2] to-[#6d24cf] text-white shadow-[0_0_15px_rgba(120,49,214,0.4)] ring-1 ring-white/20 scale-[1.02]'
+                  : 'text-zinc-400 hover:bg-white/[0.08] hover:text-white hover:scale-[1.02]'
+              }`}
               aria-pressed={active}
             >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-              {active && <span className="absolute bottom-2 right-0 top-2 w-0.5 rounded-full bg-[#ff5500]" />}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{tab.label}</span>
             </button>
           );
         })}
@@ -263,7 +266,7 @@ export const MediaPanel = ({
 
         {!libraryOpen && (activeTab === 'media' || activeTab === 'audio') && (
           <div className="flex h-full min-h-48 flex-col items-center justify-center p-5 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0071e3]/10 text-[#4da3ff] ring-1 ring-[#0071e3]/20">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#7831d6]/15 text-[#c4b5fd] ring-1 ring-[#7831d6]/30">
               <FolderOpen className="h-5 w-5" />
             </span>
             <p className="mt-3 text-xs font-bold text-[#e6e8ec]">Media Library</p>
@@ -273,7 +276,7 @@ export const MediaPanel = ({
             <button
               type="button"
               onClick={() => onOpenLibrary(activeTab === 'audio' ? 'audio' : 'video')}
-              className="mt-4 rounded-xl bg-[#ff5500] px-4 py-2 text-[10px] font-bold text-white transition hover:bg-[#ff6a1a]"
+              className="mt-4 rounded-xl bg-[#7831d6] px-4 py-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-[#6825bc]"
             >
               Open Media Library
             </button>
@@ -291,19 +294,21 @@ export const MediaPanel = ({
               </p>
             </div>
 
-            <label className="mt-3 flex h-9 min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-[#171a20] px-2.5 focus-within:border-[#ff5500]/60 focus-within:bg-[#1b1f27]">
-              <Search className="h-3.5 w-3.5 shrink-0 text-[#727985]" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search promo videos"
-                className="min-w-0 flex-1 bg-transparent text-[10px] font-semibold text-[#e6e8ec] outline-none placeholder:text-[#666d78]"
-              />
-            </label>
+            <div className="mt-3 relative rounded-xl p-[1px] bg-gradient-to-r from-[#7831d6]/50 via-purple-500/30 to-indigo-500/30 transition-all duration-300 focus-within:from-[#7831d6] focus-within:via-purple-500 focus-within:to-indigo-500 focus-within:shadow-[0_0_12px_rgba(120,49,214,0.25)]">
+              <label className="flex h-9 min-w-0 items-center gap-2 rounded-[11px] bg-[#1c1c1f] px-2.5">
+                <Search className="h-3.5 w-3.5 shrink-0 text-[#8b929d]" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search promo videos"
+                  className="min-w-0 flex-1 !bg-transparent !border-0 text-[10px] font-semibold text-[#e6e8ec] outline-none placeholder:text-[#666d78]"
+                />
+              </label>
+            </div>
 
             {promoLoading && (
               <div className="flex items-center justify-center gap-2 py-8 text-[10px] font-bold text-[#a6abb4]">
-                <Loader2 className="h-4 w-4 animate-spin text-[#ff5500]" />
+                <Loader2 className="h-4 w-4 animate-spin text-[#7831d6]" />
                 Loading promo videos…
               </div>
             )}
@@ -343,12 +348,12 @@ export const MediaPanel = ({
               draggable
               onDragStart={(event) => setEditorDragData(event, { kind: 'text', text: 'Add text' })}
               onClick={() => onAddText('Add text')}
-              className="flex h-10 w-full cursor-grab items-center justify-center gap-2 rounded-xl bg-[#ff5500] px-3 text-[11px] font-bold text-white transition hover:bg-[#ff6a1a] active:cursor-grabbing"
+              className="flex h-10 w-full cursor-grab items-center justify-center gap-2 rounded-xl bg-[#7831d6] px-3 text-[11px] font-bold text-white transition hover:bg-[#6825bc] active:cursor-grabbing"
             >
               <Plus className="h-3.5 w-3.5" />
               Add text
             </button>
-            <div className="overflow-hidden rounded-xl border border-white/10 bg-[#171a20]">
+            <div className="overflow-hidden rounded-xl border border-[#35353a] bg-[#1c1c1f]">
               {[
                 { label: 'Title', previewClass: 'text-[13px] font-black' },
                 { label: 'Subtitle', previewClass: 'text-[11px] font-semibold' },
@@ -360,12 +365,12 @@ export const MediaPanel = ({
                   draggable
                   onDragStart={(event) => setEditorDragData(event, { kind: 'text', text: preset.label })}
                   onClick={() => onAddText(preset.label)}
-                  className={`group flex h-11 w-full cursor-grab items-center gap-3 px-3 text-left text-[#e6e8ec] transition hover:bg-[#201914] active:cursor-grabbing ${index > 0 ? 'border-t border-white/10' : ''
+                  className={`group flex h-11 w-full cursor-grab items-center gap-3 px-3 text-left text-[#e6e8ec] transition hover:bg-[#232326] active:cursor-grabbing ${index > 0 ? 'border-t border-[#35353a]' : ''
                     }`}
                 >
-                  <Type className="h-3.5 w-3.5 shrink-0 text-[#727985] transition group-hover:text-[#ff6a1a]" />
+                  <Type className="h-3.5 w-3.5 shrink-0 text-[#727985] transition group-hover:text-[#c4b5fd]" />
                   <span className={`min-w-0 flex-1 ${preset.previewClass}`}>{preset.label}</span>
-                  <Plus className="h-3.5 w-3.5 shrink-0 text-[#666d78] transition group-hover:text-[#ff6a1a]" />
+                  <Plus className="h-3.5 w-3.5 shrink-0 text-[#666d78] transition group-hover:text-[#c4b5fd]" />
                 </button>
               ))}
             </div>
