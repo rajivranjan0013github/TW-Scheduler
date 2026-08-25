@@ -32,6 +32,11 @@ import {
   subscribeToBulkRows,
   writeBulkRowsSnapshot,
 } from '../bulkBuilder/bulkProjectStore';
+import {
+  clearAgentReservationMetadata,
+  collectAgentReservations,
+  queueAgentReservationReleases,
+} from '../bulkBuilder/bulkAgentReservations';
 import { EditorToolbar } from './components/EditorToolbar';
 import { ExportDialog } from './components/ExportDialog';
 import { InspectorPanel } from './components/InspectorPanel';
@@ -139,11 +144,22 @@ const persistProjectToBulkRow = (project, bulkRowId, { clearResult = true } = {}
   if (rowIndex < 0) throw new Error('The Bulk Planning Board row no longer exists.');
 
   const isDualVideo = localStorage.getItem('tw_bulk_builder_dual_video') !== 'false';
-  rows[rowIndex] = sanitizeBulkRowForStorage(projectToBulkRow(project, rows[rowIndex], {
+  const currentRow = rows[rowIndex];
+  const nextRow = sanitizeBulkRowForStorage(projectToBulkRow(project, currentRow, {
     isDualVideo,
     clearResult,
   }));
+  const changedReservedSlots = ['video1', 'video2', 'audio'].filter((slot) => {
+    const beforeId = String(currentRow?.[slot]?.mediaId || currentRow?.[slot]?.id || '');
+    const afterId = String(nextRow?.[slot]?.mediaId || nextRow?.[slot]?.id || '');
+    return beforeId !== afterId;
+  });
+  const releasedReservations = collectAgentReservations(currentRow, changedReservedSlots);
+  rows[rowIndex] = clearAgentReservationMetadata(nextRow, changedReservedSlots);
   writeBulkRowsSnapshot(rows, { source: 'editor-v2', rowId: bulkRowId });
+  if (releasedReservations.length > 0) {
+    queueAgentReservationReleases(releasedReservations, getActiveCampaignId());
+  }
   return serializeProject(project);
 };
 
@@ -1974,13 +1990,18 @@ export const VideoEditorV2 = () => {
           isDualVideo,
           clearResult: false,
         });
-        rows[rowIndex] = sanitizeBulkRowForStorage({
+        const completedRow = sanitizeBulkRowForStorage({
           ...rowWithProject,
           ...getUploadedMediaSummary(uploadedMedia),
           resultVideoUrl: '',
           status: 'done',
         });
+        const completedReservations = collectAgentReservations(completedRow);
+        rows[rowIndex] = clearAgentReservationMetadata(completedRow);
         writeBulkRowsSnapshot(rows, { source: 'editor-v2', rowId: bulkRowId });
+        if (completedReservations.length > 0) {
+          queueAgentReservationReleases(completedReservations, getActiveCampaignId());
+        }
         const savedSnapshot = serializeProject(project);
         savedProjectRef.current = savedSnapshot;
         bulkSyncedProjectRef.current = savedSnapshot;

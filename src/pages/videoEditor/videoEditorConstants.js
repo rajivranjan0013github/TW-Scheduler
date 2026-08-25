@@ -4,7 +4,7 @@ export const OUTPUT_FPS = 30;
 export const PREVIEW_FRAME_WIDTH = 270;
 export const PREVIEW_FRAME_HEIGHT = 480;
 
-import { API_BASE_URL as CONFIG_API_BASE_URL } from '../../config';
+import { API_BASE_URL as CONFIG_API_BASE_URL } from '../../config.js';
 export const API_BASE_URL = CONFIG_API_BASE_URL;
 
 export const FONT_FAMILY_CSS = {
