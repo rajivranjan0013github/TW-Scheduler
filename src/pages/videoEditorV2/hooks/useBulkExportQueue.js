@@ -7,11 +7,16 @@ import {
   useSyncExternalStore,
 } from 'react';
 import {
-  BULK_ROWS_STORAGE_KEY,
+  getBulkRowsStorageKey,
   readBulkRowsSnapshot,
   subscribeToBulkRows,
   writeBulkRowsSnapshot,
 } from '../../bulkBuilder/bulkProjectStore.js';
+import {
+  collectAgentReservations,
+  queueAgentReservationReleases,
+} from '../../bulkBuilder/bulkAgentReservations.js';
+import { getActiveCampaignId } from '../../../utils/campaignScope.js';
 import { loadBrowserFFmpeg } from '../export/loadFFmpeg.js';
 import {
   BULK_EXPORT_ITEM_STATUS,
@@ -33,7 +38,7 @@ const EMPTY_ROWS_SNAPSHOT = '[]';
 
 const getRowsStorageSnapshot = () => {
   try {
-    return localStorage.getItem(BULK_ROWS_STORAGE_KEY) || EMPTY_ROWS_SNAPSHOT;
+    return localStorage.getItem(getBulkRowsStorageKey()) || EMPTY_ROWS_SNAPSHOT;
   } catch {
     return EMPTY_ROWS_SNAPSHOT;
   }
@@ -504,7 +509,13 @@ export const useBulkExportQueue = ({
             ...(generatedCaption !== null ? { generatedCaption } : {}),
             status: 'done',
             bulkExportError: '',
+            agentReservations: undefined,
+            agentOriginPlanId: undefined,
           }));
+          const completedReservations = collectAgentReservations(latest);
+          if (completedReservations.length > 0) {
+            queueAgentReservationReleases(completedReservations, getActiveCampaignId());
+          }
           summary.succeeded.push({ rowId, media });
           updateQueueItem({
             rowId,

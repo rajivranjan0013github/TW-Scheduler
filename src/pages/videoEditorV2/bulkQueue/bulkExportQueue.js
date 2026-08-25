@@ -5,6 +5,11 @@ import {
 } from '../project/projectModel.js';
 import { hydrateBulkProjectDurations } from '../project/projectAdapters.js';
 import { readTimedMediaMetadata } from '../media/mediaRegistry.js';
+import {
+  collectAgentReservations,
+  queueAgentReservationReleases,
+} from '../../bulkBuilder/bulkAgentReservations.js';
+import { getActiveCampaignId } from '../../../utils/campaignScope.js';
 
 export const BULK_EXPORT_ITEM_STATUS = Object.freeze({
   QUEUED: 'queued',
@@ -435,7 +440,13 @@ export const runSequentialBulkExport = async ({
         ...(generatedCaption !== null ? { generatedCaption } : {}),
         status: 'done',
         bulkExportError: '',
+        agentReservations: undefined,
+        agentOriginPlanId: undefined,
       }));
+      const completedReservations = collectAgentReservations(latestBeforeCommit);
+      if (completedReservations.length > 0) {
+        queueAgentReservationReleases(completedReservations, getActiveCampaignId());
+      }
       const completedItem = {
         rowId,
         fileName: mediaSummary.resultMediaName,

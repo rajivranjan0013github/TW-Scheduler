@@ -58,6 +58,7 @@ const BULK_CONTENT_FIELDS = Object.freeze([
   'caption',
   'textSettings',
   'dragPos',
+  'textOverlays',
   'audio',
 ]);
 
@@ -89,6 +90,15 @@ const mergeBulkRowValues = (existingRow = {}, patch = {}) => {
       ...(existingRow.dragPos || {}),
       ...(patch.dragPos || {}),
     };
+  }
+  if (hasOwn(patch, 'textOverlays')) {
+    merged.textOverlays = Array.isArray(patch.textOverlays)
+      ? patch.textOverlays.map((overlay) => ({
+          ...overlay,
+          style: { ...(overlay?.style || {}) },
+          position: { ...(overlay?.position || {}) },
+        }))
+      : [];
   }
   if (
     hasOwn(patch, 'audio')
@@ -326,6 +336,142 @@ const legacyTextSettingsToStyle = (
       ? 4 * fontScale
       : normalizedSettings.bgType === 'White' ? 3 * fontScale : 0,
   };
+};
+
+const AGENT_OVERLAY_BINDINGS = new Set(['video1', 'video2', 'bulkVideos', 'custom']);
+const AGENT_POSITION_PRESETS = Object.freeze({
+  'top-left': { x: 0.2, y: 0.15 },
+  top: { x: 0.5, y: 0.15 },
+  'top-right': { x: 0.8, y: 0.15 },
+  left: { x: 0.2, y: 0.5 },
+  center: { x: 0.5, y: 0.5 },
+  right: { x: 0.8, y: 0.5 },
+  'bottom-left': { x: 0.2, y: 0.85 },
+  bottom: { x: 0.5, y: 0.85 },
+  'bottom-right': { x: 0.8, y: 0.85 },
+});
+
+const normalizeAgentTextOverlay = (overlay = {}, index = 0) => {
+  const binding = AGENT_OVERLAY_BINDINGS.has(String(overlay.binding))
+    ? String(overlay.binding)
+    : 'video1';
+  const preset = AGENT_POSITION_PRESETS[overlay?.position?.preset]
+    ? overlay.position.preset
+    : 'center';
+  return {
+    id: String(overlay.id || `overlay-${index + 1}`).slice(0, 100),
+    text: String(overlay.text || '').trim().slice(0, 5000),
+    binding,
+    start: clampNumber(overlay.start, 0, 30, 0),
+    duration: clampNumber(overlay.duration, 0, 30, 0),
+    style: { ...(overlay.style || {}) },
+    position: {
+      preset,
+      ...(Number.isFinite(Number(overlay?.position?.x))
+        ? { x: clampNumber(overlay.position.x, 0, 1, 0.5) }
+        : {}),
+      ...(Number.isFinite(Number(overlay?.position?.y))
+        ? { y: clampNumber(overlay.position.y, 0, 1, 0.5) }
+        : {}),
+    },
+  };
+};
+
+const normalizeAgentTextOverlays = (overlays) => (
+  (Array.isArray(overlays) ? overlays : [])
+    .slice(0, 20)
+    .map(normalizeAgentTextOverlay)
+    .filter((overlay) => overlay.text)
+);
+
+const getAgentOverlayRange = ({ overlay, videoClips = [], projectDuration = 0 }) => {
+  const video1 = videoClips.find((clip) => clip.metadata?.bulkSlot === 'video1') || videoClips[0];
+  const video2 = videoClips.find((clip) => clip.metadata?.bulkSlot === 'video2') || videoClips[1];
+  const bulkEnd = videoClips.reduce((maximum, clip) => Math.max(
+    maximum,
+    Number(clip.timelineStart || 0) + Number(clip.duration || 0),
+  ), Number(projectDuration) || 0);
+  if (overlay.binding === 'video1' && video1) {
+    return { timelineStart: video1.timelineStart, duration: video1.duration };
+  }
+  if (overlay.binding === 'video2' && video2) {
+    return { timelineStart: video2.timelineStart, duration: video2.duration };
+  }
+  if (overlay.binding === 'bulkVideos') {
+    return { timelineStart: 0, duration: Math.max(BULK_MIN_CLIP_DURATION, bulkEnd) };
+  }
+  const timelineStart = clampNumber(overlay.start, 0, Math.max(0, bulkEnd), 0);
+  const remaining = Math.max(BULK_MIN_CLIP_DURATION, bulkEnd - timelineStart);
+  return {
+    timelineStart,
+    duration: overlay.duration > 0
+      ? Math.min(overlay.duration, remaining)
+      : remaining,
+  };
+};
+
+const agentOverlayToTextClip = ({
+  overlay,
+  index,
+  row,
+  output,
+  videoClips,
+  projectDuration,
+  options,
+}) => {
+  const previewWidth = Number(options.legacyPreview?.width) || LEGACY_PREVIEW_WIDTH;
+  const rawStyle = overlay.style || {};
+  const fontScale = output.width / previewWidth;
+  const legacySettings = {
+    ...LEGACY_DEFAULT_TEXT_SETTINGS,
+    ...(row.textSettings || {}),
+    ...(rawStyle.fontFamily ? { fontFamily: rawStyle.fontFamily } : {}),
+    ...(rawStyle.fontWeight ? { fontWeight: toLegacyFontWeight(rawStyle.fontWeight) } : {}),
+    ...(rawStyle.fontSize ? { fontSize: Number(rawStyle.fontSize) / fontScale } : {}),
+    ...(rawStyle.color || rawStyle.fontColor
+      ? { fontColor: rawStyle.color || rawStyle.fontColor }
+      : {}),
+    ...(rawStyle.strokeWidth !== undefined
+      ? { strokeWidth: Number(rawStyle.strokeWidth) / fontScale }
+      : {}),
+    ...(rawStyle.strokeColor ? { strokeColor: rawStyle.strokeColor } : {}),
+    ...(rawStyle.backgroundType ? { bgType: rawStyle.backgroundType } : {}),
+    ...(rawStyle.backgroundColor ? { bgColor: rawStyle.backgroundColor } : {}),
+  };
+  const metrics = getLegacyTextBoxMetrics(overlay.text, legacySettings, previewWidth);
+  const importedStyle = legacyTextSettingsToStyle(
+    legacySettings,
+    fontScale,
+    metrics,
+    options.legacyPreview,
+  );
+  const preset = AGENT_POSITION_PRESETS[overlay.position?.preset] || AGENT_POSITION_PRESETS.center;
+  const transform = {
+    x: Number.isFinite(Number(overlay.position?.x)) ? Number(overlay.position.x) : preset.x,
+    y: Number.isFinite(Number(overlay.position?.y)) ? Number(overlay.position.y) : preset.y,
+    scale: 1,
+    rotation: 0,
+    opacity: 1,
+    flipX: false,
+    flipY: false,
+  };
+  const range = getAgentOverlayRange({ overlay, videoClips, projectDuration });
+  return createTextClip({
+    name: index === 0 ? 'Caption' : `Overlay ${index + 1}`,
+    text: overlay.text,
+    timelineStart: range.timelineStart,
+    duration: range.duration,
+    style: importedStyle,
+    transform,
+    metadata: {
+      bulkCaption: index === 0,
+      bulkAgentOverlay: true,
+      bulkOverlayId: overlay.id,
+      bulkDurationBinding: overlay.binding,
+      bulkTextGeometryVersion: BULK_TEXT_GEOMETRY_VERSION,
+      agentPositionPreset: overlay.position?.preset || 'center',
+    },
+  });
 };
 
 const upgradeEmbeddedBulkTextGeometry = (project, row, options = {}) => {
@@ -584,7 +730,18 @@ export const bulkRowToProject = (row = {}, options = {}) => {
   const projectDuration = Math.max(0.1, timelineStart || defaultClipDuration);
   const firstVideoDuration = videoTrack.clips[0]?.duration || projectDuration;
   const textTrack = { type: TRACK_TYPES.TEXT, name: 'Text', clips: [] };
-  if (typeof row.caption === 'string' && row.caption.length > 0) {
+  const agentTextOverlays = normalizeAgentTextOverlays(row.textOverlays);
+  if (agentTextOverlays.length > 0) {
+    textTrack.clips.push(...agentTextOverlays.map((overlay, index) => agentOverlayToTextClip({
+      overlay,
+      index,
+      row,
+      output,
+      videoClips: videoTrack.clips,
+      projectDuration,
+      options,
+    })));
+  } else if (typeof row.caption === 'string' && row.caption.length > 0) {
     const textMetrics = getLegacyTextBoxMetrics(
       row.caption,
       row.textSettings,
@@ -759,6 +916,39 @@ const textClipToLegacyDragPos = (
   return {
     x: Math.round(clampedDragPos.x * 100) / 100,
     y: Math.round(clampedDragPos.y * 100) / 100,
+  };
+};
+
+const textClipToAgentOverlay = (clip, index, fontScale) => {
+  const binding = AGENT_OVERLAY_BINDINGS.has(clip.metadata?.bulkDurationBinding)
+    ? clip.metadata.bulkDurationBinding
+    : 'custom';
+  const legacyStyle = textClipToLegacySettings(clip, LEGACY_DEFAULT_TEXT_SETTINGS, fontScale);
+  return {
+    id: String(clip.metadata?.bulkOverlayId || `overlay-${index + 1}`),
+    text: String(clip.text || ''),
+    binding,
+    start: binding === 'custom' ? Number(clip.timelineStart || 0) : 0,
+    duration: binding === 'custom' ? Number(clip.duration || 0) : 0,
+    style: {
+      fontFamily: clip.style?.fontFamily || legacyStyle.fontFamily,
+      fontWeight: Number(clip.style?.fontWeight)
+        || NAMED_FONT_WEIGHTS[legacyStyle.fontWeight]
+        || legacyStyle.fontWeight,
+      fontSize: Number(clip.style?.fontSize) || legacyStyle.fontSize * fontScale,
+      color: legacyStyle.fontColor,
+      strokeWidth: Number.isFinite(Number(clip.style?.strokeWidth))
+        ? Number(clip.style.strokeWidth)
+        : legacyStyle.strokeWidth * fontScale,
+      strokeColor: legacyStyle.strokeColor,
+      backgroundType: legacyStyle.bgType,
+      backgroundColor: legacyStyle.bgColor,
+    },
+    position: {
+      preset: clip.metadata?.agentPositionPreset || 'center',
+      x: clampNumber(clip.transform?.x, 0, 1, 0.5),
+      y: clampNumber(clip.transform?.y, 0, 1, 0.5),
+    },
   };
 };
 
@@ -1010,29 +1200,45 @@ export function hydrateBulkProjectDurations(
   });
 
   const hydratedFirst = originalFirst ? replacements.get(originalFirst.id) : null;
+  const originalSecond = originalEntries.find(({ slot }) => slot === 'video2')?.clip || null;
+  const hydratedSecond = originalSecond ? replacements.get(originalSecond.id) : null;
   const hydratedTaggedEnd = timelineCursor;
   const tracks = project.tracks.map((track) => ({
     ...track,
     clips: track.clips.map((clip) => {
       if (replacements.has(clip.id)) return replacements.get(clip.id);
 
-      if (clip.type === TRACK_TYPES.TEXT && clip.metadata?.bulkCaption === true) {
-        const followsFirstVideo = hydratedFirst && (
-          clip.metadata?.bulkDurationBinding === 'video1'
+      if (clip.type === TRACK_TYPES.TEXT && (
+        clip.metadata?.bulkCaption === true || clip.metadata?.bulkAgentOverlay === true
+      )) {
+        const binding = clip.metadata?.bulkDurationBinding || 'video1';
+        const boundVideo = binding === 'video2' ? hydratedSecond : hydratedFirst;
+        const originalBoundVideo = binding === 'video2' ? originalSecond : originalFirst;
+        const followsBoundVideo = boundVideo && (
+          binding === 'video1'
+          || binding === 'video2'
           || (
-            originalFirst
-            && nearlyEqualDuration(clip.timelineStart, originalFirst.timelineStart)
-            && nearlyEqualDuration(clip.duration, originalFirst.duration)
+            originalBoundVideo
+            && nearlyEqualDuration(clip.timelineStart, originalBoundVideo.timelineStart)
+            && nearlyEqualDuration(clip.duration, originalBoundVideo.duration)
           )
         );
-        if (!followsFirstVideo) return clip;
+        if (binding === 'bulkVideos' && hydratedTaggedEnd > 0) {
+          return createTextClip({
+            ...clip,
+            timelineStart: 0,
+            duration: hydratedTaggedEnd,
+            metadata: { ...(clip.metadata || {}), bulkDurationBinding: 'bulkVideos' },
+          });
+        }
+        if (!followsBoundVideo) return clip;
         return createTextClip({
           ...clip,
-          timelineStart: hydratedFirst.timelineStart,
-          duration: hydratedFirst.duration,
+          timelineStart: boundVideo.timelineStart,
+          duration: boundVideo.duration,
           metadata: {
             ...(clip.metadata || {}),
-            bulkDurationBinding: 'video1',
+            bulkDurationBinding: binding,
           },
         });
       }
@@ -1156,6 +1362,7 @@ const mergeVideoBinding = (project, row, patch, slot, options) => {
 };
 
 const mergeCaptionBinding = (project, row, patch, options) => {
+  if (hasOwn(patch, 'textOverlays')) return project;
   const captionChanged = hasOwn(patch, 'caption');
   const settingsChanged = hasOwn(patch, 'textSettings');
   const positionChanged = hasOwn(patch, 'dragPos');
@@ -1187,7 +1394,12 @@ const mergeCaptionBinding = (project, row, patch, options) => {
     { width: previewWidth, height: previewHeight },
   );
   const firstVideo = getTaggedVideoClip(project, 'video1');
-  const duration = currentClip?.duration
+  // A caption-text change from the bulk builder represents its default caption
+  // command. Always bind that command to the first video instead of inheriting
+  // a stale range from an existing overlay that may target video2. Style- and
+  // position-only edits keep an explicitly selected advanced binding.
+  const resetToFirstVideo = captionChanged || !currentClip;
+  const duration = (resetToFirstVideo ? firstVideo?.duration : currentClip?.duration)
     || firstVideo?.duration
     || Math.max(0.1, project.duration || clampNumber(options.defaultClipDuration, 0.1, 30, 5));
   const legacyStylePatch = settingsChanged || !currentClip ? {
@@ -1221,7 +1433,9 @@ const mergeCaptionBinding = (project, row, patch, options) => {
     ...(currentClip || {}),
     name: currentClip?.name || 'Caption',
     text: caption,
-    timelineStart: currentClip?.timelineStart ?? 0,
+    timelineStart: resetToFirstVideo
+      ? (firstVideo?.timelineStart ?? 0)
+      : (currentClip?.timelineStart ?? firstVideo?.timelineStart ?? 0),
     duration,
     style: {
       ...(currentClip?.style || {}),
@@ -1232,7 +1446,9 @@ const mergeCaptionBinding = (project, row, patch, options) => {
     metadata: {
       ...(currentClip?.metadata || {}),
       bulkCaption: true,
-      bulkDurationBinding: currentClip?.metadata?.bulkDurationBinding || 'video1',
+      bulkDurationBinding: resetToFirstVideo
+        ? 'video1'
+        : (currentClip?.metadata?.bulkDurationBinding || 'video1'),
       bulkTextGeometryVersion: BULK_TEXT_GEOMETRY_VERSION,
       legacyDragPos: positionChanged || !currentClip
         ? {
@@ -1246,6 +1462,31 @@ const mergeCaptionBinding = (project, row, patch, options) => {
   return currentClip
     ? replaceProjectClip(project, currentClip.id, nextClip)
     : appendProjectClip(project, TRACK_TYPES.TEXT, nextClip);
+};
+
+const mergeTextOverlaysBinding = (project, row, patch, options) => {
+  if (!hasOwn(patch, 'textOverlays')) return project;
+  let nextProject = removeProjectClips(project, (clip) => (
+    clip.type === TRACK_TYPES.TEXT
+    && (clip.metadata?.bulkAgentOverlay === true || clip.metadata?.bulkCaption === true)
+  ));
+  const overlays = normalizeAgentTextOverlays(row.textOverlays);
+  if (overlays.length === 0) return nextProject;
+  const videoClips = getTypedClips(nextProject, TRACK_TYPES.VIDEO)
+    .filter((clip) => clip.enabled !== false);
+  overlays.forEach((overlay, index) => {
+    const clip = agentOverlayToTextClip({
+      overlay,
+      index,
+      row,
+      output: nextProject.output,
+      videoClips,
+      projectDuration: nextProject.duration,
+      options,
+    });
+    nextProject = appendProjectClip(nextProject, TRACK_TYPES.TEXT, clip);
+  });
+  return nextProject;
 };
 
 const mergeAudioBinding = (project, row, patch, options) => {
@@ -1328,6 +1569,7 @@ export function mergeBulkRowPatchIntoProject(
   let project = normalizeBulkRepresentativeBindings(projectInput);
   project = mergeVideoBinding(project, row, contentPatch, 'video1', options);
   project = mergeVideoBinding(project, row, contentPatch, 'video2', options);
+  project = mergeTextOverlaysBinding(project, row, contentPatch, options);
   project = mergeCaptionBinding(project, row, contentPatch, options);
   project = mergeAudioBinding(project, row, contentPatch, options);
   return hydrateBulkProjectDurations(
@@ -1365,6 +1607,7 @@ export const projectToBulkRow = (projectInput, existingRow = {}, options = {}) =
   const clearResult = options.clearResult !== false;
   const previewWidth = Number(options.legacyPreview?.width) || LEGACY_PREVIEW_WIDTH;
   const fontScale = project.output.width / previewWidth;
+  const agentTextClips = textClips.filter((clip) => clip.metadata?.bulkAgentOverlay === true);
   const legacyTextSettings = textClipToLegacySettings(
     textClip,
     existingRow.textSettings,
@@ -1387,6 +1630,9 @@ export const projectToBulkRow = (projectInput, existingRow = {}, options = {}) =
     video2Url: video2?.url || '',
     audio: audioClipToLegacyTrack(audioClip, existingRow.audio),
     caption: textClip?.text || '',
+    textOverlays: agentTextClips.length > 0
+      ? agentTextClips.map((clip, index) => textClipToAgentOverlay(clip, index, fontScale))
+      : (Array.isArray(existingRow.textOverlays) ? [] : existingRow.textOverlays),
     textSettings: legacyTextSettings,
     dragPos: textClipToLegacyDragPos(
       textClip,

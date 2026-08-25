@@ -1,4 +1,4 @@
-import { FONT_WIDTH_FACTORS, CANVAS_FONT_FAMILY, WEIGHT_MAP } from './videoEditorConstants';
+import { FONT_WIDTH_FACTORS, CANVAS_FONT_FAMILY, WEIGHT_MAP } from './videoEditorConstants.js';
 
 /**
  * Format seconds into a m:ss display string.

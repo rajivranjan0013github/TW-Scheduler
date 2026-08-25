@@ -1,13 +1,15 @@
 import { memo, useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Minus, Plus, Play, RotateCcw, Trash2, Folder, Sliders, Layout, ChevronLeft, ChevronRight, X, Music } from 'lucide-react';
+import { Plus, Play, Trash2, Folder, Sliders, Layout, ChevronLeft, ChevronRight, X, Music } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { DEFAULT_TEXT_SETTINGS, useBulkRows } from './bulkBuilder/useBulkRows';
 import { BulkVideoRow } from './bulkBuilder/BulkVideoRow';
 import { CaptionDrawer } from './bulkBuilder/CaptionDrawer';
+import { BulkAgentComposer } from './bulkBuilder/BulkAgentComposer';
 import { MediaLibraryPanel } from './videoEditorV2/components/MediaLibraryPanel';
 import { getOverlayTextHeight, getOverlayTextWidth } from './videoEditor/videoEditorUtils';
 import { PREVIEW_FRAME_HEIGHT, PREVIEW_FRAME_WIDTH } from './videoEditor/videoEditorConstants';
+import { getActiveCampaignId } from '../utils/campaignScope';
 
 const SOURCE_PREVIEW_WIDTH = PREVIEW_FRAME_WIDTH;
 const SOURCE_PREVIEW_HEIGHT = PREVIEW_FRAME_HEIGHT;
@@ -139,6 +141,7 @@ BulkVideoNode.displayName = 'BulkVideoNode';
 export const BulkVideoBuilder = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
+  const [campaignId, setCampaignId] = useState(getActiveCampaignId);
   const {
     rows,
     addRow,
@@ -150,16 +153,32 @@ export const BulkVideoBuilder = () => {
     updateRowEditorClip,
     getReadyRows,
     clearAllRows,
+    applyAgentPlan,
+    undoAgentPlan,
     isDualVideo,
     toggleDualVideo,
     persistenceError,
-  } = useBulkRows();
+  } = useBulkRows({ campaignId });
+  const [isAgentModeLocked, setIsAgentModeLocked] = useState(false);
+
+  useEffect(() => {
+    const syncCampaign = (event) => {
+      setCampaignId(String(event?.detail?.campaignId || getActiveCampaignId()));
+    };
+    window.addEventListener('campaign-selected', syncCampaign);
+    window.addEventListener('storage', syncCampaign);
+    return () => {
+      window.removeEventListener('campaign-selected', syncCampaign);
+      window.removeEventListener('storage', syncCampaign);
+    };
+  }, []);
 
   // Canvas Pan & Zoom states
   const [pan, setPan] = useState({ x: 80, y: 60 });
   const [pageZoom, setPageZoom] = useState(0.8);
   const canvasViewportRef = useRef(null);
   const didInitialFitRef = useRef(false);
+  const shouldFitAfterAgentChangeRef = useRef(false);
 
   // Sidebar visibility state (collapsible)
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
@@ -178,6 +197,22 @@ export const BulkVideoBuilder = () => {
       // The sidebar preference is optional when browser storage is unavailable.
     }
   }, [isSidebarOpen]);
+
+  const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(() => {
+    try {
+      return localStorage.getItem('tw_bulk_builder_ai_drawer_open') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('tw_bulk_builder_ai_drawer_open', String(isAiDrawerOpen));
+    } catch {
+      // The drawer preference is optional when browser storage is unavailable.
+    }
+  }, [isAiDrawerOpen]);
 
   const [sidebarTab, setSidebarTab] = useState('frames'); // 'frames' | 'media' | 'audio'
 
@@ -301,27 +336,6 @@ export const BulkVideoBuilder = () => {
 
     zoomStateRef.current = { pageZoom: nextZoom, pan: nextPan };
     setPageZoom(nextZoom);
-    setPan(nextPan);
-  }, []);
-
-  const handleStepZoom = useCallback((step) => {
-    const rect = canvasViewportRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const sidebarOffset = isSidebarOpen ? Math.min(320, Math.max(0, rect.width - 200)) : 0;
-    const topOffset = 90;
-    const bottomOffset = 50;
-    const pointX = sidebarOffset + (rect.width - sidebarOffset) / 2;
-    const pointY = topOffset + Math.max(0, rect.height - topOffset - bottomOffset) / 2;
-    const currentZoom = zoomStateRef.current.pageZoom;
-
-    applyZoomAtPoint(currentZoom + step, pointX, pointY);
-  }, [applyZoomAtPoint, isSidebarOpen]);
-
-  const handleResetView = useCallback(() => {
-    const nextPan = { x: 80, y: 60 };
-    zoomStateRef.current = { pageZoom: 0.8, pan: nextPan };
-    setPageZoom(0.8);
     setPan(nextPan);
   }, []);
 
@@ -460,6 +474,13 @@ export const BulkVideoBuilder = () => {
   }, [isDualVideo, isSidebarOpen]);
 
   const fitView = useCallback(() => fitRows(rows), [fitRows, rows]);
+
+  useEffect(() => {
+    if (!shouldFitAfterAgentChangeRef.current) return;
+    shouldFitAfterAgentChangeRef.current = false;
+    const timeoutId = window.setTimeout(() => fitRows(rows), 50);
+    return () => window.clearTimeout(timeoutId);
+  }, [fitRows, rows]);
 
   // Align all frames in a grid with up to 6 columns
   const alignAllCards = useCallback(() => {
@@ -695,6 +716,20 @@ export const BulkVideoBuilder = () => {
     navigate(`/media/editor?mode=bulk&rowId=${encodeURIComponent(readyRows[0].id)}&panel=bulk`);
   }, [getReadyRows, navigate]);
 
+  const handleApplyAgentPlan = useCallback((plan) => {
+    shouldFitAfterAgentChangeRef.current = true;
+    const changeSet = applyAgentPlan(plan);
+    if (typeof plan?.isDualVideo === 'boolean' && plan.isDualVideo !== isDualVideo) {
+      toggleDualVideo(plan.isDualVideo);
+    }
+    return changeSet;
+  }, [applyAgentPlan, isDualVideo, toggleDualVideo]);
+
+  const handleUndoAgentPlan = useCallback((changeSet) => {
+    shouldFitAfterAgentChangeRef.current = true;
+    return undoAgentPlan(changeSet);
+  }, [undoAgentPlan]);
+
   // Auto center view on mount if nodes exist
   useEffect(() => {
     if (didInitialFitRef.current || rows.length === 0) return undefined;
@@ -775,53 +810,22 @@ export const BulkVideoBuilder = () => {
           </div>
         </div>
 
-        {/* Floating zoom & status HUD (bottom right) */}
-        <div
-          className="absolute bottom-4 right-4 z-40 flex items-center gap-2 rounded-xl border border-[#303034] bg-[#1c1c1f]/95 p-1.5 shadow-lg backdrop-blur-sm text-zinc-300"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="px-2 py-1 text-[9px] font-mono text-zinc-400 border-r border-[#303034]">
-            Pan: X={Math.round(pan.x)}, Y={Math.round(pan.y)}
-          </div>
-          <button
-            type="button"
-            onClick={() => handleStepZoom(-0.1)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-[#232326] hover:text-white active:scale-95"
-            title="Zoom out"
-          >
-            <Minus className="h-3.5 w-3.5" />
-          </button>
-          <span className="min-w-10 text-center text-[10px] font-bold text-zinc-300">
-            {Math.round(pageZoom * 100)}%
-          </span>
-          <button
-            type="button"
-            onClick={() => handleStepZoom(0.1)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-[#232326] hover:text-white active:scale-95"
-            title="Zoom in"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={handleResetView}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition-all hover:bg-[#232326] hover:text-white active:scale-95"
-            title="Reset Zoom Layout"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </button>
-        </div>
       </div>
 
       {/* Floating Top Toolbar */}
-      <header className="absolute top-4 left-4 right-4 h-14 flex items-center justify-end px-5 z-30 pointer-events-none">
+      <header
+        className="absolute top-4 right-4 left-4 h-14 flex items-center justify-end px-5 z-30 pointer-events-none"
+      >
         {/* Global Toolbar buttons */}
         <div className="flex items-center gap-2 pointer-events-auto">
-          <label className="flex items-center gap-1.5 cursor-pointer bg-[#232326] border border-[#35353a] hover:bg-[#2a2a2e] px-2.5 py-1.5 rounded-lg text-white select-none transition-all">
+          <label className={`flex items-center gap-1.5 border border-[#35353a] px-2.5 py-1.5 rounded-lg text-white select-none transition-all ${isAgentModeLocked
+            ? 'cursor-not-allowed bg-[#1c1c1f] opacity-55'
+            : 'cursor-pointer bg-[#232326] hover:bg-[#2a2a2e]'
+          }`}>
             <input
               type="checkbox"
               checked={isDualVideo}
+              disabled={isAgentModeLocked}
               onChange={(e) => toggleDualVideo(e.target.checked)}
               className="hidden"
             />
@@ -1075,6 +1079,21 @@ export const BulkVideoBuilder = () => {
           onClose={() => setCaptionDrawerRowId(null)}
         />
       )}
+
+      <BulkAgentComposer
+        key={campaignId || 'no-campaign'}
+        token={token}
+        campaignId={campaignId}
+        isDualVideo={isDualVideo}
+        isOpen={isAiDrawerOpen}
+        onOpenChange={setIsAiDrawerOpen}
+        canvasLeftOffset={isSidebarOpen ? 320 : 0}
+        currentFrameCount={rows.length}
+        currentRows={rows}
+        onApplyPlan={handleApplyAgentPlan}
+        onUndoPlan={handleUndoAgentPlan}
+        onModeLockChange={setIsAgentModeLocked}
+      />
 
       {/* Clear Confirmation Dialog Modal */}
       {showClearDialog && (
