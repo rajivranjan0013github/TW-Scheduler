@@ -876,13 +876,13 @@ export const CreatorCampaigns = () => {
 
         {loading ? (
           <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-8 text-center text-sm text-zinc-400">
-            Syncing campaigns and calendar...
+            Syncing products and calendar...
           </div>
         ) : (
           <div className="space-y-3 md:space-y-4">
             <section className="space-y-5 md:space-y-6">
               <div className="flex items-center justify-between gap-3 px-1">
-                <h2 className="m-0 text-2xl font-semibold text-white">My Campaigns</h2>
+                <h2 className="m-0 text-2xl font-semibold text-white">My Products</h2>
                 <PwaInstallButton
                   collapsed
                   popoverClassName="right-0"
@@ -1142,8 +1142,8 @@ export const CreatorCampaigns = () => {
               ) : (
                 <div className="p-5 text-center text-sm text-zinc-400 md:p-6">
                   <Calendar className="mx-auto h-7 w-7 text-zinc-600" />
-                  <p className="m-0 mt-2 font-semibold text-white">No campaign cards yet</p>
-                  <p className="m-0 mt-1 text-xs">Assigned campaigns will appear here.</p>
+                  <p className="m-0 mt-2 font-semibold text-white">No products yet</p>
+                  <p className="m-0 mt-1 text-xs">Assigned products will appear here.</p>
                 </div>
               )}
             </section>

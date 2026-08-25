@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Sparkles, Loader2, Plus, Bookmark, ArrowLeft, Search } from 'lucide-react';
 import { API_BASE_URL } from '../videoEditor/videoEditorConstants';
+import { withCampaignScope } from '../../utils/campaignScope';
 
 /**
  * Right-side slide-in drawer for assigning captions to a bulk row (Figma Dark Theme).
@@ -19,7 +20,7 @@ export const CaptionDrawer = ({
   onClose,
   title = 'Assign Caption',
   manualLabel = 'Type your caption',
-  manualPlaceholder = 'POV: You finally found an app made for couples.',
+  manualPlaceholder = 'POV: The hard part just got easier.',
   applyLabel = 'Apply Caption',
   mountToViewport = false,
   side = 'right',
@@ -116,7 +117,7 @@ export const CaptionDrawer = ({
     onSuggestionsChange([]);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/ai/generate-text`, {
+      const response = await fetch(`${API_BASE_URL}/api/ai/generate-text${withCampaignScope()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -145,7 +146,7 @@ export const CaptionDrawer = ({
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/ai/generate-text`, {
+      const response = await fetch(`${API_BASE_URL}/api/ai/generate-text${withCampaignScope()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

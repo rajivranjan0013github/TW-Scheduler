@@ -1,29 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from '../config';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   CheckCircle2,
-  Link2,
-  Upload,
-  Clock,
-  Megaphone,
   Plus,
   RefreshCw,
-  Save,
   Sparkles,
-  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import CampaignCreationModal from '../components/campaigns/CampaignCreationModal';
+import { emptyProductFields } from '../components/campaigns/campaignProductForm';
 
 const emptyCampaignForm = {
   name: '',
   description: '',
+  ...emptyProductFields,
 };
 
 export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const canCreateCampaign = Boolean(user);
   const storageKey = `active-campaign-id:${user?._id || user?.email || 'default'}`;
   const [campaigns, setCampaigns] = useState([]);
@@ -106,7 +104,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
 
         // Auto-navigate to the working queue if user has exactly 1 campaign
         // (no reason to make them "pick" when there's nothing to pick)
-        if (campaignData.length === 1) {
+        if (campaignData.length === 1 && location.pathname === '/') {
           navigate('/scheduler', { replace: true });
         }
         return;
@@ -155,8 +153,12 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
 
   const createCampaign = async (event) => {
     event.preventDefault();
-    if (!campaignForm.name.trim()) {
-      setCreateError('Workspace name is required.');
+    if (!campaignForm.productName.trim()) {
+      setCreateError('Product name is required.');
+      return;
+    }
+    if (!campaignForm.productDescription.trim()) {
+      setCreateError('Product description is required. Analyze the link or enter it manually.');
       return;
     }
 
@@ -172,9 +174,11 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
             Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
           },
           body: JSON.stringify({
-            name: campaignForm.name,
+            name: campaignForm.productName,
             mainEmail: user?.email || '',
-            description: campaignForm.description,
+            description: campaignForm.productDescription,
+            productName: campaignForm.productName,
+            productDescription: campaignForm.productDescription,
             status: 'active',
           }),
         }
@@ -182,7 +186,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to create workspace.');
+        throw new Error(data.message || 'Failed to create product.');
       }
 
       setCampaigns((current) => [data, ...current]);
@@ -190,7 +194,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
       setIsCreating(false);
       navigate('/scheduler');
     } catch (err) {
-      setCreateError(err.message || 'Failed to create workspace.');
+      setCreateError(err.message || 'Failed to create product.');
     } finally {
       setSaving(false);
     }
@@ -203,147 +207,23 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
   // ─────────────────────────────────────────────
   if (!loading && campaigns.length === 0) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center px-6 py-12 text-white">
-        <div className="w-full max-w-lg">
-          {/* Welcome hero */}
-          <div className="text-center mb-8">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#7831d6] to-[#9333ea] text-white shadow-lg mb-6 shadow-purple-950/40">
-              <Sparkles className="h-7 w-7" />
-            </div>
-            <h1 className="m-0 text-3xl font-semibold tracking-tight text-white">
-              Welcome, {firstName}!
-            </h1>
-            <p className="m-0 mt-3 text-sm leading-6 text-zinc-400 max-w-md mx-auto">
-              Let's set up your workspace in under 2 minutes.
-              You'll be scheduling your first post in no time.
-            </p>
+      <div className="flex min-h-screen items-center justify-center bg-black px-6 py-12 text-white">
+        <div className="text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#7831d6] to-[#9333ea] text-white shadow-lg shadow-purple-950/40">
+            <Sparkles className="h-7 w-7" />
           </div>
-
-          {/* Workspace creation form */}
-          <form
-            onSubmit={createCampaign}
-            className="rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 shadow-2xl shadow-black/80"
-          >
-            <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#7831d6]/20 text-[#c4b5fd]">
-                <Megaphone className="h-4 w-4" />
-              </div>
-              <div>
-                <h2 className="m-0 text-sm font-semibold text-white">
-                  Name your workspace
-                </h2>
-                <p className="m-0 text-[11px] text-zinc-400">
-                  This is where all your content and channels will live
-                </p>
-              </div>
-            </div>
-
-            {createError && (
-              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-300">
-                {createError}
-              </div>
-            )}
-
-            <div className="mt-5 space-y-4">
-              <label className="block">
-                <span className="text-xs font-semibold text-zinc-300">
-                  Workspace name
-                </span>
-                <input
-                  value={campaignForm.name}
-                  onChange={(event) =>
-                    setCampaignForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="e.g. My Brand, Summer Campaign, Client Name..."
-                  className="mt-2 w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 placeholder:text-zinc-600"
-                  autoFocus
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-xs font-semibold text-zinc-300">
-                  Description{' '}
-                  <span className="font-normal text-zinc-500">(optional)</span>
-                </span>
-                <textarea
-                  value={campaignForm.description}
-                  onChange={(event) =>
-                    setCampaignForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                  placeholder="What will you be posting about?"
-                  rows={2}
-                  className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 placeholder:text-zinc-600"
-                />
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#7831d6] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#6825bc] disabled:opacity-60 active:scale-[0.98] shadow-md"
-            >
-              {saving ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  Get Started
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* "What's next" preview */}
-          <div className="mt-6 rounded-xl border border-white/10 bg-[#0a0a0a] p-5">
-            <p className="m-0 text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-3">
-              What happens next
-            </p>
-            <div className="space-y-3">
-              {[
-                {
-                  icon: Link2,
-                  label: 'Connect your Instagram, Facebook, or YouTube',
-                  color: '#7831d6',
-                },
-                {
-                  icon: Upload,
-                  label: 'Upload your videos and images',
-                  color: '#9333ea',
-                },
-                {
-                  icon: Clock,
-                  label: 'Schedule your first post',
-                  color: '#10b981',
-                },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-white"
-                    style={{ backgroundColor: item.color }}
-                  >
-                    <span className="text-[10px] font-bold">{i + 1}</span>
-                  </div>
-                  <span className="text-xs text-zinc-300">{item.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Signed-in context */}
-          <p className="m-0 mt-5 text-center text-[11px] text-zinc-500">
-            Signed in as{' '}
-            <span className="font-semibold text-zinc-300">{user?.email}</span>
-          </p>
+          <h1 className="m-0 mt-6 text-3xl font-semibold tracking-tight text-white">Welcome, {firstName}!</h1>
+          <p className="m-0 mt-3 text-sm text-zinc-400">Let&apos;s add your first product.</p>
         </div>
+        <CampaignCreationModal
+          form={campaignForm}
+          setForm={setCampaignForm}
+          saving={saving}
+          error={createError}
+          onSubmit={createCampaign}
+          onClose={closeCreateForm}
+          canClose={false}
+        />
       </div>
     );
   }
@@ -357,17 +237,17 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
           <div>
             <p className="m-0 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-              Workspaces
+              Products
             </p>
             <h1 className="m-0 mt-1 text-2xl font-semibold tracking-tight text-white">
-              Select Workspace
+              Select Product
             </h1>
             <p className="m-0 mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
               You are signed in as{' '}
               <span className="font-semibold text-white">
                 {user?.email}
               </span>
-              . Choose the workspace you want to manage.
+              . Choose the product you want to manage.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -386,92 +266,21 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                 className="inline-flex items-center gap-2 rounded-lg bg-[#7831d6] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#6825bc] shadow-sm"
               >
                 <Plus className="h-3.5 w-3.5" />
-                New workspace
+                New product
               </button>
             )}
           </div>
         </div>
 
         {isCreating && (
-          <form
+          <CampaignCreationModal
+            form={campaignForm}
+            setForm={setCampaignForm}
+            saving={saving}
+            error={createError}
             onSubmit={createCampaign}
-            className="rounded-lg border border-white/10 bg-[#0a0a0a] p-5 shadow-2xl shadow-black/80"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                  Workspace setup
-                </p>
-                <h2 className="m-0 mt-1 text-lg font-semibold tracking-tight text-white">
-                  New workspace
-                </h2>
-              </div>
-              {campaigns.length > 0 && (
-                <button
-                  type="button"
-                  onClick={closeCreateForm}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white"
-                  aria-label="Close workspace form"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-
-            {createError && (
-              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-300">
-                {createError}
-              </div>
-            )}
-
-            <div className="mt-5 grid gap-4">
-              <label className="block">
-                <span className="text-xs font-semibold text-zinc-300">
-                  Workspace name
-                </span>
-                <input
-                  value={campaignForm.name}
-                  onChange={(event) =>
-                    setCampaignForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="Workspace name"
-                  className="mt-2 w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none focus:border-[#7831d6]"
-                />
-              </label>
-            </div>
-
-            <label className="mt-4 block">
-              <span className="text-xs font-semibold text-zinc-300">
-                Description
-              </span>
-              <textarea
-                value={campaignForm.description}
-                onChange={(event) =>
-                  setCampaignForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder="Workspace description"
-                rows={3}
-                className="mt-2 w-full resize-none rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none focus:border-[#7831d6]"
-              />
-            </label>
-
-            <div className="mt-5 flex justify-end">
-              <button
-                type="submit"
-                disabled={saving}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#7831d6] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#6825bc] disabled:opacity-60 shadow-sm"
-              >
-                <Save className="h-4 w-4" />
-                {saving ? 'Creating...' : 'Create workspace and continue'}
-              </button>
-            </div>
-          </form>
+            onClose={closeCreateForm}
+          />
         )}
 
         {loading ? (
@@ -509,7 +318,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                        Workspace
+                        Product
                       </p>
                       <h2 className="m-0 mt-1 text-lg font-semibold tracking-tight text-white">
                         {campaign.name}
@@ -523,7 +332,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                   </div>
 
                   <p className="m-0 mt-3 line-clamp-3 text-sm leading-5 text-zinc-400">
-                    {campaign.description || 'Workspace'}
+                    {campaign.productDescription || campaign.description || 'Product'}
                   </p>
 
                   <div className="mt-5 flex flex-1 items-end">

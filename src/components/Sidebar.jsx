@@ -181,11 +181,11 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   const isCreator = user?.userType === 'account_handler';
 
   const navItems = isCreator ? [
-    { name: 'My Campaigns', label: 'Campaigns', path: '/campaigns', icon: Megaphone },
+    { name: 'My Products', label: 'Products', path: '/campaigns', icon: Megaphone },
     { name: 'My Channels', label: 'Channels', path: '/channels', icon: Link2 },
     { name: 'Settings', label: 'Settings', path: '/settings', icon: SettingsIcon },
   ] : [
-    { name: 'Campaigns', label: 'Campaigns', path: '/campaigns', icon: Megaphone },
+    { name: 'Products', label: 'Products', path: '/campaigns', icon: Megaphone },
     ...(canViewAdmin ? [{ name: 'Performance', label: 'Perf', path: '/dashboard', icon: BarChart3 }] : []),
     { name: 'Scheduled Queue', label: 'Queue', path: '/scheduler', icon: Clock },
     { name: 'Media Library', label: 'Media', path: '/media', icon: FolderHeart },
@@ -196,11 +196,11 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   ];
 
   const managerItems = (!isCreator && canViewAdmin) ? [
-    { name: 'Campaign Setup', label: 'Setup', path: '/admin/campaign', icon: Megaphone },
+    { name: 'Product Setup', label: 'Setup', path: '/admin/campaign', icon: Megaphone },
     { name: 'Team Access', label: 'Team', path: '/admin/users', icon: Users },
   ] : [];
   const activeCampaign = campaigns.find(campaign => campaign._id === activeCampaignId);
-  const campaignTitle = activeCampaign?.name || (isAdminViewingUser ? (adminViewContext.userName || 'Campaign View') : 'Select campaign');
+  const campaignTitle = activeCampaign?.name || (isAdminViewingUser ? (adminViewContext.userName || 'Product View') : 'Select product');
 
   return (
     <aside className={`relative z-50 w-20 overflow-visible ${
@@ -242,7 +242,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                 <div className="absolute left-[calc(100%+0.75rem)] top-0 z-[999] w-72 overflow-hidden rounded-2xl border border-white/[0.12] bg-[#0c0717]/95 backdrop-blur-2xl text-white shadow-2xl shadow-black/90 ring-1 ring-white/10">
                   <div className="border-b border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5">
                     <p className="m-0 text-[9px] font-bold uppercase tracking-wider text-[#c4b5fd]">
-                      Switch campaign
+                      Switch product
                     </p>
                   </div>
                   <div className="max-h-72 overflow-y-auto p-1.5 space-y-0.5">
@@ -261,7 +261,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                         >
                           <span className={`h-2 w-2 flex-shrink-0 rounded-full ${isSelected ? 'bg-white shadow-[0_0_6px_#fff]' : 'bg-zinc-600'}`} />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs">{campaign.name || 'Untitled campaign'}</span>
+                            <span className="block truncate text-xs">{campaign.name || 'Untitled product'}</span>
                             {(campaign.mainEmail || campaign.createdBy?.email) && (
                               <span className={`mt-0.5 block truncate text-[9px] ${isSelected ? 'text-inherit opacity-80' : 'text-zinc-400'}`}>
                                 {campaign.mainEmail || campaign.createdBy?.email}
@@ -273,7 +273,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                       );
                     }) : (
                       <div className="px-2 py-4 text-center text-[10px] text-zinc-400">
-                        No campaigns available
+                        No products available
                       </div>
                     )}
                   </div>

@@ -72,6 +72,88 @@ const getMediaFolderName = (item, folders = []) => {
   return folder?.name || 'Folder';
 };
 
+const AiAnalysisProgress = ({ compact = false }) => (
+  <div
+    className={`border border-violet-400/25 bg-[#09090b]/90 shadow-xl shadow-black/30 backdrop-blur-md ${
+      compact ? 'rounded-lg p-2' : 'rounded-xl p-3.5'
+    }`}
+    role="status"
+    aria-label="AI is analyzing this video"
+  >
+    <div className="flex items-center justify-between gap-2">
+      <span className={`inline-flex items-center gap-1.5 rounded-full border border-amber-300/25 bg-gradient-to-r from-amber-400/15 to-violet-500/15 font-bold text-white ${
+        compact ? 'px-2 py-1 text-[8px]' : 'px-2.5 py-1.5 text-[10px]'
+      }`}>
+        <Sparkles className={`text-amber-300 animate-pulse ${compact ? 'h-2.5 w-2.5' : 'h-3.5 w-3.5'}`} />
+        Analyzing video
+      </span>
+      {!compact && (
+        <span className="text-[9px] font-medium text-zinc-500">You can keep working</span>
+      )}
+    </div>
+
+    <div className={compact ? 'mt-2 space-y-1.5' : 'mt-3 space-y-2'}>
+      <div className={`flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.025] ${compact ? 'px-2 py-1.5' : 'px-3 py-2.5'}`}>
+        <span className={`flex min-w-0 items-center gap-1.5 font-semibold text-zinc-200 ${compact ? 'text-[8px]' : 'text-[10px]'}`}>
+          <span className="relative flex h-1.5 w-1.5 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-60" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-300" />
+          </span>
+          <span className="truncate">Finding reaction tags</span>
+        </span>
+        <span className="flex shrink-0 gap-1" aria-hidden="true">
+          {[0, 1, 2].map((index) => (
+            <span key={index} className={`${compact ? 'h-1.5 w-3' : 'h-2 w-5'} animate-pulse rounded-full bg-zinc-600/80`} />
+          ))}
+        </span>
+      </div>
+
+      <div className={`flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.025] ${compact ? 'px-2 py-1.5' : 'px-3 py-2.5'}`}>
+        <span className={`flex min-w-0 items-center gap-1.5 font-semibold text-zinc-200 ${compact ? 'text-[8px]' : 'text-[10px]'}`}>
+          <Sparkles className={`shrink-0 text-violet-400 animate-pulse ${compact ? 'h-2.5 w-2.5' : 'h-3 w-3'}`} />
+          <span className="truncate">Writing video summary</span>
+        </span>
+        <span className={`${compact ? 'h-1.5 w-10' : 'h-2 w-20'} shrink-0 animate-pulse rounded-full bg-zinc-600/80`} aria-hidden="true" />
+      </div>
+    </div>
+  </div>
+);
+
+const AiProcessingVideoPreview = ({ media }) => {
+  const [failedThumbnailUrl, setFailedThumbnailUrl] = useState('');
+  const thumbnailUrl = media?.thumbnailUrl ? getAssetUrl(media.thumbnailUrl) : '';
+
+  return (
+    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-xl border border-violet-400/25 bg-zinc-950">
+      {thumbnailUrl && failedThumbnailUrl !== thumbnailUrl ? (
+        <img
+          src={thumbnailUrl}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setFailedThumbnailUrl(thumbnailUrl)}
+        />
+      ) : (
+        <LoadingVideoPreview
+          src={getAssetUrl(media?.url)}
+          className="h-full w-full"
+          videoClassName="h-full w-full object-cover"
+          loadingLabel="Loading preview"
+          muted
+          playsInline
+          preload="metadata"
+          crossOrigin="anonymous"
+        />
+      )}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/65 to-transparent px-2.5 pb-2.5 pt-10">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/25 bg-black/65 px-2 py-1 text-[8px] font-bold text-white backdrop-blur-sm">
+          <Sparkles className="h-2.5 w-2.5 animate-pulse text-amber-300" />
+          Analyzing video
+        </span>
+      </div>
+    </div>
+  );
+};
+
 const normalizeTagList = (tags) => {
   const rawTags = Array.isArray(tags) ? tags : String(tags || '').split(',');
   return Array.from(new Set(
@@ -514,6 +596,27 @@ export const MediaLibrary = () => {
         : current),
     );
   };
+  const updateAiMediaItems = useCallback((updatedItems) => {
+    const updatesById = new Map(
+      (updatedItems || [])
+        .filter((item) => item?._id)
+        .map((item) => [String(item._id), item]),
+    );
+    if (updatesById.size === 0) return;
+
+    const mergeUpdates = (current) => (Array.isArray(current)
+      ? current.map((item) => {
+          const updates = updatesById.get(String(item?._id));
+          return updates ? { ...item, ...updates } : item;
+        })
+      : current);
+
+    setMedia(mergeUpdates);
+    queryClient.setQueriesData(
+      { queryKey: mediaLibraryKeys.allMedia },
+      mergeUpdates,
+    );
+  }, [queryClient]);
 
   const clearCarouselDrafts = () => {
     carouselDrafts.forEach((set) => {
@@ -1018,17 +1121,56 @@ export const MediaLibrary = () => {
     }
   }, [activeFolderId, fetchMedia]);
 
-  // Automatically refresh when any video is currently being analyzed by AI
+  const processingAiMediaIds = media
+    .filter((item) => item.type === 'video' && item.aiStatus === 'processing')
+    .map((item) => String(item._id))
+    .sort()
+    .join(',');
+
+  // Poll only the videos being analyzed. Do not reload or replace the active folder.
   useEffect(() => {
-    const hasProcessingAi = media.some((m) => m.type === 'video' && m.aiStatus === 'processing');
-    if (!hasProcessingAi) return;
+    const mediaIds = processingAiMediaIds.split(',').filter(Boolean);
+    if (mediaIds.length === 0) return undefined;
 
-    const timeout = setTimeout(() => {
-      fetchMedia(1, { force: true });
-    }, 2500);
+    let cancelled = false;
+    let timeoutId;
 
-    return () => clearTimeout(timeout);
-  }, [media, fetchMedia]);
+    const pollAiStatus = async () => {
+      let shouldContinue = true;
+      try {
+        const updatedItems = await Promise.all(mediaIds.map(async (mediaId) => {
+          const response = await fetch(
+            `${API_BASE_URL}/api/media/${mediaId}/analyze-ai${withCampaignScope()}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${authToken}`,
+              },
+            },
+          );
+          if (!response.ok) {
+            throw new Error(await getErrorMessage(response, 'Failed to refresh AI analysis status.'));
+          }
+          return response.json();
+        }));
+
+        if (cancelled) return;
+        updateAiMediaItems(updatedItems);
+        shouldContinue = updatedItems.some((item) => item.aiStatus === 'processing');
+      } catch (error) {
+        console.error('Failed to refresh AI analysis status:', error);
+      }
+
+      if (!cancelled && shouldContinue) {
+        timeoutId = setTimeout(pollAiStatus, 2500);
+      }
+    };
+
+    timeoutId = setTimeout(pollAiStatus, 2500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [authToken, processingAiMediaIds, updateAiMediaItems]);
 
   const viewingAiMedia = React.useMemo(() => {
     if (!viewingAiMediaId) return null;
@@ -1051,7 +1193,8 @@ export const MediaLibrary = () => {
         throw new Error(await getErrorMessage(response, 'Failed to start AI analysis.'));
       }
 
-      setMedia((prev) => prev.map((m) => (m._id === mediaId ? { ...m, aiStatus: 'processing', aiError: '' } : m)));
+      updateAiMediaItems([{ _id: mediaId, aiStatus: 'processing', aiError: '' }]);
+      setViewingAiMediaId(mediaId);
     } catch (error) {
       console.error('Failed to trigger AI analysis:', error);
       alert(error.message || 'Failed to start AI analysis.');
@@ -1435,7 +1578,7 @@ export const MediaLibrary = () => {
     if (!captionDialogMedia) return;
     setGeneratingCaption(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/ai/generate-caption`, {
+      const response = await fetch(`${API_BASE_URL}/api/ai/generate-caption${withCampaignScope()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2822,11 +2965,12 @@ export const MediaLibrary = () => {
                         )}
                         {item.type === 'video' ? (
                           <LoadingVideoPreview
-                            src={getAssetUrl(item.url)} 
-                            crossOrigin="anonymous" 
+                            src={getAssetUrl(item.url)}
+                            crossOrigin="anonymous"
                             videoClassName="w-full h-full object-cover cursor-pointer"
                             playsInline
                             preload="metadata"
+                            poster={item.thumbnailUrl ? getAssetUrl(item.thumbnailUrl) : undefined}
                             onMouseEnter={(e) => {
                               e.target.muted = false;
                               e.target.play().catch(err => {
@@ -2916,13 +3060,12 @@ export const MediaLibrary = () => {
                           {item.type}
                         </div>
                         {item.type === 'video' && item.aiStatus === 'processing' && (
-                          <div className="absolute right-10 top-2 rounded bg-purple-950/90 border border-purple-500/50 px-2 py-0.5 text-[8px] font-bold tracking-wide text-purple-200 shadow-sm flex items-center gap-1 backdrop-blur-sm animate-pulse">
-                            <Sparkles className="h-2.5 w-2.5 animate-spin text-purple-300" />
-                            <span>AI Reading</span>
+                          <div className="pointer-events-none absolute inset-x-2 bottom-2 z-[4]">
+                            <AiAnalysisProgress compact />
                           </div>
                         )}
                         {normalizeScope(item.scope) === 'global' && (
-                          <div className={`absolute ${item.type === 'video' && item.aiStatus === 'processing' ? 'right-28' : 'right-10'} top-2 rounded bg-[#7831d6]/20 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#c4b5fd] shadow-sm`}>
+                          <div className="absolute right-10 top-2 rounded bg-[#7831d6]/20 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#c4b5fd] shadow-sm">
                             Global
                           </div>
                         )}
@@ -2947,7 +3090,7 @@ export const MediaLibrary = () => {
                             <p className="m-0 truncate" title={item.name}>{item.name || 'Untitled media'}</p>
                           </div>
                         )}
-                        {(item.tags || []).length > 0 && (
+                        {item.aiStatus !== 'processing' && (item.tags || []).length > 0 && (
                           <div className={`absolute ${item.type === 'video' ? 'bottom-2' : 'bottom-7'} left-2 right-2 flex flex-wrap gap-1 pointer-events-none`}>
                             {(item.tags || []).slice(0, 3).map((tag) => (
                               <span
@@ -3567,7 +3710,9 @@ export const MediaLibrary = () => {
       {/* AI Video Intelligence Modal */}
       {viewingAiMedia && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 sm:p-6">
-          <div className="bg-[#0a0a0a] border border-white/[0.1] rounded-2xl w-full max-w-xl text-white shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className={`bg-[#0a0a0a] border border-white/[0.1] rounded-2xl w-full text-white shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${
+            viewingAiMedia.aiStatus === 'processing' ? 'max-w-5xl' : 'max-w-xl'
+          }`}>
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08] bg-zinc-950/60">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -3604,43 +3749,101 @@ export const MediaLibrary = () => {
             </div>
 
             {/* Content Body */}
-            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+            <div className={`overflow-y-auto text-xs ${viewingAiMedia.aiStatus === 'processing' ? 'p-0' : 'p-5 space-y-4'}`}>
               {viewingAiMedia.aiStatus === 'processing' && (
-                <div className="flex flex-col items-center justify-center py-8 text-center space-y-3 bg-white/[0.02] border border-white/[0.05] rounded-xl">
-                  <div className="w-8 h-8 border-2 border-[#7831d6] border-t-transparent rounded-full animate-spin" />
-                  <div>
-                    <p className="font-semibold text-white text-xs m-0">Gemini AI is reading this video...</p>
-                    <p className="text-[11px] text-zinc-400 mt-1 mb-0">Analyzing opening hook, app screens & generating tags</p>
+                <div className="grid min-h-[560px] grid-cols-1 bg-[#08090b] md:grid-cols-[minmax(280px,0.9fr)_minmax(360px,1.1fr)]">
+                  <div className="relative flex min-h-[420px] items-center justify-center overflow-hidden border-b border-white/[0.08] bg-[radial-gradient(circle_at_50%_35%,rgba(120,49,214,0.16),transparent_46%),#0b0c0f] p-5 md:min-h-0 md:border-b-0 md:border-r md:p-7">
+                    <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:24px_24px]" />
+                    <div className="relative w-full max-w-[300px]">
+                      <AiProcessingVideoPreview media={viewingAiMedia} />
+                    </div>
                   </div>
+
+                  <aside className="flex min-h-[520px] flex-col bg-gradient-to-br from-[#101116] to-[#090a0d] p-6 sm:p-8">
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles className="h-5 w-5 text-violet-400" />
+                      <h4 className="m-0 text-lg font-bold tracking-tight text-white">AI Insights</h4>
+                    </div>
+
+                    <section className="mt-8">
+                      <div className="flex items-center justify-between gap-3">
+                        <h5 className="m-0 text-[12px] font-bold text-zinc-100">Reaction tags</h5>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-[8px] font-bold text-amber-200">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-60" />
+                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-300" />
+                          </span>
+                          Finding tags
+                        </span>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2.5" aria-hidden="true">
+                        {[72, 88, 76, 92, 68].map((width, index) => (
+                          <span
+                            key={`${width}-${index}`}
+                            className="h-8 animate-pulse rounded-full border border-white/[0.04] bg-zinc-700/65"
+                            style={{ width: `${width}px`, animationDelay: `${index * 110}ms` }}
+                          />
+                        ))}
+                      </div>
+                    </section>
+
+                    <div className="my-8 h-px bg-white/[0.08]" />
+
+                    <section>
+                      <div className="flex items-center justify-between gap-3">
+                        <h5 className="m-0 text-[12px] font-bold text-zinc-100">Video summary</h5>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/20 bg-violet-400/10 px-2 py-1 text-[8px] font-bold text-violet-200">
+                          <Sparkles className="h-2.5 w-2.5 animate-pulse" />
+                          Writing summary
+                        </span>
+                      </div>
+                      <div className="mt-5 space-y-3" aria-hidden="true">
+                        {[100, 96, 98, 91, 58].map((width, index) => (
+                          <span
+                            key={`${width}-${index}`}
+                            className="block h-2.5 animate-pulse rounded-full bg-zinc-700/65"
+                            style={{ width: `${width}%`, animationDelay: `${index * 120}ms` }}
+                          />
+                        ))}
+                      </div>
+                    </section>
+
+                    <div className="mt-auto flex items-center gap-2 pt-10 text-[10px] font-medium text-zinc-500">
+                      <span className="h-2 w-2 rounded-full bg-violet-500" />
+                      You can keep editing while AI finishes
+                    </div>
+                  </aside>
                 </div>
               )}
 
-              {viewingAiMedia.aiStatus === 'failed' && (
-                <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs">
-                  <p className="font-semibold m-0">AI Analysis could not complete</p>
-                  <p className="text-[11px] text-rose-400 mt-1 mb-0">{viewingAiMedia.aiError || 'Error occurred during analysis.'}</p>
-                </div>
-              )}
+              {viewingAiMedia.aiStatus !== 'processing' && (
+                <>
+                  {viewingAiMedia.aiStatus === 'failed' && (
+                    <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-xs">
+                      <p className="font-semibold m-0">AI Analysis could not complete</p>
+                      <p className="text-[11px] text-rose-400 mt-1 mb-0">{viewingAiMedia.aiError || 'Error occurred during analysis.'}</p>
+                    </div>
+                  )}
 
-              {/* Folder Classification Info */}
-              <div className="p-3 rounded-xl border border-white/[0.08] bg-zinc-950 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-zinc-400">Folder / Placement</span>
-                  <p className="text-xs font-semibold text-white mt-0.5 m-0">
-                    {getMediaFolderName(viewingAiMedia, folders)}
-                  </p>
-                </div>
-                {getMediaFolderKind(viewingAiMedia, folders) === 'hook' && (
-                  <span className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-violet-600/30 to-purple-600/30 border border-purple-400/40 text-[#c4b5fd] text-xs font-bold flex items-center gap-1.5 shadow-sm">
-                    <Sparkles className="w-3 h-3 text-purple-300" /> Hook (Hooks Folder)
-                  </span>
-                )}
-                {getMediaFolderKind(viewingAiMedia, folders) === 'showcase' && (
-                  <span className="px-2.5 py-1 rounded-lg bg-sky-950/80 border border-sky-500/40 text-sky-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
-                    <Images className="w-3 h-3 text-sky-400" /> App Showcase (Showcase Folder)
-                  </span>
-                )}
-              </div>
+                  {/* Folder Classification Info */}
+                  <div className="p-3 rounded-xl border border-white/[0.08] bg-zinc-950 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-zinc-400">Folder / Placement</span>
+                      <p className="text-xs font-semibold text-white mt-0.5 m-0">
+                        {getMediaFolderName(viewingAiMedia, folders)}
+                      </p>
+                    </div>
+                    {getMediaFolderKind(viewingAiMedia, folders) === 'hook' && (
+                      <span className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-violet-600/30 to-purple-600/30 border border-purple-400/40 text-[#c4b5fd] text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                        <Sparkles className="w-3 h-3 text-purple-300" /> Hook (Hooks Folder)
+                      </span>
+                    )}
+                    {getMediaFolderKind(viewingAiMedia, folders) === 'showcase' && (
+                      <span className="px-2.5 py-1 rounded-lg bg-sky-950/80 border border-sky-500/40 text-sky-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                        <Images className="w-3 h-3 text-sky-400" /> App Showcase (Showcase Folder)
+                      </span>
+                    )}
+                  </div>
 
               {/* Video Summary */}
               {viewingAiMedia.aiAnalysis?.summary && (
@@ -3684,55 +3887,59 @@ export const MediaLibrary = () => {
 
               {/* Tags */}
               <div className="p-3.5 rounded-xl border border-white/[0.08] bg-zinc-950">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 m-0">
-                    <Tags className="w-3.5 h-3.5" /> Media Tags
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const current = viewingAiMedia;
-                      setViewingAiMediaId(null);
-                      openMediaTagsModal(current);
-                    }}
-                    className="text-[10px] text-[#c4b5fd] hover:underline"
-                  >
-                    Edit tags
-                  </button>
-                </div>
-                {(viewingAiMedia.tags || []).length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {(viewingAiMedia.tags || []).map((t) => (
-                      <span key={t} className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-white text-[11px] font-semibold">
-                        {t}
-                      </span>
-                    ))}
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1.5 m-0">
+                      <Tags className="w-3.5 h-3.5" /> Media Tags
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = viewingAiMedia;
+                        setViewingAiMediaId(null);
+                        openMediaTagsModal(current);
+                      }}
+                      className="text-[10px] text-[#c4b5fd] hover:underline"
+                    >
+                      Edit tags
+                    </button>
                   </div>
-                ) : (
-                  <p className="text-zinc-500 text-[11px] m-0">No tags assigned yet.</p>
-                )}
-              </div>
+                  {(viewingAiMedia.tags || []).length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {(viewingAiMedia.tags || []).map((t) => (
+                        <span key={t} className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-white text-[11px] font-semibold">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-zinc-500 text-[11px] m-0">No tags assigned yet.</p>
+                  )}
+                </div>
+                </>
+              )}
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.08] bg-zinc-950/60">
-              <button
-                type="button"
-                onClick={(e) => handleTriggerAiAnalysis(viewingAiMedia._id, e)}
-                disabled={viewingAiMedia.aiStatus === 'processing' || analyzingMediaId === viewingAiMedia._id}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-semibold text-white transition-all disabled:opacity-50"
-              >
-                <Sparkles className={`w-3.5 h-3.5 text-amber-400 ${analyzingMediaId === viewingAiMedia._id ? 'animate-spin' : ''}`} />
-                <span>{viewingAiMedia.aiStatus === 'processing' ? 'AI Analyzing...' : 'Re-analyze with Gemini'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewingAiMediaId(null)}
-                className="px-4 py-1.5 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] text-xs font-semibold text-white shadow-md transition-colors"
-              >
-                Done
-              </button>
-            </div>
+            {viewingAiMedia.aiStatus !== 'processing' && (
+              <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.08] bg-zinc-950/60">
+                <button
+                  type="button"
+                  onClick={(e) => handleTriggerAiAnalysis(viewingAiMedia._id, e)}
+                  disabled={analyzingMediaId === viewingAiMedia._id}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-semibold text-white transition-all disabled:opacity-50"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 text-amber-400 ${analyzingMediaId === viewingAiMedia._id ? 'animate-spin' : ''}`} />
+                  <span>Re-analyze with Gemini</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingAiMediaId(null)}
+                  className="px-4 py-1.5 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] text-xs font-semibold text-white shadow-md transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

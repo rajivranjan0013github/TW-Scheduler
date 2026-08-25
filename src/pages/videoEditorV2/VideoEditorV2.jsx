@@ -384,7 +384,7 @@ export const VideoEditorV2 = () => {
     let generatedCaption = row.generatedCaption || '';
     if (uploadOptions?.generateCaptions) {
       onProgress?.(0.05, 'Generating AI caption…');
-      const captionResponse = await fetch(`${API_BASE_URL}/api/ai/generate-caption`, {
+      const captionResponse = await fetch(`${API_BASE_URL}/api/ai/generate-caption${withCampaignScope()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1683,7 +1683,7 @@ export const VideoEditorV2 = () => {
       if (!exportState.resultUrl || exportState.generatingCaptions) return;
       setExportState((current) => ({ ...current, generatingCaptions: true, error: '' }));
       try {
-        const response = await fetch(`${API_BASE_URL}/api/ai/generate-caption`, {
+        const response = await fetch(`${API_BASE_URL}/api/ai/generate-caption${withCampaignScope()}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1723,13 +1723,13 @@ export const VideoEditorV2 = () => {
     setStatus(null);
     try {
       for (const row of targetRows) {
-        const response = await fetch(`${API_BASE_URL}/api/ai/generate-caption`, {
+        const response = await fetch(`${API_BASE_URL}/api/ai/generate-caption${withCampaignScope()}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ videoName: row.caption || 'couple video' }),
+          body: JSON.stringify({ videoName: row.caption || 'short video' }),
         });
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));

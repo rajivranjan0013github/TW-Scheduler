@@ -15,6 +15,7 @@ import {
   Pause,
   Play,
   Search,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { getActiveCampaignId } from '../../../utils/campaignScope';
@@ -153,8 +154,26 @@ const MediaThumbnail = ({ item }) => {
           if (videoRef.current) videoRef.current.currentTime = 0;
         }}
       />
+      {item.aiStatus === 'processing' && (
+        <div
+          className="pointer-events-none absolute inset-x-1 bottom-1 z-[3] rounded-md border border-violet-400/25 bg-black/80 px-1.5 py-1 shadow-lg backdrop-blur-sm"
+          role="status"
+          aria-label="AI is generating reaction tags and a video summary"
+        >
+          <span className="flex items-center gap-1 text-[7px] font-bold text-white">
+            <Sparkles className="h-2 w-2 animate-pulse text-amber-300" />
+            AI analyzing
+          </span>
+          <span className="mt-0.5 flex items-center gap-1 text-[6px] font-semibold text-zinc-400">
+            <span className="h-1 w-1 animate-pulse rounded-full bg-amber-300" />
+            Tags
+            <span className="ml-0.5 h-1 w-1 animate-pulse rounded-full bg-violet-400" />
+            Summary
+          </span>
+        </div>
+      )}
       {detectedDuration > 0 && (
-        <span className="absolute bottom-1.5 left-1.5 z-[2] rounded bg-black/45 px-1.5 py-0.5 text-[8px] font-bold tabular-nums text-white shadow-sm">
+        <span className={`absolute left-1.5 z-[2] rounded bg-black/45 px-1.5 py-0.5 text-[8px] font-bold tabular-nums text-white shadow-sm ${item.aiStatus === 'processing' ? 'bottom-10' : 'bottom-1.5'}`}>
           {formatDuration(detectedDuration)}
         </span>
       )}

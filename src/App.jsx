@@ -46,12 +46,12 @@ const TimelineEditorFallback = () => (
 function MobileNav({ isCreator, canViewAdmin }) {
   const items = isCreator
     ? [
-        { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
+        { name: 'Products', path: '/campaigns', icon: Megaphone },
         { name: 'Channels', path: '/channels', icon: Link2 },
         { name: 'Settings', path: '/settings', icon: SettingsIcon },
       ]
     : [
-        { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
+        { name: 'Products', path: '/campaigns', icon: Megaphone },
         ...(canViewAdmin ? [{ name: 'Performance', path: '/dashboard', icon: BarChart3 }] : []),
         { name: 'Queue', path: '/scheduler', icon: Clock },
         { name: 'Media', path: '/media', icon: FolderHeart },

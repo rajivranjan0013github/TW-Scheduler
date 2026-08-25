@@ -20,6 +20,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { getActiveCampaignId } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
+import ProductDetailsFields from '../components/campaigns/ProductDetailsFields';
+import { emptyProductFields } from '../components/campaigns/campaignProductForm';
 
 const statusOptions = ['active', 'paused', 'archived'];
 const platformOptions = ['instagram', 'facebook', 'youtube'];
@@ -36,7 +38,15 @@ export const AdminCampaigns = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [campaign, setCampaign] = useState(null);
-  const [form, setForm] = useState({ name: '', description: '', mainEmail: '', status: 'active', promoFolderId: '', channels: [] });
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    mainEmail: '',
+    status: 'active',
+    promoFolderId: '',
+    channels: [],
+    ...emptyProductFields,
+  });
   const [promoFolders, setPromoFolders] = useState([]);
   const [foldersLoading, setFoldersLoading] = useState(false);
   const [promoFolderPickerOpen, setPromoFolderPickerOpen] = useState(false);
@@ -61,8 +71,13 @@ export const AdminCampaigns = () => {
     setCampaign(nextCampaign || null);
     if (nextCampaign) {
       setForm({
-        name: nextCampaign.name || '',
-        description: nextCampaign.description || '',
+        name: nextCampaign.productName || nextCampaign.name || '',
+        description: nextCampaign.productDescription || nextCampaign.description || '',
+        productSource: nextCampaign.productSource || 'website',
+        productUrl: nextCampaign.productUrl || nextCampaign.productWebsite || '',
+        productWebsite: nextCampaign.productWebsite || '',
+        productName: nextCampaign.productName || nextCampaign.name || '',
+        productDescription: nextCampaign.productDescription || nextCampaign.description || '',
         mainEmail: nextCampaign.mainEmail || nextCampaign.createdBy?.email || '',
         status: nextCampaign.status || 'active',
         promoFolderId: String(nextCampaign.promoFolderId?._id || nextCampaign.promoFolderId || ''),
@@ -93,7 +108,7 @@ export const AdminCampaigns = () => {
           queryFn: async () => {
             const campaignRes = await fetch(`${API_BASE_URL}/api/admin/campaigns/${campaignId}?scope=workspace`, { headers });
             const payload = await campaignRes.json();
-            if (!campaignRes.ok) throw new Error(payload.message || 'Failed to load campaign.');
+            if (!campaignRes.ok) throw new Error(payload.message || 'Failed to load product.');
             return payload;
           },
           staleTime: 2 * 60 * 1000,
@@ -150,7 +165,7 @@ export const AdminCampaigns = () => {
       (ch) => ch.platform === newChannelPlatform && ch.handle.toLowerCase() === cleanHandle.toLowerCase()
     );
     if (exists) {
-      setError(`This ${newChannelPlatform} account is already added to the campaign.`);
+      setError(`This ${newChannelPlatform} account is already added to the product.`);
       return;
     }
 
@@ -325,13 +340,17 @@ export const AdminCampaigns = () => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
           },
-          body: JSON.stringify(form),
+          body: JSON.stringify({
+            ...form,
+            name: form.productName,
+            description: form.productDescription,
+          }),
         }
       );
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to save campaign.');
+        throw new Error(data.message || 'Failed to save product.');
       }
 
       setCampaign(data);
@@ -352,7 +371,7 @@ export const AdminCampaigns = () => {
   const deleteCampaign = async () => {
     if (!campaign || !canDelete) return;
 
-    const confirmed = window.confirm(`Delete campaign "${campaign.name}"? This will not delete posts or publishing channels.`);
+    const confirmed = window.confirm(`Delete product "${campaign.productName || campaign.name}"? This will not delete posts or publishing channels.`);
     if (!confirmed) return;
 
     setSaving(true);
@@ -365,7 +384,7 @@ export const AdminCampaigns = () => {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to delete campaign.');
+        throw new Error(data.message || 'Failed to delete product.');
       }
 
       localStorage.removeItem('active-campaign-id');
@@ -384,17 +403,17 @@ export const AdminCampaigns = () => {
       <div className="min-h-screen bg-black px-3 py-3 text-white lg:px-5">
         <div className="mx-auto max-w-5xl space-y-3">
           <div className="border-b border-white/10 pb-2">
-            <h2 className="m-0 text-base font-semibold tracking-tight text-white">Campaign Setup</h2>
+            <h2 className="m-0 text-base font-semibold tracking-tight text-white">Product Setup</h2>
           </div>
           <div className="flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-[#0a0a0a] p-12 text-center shadow-sm">
-            <p className="m-0 text-sm font-semibold text-white">No campaign selected</p>
-            <p className="m-0 mt-1 text-xs text-zinc-400">Select a campaign from the sidebar to edit it here.</p>
+            <p className="m-0 text-sm font-semibold text-white">No product selected</p>
+            <p className="m-0 mt-1 text-xs text-zinc-400">Select a product from the sidebar to edit it here.</p>
             <button
               type="button"
               onClick={() => navigate('/campaigns')}
               className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#7831d6] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#6825bc] shadow-sm"
             >
-              Go to Campaign Selector
+              Go to Product Selector
             </button>
           </div>
         </div>
@@ -406,9 +425,9 @@ export const AdminCampaigns = () => {
     <div className="min-h-screen bg-black px-3 py-3 text-white lg:px-5">
       <div className="mx-auto max-w-5xl space-y-3">
         <div className="border-b border-white/10 pb-2">
-          <h2 className="m-0 text-base font-semibold tracking-tight text-white">Campaign Setup</h2>
+          <h2 className="m-0 text-base font-semibold tracking-tight text-white">Product Setup</h2>
           <p className="m-0 mt-0.5 text-xs text-zinc-400">
-            Edit details and manage accounts for the active campaign.
+            Edit details and manage accounts for the active product.
           </p>
         </div>
 
@@ -420,11 +439,11 @@ export const AdminCampaigns = () => {
         )}
 
         {loading ? (
-          <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-10 text-center text-sm text-zinc-400">Loading campaign...</div>
+          <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-10 text-center text-sm text-zinc-400">Loading product...</div>
         ) : !campaign ? (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-[#0a0a0a] p-12 text-center">
-            <p className="m-0 text-sm font-semibold text-white">Campaign not found</p>
-            <p className="m-0 mt-1 text-xs text-zinc-400">The selected campaign could not be loaded.</p>
+            <p className="m-0 text-sm font-semibold text-white">Product not found</p>
+            <p className="m-0 mt-1 text-xs text-zinc-400">The selected product could not be loaded.</p>
           </div>
         ) : (
           <form onSubmit={saveCampaign}>
@@ -462,24 +481,10 @@ export const AdminCampaigns = () => {
                 <div className="p-6 space-y-5">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="sm:col-span-2">
-                      <label className="mb-1.5 block text-xs font-semibold text-zinc-300">
-                        Campaign Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={form.name}
-                        onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
-                        className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="mb-1.5 block text-xs font-semibold text-zinc-300">Description</label>
-                      <textarea
-                        rows={3}
-                        value={form.description}
-                        onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))}
-                        className="w-full resize-none rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
+                      <ProductDetailsFields
+                        form={form}
+                        setForm={setForm}
+                        heading="Product profile"
                       />
                     </div>
                     <div>
@@ -539,7 +544,7 @@ export const AdminCampaigns = () => {
                         </button>
                       </div>
                       <p className="m-0 mt-1 text-[11px] text-zinc-500">
-                        Videos in this folder appear in the video editor’s Promo tab for this campaign.
+                        Videos in this folder appear in the video editor’s Promo tab for this product.
                       </p>
                     </div>
                   </div>
@@ -551,9 +556,9 @@ export const AdminCampaigns = () => {
                 <div className="p-6 space-y-6">
                   {/* Info Header */}
                   <div>
-                    <h3 className="text-base font-semibold text-white m-0">Campaign Social Channels</h3>
+                    <h3 className="text-base font-semibold text-white m-0">Product Social Channels</h3>
                     <p className="text-xs text-zinc-400 mt-1 m-0">
-                      Add the social media accounts or channels of creators/influencers associated with this campaign.
+                      Add the social media accounts or channels associated with this product.
                       The system will automatically check their verification status by scanning connected accounts.
                     </p>
                   </div>
@@ -675,7 +680,7 @@ export const AdminCampaigns = () => {
                       <div className="rounded-xl border border-dashed border-white/10 p-8 text-center bg-[#0a0a0a]">
                         <p className="m-0 text-sm font-semibold text-white">No channels added yet</p>
                         <p className="m-0 mt-1 text-xs text-zinc-500">
-                          Fill in the details above to add social channels to this campaign.
+                          Fill in the details above to add social channels to this product.
                         </p>
                       </div>
                     ) : (
