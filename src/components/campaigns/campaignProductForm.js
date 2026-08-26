@@ -1,4 +1,17 @@
 export const emptyProductFields = {
   productName: '',
   productDescription: '',
+  productUrl: '',
+  productSource: 'app_store',
+  category: '',
+  iconUrl: '',
+  targetAudience: '',
+  keyBenefit: '',
+  coreFunction: '',
+  useCases: [],
+  targetAudienceList: [],
+  marketingStrategies: [],
+  keyMessaging: [],
+  positioningStatement: '',
+  screenshots: [],
 };

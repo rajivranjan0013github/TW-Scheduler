@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from '../config';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
+  Check,
   CheckCircle2,
+  Clock,
+  Edit3,
+  ExternalLink,
+  Package,
   Plus,
   RefreshCw,
   Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import CampaignCreationModal from '../components/campaigns/CampaignCreationModal';
+import ProductEditorPage from '../components/campaigns/ProductEditorPage';
 import { emptyProductFields } from '../components/campaigns/campaignProductForm';
 
 const emptyCampaignForm = {
@@ -21,7 +26,6 @@ const emptyCampaignForm = {
 export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const canCreateCampaign = Boolean(user);
   const storageKey = `active-campaign-id:${user?._id || user?.email || 'default'}`;
   const [campaigns, setCampaigns] = useState([]);
@@ -34,16 +38,31 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [createError, setCreateError] = useState('');
+  const [formError, setFormError] = useState('');
   const [campaignForm, setCampaignForm] = useState(() => ({
     ...emptyCampaignForm,
   }));
+  const [expandedDescIds, setExpandedDescIds] = useState(() => new Set());
 
   const activeCampaign = useMemo(
     () => campaigns.find((campaign) => campaign._id === activeCampaignId),
     [campaigns, activeCampaignId]
   );
+
+  const toggleExpandDesc = (id, event) => {
+    event?.stopPropagation();
+    setExpandedDescIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const persistCampaign = (campaign, { emitEvent = true } = {}) => {
     const previousCampaignId =
@@ -86,7 +105,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
       );
       if (!campaignResponse.ok) {
         const data = await campaignResponse.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to load campaigns.');
+        throw new Error(data.message || 'Failed to load products.');
       }
 
       const campaignData = await campaignResponse.json();
@@ -101,12 +120,6 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
           campaignData.find((campaign) => campaign._id === savedId) ||
           campaignData[0];
         persistCampaign(nextCampaign, { emitEvent: nextCampaign._id !== savedId });
-
-        // Auto-navigate to the working queue if user has exactly 1 campaign
-        // (no reason to make them "pick" when there's nothing to pick)
-        if (campaignData.length === 1 && location.pathname === '/') {
-          navigate('/scheduler', { replace: true });
-        }
         return;
       }
 
@@ -119,233 +132,407 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
         setIsCreating(true);
       }
     } catch (err) {
-      setError(err.message || 'Failed to load campaigns.');
+      setError(err.message || 'Failed to load products.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Load campaign choices when the signed-in workspace changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCampaigns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id, user?.email]);
 
-  const handleSelect = (campaign) => {
+  const handleSelectOnly = (campaign, event) => {
+    event?.stopPropagation();
+    persistCampaign(campaign);
+  };
+
+  const handleOpenQueue = (campaign, event) => {
+    event?.stopPropagation();
     persistCampaign(campaign);
     navigate('/scheduler');
   };
 
   const openCreateForm = () => {
-    setCreateError('');
+    setFormError('');
+    setEditingCampaign(null);
     setCampaignForm({
       ...emptyCampaignForm,
     });
     setIsCreating(true);
   };
 
-  const closeCreateForm = () => {
-    if (saving) return;
+  const openEditForm = (campaign, event) => {
+    event?.stopPropagation();
+    setFormError('');
     setIsCreating(false);
-    setCreateError('');
+    setEditingCampaign(campaign);
+    setCampaignForm({
+      name: campaign.productName || campaign.name || '',
+      description: campaign.productDescription || campaign.description || '',
+      productName: campaign.productName || campaign.name || '',
+      productDescription: campaign.productDescription || campaign.description || '',
+      productSource: campaign.productSource || 'app_store',
+      productUrl: campaign.productUrl || campaign.productWebsite || '',
+      productWebsite: campaign.productWebsite || '',
+      category: campaign.category || '',
+      iconUrl: campaign.iconUrl || '',
+      targetAudience: campaign.targetAudience || '',
+      keyBenefit: campaign.keyBenefit || '',
+      coreFunction: campaign.coreFunction || '',
+      useCases: campaign.useCases || [],
+      targetAudienceList: campaign.targetAudienceList || [],
+      marketingStrategies: campaign.marketingStrategies || [],
+      keyMessaging: campaign.keyMessaging || [],
+      positioningStatement: campaign.positioningStatement || '',
+      primaryGoal: campaign.primaryGoal || 'app_downloads',
+      rating: campaign.rating,
+      ratingCount: campaign.ratingCount,
+      screenshots: campaign.screenshots || [],
+    });
   };
 
-  const createCampaign = async (event) => {
-    event.preventDefault();
+  const closeModal = () => {
+    if (saving) return;
+    setIsCreating(false);
+    setEditingCampaign(null);
+    setFormError('');
+  };
+
+  const handleSaveCampaign = async (event, { thenNavigateQueue = false } = {}) => {
+    if (event?.preventDefault) event.preventDefault();
     if (!campaignForm.productName.trim()) {
-      setCreateError('Product name is required.');
+      setFormError('Product name is required.');
       return;
     }
     if (!campaignForm.productDescription.trim()) {
-      setCreateError('Product description is required. Analyze the link or enter it manually.');
+      setFormError('Product description is required.');
       return;
     }
 
     try {
       setSaving(true);
-      setCreateError('');
-      const response = await fetch(
-        `${API_BASE_URL}/api/accounts/campaigns`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
-          },
-          body: JSON.stringify({
-            name: campaignForm.productName,
-            mainEmail: user?.email || '',
-            description: campaignForm.productDescription,
-            productName: campaignForm.productName,
-            productDescription: campaignForm.productDescription,
-            status: 'active',
-          }),
-        }
-      );
+      setFormError('');
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to create product.');
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
+      };
+
+      const payload = {
+        name: campaignForm.productName,
+        description: campaignForm.productDescription,
+        productName: campaignForm.productName,
+        productDescription: campaignForm.productDescription,
+        productSource: campaignForm.productSource || 'app_store',
+        productUrl: campaignForm.productUrl || '',
+        category: campaignForm.category || '',
+        iconUrl: campaignForm.iconUrl || '',
+        targetAudience: campaignForm.targetAudience || '',
+        keyBenefit: campaignForm.keyBenefit || '',
+        coreFunction: campaignForm.coreFunction || '',
+        useCases: campaignForm.useCases || [],
+        targetAudienceList: campaignForm.targetAudienceList || [],
+        marketingStrategies: campaignForm.marketingStrategies || [],
+        keyMessaging: campaignForm.keyMessaging || [],
+        positioningStatement: campaignForm.positioningStatement || '',
+        screenshots: campaignForm.screenshots || [],
+        primaryGoal: campaignForm.primaryGoal || 'app_downloads',
+      };
+
+      let savedData = null;
+
+      if (editingCampaign) {
+        // Edit existing product
+        const response = await fetch(
+          `${API_BASE_URL}/api/accounts/campaigns/${editingCampaign._id}`,
+          {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify(payload),
+          }
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to update product.');
+        }
+
+        savedData = data;
+        setCampaigns((current) =>
+          current.map((c) => (c._id === data._id ? { ...c, ...data } : c))
+        );
+        if (activeCampaignId === data._id) {
+          persistCampaign(data);
+        }
+      } else {
+        // Create new product
+        const response = await fetch(
+          `${API_BASE_URL}/api/accounts/campaigns`,
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              ...payload,
+              mainEmail: user?.email || '',
+              status: 'active',
+            }),
+          }
+        );
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to create product.');
+        }
+
+        savedData = data;
+        setCampaigns((current) => [data, ...current]);
+        persistCampaign(data);
       }
 
-      setCampaigns((current) => [data, ...current]);
-      persistCampaign(data);
-      setIsCreating(false);
-      navigate('/scheduler');
+      closeModal();
+
+      if (thenNavigateQueue && savedData) {
+        navigate('/scheduler');
+      }
     } catch (err) {
-      setCreateError(err.message || 'Failed to create product.');
+      setFormError(err.message || 'Failed to save product.');
     } finally {
       setSaving(false);
     }
   };
 
-  const firstName = (user?.name || '').split(' ')[0] || 'there';
-
   // ─────────────────────────────────────────────
-  // FIRST-TIME USER: Welcome Screen
+  // FULL PAGE VIEW: CREATE OR EDIT PRODUCT
   // ─────────────────────────────────────────────
-  if (!loading && campaigns.length === 0) {
+  if (isCreating || editingCampaign || (!loading && campaigns.length === 0)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black px-6 py-12 text-white">
-        <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#7831d6] to-[#9333ea] text-white shadow-lg shadow-purple-950/40">
-            <Sparkles className="h-7 w-7" />
-          </div>
-          <h1 className="m-0 mt-6 text-3xl font-semibold tracking-tight text-white">Welcome, {firstName}!</h1>
-          <p className="m-0 mt-3 text-sm text-zinc-400">Let&apos;s add your first product.</p>
-        </div>
-        <CampaignCreationModal
-          form={campaignForm}
-          setForm={setCampaignForm}
-          saving={saving}
-          error={createError}
-          onSubmit={createCampaign}
-          onClose={closeCreateForm}
-          canClose={false}
-        />
-      </div>
+      <ProductEditorPage
+        form={campaignForm}
+        setForm={setCampaignForm}
+        saving={saving}
+        error={formError}
+        isEditing={Boolean(editingCampaign)}
+        canCancel={campaigns.length > 0}
+        onCancel={closeModal}
+        onSubmit={(e) => handleSaveCampaign(e, { thenNavigateQueue: false })}
+        onSaveAndOpenQueue={(e) => handleSaveCampaign(e, { thenNavigateQueue: true })}
+      />
     );
   }
 
   // ─────────────────────────────────────────────
-  // RETURNING USER: Campaign Picker (2+ campaigns)
+  // FULL PAGE VIEW: PRODUCT WORKSPACES LIST
   // ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-black px-8 py-7 text-white">
+    <div className="min-h-screen bg-black px-4 py-7 text-white sm:px-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/10 pb-5">
           <div>
-            <p className="m-0 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-              Products
+            <p className="m-0 text-[11px] font-semibold uppercase tracking-wider text-purple-400">
+              Workspace Products
             </p>
-            <h1 className="m-0 mt-1 text-2xl font-semibold tracking-tight text-white">
-              Select Product
+            <h1 className="m-0 mt-1 text-2xl font-bold tracking-tight text-white">
+              My App & Product Workspaces
             </h1>
-            <p className="m-0 mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-              You are signed in as{' '}
-              <span className="font-semibold text-white">
-                {user?.email}
-              </span>
-              . Choose the product you want to manage.
+            <p className="m-0 mt-1.5 max-w-2xl text-sm leading-6 text-zinc-400">
+              Connect your App Store or Play Store apps to auto-generate TikTok, Reels, and Shorts campaigns.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={fetchCampaigns}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
-            {canCreateCampaign && campaigns.length > 0 && (
+            {canCreateCampaign && (
               <button
                 type="button"
                 onClick={openCreateForm}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#7831d6] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#6825bc] shadow-sm"
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#7831d6] to-[#9333ea] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-[#7831d6]/25 transition hover:brightness-110 hover:scale-[1.02]"
               >
-                <Plus className="h-3.5 w-3.5" />
-                New product
+                <Plus className="h-4 w-4" />
+                Add New App
               </button>
             )}
           </div>
         </div>
 
-        {isCreating && (
-          <CampaignCreationModal
-            form={campaignForm}
-            setForm={setCampaignForm}
-            saving={saving}
-            error={createError}
-            onSubmit={createCampaign}
-            onClose={closeCreateForm}
-          />
-        )}
-
+        {/* Loading / Error States */}
         {loading ? (
-          <div className="flex min-h-[360px] items-center justify-center rounded-lg border border-white/10 bg-[#0a0a0a]">
+          <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-white/10 bg-[#0a0a0a]">
             <div className="flex flex-col items-center gap-3">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#7831d6] border-t-transparent" />
               <span className="text-xs font-semibold tracking-wide text-zinc-400">
-                Loading workspaces...
+                Loading products...
               </span>
             </div>
           </div>
         ) : error ? (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-5 text-sm font-semibold text-red-300">
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm font-semibold text-red-300">
             {error}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {campaigns.map((campaign) => {
               const isActive = campaign._id === activeCampaign?._id;
               const mainEmail =
                 campaign.mainEmail ||
                 campaign.createdBy?.email ||
-                'No main email set';
+                '';
+              const description =
+                campaign.productDescription ||
+                campaign.description ||
+                '';
+              const isExpanded = expandedDescIds.has(campaign._id);
+              const isLongDescription = description.length > 180;
+
               return (
-                <button
+                <div
                   key={campaign._id}
-                  type="button"
-                  onClick={() => handleSelect(campaign)}
-                  className={`flex min-h-[220px] flex-col rounded-lg border bg-[#0a0a0a] p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#7831d6] hover:bg-white/[0.04] ${
+                  onClick={(e) => handleSelectOnly(campaign, e)}
+                  className={`group relative flex flex-col justify-between rounded-2xl border bg-gradient-to-b from-[#0f0c18] via-[#09070e] to-[#040306] p-5 shadow-lg transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'border-[#7831d6] ring-2 ring-[#7831d6]/25'
-                      : 'border-white/10'
+                      ? 'border-[#7831d6] ring-2 ring-[#7831d6]/30 shadow-[#7831d6]/10'
+                      : 'border-white/[0.08] hover:border-white/20 hover:bg-white/[0.03]'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                        Product
-                      </p>
-                      <h2 className="m-0 mt-1 text-lg font-semibold tracking-tight text-white">
-                        {campaign.name}
-                      </h2>
+                  {/* Card Top */}
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        {campaign.iconUrl ? (
+                          <img
+                            src={campaign.iconUrl}
+                            alt={campaign.name || 'App icon'}
+                            className="h-11 w-11 rounded-xl object-cover border border-white/10 shadow-sm"
+                          />
+                        ) : (
+                          <div className={`flex h-11 w-11 items-center justify-center rounded-xl border ${
+                            isActive
+                              ? 'bg-[#7831d6]/20 border-[#7831d6]/40 text-[#c4b5fd]'
+                              : 'bg-white/[0.05] border-white/10 text-zinc-400'
+                          }`}>
+                            <Package className="h-5 w-5" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h2 className="m-0 text-base font-semibold tracking-tight text-white group-hover:text-purple-200 transition-colors truncate">
+                              {campaign.name || 'Untitled product'}
+                            </h2>
+                            {campaign.category && (
+                              <span className="rounded-md bg-purple-500/20 border border-purple-500/30 px-1.5 py-0.5 text-[9px] font-medium text-purple-300">
+                                {campaign.category}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-500">
+                            {campaign.productSource === 'app_store' && <span>🍎 App Store</span>}
+                            {campaign.productSource === 'play_store' && <span>🤖 Play Store</span>}
+                            {campaign.productSource === 'website' && <span>🌐 Website</span>}
+                            {campaign.productUrl && (
+                              <a
+                                href={campaign.productUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-0.5 text-purple-400 hover:text-purple-300 transition-colors hover:underline"
+                                title="Open official store listing"
+                              >
+                                <span>Store</span>
+                                <ExternalLink className="h-2.5 w-2.5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Active indicator */}
+                      {isActive && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#7831d6]/20 border border-[#7831d6]/40 px-2.5 py-0.5 text-[10px] font-semibold text-[#c4b5fd] shrink-0">
+                          <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+                          Active
+                        </span>
+                      )}
                     </div>
-                    {isActive ? (
-                      <CheckCircle2 className="h-5 w-5 text-[#7831d6]" />
-                    ) : (
-                      <ArrowRight className="h-5 w-5 text-zinc-500" />
-                    )}
+
+                    {/* Product Description */}
+                    <div className="mt-4 rounded-xl border border-white/[0.06] bg-black/40 p-3.5">
+                      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">
+                        Product Description & Hook
+                      </p>
+                      {description ? (
+                        <div>
+                          <p className={`m-0 text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap ${
+                            !isExpanded && isLongDescription ? 'line-clamp-4' : ''
+                          }`}>
+                            {description}
+                          </p>
+                          {isLongDescription && (
+                            <button
+                              type="button"
+                              onClick={(e) => toggleExpandDesc(campaign._id, e)}
+                              className="mt-1.5 text-[11px] font-medium text-purple-400 hover:text-purple-300 transition-colors underline underline-offset-2"
+                            >
+                              {isExpanded ? 'Show less' : 'Read full description'}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="m-0 text-xs italic text-zinc-500">
+                          No description provided. Click &apos;Edit Details&apos; to add one.
+                        </p>
+                      )}
+                    </div>
                   </div>
 
-                  <p className="m-0 mt-3 line-clamp-3 text-sm leading-5 text-zinc-400">
-                    {campaign.productDescription || campaign.description || 'Product'}
-                  </p>
+                  {/* Card Bottom / Actions */}
+                  <div className="mt-5 flex items-center justify-between gap-2 border-t border-white/[0.08] pt-4">
+                    <button
+                      type="button"
+                      onClick={(e) => openEditForm(campaign, e)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                      title="View or edit product details"
+                    >
+                      <Edit3 className="h-3.5 w-3.5 text-zinc-400" />
+                      Edit Details
+                    </button>
 
-                  <div className="mt-5 flex flex-1 items-end">
-                    <div className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-                        Main email
-                      </p>
-                      <p className="m-0 mt-1 truncate text-xs font-semibold text-white">
-                        {mainEmail}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      {!isActive ? (
+                        <button
+                          type="button"
+                          onClick={(e) => handleSelectOnly(campaign, e)}
+                          className="inline-flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+                        >
+                          <Check className="h-3.5 w-3.5 text-zinc-400" />
+                          Select
+                        </button>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleOpenQueue(campaign, e)}
+                        className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                          isActive
+                            ? 'bg-[#7831d6] text-white hover:bg-[#6825bc] shadow-md shadow-[#7831d6]/20'
+                            : 'bg-white/10 text-zinc-200 hover:bg-white/15 hover:text-white'
+                        }`}
+                        title="Open Scheduled Queue for this product"
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>Queue</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
