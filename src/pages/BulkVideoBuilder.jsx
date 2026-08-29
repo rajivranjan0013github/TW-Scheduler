@@ -339,7 +339,7 @@ export const BulkVideoBuilder = () => {
     setPan(nextPan);
   }, []);
 
-  // Normal wheel input zooms around the cursor. Horizontal/Shift+wheel pans.
+  // Zoom with Ctrl + Scrollwheel. Normal wheel input pans the canvas.
   useEffect(() => {
     const viewport = canvasViewportRef.current;
     if (!viewport) return undefined;
@@ -350,26 +350,39 @@ export const BulkVideoBuilder = () => {
       const scrollable = target?.closest('.overflow-y-auto, .overflow-x-auto, .overflow-auto');
       if (scrollable && viewport.contains(scrollable)) return;
 
-      const isHorizontalPan = event.shiftKey
-        || Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.5;
-      if (isHorizontalPan) {
+      // Zoom in and out with Ctrl / Cmd + scrollwheel (or pinch gesture)
+      if (event.ctrlKey || event.metaKey) {
+        if (event.deltaY === 0) return;
         event.preventDefault();
-        const nextPan = {
-          x: currentPan.x - (event.deltaX || event.deltaY),
-          y: currentPan.y,
-        };
-        zoomStateRef.current = { pageZoom: currentZoom, pan: nextPan };
-        setPan(nextPan);
+        const rect = viewport.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        const normalizedDelta = clamp(event.deltaY, -120, 120);
+        const zoomFactor = Math.exp(-normalizedDelta * 0.002);
+        applyZoomAtPoint(currentZoom * zoomFactor, mouseX, mouseY);
         return;
       }
 
-      if (event.deltaY === 0) return;
+      // Normal scrollwheel: pan the canvas
       event.preventDefault();
-      const rect = viewport.getBoundingClientRect();
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
-      const zoomFactor = Math.exp(-event.deltaY * 0.0015);
-      applyZoomAtPoint(currentZoom * zoomFactor, mouseX, mouseY);
+      let deltaX = event.deltaX;
+      let deltaY = event.deltaY;
+
+      if (event.shiftKey) {
+        // Shift + scroll pans horizontally
+        deltaX = event.deltaX || event.deltaY;
+        deltaY = 0;
+      }
+
+      if (deltaX === 0 && deltaY === 0) return;
+
+      const nextPan = {
+        x: currentPan.x - deltaX,
+        y: currentPan.y - deltaY,
+      };
+
+      zoomStateRef.current = { pageZoom: currentZoom, pan: nextPan };
+      setPan(nextPan);
     };
 
     viewport.addEventListener('wheel', handleCanvasWheel, { passive: false });
@@ -1049,7 +1062,7 @@ export const BulkVideoBuilder = () => {
           )}
 
           <div className="p-2.5 bg-[#1a1a1d] border-t border-[#303034] shrink-0 text-[10px] text-gray-400 leading-normal font-medium">
-            💡 <strong className="text-gray-300">Scroll or pinch</strong> to zoom. <strong className="text-gray-300">Space + Drag</strong> to pan.
+            💡 <strong className="text-gray-300">Ctrl + Scroll</strong> to zoom. <strong className="text-gray-300">Scroll / Space + Drag</strong> to pan.
           </div>
         </aside>
       )}

@@ -3,7 +3,6 @@ import {
 } from './bulkAgentReservations.js';
 import { syncBulkRowContent } from '../videoEditorV2/project';
 import {
-  BULK_TEXT_SIZING_VERSION,
   DEFAULT_DRAG_POS,
   DEFAULT_TEXT_SETTINGS,
   createEmptyRow,
@@ -14,7 +13,6 @@ import {
   sanitizeBulkRowForStorage,
   stripAgentReservations,
   cloneValue,
-  valuesEqual,
   hasAppliedAgentPlan,
 } from './useBulkRows.js';
 

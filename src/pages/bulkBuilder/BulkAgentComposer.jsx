@@ -9,14 +9,18 @@ import {
 } from 'react';
 import {
   AlertTriangle,
+  ArrowUp,
   Check,
+  ChevronRight,
   Folder,
   Loader2,
   Maximize2,
-  Plus,
-  Send,
+  Pause,
+  Play,
+  Sparkles,
   SquarePen,
   Undo2,
+  Video,
   X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
@@ -632,6 +636,63 @@ export const BulkAgentComposer = ({
   const [undoState, setUndoState] = useState(() => readStoredUndo(campaignId));
   const [error, setError] = useState(null);
   const [reuseRetry, setReuseRetry] = useState(null);
+  const [frameSelection, setFrameSelection] = useState({ planId: '', indexes: new Set() });
+  const [previewAudioUrl, setPreviewAudioUrl] = useState('');
+  const audioPlayerRef = useRef(null);
+  const selectableFrameCount = plan?.assignments?.length || plan?.targetRows?.length || 0;
+  const selectionPlanId = String(plan?.id || '');
+  const selectedFrameIndexes = frameSelection.planId === selectionPlanId
+    ? frameSelection.indexes
+    : new Set(Array.from({ length: selectableFrameCount }, (_, index) => index));
+
+  const toggleFrameSelection = (index) => {
+    setFrameSelection(() => {
+      const next = new Set(selectedFrameIndexes);
+      if (next.has(index)) {
+        if (next.size > 1) next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return { planId: selectionPlanId, indexes: next };
+    });
+  };
+
+  const toggleSelectAllFrames = () => {
+    const total = (plan?.assignments?.length || plan?.targetRows?.length || 0);
+    if (total === 0) return;
+    if (selectedFrameIndexes.size === total) {
+      setFrameSelection({ planId: selectionPlanId, indexes: new Set([0]) });
+    } else {
+      setFrameSelection({
+        planId: selectionPlanId,
+        indexes: new Set(Array.from({ length: total }, (_, index) => index)),
+      });
+    }
+  };
+
+  const toggleAudioPreview = (url) => {
+    if (!url) return;
+    if (previewAudioUrl === url) {
+      audioPlayerRef.current?.pause();
+      setPreviewAudioUrl('');
+    } else {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+      }
+      const audio = new Audio(url);
+      audioPlayerRef.current = audio;
+      audio.play().catch(() => {});
+      audio.onended = () => setPreviewAudioUrl('');
+      setPreviewAudioUrl(url);
+    }
+  };
+
+  useEffect(() => () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -1169,6 +1230,22 @@ export const BulkAgentComposer = ({
         const failure = { ...payload, message: payload?.message || 'Unable to prepare the plan.', status: response.status };
         throw Object.assign(new Error(failure.message), failure);
       }
+      if (payload?.clarification?.question) {
+        setMessages((current) => [
+          ...current,
+          createMessage('assistant', payload.clarification.question),
+        ]);
+        if (draftHtmlRef.current === submitted.html) {
+          editorRef.current?.clear();
+          setDraftHtml('');
+          setInput('');
+          setFolderMentions([]);
+          mentionMatchRef.current = null;
+          setMentionMatch(null);
+        }
+        window.requestAnimationFrame(() => editorRef.current?.focus());
+        return;
+      }
       if (!payload?.plan) throw new Error('The assistant returned an empty plan.');
       planRef.current = payload.plan;
       setPlan(payload.plan);
@@ -1253,7 +1330,42 @@ export const BulkAgentComposer = ({
     applyingRef.current = true;
     setIsApplying(true);
     setError(null);
-    const applyRecovery = { plan: planToApply, startedAt: new Date().toISOString() };
+
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      setPreviewAudioUrl('');
+    }
+
+    const hasAssignments = Array.isArray(planToApply.assignments) && planToApply.assignments.length > 0;
+    const isSubset = hasAssignments && selectedFrameIndexes.size < planToApply.assignments.length;
+    const filteredAssignments = hasAssignments
+      ? planToApply.assignments.filter((_, index) => selectedFrameIndexes.has(index))
+      : planToApply.assignments;
+    const unselectedAssignments = hasAssignments
+      ? planToApply.assignments.filter((_, index) => !selectedFrameIndexes.has(index))
+      : [];
+
+    const unselectedReservations = unselectedAssignments.flatMap((assignment) => (
+      ['video1', 'video2', 'audio'].map((slot) => ({
+        planId: planToApply.id,
+        mediaId: getMediaId(assignment?.[slot]),
+      })).filter((entry) => entry.mediaId)
+    ));
+    if (unselectedReservations.length > 0) {
+      queueAgentReservationReleases(unselectedReservations, campaignId);
+    }
+
+    const planForApply = isSubset ? {
+      ...planToApply,
+      assignments: filteredAssignments,
+      summary: {
+        ...planToApply.summary,
+        frameCount: filteredAssignments.length,
+        affectedFrameCount: filteredAssignments.length,
+      },
+    } : planToApply;
+
+    const applyRecovery = { plan: planForApply, startedAt: new Date().toISOString() };
     applyRecoveryRef.current = applyRecovery;
     persistOptionalValue(applyRecoveryStorageKey(campaignId), applyRecovery);
     const controller = new AbortController();
@@ -1270,8 +1382,8 @@ export const BulkAgentComposer = ({
           body: JSON.stringify({
             currentBoard: serializeCurrentBoard(
               currentRowsRef.current,
-              typeof planToApply.isDualVideo === 'boolean'
-                ? planToApply.isDualVideo
+              typeof planForApply.isDualVideo === 'boolean'
+                ? planForApply.isDualVideo
                 : isDualVideo,
             ),
           }),
@@ -1285,7 +1397,10 @@ export const BulkAgentComposer = ({
         throw Object.assign(new Error(failure.message), failure);
       }
       const payload = await response.json();
-      const appliedPlan = payload?.plan || planToApply;
+      const appliedPlan = {
+        ...(payload?.plan || planToApply),
+        assignments: planForApply.assignments,
+      };
       const changeSet = onApplyPlan(appliedPlan);
       if (!changeSet) throw new Error('The plan did not contain a valid board change.');
       if (!changeSet.alreadyApplied) {
@@ -1297,15 +1412,16 @@ export const BulkAgentComposer = ({
       persistOptionalValue(applyRecoveryStorageKey(campaignId), null);
       planRef.current = null;
       setPlan(null);
-      const affectedCount = Number(
-        appliedPlan.summary?.frameCount
-        || appliedPlan.assignments?.length
-        || appliedPlan.targetRows?.length
-        || 0,
-      );
+      const affectedCount = filteredAssignments?.length
+        || Number(
+          appliedPlan.summary?.frameCount
+          || appliedPlan.assignments?.length
+          || appliedPlan.targetRows?.length
+          || 0,
+        );
       setMessages((current) => [
         ...current,
-        createMessage('assistant', `Plan applied${affectedCount ? ` to ${affectedCount} frame${affectedCount === 1 ? '' : 's'}` : ''}. You can undo changes that have not been edited since.`),
+        createMessage('assistant', `Plan applied${affectedCount ? ` to ${affectedCount} frame${affectedCount === 1 ? '' : 's'}` : ''}${unselectedReservations.length > 0 ? ' (unselected media released)' : ''}. You can undo changes that have not been edited since.`),
       ]);
     } catch (applyError) {
       if (applyError?.name !== 'AbortError' && mountedRef.current) {
@@ -1420,47 +1536,88 @@ export const BulkAgentComposer = ({
           type="button"
           aria-label="Close Bulk Builder assistant"
           onClick={() => onOpenChange(false)}
-          className="absolute inset-0 z-40 bg-black/55 backdrop-blur-[1px] xl:hidden"
+          className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm xl:hidden transition-opacity"
         />
       )}
 
       {isOpen ? (
         <section
           aria-label="Bulk Builder AI assistant"
-          className="absolute bottom-4 right-4 top-20 z-50 flex w-[min(400px,calc(100%_-_1rem))] select-text flex-col overflow-hidden rounded-2xl border border-[#35353a] bg-[#151517]/[0.99] text-zinc-100 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl"
+          className="absolute bottom-4 right-4 top-20 z-50 flex w-[min(440px,calc(100%_-_1rem))] select-text flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0d0d10]/[0.98] text-zinc-100 shadow-[0_30px_90px_rgba(0,0,0,0.85)] backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-200"
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-            <div className="sticky top-0 z-10 flex shrink-0 items-center justify-end bg-[#151517]/95 px-5 py-4 backdrop-blur-xl">
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => void startNewChat()}
-                  disabled={controlsLocked}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Start a new chat"
-                  title="Clear this conversation and start a new chat"
-                >
-                  {isStartingNewChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <SquarePen className="h-4 w-4" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenChange(false)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 hover:bg-white/10 hover:text-white"
-                  aria-label="Close assistant drawer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+          {/* Top Header */}
+          <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0d0d10]/90 px-4 py-3.5 backdrop-blur-xl">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-md shadow-violet-500/25 text-white">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold tracking-tight text-zinc-100">Bulk Composer</span>
+                <span className="rounded-full bg-violet-500/15 border border-violet-500/30 px-2 py-0.5 text-[8px] font-mono font-semibold text-violet-300">
+                  {isDualVideo ? 'Dual Video' : 'Single Video'}
+                </span>
               </div>
             </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => void startNewChat()}
+                disabled={controlsLocked}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.08] hover:text-white transition-all disabled:opacity-40"
+                aria-label="Start a new chat"
+                title="Clear conversation and start a new chat"
+              >
+                {isStartingNewChat ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <SquarePen className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/[0.08] hover:text-white transition-all"
+                aria-label="Close assistant drawer"
+                title="Close drawer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
 
-            <div className={`space-y-2 px-3.5 py-3 ${messages.length === 0 && !isPlanning && !plan ? 'flex flex-1 items-center justify-center' : ''}`}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            {/* Conversation Stream */}
+            <div className={`space-y-2.5 px-4 py-3.5 ${messages.length === 0 && !isPlanning && !plan ? 'flex flex-1 flex-col items-center justify-center' : ''}`}>
               {messages.length === 0 && !isPlanning && !plan && (
-                <div className="max-w-64 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-center text-[10px] leading-relaxed text-zinc-400">
-                  Type @ to attach media folders, then describe what to create. Music uses Trending Songs by default.
+                <div className="my-auto flex flex-col items-center justify-center px-2 py-6 text-center">
+                  <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-400 shadow-inner">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <h4 className="text-xs font-bold text-zinc-200">How can I help you build?</h4>
+                  <p className="mt-1 text-[10px] text-zinc-500 max-w-60 leading-relaxed">
+                    Type <code className="rounded bg-white/5 px-1 py-0.5 font-mono text-violet-300 font-medium">@</code> to attach Media Folders and generate bulk video variations.
+                  </p>
+                  <div className="mt-4 flex flex-col gap-1.5 w-full max-w-72">
+                    {[
+                      'Create 10 frames with hooks',
+                      'Add Trending BGM to all frames',
+                      'Position captions at bottom',
+                    ].map((promptText) => (
+                      <button
+                        key={promptText}
+                        type="button"
+                        onClick={() => {
+                          setInput(promptText);
+                          editorRef.current?.setText?.(promptText);
+                        }}
+                        className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-left text-[10px] font-medium text-zinc-400 hover:border-violet-500/30 hover:bg-violet-500/5 hover:text-zinc-200 transition-all group"
+                      >
+                        <span>{promptText}</span>
+                        <ChevronRight className="h-3 w-3 text-zinc-600 group-hover:text-violet-400 transition-colors" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
+
               {messages.slice(-8).map((message) => (
                 <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[82%] whitespace-pre-wrap rounded-xl px-2.5 py-2 text-[10px] leading-relaxed ${message.role === 'user'
@@ -1471,6 +1628,7 @@ export const BulkAgentComposer = ({
                   </div>
                 </div>
               ))}
+
               {isPlanning && (
                 <div className="flex items-center gap-2 text-[10px] font-semibold text-zinc-300">
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
@@ -1480,71 +1638,158 @@ export const BulkAgentComposer = ({
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Proposed Plan / Changeset Card */}
             {plan && (
-              <div className="border-t border-white/10 bg-[#111113] p-3.5">
-                <div className="mb-2.5 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-zinc-200">Proposed plan</div>
-                    <div className="mt-0.5 text-[9px] text-zinc-500">Nothing changes until you apply it.</div>
+              <div className="border-t border-white/[0.08] bg-[#111115] p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-md bg-violet-500/20 text-violet-300">
+                      <Sparkles className="h-3 w-3" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-extrabold uppercase tracking-wider text-violet-300">Proposed Changes</div>
+                      <div className="text-[9px] text-zinc-500">Review and select frames to apply</div>
+                    </div>
                   </div>
-                  <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-zinc-300">
+                  <span className="rounded-full border border-violet-500/40 bg-violet-500/15 px-2.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-violet-300">
                     {plan.operation}
                   </span>
                 </div>
-                <div className="grid grid-cols-4 gap-1.5">
+
+                <div className="grid grid-cols-4 gap-1.5 mb-3">
                   <SummaryStat label="Affected" value={affectedFrameCount} />
                   <SummaryStat label="Unique V1" value={planSummary.uniquePrimaryVideos ?? '—'} />
                   <SummaryStat label="Unique V2" value={planIsDualVideo ? (planSummary.uniqueSecondaryVideos ?? '—') : 'Off'} />
                   <SummaryStat label="Audio" value={planSummary.uniqueAudioTracks ?? 0} />
                 </div>
+
                 {compiledTasks.length > 0 && (
-                  <div className="mt-2.5 max-h-28 space-y-1 overflow-y-auto rounded-lg border border-white/[0.08] bg-white/[0.03] p-2">
-                    <div className="pb-0.5 text-[8px] font-extrabold uppercase tracking-[0.12em] text-zinc-300">
-                      Compiled tasks
+                  <div className="mb-3 max-h-24 space-y-1 overflow-y-auto rounded-xl border border-violet-500/20 bg-violet-500/5 p-2.5">
+                    <div className="pb-0.5 text-[8px] font-extrabold uppercase tracking-[0.12em] text-violet-300">
+                      Tasks to execute
                     </div>
                     {compiledTasks.map((task, index) => (
                       <div key={task.id || `${task.type}-${index}`} className="flex gap-2 text-[9px] leading-relaxed text-zinc-300">
-                        <span className="shrink-0 font-mono text-zinc-600">{index + 1}.</span>
+                        <span className="shrink-0 font-mono text-zinc-500">{index + 1}.</span>
                         <span>{describeCompiledTask(task)}</span>
                       </div>
                     ))}
                   </div>
                 )}
+
                 {assignments.length > 0 && (
-                  <div className="mt-2.5 max-h-24 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-black/20 p-2">
-                    {assignments.slice(0, 8).map((assignment, index) => (
-                      <div key={`${assignment.targetRowId || assignment.video1?.mediaId || 'assignment'}-${index}`} className="flex items-center gap-2 text-[9px] text-zinc-400">
-                        <span className="w-5 shrink-0 font-mono text-zinc-600">
-                          #{Number.isInteger(Number(assignment.targetIndex)) ? Number(assignment.targetIndex) + 1 : index + 1}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-zinc-300">
-                          {assignment.video1?.name
-                            || (assignment.caption ? `“${assignment.caption}”` : '')
-                            || (assignment.textOverlays?.[0]?.text
-                              ? `“${assignment.textOverlays[0].text}”`
-                              : '')
-                            || assignment.changedFields?.join(', ')
-                            || 'Frame change'}
-                        </span>
-                        {assignment.video2 && <span className="min-w-0 flex-1 truncate">+ {assignment.video2.name}</span>}
-                        {assignment.audio && <span className="max-w-24 truncate text-sky-300">♫ {assignment.audio.name}</span>}
-                        {assignment.clearFields?.includes('audio') && (
-                          <span className="max-w-24 truncate text-rose-300">Remove audio</span>
-                        )}
-                        {assignment.textOverlays?.length > 0 && (
-                          <span className="max-w-28 truncate text-sky-300">
-                            Text: {assignment.textOverlays.length > 1
-                              ? `${assignment.textOverlays.length} segments`
-                              : `${assignment.textOverlays[0].binding || 'video1'} · ${assignment.textOverlays[0].position?.preset || 'center'}`}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                    {assignments.length > 8 && <div className="pl-7 text-[8px] font-semibold text-zinc-600">+{assignments.length - 8} more changes</div>}
+                  <div className="space-y-2 rounded-xl border border-white/[0.08] bg-black/40 p-2.5">
+                    <div className="flex items-center justify-between px-1 pb-1.5 border-b border-white/[0.06] text-[9px] font-bold text-zinc-400 uppercase tracking-wider">
+                      <span>Frames ({selectedFrameIndexes.size}/{assignments.length} selected)</span>
+                      <button
+                        type="button"
+                        onClick={toggleSelectAllFrames}
+                        className="text-violet-300 hover:text-white transition-colors text-[9px]"
+                      >
+                        {selectedFrameIndexes.size === assignments.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
+                    <div className="max-h-48 space-y-1.5 overflow-y-auto pr-0.5">
+                      {assignments.map((assignment, index) => {
+                        const isChecked = selectedFrameIndexes.has(index);
+                        const audioUrl = assignment.audio?.url;
+                        const isAudioPlaying = previewAudioUrl && previewAudioUrl === audioUrl;
+
+                        return (
+                          <div
+                            key={`${assignment.targetRowId || assignment.video1?.mediaId || 'assignment'}-${index}`}
+                            onClick={() => toggleFrameSelection(index)}
+                            className={`flex items-center gap-2 p-2 rounded-xl border transition-all cursor-pointer select-none text-[9px] ${
+                              isChecked
+                                ? 'border-violet-500/40 bg-violet-500/10 text-zinc-100 shadow-sm'
+                                : 'border-white/5 bg-white/[0.02] text-zinc-500 opacity-60'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleFrameSelection(index)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="rounded border-zinc-700 bg-zinc-800 text-violet-600 focus:ring-0 focus:ring-offset-0 h-3.5 w-3.5 shrink-0 cursor-pointer"
+                            />
+                            <span className="w-4 shrink-0 font-mono text-[9px] font-bold text-zinc-500">
+                              #{Number.isInteger(Number(assignment.targetIndex)) ? Number(assignment.targetIndex) + 1 : index + 1}
+                            </span>
+
+                            {/* Video 1 Preview */}
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+                              {assignment.video1?.thumbnailUrl ? (
+                                <img
+                                  src={assignment.video1.thumbnailUrl}
+                                  alt=""
+                                  className="h-5 w-5 rounded-md object-cover border border-white/10 shrink-0"
+                                />
+                              ) : (
+                                <div className="h-5 w-5 rounded-md bg-zinc-800 border border-white/10 flex items-center justify-center shrink-0">
+                                  <Video className="h-2.5 w-2.5 text-zinc-400" />
+                                </div>
+                              )}
+                              <span className="truncate text-zinc-200 font-medium" title={assignment.video1?.name}>
+                                {assignment.video1?.name || (assignment.caption ? `“${assignment.caption}”` : '') || 'Video 1'}
+                              </span>
+                            </div>
+
+                            {/* Video 2 Preview (Dual Mode) */}
+                            {assignment.video2 && (
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate border-l border-white/10 pl-1.5">
+                                {assignment.video2.thumbnailUrl ? (
+                                  <img
+                                    src={assignment.video2.thumbnailUrl}
+                                    alt=""
+                                    className="h-5 w-5 rounded-md object-cover border border-white/10 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="h-5 w-5 rounded-md bg-zinc-800 border border-white/10 flex items-center justify-center shrink-0">
+                                    <Video className="h-2.5 w-2.5 text-violet-300" />
+                                  </div>
+                                )}
+                                <span className="truncate text-zinc-300 font-medium" title={assignment.video2.name}>
+                                  {assignment.video2.name}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Audio Snippet Preview */}
+                            {assignment.audio && (
+                              <div
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleAudioPreview(assignment.audio?.url);
+                                }}
+                                className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-lg bg-purple-950/40 border border-purple-800/40 hover:bg-purple-900/60 cursor-pointer transition text-purple-200"
+                                title={`Preview: ${assignment.audio.name}`}
+                              >
+                                {isAudioPlaying ? (
+                                  <Pause className="h-2.5 w-2.5 text-purple-300 animate-pulse" />
+                                ) : (
+                                  <Play className="h-2.5 w-2.5 text-purple-300" />
+                                )}
+                                <span className="max-w-16 truncate text-[8px] font-semibold">
+                                  {assignment.audio.name}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Caption Badge */}
+                            {assignment.textOverlays?.length > 0 && (
+                              <span className="shrink-0 max-w-20 truncate rounded-md bg-sky-950/40 border border-sky-800/40 px-1.5 py-0.5 text-[8px] font-medium text-sky-300" title={assignment.textOverlays[0]?.text}>
+                                {assignment.textOverlays[0]?.text || 'Text'}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
+
                 {assignments.length === 0 && targetRows.length > 0 && (
-                  <div className="mt-2.5 max-h-24 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-black/20 p-2">
+                  <div className="mt-2.5 max-h-24 space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-2.5">
                     {targetRows.slice(0, 8).map((target, index) => (
                       <div key={`${target.rowId || target.index || index}`} className="text-[9px] text-zinc-300">
                         Frame {Number.isInteger(Number(target.index ?? target.targetIndex))
@@ -1558,8 +1803,9 @@ export const BulkAgentComposer = ({
                     )}
                   </div>
                 )}
+
                 {plan.warnings?.length > 0 && (
-                  <div className="mt-2 space-y-1 rounded-lg border border-amber-800/40 bg-amber-950/20 p-2 text-[9px] leading-relaxed text-amber-300">
+                  <div className="mt-2.5 space-y-1 rounded-xl border border-amber-800/40 bg-amber-950/20 p-2.5 text-[9px] leading-relaxed text-amber-300">
                     {plan.warnings.map((warning) => (
                       <div key={warning} className="flex gap-1.5">
                         <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
@@ -1568,44 +1814,49 @@ export const BulkAgentComposer = ({
                     ))}
                   </div>
                 )}
-                <div className="mt-3 flex justify-end gap-2">
+
+                <div className="mt-3.5 flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => void discardPlan(plan)}
                     disabled={controlsLocked}
-                    className="rounded-[8px] border border-white/10 px-3 py-2 text-[9px] font-bold text-zinc-400 hover:bg-white/5 hover:text-white disabled:opacity-50"
+                    className="rounded-xl border border-white/10 px-3.5 py-2 text-[10px] font-bold text-zinc-400 hover:bg-white/5 hover:text-white disabled:opacity-50 transition-colors"
                   >
                     {isDiscarding ? 'Discarding…' : 'Discard'}
                   </button>
                   <button
                     type="button"
                     onClick={() => void applyCurrentPlan()}
-                    disabled={controlsLocked || isPlanExpired(plan)}
-                    className="flex items-center gap-1.5 rounded-[8px] bg-white px-3 py-2 text-[9px] font-extrabold text-black hover:bg-zinc-200 disabled:opacity-50 shadow-sm"
+                    disabled={controlsLocked || isPlanExpired(plan) || (assignments.length > 0 && selectedFrameIndexes.size === 0)}
+                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-[#7831d6] px-4 py-2 text-[10px] font-extrabold text-white hover:from-violet-500 hover:to-[#6825bc] disabled:opacity-50 transition-all shadow-md shadow-violet-600/25 active:scale-95"
                   >
                     {isApplying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                    Apply plan
+                    {assignments.length > 0 && selectedFrameIndexes.size < assignments.length
+                      ? `Apply Selected (${selectedFrameIndexes.size})`
+                      : `Apply plan (${assignments.length || targetRows.length || 1})`}
                   </button>
                 </div>
               </div>
             )}
           </div>
 
+          {/* Undo Notification Pill */}
           {undoState && !plan && (
-            <div className="mx-3 mb-3 flex shrink-0 items-center justify-between rounded-xl border border-emerald-800/40 bg-emerald-950/90 px-3 py-2 text-[9px] font-semibold text-emerald-200 shadow-xl">
+            <div className="mx-3.5 mb-2 flex shrink-0 items-center justify-between rounded-xl border border-emerald-800/40 bg-emerald-950/90 px-3 py-2 text-[9px] font-semibold text-emerald-200 shadow-xl">
               <span>AI plan applied to the board.</span>
               <button
                 type="button"
                 onClick={undoAppliedPlan}
                 disabled={controlsLocked}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 font-extrabold text-emerald-100 hover:bg-white/10 disabled:opacity-50"
+                className="flex items-center gap-1 rounded-lg px-2 py-1 font-bold text-emerald-100 hover:bg-white/10 disabled:opacity-50 transition-colors"
               >
                 <Undo2 className="h-3 w-3" /> Undo
               </button>
             </div>
           )}
 
-          <div className="relative mx-3 mb-3 shrink-0 rounded-[22px] border border-[#3b3b40] bg-[#171719]/98 p-3 shadow-[0_12px_35px_rgba(0,0,0,0.28)] transition-colors focus-within:border-[#5d5d66]">
+          {/* Drawer Composer Input Box */}
+          <div className="relative mx-3.5 mb-3.5 shrink-0 rounded-2xl border border-white/[0.1] bg-[#141418] p-3 shadow-xl transition-all focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/20">
             <FolderSuggestionMenu
               isVisible={Boolean(mentionMatch) && !controlsLocked}
               foldersLoading={foldersLoading}
@@ -1615,43 +1866,45 @@ export const BulkAgentComposer = ({
               onHighlight={setSuggestionIndex}
               onSelect={selectFolderSuggestion}
             />
-            {composerEditor('What do you want to create?', 'max-h-28 min-h-10 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent px-1 py-2 text-[12px] leading-5 text-white outline-none')}
+            {composerEditor('What do you want to create? (type @ for folders)', 'max-h-28 min-h-10 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent px-1 py-1 text-[12px] leading-5 text-white outline-none placeholder:text-zinc-500')}
             {showDefaultAudioHint && (
               <div className="px-1 text-[8px] leading-relaxed text-sky-300/70" role="status">
                 When no audio folder is attached, music uses Trending Songs automatically.
               </div>
             )}
-            <div className="mt-1 flex items-center justify-between">
+            <div className="mt-2 flex items-center justify-between pt-1 border-t border-white/[0.04]">
               <button
                 type="button"
                 onClick={showFolderSuggestions}
                 disabled={controlsLocked}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex items-center gap-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 px-2 py-1 text-[10px] font-medium text-zinc-300 transition-colors disabled:opacity-40"
                 aria-label="Attach a Media Library folder"
               >
-                <Plus className="h-5 w-5" />
+                <Folder className="h-3 w-3 text-sky-400" />
+                <span>Attach</span>
               </button>
               <button
                 type="button"
                 onClick={() => void submitInstruction()}
                 disabled={!input.trim() || controlsLocked}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-zinc-700"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white transition-all hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-zinc-600 shadow-md shadow-violet-600/20 active:scale-95"
                 aria-label="Send instruction"
               >
-                {isPlanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {isPlanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
               </button>
             </div>
             {errorPanel}
           </div>
         </section>
       ) : (
+        /* Collapsed Floating Island Composer (Codex Style) */
         <div
           className="pointer-events-none absolute bottom-5 right-0 z-40 flex justify-center px-4 transition-[left] duration-200"
           style={{ left: `${canvasLeftOffset}px` }}
         >
           <section
             aria-label="Bulk Builder AI composer"
-            className="pointer-events-auto relative w-full max-w-2xl select-text rounded-[24px] border border-[#37373c] bg-[#18181b]/[0.98] p-3 text-zinc-100 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl transition-colors focus-within:border-[#5d5d66]"
+            className="pointer-events-auto relative w-full max-w-2xl select-text rounded-2xl border border-white/[0.1] bg-[#101014]/[0.94] p-3 text-zinc-100 shadow-[0_20px_70px_rgba(0,0,0,0.75)] backdrop-blur-2xl transition-all focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/20"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
           >
@@ -1664,45 +1917,51 @@ export const BulkAgentComposer = ({
               onHighlight={setSuggestionIndex}
               onSelect={selectFolderSuggestion}
             />
-            <button
-              type="button"
-              onClick={openDrawer}
-              className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white/10 hover:text-white"
-              aria-label="Expand agent drawer"
-              title="Open conversation"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </button>
-            {composerEditor('What do you want to build? Type @ to attach folders', 'max-h-32 min-h-12 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent py-2.5 pl-2 pr-12 text-[11px] leading-5 text-white outline-none')}
+            {composerEditor('Ask AI to build or edit frames... (type @ for folders)', 'max-h-32 min-h-12 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent py-1.5 pl-2 pr-12 text-[12px] leading-5 text-white outline-none placeholder:text-zinc-500')}
             {showDefaultAudioHint && (
               <div className="px-2 text-[8px] leading-relaxed text-sky-300/70" role="status">
                 When no audio folder is attached, music uses Trending Songs automatically.
               </div>
             )}
-            <div className="mt-1 flex items-center justify-between gap-3">
+            <div className="mt-2 flex items-center justify-between gap-3 pt-1 border-t border-white/[0.04]">
               <div className="flex min-w-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={showFolderSuggestions}
                   disabled={controlsLocked}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex items-center gap-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/5 px-2.5 py-1 text-[10px] font-medium text-zinc-300 transition-colors disabled:opacity-40"
                   aria-label="Attach a Media Library folder"
                 >
-                  <Plus className="h-5 w-5" />
+                  <Folder className="h-3.5 w-3.5 text-sky-400" />
+                  <span>Attach @</span>
                 </button>
-                <span className="truncate text-[8px] font-semibold text-zinc-600">
-                  {plan ? `${planIsDualVideo ? 'Dual' : 'Single'} mode locked by pending plan` : `${isDualVideo ? 'Dual video' : 'Single video'} · ${currentFrameCount} on board`}
+                <span className="rounded-md bg-white/[0.03] border border-white/5 px-2 py-0.5 text-[9px] font-mono text-zinc-400">
+                  {plan ? `${planIsDualVideo ? 'Dual' : 'Single'} locked` : (isDualVideo ? 'Dual Video' : 'Single Video')}
+                </span>
+                <span className="truncate text-[9px] text-zinc-500">
+                  {currentFrameCount} frames on board
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => void submitInstruction()}
-                disabled={!input.trim() || controlsLocked}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-zinc-700"
-                aria-label="Send instruction"
-              >
-                {isPlanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={openDrawer}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-zinc-400 hover:bg-white/[0.08] hover:text-white transition-colors"
+                  aria-label="Expand agent drawer"
+                  title="Open conversation panel"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void submitInstruction()}
+                  disabled={!input.trim() || controlsLocked}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600 text-white transition-all hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-zinc-600 shadow-md shadow-violet-600/25 active:scale-95"
+                  aria-label="Send instruction"
+                >
+                  {isPlanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             {errorPanel}
           </section>

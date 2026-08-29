@@ -6,19 +6,40 @@ const numberFormat = new Intl.NumberFormat();
 const fallbackAvatarUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
 
 export const MetricCard = ({ icon: Icon, label, value, note }) => (
-  <div className="rounded-lg border border-white/10 bg-[#0a0a0a] px-3 py-2.5 shadow-sm">
+  <div className="rounded-xl border border-white/10 bg-[#121215] p-3.5 shadow-sm">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{label}</p>
-        <p className="m-0 mt-1 truncate text-xl font-semibold leading-none text-white">{value}</p>
+        <p className="m-0 text-xs font-semibold uppercase tracking-wider text-zinc-400">{label}</p>
+        <p className="m-0 mt-1.5 truncate text-2xl font-bold leading-none text-zinc-100 sm:text-3xl">{value}</p>
       </div>
-      <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-[#7831d6]/20 text-[#c4b5fd]">
-        <Icon className="h-3.5 w-3.5" />
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#7831d6]/20 text-[#c4b5fd]">
+        <Icon className="h-4 w-4" />
       </span>
     </div>
-    {note && <p className="m-0 mt-1.5 truncate text-[10px] text-zinc-500">{note}</p>}
+    {note && <p className="m-0 mt-2 truncate text-xs font-medium text-zinc-400">{note}</p>}
   </div>
 );
+
+const CustomChartTooltip = ({ active, payload }) => {
+  if (!active || !payload || !payload.length) return null;
+  const item = payload[0]?.payload;
+  if (!item) return null;
+
+  return (
+    <div className="rounded-xl border border-white/15 bg-[#18181b] px-3.5 py-2.5 text-xs shadow-2xl text-zinc-100 min-w-[140px]">
+      <p className="m-0 font-semibold text-[#c4b5fd]">
+        {item.dateStr ? item.dateStr : 'Date activity'}
+        <span className="ml-1.5 text-xs font-normal text-zinc-400">
+          ({item.posts || 0} {item.posts === 1 ? 'post' : 'posts'})
+        </span>
+      </p>
+      <div className="mt-1.5 flex items-center justify-between gap-3 text-zinc-300">
+        <span className="text-zinc-400">Views:</span>
+        <span className="font-bold text-white text-sm">{numberFormat.format(item.views || 0)}</span>
+      </div>
+    </div>
+  );
+};
 
 export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }) => {
   const chartData = data.map((item) => {
@@ -41,10 +62,10 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
         <text
           x={0}
           y={0}
-          dy={7}
+          dy={8}
           textAnchor="middle"
-          fill={isSelected ? '#c4b5fd' : '#a1a1aa'}
-          fontSize={9}
+          fill={isSelected ? '#c4b5fd' : '#d4d4d8'}
+          fontSize={11}
           fontWeight={isSelected ? 700 : 500}
         >
           {payload.value}
@@ -52,10 +73,10 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
         <text
           x={0}
           y={0}
-          dy={18}
+          dy={20}
           textAnchor="middle"
-          fill={postCount > 0 ? (isSelected ? '#c4b5fd' : '#7831d6') : '#52525b'}
-          fontSize={8}
+          fill={postCount > 0 ? (isSelected ? '#c4b5fd' : '#a855f7') : '#71717a'}
+          fontSize={10}
           fontWeight={postCount > 0 ? 700 : 400}
         >
           {postCount > 0 ? `${postCount}p` : '0'}
@@ -65,58 +86,53 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
   };
 
   return (
-    <div className="mt-3 rounded-xl border border-white/10 bg-[#0a0a0a] px-3 py-2.5 shadow-sm">
-      <div className="mb-2 flex items-center justify-between gap-3">
+    <div className="mt-3 rounded-xl border border-white/10 bg-[#121215] p-3.5 shadow-sm">
+      <div className="mb-2.5 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Last 30 days</p>
-          <p className="m-0 mt-0.5 text-sm font-semibold text-white">
-            Views by publish day <span className="text-[10px] font-normal text-zinc-500">(Date / Posts)</span>
+          <p className="m-0 text-xs font-semibold uppercase tracking-wider text-zinc-400">Last 30 days</p>
+          <p className="m-0 mt-0.5 text-base font-semibold text-zinc-100">
+            Views by publish day <span className="text-xs font-normal text-zinc-400">(Date / Posts)</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {selectedDate && (
             <button
               type="button"
               onClick={() => onSelectDate?.(null)}
-              className="text-[10px] font-semibold text-[#c4b5fd] hover:underline"
+              className="text-xs font-semibold text-[#c4b5fd] hover:underline"
             >
               Clear date selection
             </button>
           )}
-          <p className="m-0 text-[10px] font-medium text-zinc-500">Click any bar to inspect date activity</p>
+          <p className="m-0 text-xs font-medium text-zinc-400">Click any bar to inspect date activity</p>
         </div>
       </div>
-      <div className="h-40 w-full cursor-pointer outline-none focus:outline-none focus-visible:outline-none [&_*]:outline-none [&_*]:focus:outline-none [&_*]:focus-visible:outline-none select-none">
+      <div className="h-44 w-full cursor-pointer outline-none focus:outline-none focus-visible:outline-none [&_*]:outline-none [&_*]:focus:outline-none [&_*]:focus-visible:outline-none select-none">
         <ResponsiveContainer width="100%" height="100%" style={{ outline: 'none' }}>
-          <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 2, left: 0 }} style={{ outline: 'none' }}>
+          <BarChart data={chartData} margin={{ top: 6, right: 6, bottom: 4, left: 0 }} style={{ outline: 'none' }}>
             <XAxis
               dataKey="label"
               tick={renderCustomAxisTick}
               tickLine={false}
               axisLine={false}
               interval={0}
-              height={26}
+              height={30}
             />
             <YAxis
-              tick={{ fontSize: 9, fill: '#a1a1aa' }}
+              tick={{ fontSize: 11, fill: '#d4d4d8' }}
               tickLine={false}
               axisLine={false}
-              width={36}
+              width={40}
               tickFormatter={(value) => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
             />
             <Tooltip
-              cursor={{ fill: 'rgba(120, 49, 214, 0.12)' }}
-              formatter={(value, name) => [name === 'views' ? numberFormat.format(value) : value, name === 'views' ? 'Views' : 'Posts']}
-              labelFormatter={(_, payload) => {
-                const p = payload?.[0]?.payload;
-                return p?.dateStr ? `${p.dateStr} (${p.posts || 0} posts)` : '';
-              }}
-              contentStyle={{ borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.15)', backgroundColor: '#0a0a0a', color: '#ffffff', fontSize: 11 }}
+              cursor={{ fill: 'rgba(120, 49, 214, 0.15)' }}
+              content={<CustomChartTooltip />}
             />
             <Bar
               dataKey="views"
-              radius={[3, 3, 0, 0]}
-              maxBarSize={14}
+              radius={[4, 4, 0, 0]}
+              maxBarSize={16}
               onClick={(entry) => {
                 if (entry && entry.dateStr) {
                   onSelectDate?.(selectedDate === entry.dateStr ? null : entry.dateStr);
@@ -170,7 +186,7 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
     const checkedCount = Math.min(totalPostsCount, 3);
 
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         {[0, 1, 2].map((slot) => {
           const post = visiblePosts[slot];
           const hasPost = slot < checkedCount;
@@ -179,14 +195,14 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
             <span
               key={slot}
               title={post?.publishedAt ? formatPostDateTime(post.publishedAt) : hasPost ? 'Posted time unavailable' : 'No post'}
-              className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${hasPost ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-white/10 bg-white/5 text-transparent'}`}
+              className={`flex h-6 min-w-10 items-center justify-center rounded-md border px-1.5 text-[10px] font-bold leading-none ${hasPost ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-white/10 bg-white/5 text-transparent'}`}
             >
               {hasPost ? timeLabel || '✓' : '✓'}
             </span>
           );
         })}
         {totalPostsCount > 3 && (
-          <span className="text-[9px] font-semibold text-zinc-400" title={`${totalPostsCount} posts on ${selectedGraphDate}`}>
+          <span className="text-xs font-bold text-zinc-400" title={`${totalPostsCount} posts on ${selectedGraphDate}`}>
             +{totalPostsCount - 3}
           </span>
         )}
@@ -199,7 +215,7 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
     const visiblePosts = (activityDay?.posts || []).slice().sort((a, b) => new Date(a.publishedAt || 0) - new Date(b.publishedAt || 0));
     const checkedCount = Math.min(Number(account[selectedRange.postsKey] || 0), 3);
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         {[0, 1, 2].map((slot) => {
           const post = visiblePosts[slot];
           const hasPost = slot < checkedCount;
@@ -208,14 +224,14 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
             <span
               key={slot}
               title={post?.publishedAt ? formatPostDateTime(post.publishedAt) : hasPost ? 'Posted time unavailable' : 'No post'}
-              className={`flex h-5 min-w-8 items-center justify-center rounded border px-1 text-[8px] font-bold leading-none ${hasPost ? 'border-[#7831d6] bg-[#7831d6] text-white' : 'border-white/10 bg-white/5 text-transparent'}`}
+              className={`flex h-6 min-w-10 items-center justify-center rounded-md border px-1.5 text-[10px] font-bold leading-none ${hasPost ? 'border-[#7831d6] bg-[#7831d6] text-white' : 'border-white/10 bg-white/5 text-transparent'}`}
             >
               {hasPost ? timeLabel || '✓' : '✓'}
             </span>
           );
         })}
         {Number(account[selectedRange.postsKey] || 0) > 3 && (
-          <span className="text-[9px] font-semibold text-zinc-400" title={`${account[selectedRange.postsKey]} posts in ${selectedRange.label.toLowerCase()}`}>
+          <span className="text-xs font-bold text-zinc-400" title={`${account[selectedRange.postsKey]} posts in ${selectedRange.label.toLowerCase()}`}>
             +{Number(account[selectedRange.postsKey] || 0) - 3}
           </span>
         )}
@@ -225,12 +241,12 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
 
   if (selectedTimeRange === 'last7Days') {
     return (
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1.5">
         {(account.last7DaysActivity || []).map((day) => (
           <span
             key={day.dateStr}
             title={getDayTitle(day)}
-            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[9px] font-semibold ${Number(day.count || 0) >= 3 ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-white/10 bg-white/5 text-zinc-400'}`}
+            className={`inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-bold ${Number(day.count || 0) >= 3 ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-white/10 bg-white/5 text-zinc-300'}`}
           >
             {day.count || 0}
           </span>
@@ -239,7 +255,7 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
     );
   }
 
-  return <span className="text-xs text-zinc-300">{numberFormat.format(account[selectedRange.postsKey] || 0)} posts</span>;
+  return <span className="text-sm font-medium text-zinc-200">{numberFormat.format(account[selectedRange.postsKey] || 0)} posts</span>;
 };
 
 export const AccountAvatar = ({ account }) => {
@@ -253,25 +269,25 @@ export const AccountAvatar = ({ account }) => {
         crossOrigin="anonymous"
         alt={`${account.name || 'Publishing channel'} avatar`}
         onError={() => setImageFailed(true)}
-        className="h-7 w-7 flex-shrink-0 rounded-full border border-black/10 object-cover"
+        className="h-8 w-8 flex-shrink-0 rounded-full border border-white/10 object-cover shadow-xs"
       />
     );
   }
 
   return (
-    <span aria-hidden="true" className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-[#d2d2d7] bg-[#f0f7ff] text-[11px] font-bold text-[#3478f6]">
+    <span aria-hidden="true" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#7831d6]/20 text-xs font-bold text-[#c4b5fd]">
       {initial}
     </span>
   );
 };
 
 export const AccountIdentity = ({ account }) => (
-  <div className="flex min-w-0 items-center gap-2">
+  <div className="flex min-w-0 items-center gap-2.5">
     <AccountAvatar account={account} />
     <div className="min-w-0">
-      <p className="m-0 truncate font-semibold text-[#1d1d1f]">{account.name}</p>
-      <p className="m-0 flex items-center gap-1 truncate text-[10px] text-[#6e6e73]">
-        <PlatformIcon platform={account.platform} className="h-3.5 w-3.5" />
+      <p className="m-0 truncate text-sm font-semibold text-zinc-100">{account.name}</p>
+      <p className="m-0 flex items-center gap-1.5 truncate text-xs text-zinc-400">
+        <PlatformIcon platform={account.platform} className="h-4 w-4" />
         <span className="truncate">@{account.username || 'account'}</span>
         <span
           title={account.syncStatus === 'failed' || account.syncStatus === 'partial'
@@ -279,7 +295,7 @@ export const AccountIdentity = ({ account }) => (
             : account.lastSyncedAt
               ? `Metrics synced ${new Date(account.lastSyncedAt).toLocaleString()}`
               : 'Metrics have not synced yet'}
-          className={`ml-auto h-1.5 w-1.5 flex-shrink-0 rounded-full ${account.syncStatus === 'failed'
+          className={`ml-auto h-2 w-2 flex-shrink-0 rounded-full ${account.syncStatus === 'failed'
             ? 'bg-red-500'
             : account.syncStatus === 'partial'
               ? 'bg-amber-500'
@@ -287,7 +303,7 @@ export const AccountIdentity = ({ account }) => (
               ? 'animate-pulse bg-amber-500'
               : account.syncStatus === 'success'
                 ? 'bg-green-500'
-                : 'bg-[#c7c7cc]'}`}
+                : 'bg-zinc-600'}`}
         />
       </p>
     </div>
