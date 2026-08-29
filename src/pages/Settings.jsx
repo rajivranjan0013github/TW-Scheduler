@@ -38,26 +38,29 @@ export const Settings = () => {
 
   const getRoleBadgeColor = (role) => {
     switch (role) {
-      case 'owner': return 'bg-purple-50 text-purple-700 border-purple-200';
-      case 'admin': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'editor': return 'bg-green-50 text-green-700 border-green-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
+      case 'owner': return 'bg-purple-500/10 text-purple-300 border-purple-500/20';
+      case 'admin': return 'bg-sky-500/10 text-sky-300 border-sky-500/20';
+      case 'editor': return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20';
+      default: return 'bg-white/[0.06] text-zinc-300 border-white/[0.08]';
     }
   };
 
   return (
-    <div className="p-4 sm:p-8 space-y-6 sm:space-y-8 text-[#1d1d1f] font-sans">
+    <div className="p-4 sm:p-8 bg-[#0c0c0e] min-h-screen text-white space-y-6 sm:space-y-8 font-sans antialiased">
       
       {/* Title Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-[#e5e5ea]">
+      <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
         <div>
-          <h2 className="text-xl font-semibold text-[#1d1d1f] tracking-tight m-0">Settings</h2>
-          <p className="text-[#8e8e93] text-xs mt-1">Manage your workspace profiles and application preferences</p>
+          <p className="m-0 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">
+            Account Preferences
+          </p>
+          <h2 className="text-xl font-bold text-white tracking-tight m-0 mt-1">Settings</h2>
+          <p className="text-zinc-400 text-xs mt-1">Manage your workspace profiles and application preferences</p>
         </div>
         <button
           type="button"
           onClick={logout}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs font-semibold text-[#1d1d1f] shadow-sm transition hover:bg-[#f5f5f7]"
+          className="inline-flex items-center justify-center gap-2 rounded-[12px] border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-xs font-medium text-zinc-300 shadow-sm transition hover:bg-white/[0.06] hover:text-white"
           title="Log out"
         >
           <LogOut className="h-3.5 w-3.5" />
@@ -67,13 +70,13 @@ export const Settings = () => {
 
       {/* Success/Error Alerts */}
       {successMessage && (
-        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 text-emerald-800 px-4 py-3 rounded-xl text-xs font-semibold shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
-          <Check className="w-4 h-4 text-emerald-600" />
+        <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 px-4 py-3 rounded-xl text-xs font-semibold shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          <Check className="w-4 h-4 text-emerald-400" />
           <span>{successMessage}</span>
         </div>
       )}
       {errorMessage && (
-        <div className="flex items-center gap-3 bg-rose-50 border border-rose-100 text-rose-800 px-4 py-3 rounded-xl text-xs font-semibold shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="flex items-center gap-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 px-4 py-3 rounded-xl text-xs font-semibold shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
           <span>⚠️ {errorMessage}</span>
         </div>
       )}
@@ -83,36 +86,52 @@ export const Settings = () => {
         
         {/* Profile Card & Form */}
         <div className="space-y-6">
-          <form onSubmit={handleSave} className="bg-white border border-[#e5e5ea] rounded-xl p-6 shadow-sm space-y-6">
-            <h3 className="text-sm font-semibold text-black m-0 border-b border-[#f5f5f7] pb-3">Account Details</h3>
+          <form onSubmit={handleSave} className="bg-[#141417]/95 border border-white/[0.08] rounded-2xl p-6 shadow-xl space-y-6 backdrop-blur-xl">
+            <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-400 m-0 border-b border-white/[0.08] pb-3">Account Details</h3>
 
             {/* Profile Summary Info */}
-            <div className="flex flex-col sm:flex-row items-center gap-5 bg-[#f5f5f7]/55 p-4 rounded-xl border border-[#e5e5ea]">
-              <img 
-                src={user?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
-                crossOrigin="anonymous"
-                className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
-                alt="Avatar Preview" 
-              />
+            <div className="flex flex-col sm:flex-row items-center gap-5 bg-white/[0.02] p-4 rounded-xl border border-white/[0.06]">
+              <div className="relative w-16 h-16 shrink-0">
+                {user?.avatar ? (
+                  <img 
+                    src={user.avatar} 
+                    crossOrigin="anonymous"
+                    className="w-16 h-16 rounded-full object-cover border border-white/15 shadow-sm"
+                    alt="Avatar Preview" 
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.nextElementSibling) {
+                        e.currentTarget.nextElementSibling.style.display = 'flex';
+                      }
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="w-16 h-16 rounded-full bg-white/[0.06] border border-white/15 flex items-center justify-center text-zinc-300"
+                  style={{ display: user?.avatar ? 'none' : 'flex' }}
+                >
+                  <User className="w-7 h-7 text-zinc-400" />
+                </div>
+              </div>
               <div className="text-center sm:text-left space-y-1">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <h4 className="text-sm font-bold text-[#1d1d1f] m-0">{user?.name}</h4>
+                  <h4 className="text-sm font-bold text-white m-0">{user?.name}</h4>
                   <span className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full border ${getRoleBadgeColor(user?.role)}`}>
                     {user?.role || 'editor'}
                   </span>
-                  <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full border bg-gray-50 text-gray-700 border-gray-200">
+                  <span className="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full border bg-white/[0.06] text-zinc-300 border-white/[0.08]">
                     {user?.userType === 'account_handler' ? 'Creator' : 'Campaign Maker'}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 m-0">{user?.email}</p>
+                <p className="text-xs text-zinc-400 m-0">{user?.email}</p>
               </div>
             </div>
 
             {/* Input fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5" /> Full Name
+                <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-zinc-400" /> Full Name
                 </label>
                 <input 
                   type="text" 
@@ -120,44 +139,44 @@ export const Settings = () => {
                   onChange={(e) => setName(e.target.value)} 
                   required
                   placeholder="Enter full name"
-                  className="w-full text-xs bg-[#f5f5f7] border border-[#e5e5ea] focus:border-[#3478f6] focus:bg-white rounded-lg px-3 py-2 outline-none transition-all text-[#1d1d1f]"
+                  className="w-full text-xs bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.12] focus:border-white/30 focus:ring-1 focus:ring-white/10 rounded-[10px] px-3 py-2 outline-none transition-all text-white placeholder:text-zinc-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5" /> Email Address
+                <label className="text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-zinc-400" /> Email Address
                 </label>
                 <input 
                   type="email" 
                   value={user?.email || ''} 
                   disabled
                   title="Google email address cannot be changed."
-                  className="w-full text-xs bg-gray-100 border border-[#e5e5ea] rounded-lg px-3 py-2 text-gray-400 cursor-not-allowed outline-none"
+                  className="w-full text-xs bg-white/[0.02] border border-white/[0.06] rounded-[10px] px-3 py-2 text-zinc-500 cursor-not-allowed outline-none"
                 />
               </div>
 
               <div className="sm:col-span-2 space-y-1">
-                <label className="text-xs font-semibold text-gray-500">Account Perspective / Role</label>
+                <label className="text-xs font-medium text-zinc-300">Account Perspective / Role</label>
                 <select 
                   value={userType} 
                   onChange={(e) => setUserType(e.target.value)} 
-                  className="w-full text-xs bg-[#f5f5f7] border border-[#e5e5ea] focus:border-[#3478f6] focus:bg-white rounded-lg px-3 py-2 outline-none transition-all text-[#1d1d1f] capitalize"
+                  className="w-full text-xs bg-[#141417] border border-white/[0.08] hover:border-white/[0.12] focus:border-white/30 rounded-[10px] px-3 py-2 outline-none transition-all text-white capitalize"
                 >
-                  <option value="campaign_maker">Campaign Maker (Admins / Agencies)</option>
-                  <option value="account_handler">Account Handler (Creators / Influencers)</option>
+                  <option value="campaign_maker" className="bg-[#141417] text-white">Campaign Maker (Admins / Agencies)</option>
+                  <option value="account_handler" className="bg-[#141417] text-white">Account Handler (Creators / Influencers)</option>
                 </select>
-                <p className="text-[10px] text-gray-400 m-0 leading-relaxed mt-0.5">
+                <p className="text-[10px] text-zinc-400 m-0 leading-relaxed mt-0.5">
                   Determines your navigation sidebar and permissions shell. Switching roles will redirect your active dashboard.
                 </p>
               </div>
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-[#f5f5f7]">
+            <div className="flex justify-end pt-3 border-t border-white/[0.08]">
               <button 
                 type="submit" 
                 disabled={saving}
-                className="flex items-center gap-2 bg-[#0071e3] hover:bg-[#0071e3]/90 text-white rounded-lg px-4 py-2 text-xs font-semibold shadow-sm transition-all outline-none disabled:opacity-50"
+                className="flex items-center gap-2 bg-white hover:bg-zinc-200 text-black rounded-[12px] px-4 py-2 text-xs font-semibold shadow-sm transition-all outline-none disabled:opacity-50 active:scale-[0.98]"
               >
                 <Save className="w-3.5 h-3.5" />
                 {saving ? 'Saving...' : 'Save Settings'}
@@ -166,38 +185,38 @@ export const Settings = () => {
           </form>
 
           {/* Session Card */}
-          <div className="bg-white border border-[#e5e5ea] rounded-xl p-6 shadow-sm space-y-4">
-            <h3 className="text-sm font-semibold text-black m-0 border-b border-[#f5f5f7] pb-3">Session</h3>
+          <div className="bg-[#141417]/95 border border-white/[0.08] rounded-2xl p-6 shadow-xl space-y-4 backdrop-blur-xl">
+            <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-400 m-0 border-b border-white/[0.08] pb-3">Session</h3>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold text-[#1d1d1f] m-0">Sign Out of EasyPost</p>
-                <p className="text-[10px] text-gray-500 m-0 mt-0.5">Disconnect and close your current session on this device.</p>
+                <p className="text-xs font-semibold text-white m-0">Sign Out of Session</p>
+                <p className="text-[10px] text-zinc-400 m-0 mt-0.5">Disconnect and close your current session on this device.</p>
               </div>
               <button
                 type="button"
                 onClick={logout}
-                className="flex items-center justify-center gap-2 bg-white hover:bg-[#f5f5f7] text-rose-600 border border-[#d2d2d7] rounded-lg px-4 py-2 text-xs font-semibold shadow-sm transition-all outline-none self-start sm:self-center w-full sm:w-auto"
+                className="flex items-center justify-center gap-2 bg-white/[0.03] hover:bg-rose-500/10 text-rose-400 border border-white/[0.08] hover:border-rose-500/30 rounded-[10px] px-4 py-2 text-xs font-semibold shadow-sm transition-all outline-none self-start sm:self-center w-full sm:w-auto"
               >
-                <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
                 <span>Log Out</span>
               </button>
             </div>
           </div>
 
           {/* Danger Zone Card */}
-          <div className="bg-white border border-rose-200 rounded-xl p-6 shadow-sm space-y-4">
-            <h3 className="text-sm font-semibold text-rose-600 m-0 border-b border-rose-50 pb-3">Danger Zone</h3>
+          <div className="bg-[#141417]/95 border border-rose-500/20 rounded-2xl p-6 shadow-xl space-y-4 backdrop-blur-xl">
+            <h3 className="text-xs font-bold uppercase tracking-[0.16em] text-rose-400 m-0 border-b border-rose-500/20 pb-3">Danger Zone</h3>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold text-[#1d1d1f] m-0">Delete Workspace Account</p>
-                <p className="text-[10px] text-gray-500 m-0 mt-0.5">Permanently delete your profile and connected channel credentials. This cannot be undone.</p>
+                <p className="text-xs font-semibold text-white m-0">Delete Workspace Account</p>
+                <p className="text-[10px] text-zinc-400 m-0 mt-0.5">Permanently delete your profile and connected channel credentials. This cannot be undone.</p>
               </div>
               
               {!showDeleteConfirm ? (
                 <button
                   type="button"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="flex items-center justify-center gap-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg px-4 py-2 text-xs font-semibold shadow-sm transition-all outline-none self-start sm:self-center"
+                  className="flex items-center justify-center gap-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 rounded-[10px] px-4 py-2 text-xs font-semibold shadow-sm transition-all outline-none self-start sm:self-center"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Delete Account
@@ -207,14 +226,14 @@ export const Settings = () => {
                   <button
                     type="button"
                     onClick={handleDeleteAccount}
-                    className="bg-rose-600 hover:bg-rose-700 text-white rounded-lg px-3.5 py-2 text-xs font-semibold shadow-sm transition-all outline-none"
+                    className="bg-rose-600 hover:bg-rose-700 text-white rounded-[10px] px-3.5 py-2 text-xs font-semibold shadow-sm transition-all outline-none"
                   >
                     Confirm Delete
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowDeleteConfirm(false)}
-                    className="bg-gray-100 hover:bg-gray-200 text-[#1d1d1f] rounded-lg px-3.5 py-2 text-xs font-semibold shadow-sm transition-all outline-none border border-[#e5e5ea]"
+                    className="bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 rounded-[10px] px-3.5 py-2 text-xs font-medium shadow-sm transition-all outline-none border border-white/[0.08]"
                   >
                     Cancel
                   </button>

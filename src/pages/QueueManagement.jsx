@@ -459,32 +459,32 @@ const QueueManagement = () => {
   };
 
   return (
-    <div className="flex h-screen min-h-0 flex-col bg-black text-white">
+    <div className="flex h-screen min-h-0 flex-col bg-[#0c0c0e] text-white font-sans antialiased">
       {error && (
-        <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-xs font-semibold text-rose-400">
+        <div className="mx-4 mt-3 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-xs font-semibold text-rose-400">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
-      <div className="flex flex-shrink-0 flex-wrap items-center gap-3 border-b border-white/10 bg-[#0a0a0a] px-4 py-2">
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.08] bg-[#141417]/95 px-4 py-2.5 backdrop-blur-xl">
         <div ref={channelPickerRef} className="relative flex items-center gap-2 text-xs font-semibold text-zinc-400">
-          <span>Channel</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">Channel</span>
           <button
             type="button"
             onClick={() => {
               setChannelPickerOpen((open) => !open);
               setChannelSearch('');
             }}
-            className={`flex h-9 min-w-60 items-center justify-between gap-3 rounded-lg border px-3 text-left outline-none transition ${
+            className={`flex h-8 min-w-60 items-center justify-between gap-3 rounded-[10px] border px-3 text-left outline-none transition ${
               channelPickerOpen
-                ? 'border-[#7831d6] bg-[#7831d6]/10 ring-2 ring-[#7831d6]/20 text-white'
-                : 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+                ? 'border-white/30 bg-white/[0.08] ring-1 ring-white/20 text-white'
+                : 'border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.06] hover:border-white/[0.12]'
             }`}
             aria-haspopup="listbox"
             aria-expanded={channelPickerOpen}
           >
             <span className="flex min-w-0 items-center gap-2">
-              {selectedAccount && <ChannelAvatar account={selectedAccount} className="h-6 w-6" />}
+              {selectedAccount && <ChannelAvatar account={selectedAccount} className="h-5 w-5" />}
               <span className="min-w-0">
                 <span className="block truncate text-xs font-semibold text-white">
                   {selectedAccount ? `@${selectedAccount.label}` : 'All channels'}
@@ -496,25 +496,25 @@ const QueueManagement = () => {
                 )}
               </span>
             </span>
-            <ChevronDown className={`h-4 w-4 flex-shrink-0 text-zinc-400 transition-transform ${channelPickerOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`h-3.5 w-3.5 flex-shrink-0 text-zinc-400 transition-transform ${channelPickerOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {channelPickerOpen && (
-            <div className="absolute left-[58px] top-[calc(100%+6px)] z-50 w-80 overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0a] shadow-2xl">
-              <div className="border-b border-white/10 p-2.5">
-                <div className="flex h-9 items-center gap-2 rounded-lg border border-white/15 bg-black px-2.5 focus-within:border-[#7831d6]">
+            <div className="absolute left-[70px] top-[calc(100%+6px)] z-50 w-80 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 shadow-2xl backdrop-blur-2xl">
+              <div className="border-b border-white/[0.08] p-2.5">
+                <div className="flex h-8 items-center gap-2 rounded-[8px] border border-white/[0.08] bg-black/40 px-2.5 focus-within:border-white/30">
                   <Search className="h-3.5 w-3.5 flex-shrink-0 text-zinc-400" />
                   <input
                     type="search"
                     value={channelSearch}
                     onChange={(event) => setChannelSearch(event.target.value)}
-                    placeholder="Search channel, platform or handler"
+                    placeholder="Search channel or platform"
                     className="min-w-0 flex-1 border-0 bg-transparent text-xs font-medium text-white outline-none placeholder:text-zinc-500"
                     autoFocus
                   />
                 </div>
               </div>
-              <div role="listbox" aria-label="Select channel" className="max-h-72 overflow-y-auto p-1.5">
+              <div role="listbox" aria-label="Select channel" className="max-h-72 overflow-y-auto p-1.5 custom-scrollbar space-y-0.5">
                 {!channelSearch.trim() && (
                   <button
                     type="button"
@@ -524,10 +524,12 @@ const QueueManagement = () => {
                       setChannelPickerOpen(false);
                       navigateToWindow(pageOffset, '');
                     }}
-                    className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-white/10"
+                    className={`flex w-full items-center justify-between gap-3 rounded-[8px] px-2.5 py-2 text-left transition ${
+                      !selectedAccount ? 'bg-white text-black font-semibold' : 'text-white hover:bg-white/[0.04]'
+                    }`}
                   >
-                    <span className="text-xs font-semibold text-white">All channels</span>
-                    {!selectedAccount && <Check className="h-4 w-4 text-[#c4b5fd]" />}
+                    <span className="text-xs font-semibold">All channels</span>
+                    {!selectedAccount && <Check className="h-3.5 w-3.5 text-black" />}
                   </button>
                 )}
                 {filteredAccountOptions.map((candidate) => {
@@ -542,19 +544,21 @@ const QueueManagement = () => {
                         setChannelPickerOpen(false);
                         navigateToWindow(pageOffset, candidate._id);
                       }}
-                      className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left ${selected ? 'bg-[#7831d6]/20 text-[#c4b5fd]' : 'hover:bg-white/10 text-white'}`}
+                      className={`flex w-full items-center justify-between gap-3 rounded-[8px] px-2.5 py-2 text-left transition ${
+                        selected ? 'bg-white text-black font-semibold' : 'hover:bg-white/[0.04] text-white'
+                      }`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
-                        <ChannelAvatar account={candidate} />
+                        <ChannelAvatar account={candidate} className="h-6 w-6" />
                         <span className="min-w-0">
-                          <span className="block truncate text-xs font-semibold text-white">@{candidate.label}</span>
-                          <span className="block truncate text-[10px] font-medium capitalize text-zinc-400">
+                          <span className={`block truncate text-xs font-semibold ${selected ? 'text-black' : 'text-white'}`}>@{candidate.label}</span>
+                          <span className={`block truncate text-[9px] font-medium capitalize ${selected ? 'text-zinc-600' : 'text-zinc-400'}`}>
                             {candidate.platform || 'Social channel'}
                             {candidate.assignedHandlerName ? ` · ${candidate.assignedHandlerName}` : ''}
                           </span>
                         </span>
                       </span>
-                      {selected && <Check className="h-4 w-4 flex-shrink-0 text-[#c4b5fd]" />}
+                      {selected && <Check className="h-3.5 w-3.5 flex-shrink-0 text-black" />}
                     </button>
                   );
                 })}
@@ -569,18 +573,18 @@ const QueueManagement = () => {
           <button
             type="button"
             onClick={() => navigateToWindow(pageOffset - 1)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-white/[0.08] bg-white/[0.03] text-zinc-300 hover:bg-white/[0.06] hover:text-white transition"
             title="Previous 15 days"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={() => navigateToWindow(0)}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[11px] font-semibold ${
+            className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-3 text-[11px] font-semibold transition ${
               pageOffset === 0
-                ? 'border-[#7831d6]/40 bg-[#7831d6]/20 text-[#c4b5fd]'
-                : 'border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white'
+                ? 'border-white/20 bg-white/[0.08] text-white'
+                : 'border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white'
             }`}
             title="Show seven days before and after today"
           >
@@ -590,10 +594,10 @@ const QueueManagement = () => {
           <button
             type="button"
             onClick={() => navigateToWindow(pageOffset + 1)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-[8px] border border-white/[0.08] bg-white/[0.03] text-zinc-300 hover:bg-white/[0.06] hover:text-white transition"
             title="Next 15 days"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

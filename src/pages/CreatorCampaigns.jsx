@@ -928,7 +928,7 @@ export const CreatorCampaigns = () => {
                         <button
                           type="button"
                           onClick={() => navigate('/channels', { state: { campaignId: camp._id } })}
-                          className="shrink-0 rounded-lg bg-[#7831d6] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#6825bc] shadow-sm"
+                          className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200 shadow-sm"
                         >
                           Reconnect
                         </button>
@@ -1075,7 +1075,7 @@ export const CreatorCampaigns = () => {
                                       checked
                                       readOnly
                                       aria-label={`Posted at ${formatPostTime(getPostDisplayPublishedAt(post))}`}
-                                      className="h-3 w-3 accent-[#7831d6]"
+                                      className="h-3 w-3 accent-white"
                                     />
                                     {formatPostTime(getPostDisplayPublishedAt(post))}
                                   </span>
@@ -1097,7 +1097,7 @@ export const CreatorCampaigns = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleNotPosted(queuePost)}
-                                  className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-rose-900 bg-rose-900 px-3 py-1.5 text-xs font-semibold text-rose-100 transition-colors hover:bg-rose-950"
+                                  className="inline-flex min-h-[36px] items-center justify-center rounded-[8px] border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-400 transition-colors hover:bg-rose-500/25"
                                 >
                                   Not Posted
                                 </button>
@@ -1105,7 +1105,7 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleMarkManualPosted(queuePost)}
                                   disabled={markingPostId === queuePost._id}
-                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg border border-[#7831d6] bg-[#7831d6] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#6825bc] disabled:opacity-60 shadow-sm"
+                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-[8px] bg-white px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-60 shadow-sm"
                                 >
                                   <CheckCircle className="h-3.5 w-3.5" />
                                   {markingPostId === queuePost._id ? 'Checking' : 'Mark as Posted'}
@@ -1117,7 +1117,7 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleSharePost(queuePost, postingCooldown)}
                                   disabled={sharingPostId === queuePost._id || postingCooldown.isLocked}
-                                  className="inline-flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-lg bg-[#7831d6] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
+                                  className="inline-flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-[8px] bg-white px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
                                 >
                                   <Share2 className="h-3.5 w-3.5" />
                                   {sharingPostId === queuePost._id

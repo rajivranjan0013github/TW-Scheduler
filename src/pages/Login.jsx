@@ -44,15 +44,15 @@ export const Login = () => {
   };
 
   return (
-    <div className="h-screen overflow-y-auto bg-black text-white font-sans selection:bg-[#7831d6] selection:text-white">
-      <header className="border-b border-white/10 bg-black/80 backdrop-blur-md px-5 py-4">
+    <div className="h-screen overflow-y-auto bg-[#0c0c0e] text-white font-sans selection:bg-white selection:text-black">
+      <header className="border-b border-white/[0.08] bg-[#0c0c0e]/80 backdrop-blur-xl px-5 py-4">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#c4b5fd] transition hover:text-white">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-300 transition hover:text-white">
             <ArrowLeft className="h-4 w-4" />
             EasyPost
           </Link>
           <div className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
-            <Sparkles className="h-4 w-4 text-[#c4b5fd]" />
+            <Sparkles className="h-4 w-4 text-white" />
             Secure login
           </div>
         </div>
@@ -60,11 +60,11 @@ export const Login = () => {
 
       <main className="relative flex min-h-[calc(100vh-66px)] items-center justify-center px-5 py-12">
         {/* Subtle radial glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-[#7831d6]/15 blur-[120px] pointer-events-none rounded-full" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-white/[0.02] blur-[120px] pointer-events-none rounded-full" />
 
         <div className="relative w-full max-w-md">
           <div className="text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-[#7831d6]/40 bg-[#7831d6]/20 text-[#c4b5fd] shadow-[0_0_24px_rgba(120,49,214,0.35)]">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-white shadow-sm">
               <Sparkles className="h-7 w-7" />
             </div>
             <h1 className="m-0 mt-6 text-3xl font-black tracking-tight text-white">Sign in to EasyPost</h1>
@@ -73,15 +73,15 @@ export const Login = () => {
             </p>
           </div>
 
-          <div className="mt-8 rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 shadow-2xl">
-            <div className="flex items-center gap-2 border-b border-white/10 pb-4">
+          <div className="mt-8 rounded-2xl border border-white/[0.08] bg-[#141417]/95 p-6 shadow-2xl backdrop-blur-2xl">
+            <div className="flex items-center gap-2 border-b border-white/[0.08] pb-4">
               <LockKeyhole className="h-4 w-4 text-zinc-400" />
               <p className="m-0 text-sm font-bold text-white">Workspace authentication</p>
             </div>
 
             <button
               onClick={handleGoogleLogin}
-              className="mt-6 flex w-full items-center justify-center gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-white/10"
+              className="mt-6 flex w-full items-center justify-center gap-3 rounded-[10px] border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-white/[0.08]"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
                 <path

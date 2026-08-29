@@ -157,7 +157,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
         case 'paused':
           return 'bg-zinc-800 text-zinc-400 border border-zinc-700';
         default:
-          return 'bg-[#7831d6]/20 text-[#c4b5fd] border border-[#7831d6]/35';
+          return 'bg-sky-500/10 text-sky-300 border border-sky-500/20';
       }
     };
 
@@ -176,7 +176,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
         case 'paused':
           return 'bg-zinc-500';
         default:
-          return 'bg-[#c4b5fd]';
+          return 'bg-sky-400';
       }
     };
 
@@ -185,7 +185,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
         case 'manual':
           return 'bg-amber-500/15 text-amber-300 border border-amber-500/30';
         case 'hybrid':
-          return 'bg-[#7831d6]/20 text-[#c4b5fd] border border-[#7831d6]/35';
+          return 'bg-purple-500/15 text-purple-300 border border-purple-500/30';
         default:
           return 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30';
       }
@@ -271,9 +271,9 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 	            <span className="text-white">{getScheduleTimingLabel(item.post.scheduledAt)}</span>
 	          </span>
 	          {item.manualPosted && item.post.manualPostedAt && (
-	            <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-[#7831d6]/20 px-1.5 py-0.5 border border-[#7831d6]/30">
+	            <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-emerald-500/15 px-1.5 py-0.5 border border-emerald-500/30">
 	              <span>Posted:</span>
-	              <span className="text-[#c4b5fd]">{getScheduleTimingLabel(item.post.manualPostedAt)}</span>
+	              <span className="text-emerald-300">{getScheduleTimingLabel(item.post.manualPostedAt)}</span>
 	            </span>
 	          )}
 	          {item.post.publishedAt && (
@@ -2586,7 +2586,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
           {isLoadingCalendar && (
             <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-[2px]">
               <div className="flex flex-col items-center gap-2 rounded-xl border border-white/[0.08] bg-[#0a0a0a] px-5 py-4 shadow-2xl">
-                <Loader2 className="h-6 w-6 animate-spin text-[#7831d6]" />
+                <Loader2 className="h-6 w-6 animate-spin text-white" />
                 <p className="m-0 text-xs font-semibold text-zinc-300">Loading calendar…</p>
               </div>
             </div>
@@ -2606,7 +2606,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 	                    <ChevronLeft className="h-3 w-3 -rotate-90 text-zinc-400" />
 	                  </button>
 	                  {showCalendarAccountMenu && (
-                    <div className="absolute left-0 top-9 z-[9999] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-white/[0.08] bg-[#0a0a0a] shadow-2xl">
+                    <div className="absolute left-0 top-9 z-[9999] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 shadow-2xl backdrop-blur-2xl">
                       <div className="p-2 border-b border-white/[0.08] bg-white/[0.02]">
                         <div className="relative">
                           <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-500" />
@@ -2615,21 +2615,21 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                             value={calendarAccountSearchQuery}
                             onChange={(e) => setCalendarAccountSearchQuery(e.target.value)}
                             placeholder="Search accounts..."
-                            className="h-7 w-full rounded-md border border-white/10 bg-black pl-7 pr-2 text-[11px] font-semibold text-white placeholder:text-zinc-500 focus:border-[#7831d6] focus:outline-none focus:ring-1 focus:ring-[#7831d6]/20"
+                            className="h-7 w-full rounded-[8px] border border-white/[0.08] bg-black/40 pl-7 pr-2 text-[11px] font-semibold text-white placeholder:text-zinc-500 focus:border-white/30 focus:outline-none focus:ring-1 focus:ring-white/10"
                           />
                         </div>
                       </div>
 	                      <button
 	                        type="button"
 	                        onClick={() => setSelectedCalendarAccountIds([])}
-	                        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[12px] font-semibold hover:bg-white/5 ${
-	                          selectedCalendarAccountIds.length === 0 ? 'text-[#c4b5fd]' : 'text-zinc-300'
+	                        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[12px] font-semibold hover:bg-white/[0.04] ${
+	                          selectedCalendarAccountIds.length === 0 ? 'text-white' : 'text-zinc-400'
 	                        }`}
 	                      >
 	                        <span>All accounts</span>
-	                        {selectedCalendarAccountIds.length === 0 && <span className="text-[10px]">Selected</span>}
+	                        {selectedCalendarAccountIds.length === 0 && <span className="text-[10px] text-zinc-400">Selected</span>}
 	                      </button>
-	                      <div className="max-h-64 overflow-y-auto border-t border-white/[0.08] py-1">
+	                      <div className="max-h-64 overflow-y-auto border-t border-white/[0.08] py-1 custom-scrollbar">
 	                        {filteredCalendarAccountOptions.map((option) => {
 	                          const selected = selectedCalendarAccountIds.includes(option.id);
 	                          return (
@@ -2637,14 +2637,14 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 	                              key={option.id}
 	                              type="button"
 	                              onClick={() => toggleCalendarAccount(option.id)}
-	                              className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-white/5 ${
-	                                selected ? 'text-[#c4b5fd]' : 'text-zinc-300'
+	                              className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-white/[0.04] transition-colors ${
+	                                selected ? 'text-white font-semibold' : 'text-zinc-400'
 	                              }`}
 	                            >
 	                              <span className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${
-	                                selected ? 'border-[#7831d6] bg-[#7831d6]' : 'border-white/20 bg-black'
+	                                selected ? 'border-white bg-white text-black' : 'border-white/20 bg-black'
 	                              }`}>
-	                                {selected && <span className="h-1.5 w-1.5 rounded-sm bg-white" />}
+	                                {selected && <span className="h-1.5 w-1.5 rounded-sm bg-black" />}
 	                              </span>
 	                              <PlatformIcon platform={option.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
 	                              <AccountAvatar account={option.channel} sizeClass="h-6 w-6" textClass="text-[9px]" />
@@ -2666,7 +2666,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   <button
                     type="button"
                     onClick={() => setShowCalendarHandlerMenu((open) => !open)}
-                    className="flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] font-medium text-white transition-colors hover:bg-white/10"
+                    className="flex h-8 items-center gap-1.5 rounded-[10px] border border-white/[0.08] bg-white/[0.03] px-3 text-[12px] font-medium text-white transition-colors hover:bg-white/[0.06]"
                     title="Filter by handler email"
                   >
                     <Users className="h-3.5 w-3.5 text-zinc-400" />
@@ -2678,7 +2678,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                     <ChevronLeft className="h-3 w-3 -rotate-90 text-zinc-400" />
                   </button>
                   {showCalendarHandlerMenu && (
-                    <div className="absolute left-0 top-9 z-[9999] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-white/[0.08] bg-[#0a0a0a] shadow-2xl">
+                    <div className="absolute left-0 top-9 z-[9999] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 shadow-2xl backdrop-blur-2xl">
                       <div className="border-b border-white/[0.08] bg-white/[0.02] p-2">
                         <div className="relative">
                           <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-500" />
@@ -2687,21 +2687,21 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                             value={calendarHandlerSearchQuery}
                             onChange={(e) => setCalendarHandlerSearchQuery(e.target.value)}
                             placeholder="Search handlers..."
-                            className="h-7 w-full rounded-md border border-white/10 bg-black pl-7 pr-2 text-[11px] font-semibold text-white placeholder:text-zinc-500 focus:border-[#7831d6] focus:outline-none focus:ring-1 focus:ring-[#7831d6]/20"
+                            className="h-7 w-full rounded-[8px] border border-white/[0.08] bg-black/40 pl-7 pr-2 text-[11px] font-semibold text-white placeholder:text-zinc-500 focus:border-white/30 focus:outline-none focus:ring-1 focus:ring-white/10"
                           />
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => setSelectedCalendarHandlerEmails([])}
-                        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[12px] font-semibold hover:bg-white/5 ${
-                          selectedCalendarHandlerEmails.length === 0 ? 'text-[#c4b5fd]' : 'text-zinc-300'
+                        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[12px] font-semibold hover:bg-white/[0.04] ${
+                          selectedCalendarHandlerEmails.length === 0 ? 'text-white' : 'text-zinc-400'
                         }`}
                       >
                         <span>All handlers</span>
-                        {selectedCalendarHandlerEmails.length === 0 && <span className="text-[10px]">Selected</span>}
+                        {selectedCalendarHandlerEmails.length === 0 && <span className="text-[10px] text-zinc-400">Selected</span>}
                       </button>
-                      <div className="max-h-64 overflow-y-auto border-t border-white/[0.08] py-1">
+                      <div className="max-h-64 overflow-y-auto border-t border-white/[0.08] py-1 custom-scrollbar">
                         {filteredCalendarHandlerOptions.map((handler) => {
                           const selected = selectedCalendarHandlerEmails.includes(handler.email);
                           return (
@@ -2709,16 +2709,16 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                               key={handler.email}
                               type="button"
                               onClick={() => toggleCalendarHandlerEmail(handler.email)}
-                              className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-white/5 ${
-                                selected ? 'text-[#c4b5fd]' : 'text-zinc-300'
+                              className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-white/[0.04] transition-colors ${
+                                selected ? 'text-white font-semibold' : 'text-zinc-400'
                               }`}
                             >
                               <span className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border ${
-                                selected ? 'border-[#7831d6] bg-[#7831d6]' : 'border-white/20 bg-black'
+                                selected ? 'border-white bg-white text-black' : 'border-white/20 bg-black'
                               }`}>
-                                {selected && <span className="h-1.5 w-1.5 rounded-sm bg-white" />}
+                                {selected && <span className="h-1.5 w-1.5 rounded-sm bg-black" />}
                               </span>
-                              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] font-black uppercase text-[#c4b5fd]">
+                              <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] font-bold uppercase text-zinc-300">
                                 {(handler.name || handler.email).charAt(0)}
                               </span>
                               <span className="min-w-0 flex-1">
@@ -2761,9 +2761,9 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   <button
                     type="button"
                     onClick={openQueueEditor}
-                    className="flex h-8 items-center gap-1.5 rounded-lg border border-[#7831d6]/40 bg-[#7831d6]/20 px-3 text-[12px] font-semibold text-[#c4b5fd] transition-colors hover:bg-[#7831d6]/30 hover:text-white"
+                    className="flex h-8 items-center gap-1.5 rounded-[10px] border border-white/[0.08] bg-white/[0.03] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-white/[0.06]"
                   >
-                    <Clock className="h-3.5 w-3.5" />
+                    <Clock className="h-3.5 w-3.5 text-zinc-300" />
                     <span>Manage Queue</span>
                   </button>
                 )}
@@ -2771,7 +2771,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 
               <div className="flex flex-shrink-0 items-center gap-1.5">
                 {/* Grouping Mode Toggle */}
-                <div className="flex items-center overflow-hidden rounded-md border border-white/[0.08] bg-white/5 p-0.5">
+                <div className="flex items-center overflow-hidden rounded-[8px] border border-white/[0.08] bg-white/[0.03] p-0.5">
                   {[
                     { mode: 'posts', label: 'Posts View' },
                     { mode: 'accounts', label: 'Accounts View' },
@@ -2783,10 +2783,10 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                         setCalendarGroupingMode(item.mode);
                         localStorage.setItem('calendar-grouping-mode', item.mode);
                       }}
-                      className={`h-6 rounded px-2 text-[10px] font-semibold transition-colors ${
+                      className={`h-6 rounded-[6px] px-2 text-[10px] font-semibold transition-colors ${
                         calendarGroupingMode === item.mode
-                          ? 'bg-[#7831d6] text-white shadow-xs'
-                          : 'bg-transparent text-zinc-400 hover:text-white hover:bg-white/5'
+                          ? 'bg-white text-black font-semibold shadow-xs'
+                          : 'bg-transparent text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                       }`}
                     >
                       {item.label}
@@ -2794,16 +2794,16 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   ))}
                 </div>
 
-                <div className="flex items-center overflow-hidden rounded-md border border-white/[0.08] bg-white/5 p-0.5">
+                <div className="flex items-center overflow-hidden rounded-[8px] border border-white/[0.08] bg-white/[0.03] p-0.5">
                   {['month', 'week'].map((mode) => (
                     <button
                       key={mode}
                       type="button"
                       onClick={() => setCalendarPreset(mode)}
-                      className={`h-6 rounded px-2.5 text-[10px] font-semibold capitalize transition-colors ${
+                      className={`h-6 rounded-[6px] px-2.5 text-[10px] font-semibold capitalize transition-colors ${
                         calendarMode === mode
-                          ? 'bg-[#7831d6] text-white shadow-xs'
-                          : 'bg-transparent text-zinc-400 hover:text-white hover:bg-white/5'
+                          ? 'bg-white text-black font-semibold shadow-xs'
+                          : 'bg-transparent text-zinc-400 hover:text-white hover:bg-white/[0.04]'
                       }`}
                     >
                       {mode}
@@ -2836,7 +2836,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                       case 'done': return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
                       case 'failed': return 'bg-rose-500/15 text-rose-400 border border-rose-500/30';
                       case 'cancelled': return 'bg-zinc-800 text-zinc-400 border border-zinc-700';
-                      default: return 'bg-[#7831d6]/20 text-[#c4b5fd] border border-[#7831d6]/35';
+                      default: return 'bg-sky-500/10 text-sky-300 border border-sky-500/20';
                     }
                   };
 
@@ -2865,17 +2865,17 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 		                    <div
 		                      key={day.key}
 		                      onClick={() => setSelectedCalendarDate(day.key)}
-		                      className={`relative border-b border-r border-white/10 text-left transition-colors flex flex-col cursor-pointer ${
+		                      className={`relative border-b border-r border-white/[0.08] text-left transition-colors flex flex-col cursor-pointer ${
 			                        calendarMode === 'week' ? 'min-h-full' : 'min-h-0'
 			                      } ${
 	                        isTooltipOpen ? 'z-[9999] overflow-visible shadow-md' : 'z-0 overflow-hidden'
 	                      } ${
 	                        day.isSelected
-		                            ? 'bg-[#7831d6]/10 ring-1 ring-[#7831d6]/30'
+		                            ? 'bg-white/[0.06] ring-1 ring-white/20'
 		                            : day.isToday
-		                            ? 'bg-[#7831d6]/5'
+		                            ? 'bg-white/[0.02]'
 		                            : day.inRange
-		                            ? 'bg-black hover:bg-white/[0.04]'
+		                            ? 'bg-[#0c0c0e] hover:bg-white/[0.03]'
 		                            : 'bg-zinc-950/60'
 		                      }`}
                       role="button"
@@ -2889,15 +2889,15 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 		                      {/* Date Label + Queue Summary */}
 			                      <div className={`mb-2 flex flex-col gap-1 border-b px-2 py-1.5 ${
 		                        day.isToday
-		                          ? 'border-[#7831d6]/30 bg-[#7831d6]/15'
+		                          ? 'border-white/20 bg-white/[0.04]'
 		                          : day.inRange
-		                            ? 'border-white/10 bg-[#0a0a0a]'
-		                            : 'border-white/10 bg-zinc-950/80'
+		                            ? 'border-white/[0.06] bg-[#141417]/80'
+		                            : 'border-white/[0.06] bg-zinc-950/80'
 		                      }`}>
                               <div className="flex min-w-0 items-center justify-center gap-2">
-				                        <span className={`inline-flex min-w-0 items-center justify-center rounded-md px-1.5 py-0.5 text-xs font-extrabold ${
+				                        <span className={`inline-flex min-w-0 items-center justify-center rounded-[6px] px-1.5 py-0.5 text-xs font-semibold ${
 		                          day.isToday
-		                            ? 'bg-[#7831d6] text-white'
+		                            ? 'bg-white text-black font-bold shadow-sm'
 		                            : day.inRange
 		                              ? 'text-white'
 		                              : 'text-zinc-500'
@@ -3106,7 +3106,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                               @{getAccountLabel(activeTooltip.data.group.channel)}
                             </span>
                           </div>
-                          <div className="min-w-0 rounded-lg border border-[#7831d6]/30 bg-[#7831d6]/10 px-2 py-1">
+                          <div className="min-w-0 rounded-[8px] border border-white/[0.08] bg-white/[0.03] px-2 py-1">
                             <p className="m-0 truncate text-[11px] font-bold text-white">
                               {activeTooltip.data.group.channel?.assignedHandlerName || 'Unassigned handler'}
                             </p>
@@ -3128,7 +3128,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                               href={profileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] font-semibold text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"
+                              className="flex h-8 items-center gap-1.5 rounded-[10px] border border-white/[0.08] bg-white/[0.03] px-3 text-[12px] font-semibold text-zinc-200 transition-colors hover:bg-white/[0.06] hover:text-white"
                               title="Open social channel in new tab"
                             >
                               <ExternalLink className="h-3.5 w-3.5 text-zinc-400" />
@@ -3140,9 +3140,9 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                           <button
                             type="button"
                             onClick={() => openQueueEditorForAccount(activeTooltip.data.accountId)}
-                            className="flex h-8 items-center gap-1.5 rounded-lg border border-[#7831d6]/40 bg-[#7831d6]/20 px-3 text-[12px] font-semibold text-[#c4b5fd] transition-colors hover:bg-[#7831d6]/30 hover:text-white"
+                            className="flex h-8 items-center gap-1.5 rounded-[10px] border border-white/[0.08] bg-white/[0.03] px-3 text-[12px] font-semibold text-white transition-colors hover:bg-white/[0.06]"
                           >
-                            <Clock className="h-3.5 w-3.5" />
+                            <Clock className="h-3.5 w-3.5 text-zinc-300" />
                             <span>Edit Queue</span>
                           </button>
                         )}
@@ -3171,9 +3171,9 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
               )}
 
 	              {/* Status Legend */}
-	              <div className="flex items-center gap-4 px-4 py-2 border-t border-white/10 bg-[#0a0a0a] flex-shrink-0">
+	              <div className="flex items-center gap-4 px-4 py-2 border-t border-white/[0.08] bg-[#0c0c0e] flex-shrink-0">
                 {[
-                  ['Scheduled', 'bg-[#7831d6]'],
+                  ['Scheduled', 'bg-sky-400'],
                   ['Manual Ready', 'bg-amber-400'],
                   ['Published', 'bg-emerald-400'],
                   ['Manual Posted', 'bg-emerald-400'],
@@ -3189,7 +3189,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
             </div>
 
             {/* Right Sidebar — Selected Date Detail */}
-            <aside className={`min-h-0 flex flex-col overflow-hidden bg-[#0a0a0a] border-l border-white/10 flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-10' : 'w-[260px] xl:w-[300px]'}`}>
+            <aside className={`min-h-0 flex flex-col overflow-hidden bg-[#0e0e11] border-l border-white/[0.08] flex-shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-10' : 'w-[260px] xl:w-[300px]'}`}>
               {/* Collapse/Expand Toggle */}
               {sidebarCollapsed ? (
                 <div className="flex-1 flex flex-col items-center pt-3 gap-2">
@@ -3207,12 +3207,12 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                       return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
                     })()}
                   </span>
-                  <span className="rounded-full bg-[#7831d6] text-white text-[9px] font-bold px-1.5 py-0.5">{selectedDayPosts.length}</span>
+                  <span className="rounded-full bg-white/[0.10] border border-white/10 text-white text-[9px] font-bold px-1.5 py-0.5">{selectedDayPosts.length}</span>
                 </div>
               ) : (
                 <>
               {/* Sidebar Header */}
-              <div className="border-b border-white/10 px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0">
+              <div className="border-b border-white/[0.08] px-3 py-2 flex items-center justify-between gap-2 flex-shrink-0">
                 <div className="min-w-0 flex items-center gap-2">
                   <h3 className="m-0 text-[13px] font-bold text-white truncate">
                     {(() => {
@@ -3220,7 +3220,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                       return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
                     })()}
                   </h3>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-300">
+                  <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-zinc-300">
                     {selectedDayPosts.length}
                   </span>
                 </div>
@@ -3236,7 +3236,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
               </div>
 
               {/* Sidebar Content */}
-              <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
+              <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 custom-scrollbar">
                 {selectedDayGroups.length === 0 && (
 	                  <div className="h-32 flex flex-col items-center justify-center gap-1.5 text-center px-3">
 	                    <Clock className="h-6 w-6 text-zinc-600" />
@@ -3255,16 +3255,16 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   const deletingAccountQueue = deletingAccountQueueIds.includes(group.id);
 
                   return (
-                    <div key={group.id} className="rounded-lg border border-white/10 overflow-hidden bg-black">
+                    <div key={group.id} className="rounded-xl border border-white/[0.08] overflow-hidden bg-[#141417]/95">
                       {/* Account Header */}
-	                      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-[#0a0a0a] border-b border-white/10">
+	                      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white/[0.02] border-b border-white/[0.08]">
 	                        <div className="min-w-0 flex items-center gap-2">
 	                          <PlatformIcon platform={group.channel?.platform} className="h-5 w-5 flex-shrink-0" showFallback={true} />
 	                          <AccountAvatar account={group.channel} sizeClass="h-8 w-8" textClass="text-[10px]" />
 	                          <span className="text-[12px] font-bold text-white truncate">{getAccountLabel(group.channel)}</span>
 	                        </div>
 	                        <div className="flex items-center gap-1.5">
-	                          <span className="text-[10px] font-bold text-white bg-[#7831d6] rounded-full px-1.5 py-0.5">{group.posts.length}</span>
+	                          <span className="text-[10px] font-bold text-white bg-white/[0.10] border border-white/10 rounded-full px-1.5 py-0.5">{group.posts.length}</span>
                           {(() => {
                             const profileUrl = getChannelProfileUrl(group.channel);
                             if (!profileUrl) return null;
@@ -3295,7 +3295,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                       </div>
 
                       {/* Posts List */}
-                      <div className="flex flex-wrap gap-1 p-2 bg-black">
+                      <div className="flex flex-wrap gap-1 p-2 bg-transparent">
                         {group.posts.map((item) => {
                           const getStatusDotBg = (statusGroup, manualPosted = false) => {
                             if (manualPosted) return 'bg-emerald-400';
@@ -3304,7 +3304,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                               case 'done': return 'bg-emerald-400';
                               case 'failed': return 'bg-rose-500';
                               case 'cancelled': return 'bg-zinc-500';
-                              default: return 'bg-[#7831d6]';
+                              default: return 'bg-sky-400';
                             }
                           };
 
@@ -3316,7 +3316,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 	                              </div>
 	                              <div className="flex items-center gap-1">
 	                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusDotBg(item.statusGroup, item.manualPosted)}`} title={getPostStatusLabel(item.post)} />
-	                                <span className={`text-[9px] font-semibold ${item.manualPosted ? 'text-[#c4b5fd]' : 'text-zinc-300'}`}>
+	                                <span className="text-[9px] font-semibold text-zinc-300">
                                     {item.manualPosted ? item.manualPostedTimeLabel : item.timeLabel}
                                   </span>
 	                              </div>

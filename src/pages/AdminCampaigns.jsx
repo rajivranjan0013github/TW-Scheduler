@@ -411,7 +411,7 @@ export const AdminCampaigns = () => {
             <button
               type="button"
               onClick={() => navigate('/campaigns')}
-              className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#7831d6] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#6825bc] shadow-sm"
+              className="mt-2 inline-flex items-center gap-2 rounded-[8px] bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200 shadow-sm"
             >
               Go to Product Selector
             </button>
@@ -422,9 +422,9 @@ export const AdminCampaigns = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black px-3 py-3 text-white lg:px-5">
+    <div className="min-h-screen bg-[#0c0c0e] px-3 py-3 text-white lg:px-5">
       <div className="mx-auto max-w-5xl space-y-3">
-        <div className="border-b border-white/10 pb-2">
+        <div className="border-b border-white/[0.08] pb-2">
           <h2 className="m-0 text-base font-semibold tracking-tight text-white">Product Setup</h2>
           <p className="m-0 mt-0.5 text-xs text-zinc-400">
             Edit details and manage accounts for the active product.
@@ -432,24 +432,24 @@ export const AdminCampaigns = () => {
         </div>
 
         {error && (
-          <div className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm font-medium text-red-300">
+          <div className="flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm font-medium text-rose-300">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {loading ? (
-          <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-10 text-center text-sm text-zinc-400">Loading product...</div>
+          <div className="rounded-2xl border border-white/[0.08] bg-[#141417]/95 p-10 text-center text-sm text-zinc-400">Loading product...</div>
         ) : !campaign ? (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-[#0a0a0a] p-12 text-center">
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#141417]/95 p-12 text-center">
             <p className="m-0 text-sm font-semibold text-white">Product not found</p>
             <p className="m-0 mt-1 text-xs text-zinc-400">The selected product could not be loaded.</p>
           </div>
         ) : (
           <form onSubmit={saveCampaign}>
-            <section className="overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0a] shadow-sm">
+            <section className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 shadow-xl backdrop-blur-xl">
               {/* ── Tab Bar ── */}
-              <div className="flex border-b border-white/10">
+              <div className="flex border-b border-white/[0.08]">
                 {tabConfig.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -460,7 +460,7 @@ export const AdminCampaigns = () => {
                       onClick={() => setActiveTab(tab.id)}
                       className={`flex items-center gap-2 border-b-2 px-5 py-3.5 text-sm font-semibold transition ${
                         isActive
-                          ? 'border-[#7831d6] text-[#c4b5fd]'
+                          ? 'border-white text-white'
                           : 'border-transparent text-zinc-400 hover:text-white'
                       }`}
                     >
@@ -494,7 +494,7 @@ export const AdminCampaigns = () => {
                         value={form.mainEmail}
                         onChange={(e) => setForm((c) => ({ ...c, mainEmail: e.target.value }))}
                         placeholder="contact@brand.com"
-                        className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
+                        className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2.5 text-sm text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10"
                       />
                     </div>
                     <div>
@@ -502,7 +502,7 @@ export const AdminCampaigns = () => {
                       <select
                         value={form.status}
                         onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}
-                        className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm capitalize text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
+                        className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2.5 text-sm capitalize text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10"
                       >
                         {statusOptions.map((status) => (
                           <option key={status} value={status} className="bg-black text-white">{status}</option>
@@ -511,11 +511,11 @@ export const AdminCampaigns = () => {
                     </div>
                     <div className="sm:col-span-2">
                       <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-zinc-300">
-                        <FolderOpen className="h-3.5 w-3.5 text-[#c4b5fd]" />
+                        <FolderOpen className="h-3.5 w-3.5 text-white" />
                         Promo Video Folder
                       </label>
-                      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-black text-[#c4b5fd] shadow-sm ring-1 ring-white/10">
+                      <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] p-2.5">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-black text-white shadow-sm ring-1 ring-white/10">
                           <Folder className="h-4 w-4" />
                         </span>
                         <div className="min-w-0 flex-1">
@@ -528,7 +528,7 @@ export const AdminCampaigns = () => {
                           <button
                             type="button"
                             onClick={() => setForm((current) => ({ ...current, promoFolderId: '' }))}
-                            className="h-8 rounded-lg px-2.5 text-[10px] font-semibold text-zinc-400 transition hover:bg-white/10 hover:text-red-400"
+                            className="h-8 rounded-lg px-2.5 text-[10px] font-semibold text-zinc-400 transition hover:bg-white/10 hover:text-rose-400"
                           >
                             Clear
                           </button>
@@ -537,7 +537,7 @@ export const AdminCampaigns = () => {
                           type="button"
                           onClick={openPromoFolderPicker}
                           disabled={foldersLoading}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#7831d6] px-3 text-[10px] font-semibold text-white transition hover:bg-[#6825bc] disabled:cursor-wait disabled:opacity-60 shadow-sm"
+                          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-white px-3 text-[10px] font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-wait disabled:opacity-60 shadow-sm"
                         >
                           {foldersLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
                           Choose folder
@@ -617,7 +617,7 @@ export const AdminCampaigns = () => {
                             value={newChannelHandle}
                             onChange={(e) => setNewChannelHandle(e.target.value)}
                             placeholder={getPlatformPlaceholder(newChannelPlatform)}
-                            className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 placeholder:text-zinc-600"
+                            className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2.5 text-sm text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 placeholder:text-zinc-600"
                           />
                           <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">
                             {getPlatformFormatHelp(newChannelPlatform)}
@@ -632,7 +632,7 @@ export const AdminCampaigns = () => {
                             value={newChannelDisplayName}
                             onChange={(e) => setNewChannelDisplayName(e.target.value)}
                             placeholder="e.g. Cristiano Ronaldo"
-                            className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 placeholder:text-zinc-600"
+                            className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2.5 text-sm text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 placeholder:text-zinc-600"
                           />
                           <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">
                             A friendly name to display in lists and reports.
@@ -647,7 +647,7 @@ export const AdminCampaigns = () => {
                             value={newChannelHandlerEmail}
                             onChange={(e) => setNewChannelHandlerEmail(e.target.value)}
                             placeholder="creator@example.com"
-                            className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 placeholder:text-zinc-600"
+                            className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2.5 text-sm text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 placeholder:text-zinc-600"
                           />
                           <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">
                             Required only when this unverified handle should receive manual tasks.
@@ -661,7 +661,7 @@ export const AdminCampaigns = () => {
                           type="button"
                           onClick={addChannel}
                           disabled={!newChannelHandle.trim()}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[#7831d6] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#6825bc] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                          className="inline-flex items-center gap-1.5 rounded-[8px] bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                         >
                           <Plus className="h-4 w-4" />
                           Add Channel
@@ -677,14 +677,14 @@ export const AdminCampaigns = () => {
                     </h4>
 
                     {(form.channels?.length || 0) === 0 ? (
-                      <div className="rounded-xl border border-dashed border-white/10 p-8 text-center bg-[#0a0a0a]">
+                      <div className="rounded-2xl border border-dashed border-white/[0.08] p-8 text-center bg-white/[0.02]">
                         <p className="m-0 text-sm font-semibold text-white">No channels added yet</p>
                         <p className="m-0 mt-1 text-xs text-zinc-500">
                           Fill in the details above to add social channels to this product.
                         </p>
                       </div>
                     ) : (
-                      <div className="divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0a0a0a] overflow-hidden">
+                      <div className="divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
                         {(form.channels || []).map((ch, idx) => {
                           const statusMeta = getChannelStatusMeta(ch);
                           return (
@@ -702,7 +702,7 @@ export const AdminCampaigns = () => {
                                     <Users className="h-4 w-4" />
                                   </div>
                                 )}
-                                <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-black bg-[#0a0a0a] shadow-sm">
+                                <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-black bg-[#141417] shadow-sm">
                                   <PlatformIcon platform={ch.platform} className="h-3.5 w-3.5" />
                                 </span>
                               </div>
@@ -732,7 +732,7 @@ export const AdminCampaigns = () => {
                                   onChange={(e) => updateChannel(idx, { handle: e.target.value.trim(), requestedHandle: e.target.value.trim() })}
                                   placeholder="@handle or ID"
                                   disabled={ch.isVerified}
-                                  className="w-full rounded-lg border border-white/10 bg-black px-2.5 py-1.5 text-xs text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 disabled:bg-white/5 disabled:text-zinc-500 disabled:cursor-not-allowed"
+                                  className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 disabled:bg-white/5 disabled:text-zinc-500 disabled:cursor-not-allowed"
                                 />
                               </div>
 
@@ -746,12 +746,12 @@ export const AdminCampaigns = () => {
                                   onChange={(e) => updateChannel(idx, { assignedHandlerEmail: e.target.value.trim().toLowerCase() })}
                                   placeholder="creator@example.com"
                                   disabled={ch.isVerified}
-                                  className="w-full rounded-lg border border-white/10 bg-black px-2.5 py-1.5 text-xs text-white outline-none transition focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 disabled:bg-white/5 disabled:text-zinc-500 disabled:cursor-not-allowed"
+                                  className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 disabled:bg-white/5 disabled:text-zinc-500 disabled:cursor-not-allowed"
                                 />
                               </div>
 
                               <div className="flex flex-col items-end gap-1">
-                                <span className={`rounded-md px-2.5 py-1 text-[10px] font-semibold border ${statusMeta.className}`}>
+                                <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold border ${statusMeta.className}`}>
                                   {statusMeta.label}
                                 </span>
                                 <span className="text-[10px] text-zinc-400 max-w-[190px] text-right leading-tight">
@@ -762,7 +762,7 @@ export const AdminCampaigns = () => {
                               <button
                                 type="button"
                                 onClick={() => removeChannel(idx)}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-red-500/20 hover:text-red-400 ml-2"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-rose-500/20 hover:text-rose-400 ml-2"
                                 aria-label={`Remove ${ch.handle}`}
                               >
                                 <X className="h-4 w-4" />
@@ -777,12 +777,12 @@ export const AdminCampaigns = () => {
               )}
 
               {/* ── Action Bar ── */}
-              <div className="flex items-center justify-between border-t border-white/10 px-5 py-3 bg-black/40">
+              <div className="flex items-center justify-between border-t border-white/[0.08] px-5 py-3 bg-black/40">
                 <button
                   type="button"
                   onClick={deleteCampaign}
                   disabled={!canDelete || saving}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 rounded-[8px] border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete
@@ -790,7 +790,7 @@ export const AdminCampaigns = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#7831d6] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#6825bc] disabled:opacity-60 shadow-sm"
+                  className="inline-flex items-center gap-1.5 rounded-[8px] bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-60 shadow-sm"
                 >
                   <Save className="h-3.5 w-3.5" />
                   {saving ? 'Saving...' : 'Save Changes'}
@@ -802,14 +802,14 @@ export const AdminCampaigns = () => {
       </div>
 
       {promoFolderPickerOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="promo-folder-picker-title"
-            className="flex h-[520px] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a] text-white shadow-2xl"
+            className="flex h-[520px] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 text-white shadow-2xl backdrop-blur-2xl"
           >
-            <header className="flex items-start justify-between border-b border-white/10 px-5 py-4">
+            <header className="flex items-start justify-between border-b border-white/[0.08] px-5 py-4">
               <div>
                 <h3 id="promo-folder-picker-title" className="text-sm font-extrabold text-white">Choose Promo Folder</h3>
                 <p className="m-0 mt-1 text-[10px] font-semibold text-zinc-400">
@@ -827,7 +827,7 @@ export const AdminCampaigns = () => {
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              <label className="mb-3 flex items-center gap-2 rounded-xl border border-white/10 bg-black px-3 py-2.5 text-zinc-400 focus-within:border-[#7831d6]">
+              <label className="mb-3 flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/40 px-3 py-2.5 text-zinc-400 focus-within:border-white/30">
                 <Search className="h-3.5 w-3.5" />
                 <input
                   type="search"
@@ -857,7 +857,7 @@ export const AdminCampaigns = () => {
                           type="button"
                           onClick={() => setPendingPromoFolderId(folderId)}
                           className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] font-bold ${selected
-                            ? 'border-[#7831d6]/50 bg-[#7831d6]/20 text-[#c4b5fd]'
+                            ? 'border-white/20 bg-white/[0.08] text-white'
                             : 'border-transparent bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white'}`}
                         >
                           <Folder className="h-4 w-4 shrink-0" />
@@ -878,11 +878,11 @@ export const AdminCampaigns = () => {
               </div>
             </div>
 
-            <footer className="flex justify-end gap-2 border-t border-white/10 bg-black/60 px-5 py-4">
+            <footer className="flex justify-end gap-2 border-t border-white/[0.08] bg-black/60 px-5 py-4">
               <button
                 type="button"
                 onClick={() => setPromoFolderPickerOpen(false)}
-                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-[11px] font-bold text-zinc-300 hover:bg-white/10"
+                className="rounded-[8px] border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-[11px] font-bold text-zinc-300 hover:bg-white/10"
               >
                 Cancel
               </button>
@@ -893,7 +893,7 @@ export const AdminCampaigns = () => {
                   setPromoFolderPickerOpen(false);
                 }}
                 disabled={!pendingPromoFolderId || foldersLoading}
-                className="rounded-xl bg-[#7831d6] px-4 py-2 text-[11px] font-bold text-white hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-40 shadow-sm"
+                className="rounded-[8px] bg-white px-4 py-2 text-[11px] font-bold text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 shadow-sm"
               >
                 Use This Folder
               </button>

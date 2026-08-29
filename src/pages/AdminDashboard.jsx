@@ -461,7 +461,7 @@ export const AdminDashboard = () => {
                 value={searchChannel}
                 onChange={(e) => setSearchChannel(e.target.value)}
                 placeholder="Search channel or username..."
-                className="h-7 rounded-md border border-white/10 bg-black px-2 text-[11px] font-semibold text-white outline-none transition focus:border-[#7831d6]"
+                className="h-7 rounded-[6px] border border-white/[0.08] bg-black/40 px-2 text-[11px] font-semibold text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10"
               />
             </div>
 
@@ -473,7 +473,7 @@ export const AdminDashboard = () => {
                 id="filter-platform"
                 value={filterPlatform}
                 onChange={(e) => setFilterPlatform(e.target.value)}
-                className="h-7 rounded-md border border-white/10 bg-black px-2 text-[11px] font-semibold text-white outline-none transition focus:border-[#7831d6]"
+                className="h-7 rounded-[6px] border border-white/[0.08] bg-black/40 px-2 text-[11px] font-semibold text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10"
               >
                 <option value="all">All Platforms</option>
                 <option value="youtube">YouTube</option>
@@ -493,7 +493,7 @@ export const AdminDashboard = () => {
                 value={searchUser}
                 onChange={(e) => setSearchUser(e.target.value)}
                 placeholder="Search by user name or email..."
-                className="h-7 rounded-md border border-white/10 bg-black px-2 text-[11px] font-semibold text-white outline-none transition focus:border-[#7831d6]"
+                className="h-7 rounded-[6px] border border-white/[0.08] bg-black/40 px-2 text-[11px] font-semibold text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10"
               />
             </div>
           </div>

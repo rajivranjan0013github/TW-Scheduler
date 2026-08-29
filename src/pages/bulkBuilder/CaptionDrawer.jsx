@@ -192,27 +192,27 @@ export const CaptionDrawer = ({
         />
       )}
       {/* Drawer */}
-      <div className={`fixed bottom-0 top-0 flex w-[380px] max-w-[90vw] flex-col bg-[#151517] text-[#e0e0e5] shadow-2xl ${opensFromLeft
-        ? 'left-0 animate-slide-in-left border-r border-[#303034]'
-        : 'right-0 animate-slide-in-right border-l border-[#303034]'} ${mountToViewport ? 'z-[120]' : 'z-50'}`}>
+      <div className={`fixed bottom-0 top-0 flex w-[380px] max-w-[90vw] flex-col bg-[#141417]/95 text-white shadow-2xl backdrop-blur-2xl ${opensFromLeft
+        ? 'left-0 animate-slide-in-left border-r border-white/[0.08]'
+        : 'right-0 animate-slide-in-right border-l border-white/[0.08]'} ${mountToViewport ? 'z-[120]' : 'z-50'}`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#303034] bg-[#1a1a1d]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08] bg-white/[0.02]">
           {viewMode === 'bookmarks' ? (
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setViewMode('main')}
-                className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-[#232326] hover:text-white transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-[8px] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition-colors"
                 title="Back"
               >
                 <ArrowLeft className="h-4 w-4 text-white" />
               </button>
-              <h3 className="text-sm font-bold text-white" style={{ color: '#ffffff' }}>Saved Captions</h3>
+              <h3 className="text-sm font-bold text-white">Saved Captions</h3>
             </div>
           ) : (
             <div className="flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-[#c4b5fd]" />
-              <h3 className="text-sm font-bold text-white" style={{ color: '#ffffff' }}>{title}</h3>
+              <Sparkles className="h-3.5 w-3.5 text-zinc-300" />
+              <h3 className="text-sm font-bold text-white">{title}</h3>
             </div>
           )}
 
@@ -221,16 +221,16 @@ export const CaptionDrawer = ({
               <button
                 type="button"
                 onClick={() => setViewMode('bookmarks')}
-                className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-[#232326] hover:text-white transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-[8px] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition-colors"
                 title="Saved Captions"
               >
-                <Bookmark className="h-4 w-4 text-[#c4b5fd]" />
+                <Bookmark className="h-4 w-4 text-zinc-300" />
               </button>
             )}
             <button
               type="button"
               onClick={onClose}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 hover:bg-[#232326] hover:text-white transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-[8px] text-zinc-400 hover:bg-white/[0.06] hover:text-white transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
@@ -238,28 +238,28 @@ export const CaptionDrawer = ({
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {viewMode === 'bookmarks' ? (
-            /* Bookmarked view mode */
-            <div className="p-5 space-y-3">
+            /* Bookmarks view mode */
+            <div className="p-4">
               {savedCaptions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center text-zinc-500 rounded-xl border border-dashed border-[#35353a] p-4">
-                  <Bookmark className="h-6 w-6 text-zinc-600 mb-2" />
-                  <p className="text-xs font-semibold">No saved captions yet</p>
-                  <p className="text-[10px] text-zinc-500 mt-1 max-w-[220px]">
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Bookmark className="h-8 w-8 text-zinc-600 mb-2" />
+                  <p className="text-xs font-semibold text-zinc-400">No saved captions yet</p>
+                  <p className="text-[10px] text-zinc-600 mt-1 max-w-[200px]">
                     Bookmark custom inputs or AI recommendations to see them here.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <label className="mb-3 flex items-center gap-2 rounded-xl border border-[#35353a] bg-[#1c1c1f] px-3 py-2.5 text-zinc-500 focus-within:border-[#7831d6] focus-within:text-[#c4b5fd]">
-                    <Search className="h-3.5 w-3.5 shrink-0" />
+                  <label className="mb-3 flex items-center gap-2 rounded-[10px] border border-white/[0.08] bg-black/40 px-3 py-2.5 text-zinc-500 focus-within:border-white/30 focus-within:text-white">
+                    <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
                     <input
                       type="search"
                       value={savedCaptionSearch}
                       onChange={(event) => setSavedCaptionSearch(event.target.value)}
                       placeholder="Filter saved captions..."
-                      className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-gray-200 outline-none placeholder:text-zinc-600"
+                      className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-gray-200 outline-none placeholder:text-zinc-500"
                     />
                   </label>
                   {savedCaptions
@@ -269,7 +269,7 @@ export const CaptionDrawer = ({
                       <button
                         type="button"
                         onClick={() => handleSelectSuggestion(item.text)}
-                        className="w-full min-w-0 whitespace-pre-wrap break-words rounded-xl border border-[#35353a] bg-[#1c1c1f] py-3 pl-3 pr-10 text-left text-xs font-semibold leading-relaxed text-gray-300 hover:border-[#7831d6]/60 hover:bg-[#232326] hover:text-white"
+                        className="w-full min-w-0 whitespace-pre-wrap break-words rounded-xl border border-white/[0.08] bg-white/[0.02] py-3 pl-3 pr-10 text-left text-xs font-semibold leading-relaxed text-zinc-300 hover:border-white/20 hover:bg-white/[0.04] hover:text-white transition-all"
                         title={item.text}
                       >
                         {item.text}
@@ -277,7 +277,7 @@ export const CaptionDrawer = ({
                       <button
                         type="button"
                         onClick={() => handleToggleBookmark(item.text)}
-                        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-red-950/50 hover:text-red-400"
+                        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-zinc-500 transition-colors hover:bg-rose-500/20 hover:text-rose-400"
                         title="Remove saved caption"
                         aria-label="Remove saved caption"
                       >
@@ -286,7 +286,7 @@ export const CaptionDrawer = ({
                     </div>
                   ))}
                   {savedCaptionSearch.trim() && savedCaptions.filter((item) => item.text?.toLowerCase().includes(savedCaptionSearch.trim().toLowerCase())).length === 0 && (
-                    <div className="rounded-xl border border-dashed border-[#35353a] px-4 py-8 text-center text-xs font-semibold text-zinc-500">
+                    <div className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-xs font-semibold text-zinc-500">
                       No saved captions match “{savedCaptionSearch.trim()}”.
                     </div>
                   )}
@@ -297,7 +297,7 @@ export const CaptionDrawer = ({
             /* Main view mode */
             <>
               {/* Manual Input */}
-              <div className="p-5 border-b border-[#303034] space-y-3">
+              <div className="p-5 border-b border-white/[0.08] space-y-3">
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
                   {manualLabel}
                 </label>
@@ -306,14 +306,14 @@ export const CaptionDrawer = ({
                   onChange={(e) => setManualText(e.target.value)}
                   rows={3}
                   placeholder={manualPlaceholder}
-                  className="w-full text-xs border border-[#35353a] rounded-xl p-3 bg-[#1c1c1f] focus:bg-[#232326] transition-all outline-none resize-none text-white focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
+                  className="w-full text-xs border border-white/[0.08] rounded-xl p-3 bg-black/40 focus:bg-black/60 transition-all outline-none resize-none text-white focus:border-white/30 focus:ring-1 focus:ring-white/10"
                 />
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={handleApplyManual}
                     disabled={!manualText.trim()}
-                    className="flex-1 rounded-xl bg-[#232326] border border-[#35353a] px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-[#2a2a2e] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex-1 rounded-[10px] bg-white/[0.06] border border-white/[0.08] px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-white/10 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {applyLabel}
                   </button>
@@ -321,10 +321,10 @@ export const CaptionDrawer = ({
                     type="button"
                     onClick={() => handleToggleBookmark(manualText)}
                     disabled={!manualText.trim()}
-                    className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl border transition-all ${
+                    className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] border transition-all ${
                       isBookmarked(manualText)
-                        ? 'border-[#7831d6]/50 bg-[#7831d6]/20 text-[#c4b5fd]'
-                        : 'border-[#35353a] bg-[#1c1c1f] text-zinc-400 hover:text-white hover:border-zinc-500'
+                        ? 'border-white/30 bg-white/[0.08] text-white'
+                        : 'border-white/[0.08] bg-black/40 text-zinc-400 hover:text-white hover:border-white/20'
                     }`}
                     title="Bookmark caption"
                   >
@@ -335,9 +335,9 @@ export const CaptionDrawer = ({
 
               {/* Divider */}
               <div className="flex items-center gap-3 px-5 py-3">
-                <div className="flex-1 h-px bg-[#303034]" />
+                <div className="flex-1 h-px bg-white/[0.08]" />
                 <span className="text-[10px] font-bold text-zinc-400 uppercase">Or Generate with AI</span>
-                <div className="flex-1 h-px bg-[#303034]" />
+                <div className="flex-1 h-px bg-white/[0.08]" />
               </div>
 
               {/* AI Generation */}
@@ -348,13 +348,13 @@ export const CaptionDrawer = ({
                     value={vibe}
                     onChange={(e) => onVibeChange(e.target.value)}
                     placeholder="Optional topic/vibe..."
-                    className="flex-1 rounded-xl border border-[#35353a] bg-[#1c1c1f] px-3 py-2.5 text-xs outline-none focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20 transition-all text-white"
+                    className="flex-1 rounded-[10px] border border-white/[0.08] bg-black/40 px-3 py-2.5 text-xs outline-none focus:border-white/30 focus:ring-1 focus:ring-white/10 transition-all text-white"
                   />
                   <button
                     type="button"
                     onClick={handleGenerate}
                     disabled={loading}
-                    className="flex items-center gap-1.5 rounded-xl bg-[#7831d6] px-4 py-2.5 text-xs font-bold text-white transition-all hover:bg-[#6825bc] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1.5 rounded-[10px] bg-white px-4 py-2.5 text-xs font-bold text-black transition-all hover:bg-zinc-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
                     {loading ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -366,14 +366,14 @@ export const CaptionDrawer = ({
                 </div>
 
                 {error && (
-                  <div className="rounded-xl border border-red-950/40 bg-red-950/20 p-3 text-xs font-semibold text-red-400">
+                  <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs font-semibold text-rose-400">
                     {error}
                   </div>
                 )}
 
                 {loading && (
                   <div className="flex flex-col items-center py-8 space-y-2">
-                    <Loader2 className="h-6 w-6 text-[#c4b5fd] animate-spin" />
+                    <Loader2 className="h-6 w-6 text-white animate-spin" />
                     <p className="text-[10px] font-semibold text-zinc-400 animate-pulse">Generating suggestions...</p>
                   </div>
                 )}
@@ -388,12 +388,12 @@ export const CaptionDrawer = ({
                       return (
                         <div
                           key={idx}
-                          className="group w-full flex items-center justify-between rounded-xl border border-[#35353a] bg-[#1c1c1f] p-2.5 text-left transition-all hover:border-[#7831d6]/60 hover:bg-[#232326] hover:shadow-sm"
+                          className="group w-full flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.02] p-2.5 text-left transition-all hover:border-white/20 hover:bg-white/[0.04] hover:shadow-sm"
                         >
                           <button
                             type="button"
                             onClick={() => handleSelectSuggestion(text)}
-                            className="flex-1 text-left text-xs font-semibold text-gray-300 group-hover:text-white outline-none pr-2 truncate"
+                            className="flex-1 text-left text-xs font-semibold text-zinc-300 group-hover:text-white outline-none pr-2 truncate"
                           >
                             <span className="leading-relaxed whitespace-pre-line truncate">{text}</span>
                           </button>
@@ -402,7 +402,7 @@ export const CaptionDrawer = ({
                             onClick={() => handleToggleBookmark(text)}
                             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all ${
                               bookmarked
-                                ? 'bg-[#7831d6]/20 text-[#c4b5fd]'
+                                ? 'bg-white/[0.10] text-white'
                                 : 'text-zinc-400 hover:text-white'
                             }`}
                             title={bookmarked ? "Remove Bookmark" : "Bookmark caption"}
@@ -417,12 +417,12 @@ export const CaptionDrawer = ({
                       type="button"
                       onClick={handleGenerateMore}
                       disabled={loadingMore}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-[#35353a] hover:border-[#7831d6]/60 bg-[#1c1c1f] p-3 text-xs font-bold text-[#c4b5fd] hover:text-white hover:bg-[#232326] transition-all duration-200 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed mt-3"
+                      className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 hover:border-white/30 bg-white/[0.02] p-3 text-xs font-bold text-white hover:bg-white/[0.04] transition-all duration-200 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed mt-3"
                     >
                       {loadingMore ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#c4b5fd]" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
                       ) : (
-                        <Plus className="h-3.5 w-3.5 text-[#c4b5fd]" />
+                        <Plus className="h-3.5 w-3.5 text-white" />
                       )}
                       Generate More AI Suggestions
                     </button>
@@ -430,7 +430,7 @@ export const CaptionDrawer = ({
                 )}
 
                 {!loading && suggestions.length === 0 && !error && (
-                  <div className="flex flex-col items-center rounded-xl border border-dashed border-[#35353a] p-6 text-center">
+                  <div className="flex flex-col items-center rounded-xl border border-dashed border-white/10 p-6 text-center">
                     <Sparkles className="h-6 w-6 text-zinc-600 mb-2" />
                     <p className="text-[10px] font-medium text-zinc-500 max-w-[200px]">
                       Click Generate to get 20 AI-crafted caption suggestions
@@ -441,7 +441,6 @@ export const CaptionDrawer = ({
             </>
           )}
         </div>
-
       </div>
 
       <style>{`

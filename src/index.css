@@ -3,43 +3,43 @@
 @import "tailwindcss";
 
 @theme {
-  --color-apple-blue: #7831d6;
-  --color-apple-blue-hover: #6825bc;
-  --color-apple-gray: #000000;
-  --color-apple-dark-card: #0a0a0a;
-  --color-apple-dark-bg: #000000;
-  --color-apple-dark-border: rgba(255, 255, 255, 0.12);
-  --color-apple-light-border: rgba(255, 255, 255, 0.12);
+  --color-apple-blue: #7c3aed;
+  --color-apple-blue-hover: #6d28d9;
+  --color-apple-gray: #0c0c0e;
+  --color-apple-dark-card: #141417;
+  --color-apple-dark-bg: #0c0c0e;
+  --color-apple-dark-border: rgba(255, 255, 255, 0.08);
+  --color-apple-light-border: rgba(255, 255, 255, 0.08);
   
   --color-brand-50: #0f0b15;
   --color-brand-100: #1c1527;
   --color-brand-200: #2d1f40;
   --color-brand-300: #452a6b;
   --color-brand-400: #5c3596;
-  --color-brand-500: #7831d6;
-  --color-brand-600: #6825bc;
-  --color-brand-700: #581da2;
-  --color-brand-800: #471585;
+  --color-brand-500: #7c3aed;
+  --color-brand-600: #6d28d9;
+  --color-brand-700: #5b21b6;
+  --color-brand-800: #4c1d95;
   --color-brand-900: #ffffff;
-  --color-brand-950: #000000;
+  --color-brand-950: #0c0c0e;
   
-  --color-darkBg: #000000;
-  --color-darkCard: #0a0a0a;
-  --color-darkBorder: rgba(255, 255, 255, 0.12);
+  --color-darkBg: #0c0c0e;
+  --color-darkCard: #141417;
+  --color-darkBorder: rgba(255, 255, 255, 0.08);
 }
 
 html, body {
   height: 100%;
   overflow: hidden;
-  background-color: #000000;
-  color: #ffffff;
+  background-color: #0c0c0e;
+  color: #fafafa;
 }
 
 body {
   margin: 0;
-  background-color: #000000;
-  color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background-color: #0c0c0e;
+  color: #fafafa;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -47,14 +47,14 @@ body {
 #root {
   height: 100%;
   width: 100%;
-  background-color: #000000;
-  color: #ffffff;
+  background-color: #0c0c0e;
+  color: #fafafa;
 }
 
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
-  letter-spacing: -0.015em;
-  color: #ffffff;
+  letter-spacing: -0.02em;
+  color: #fafafa;
 }
 
 /* Custom minimal dark scrollbar */

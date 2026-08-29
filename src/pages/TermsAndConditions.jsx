@@ -30,15 +30,15 @@ const sections = [
 ];
 
 export const TermsAndConditions = () => (
-  <div className="h-screen overflow-y-auto bg-black text-white font-sans selection:bg-[#7831d6] selection:text-white">
-    <header className="border-b border-white/10 bg-black/80 backdrop-blur-md px-5 py-4">
+  <div className="h-screen overflow-y-auto bg-[#0c0c0e] text-white font-sans selection:bg-white selection:text-black">
+    <header className="border-b border-white/[0.08] bg-[#0c0c0e]/80 backdrop-blur-xl px-5 py-4">
       <div className="mx-auto flex max-w-4xl items-center justify-between">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-[#c4b5fd] transition hover:text-white">
+        <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-300 transition hover:text-white">
           <ArrowLeft className="h-4 w-4" />
           Back to EasyPost
         </Link>
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
-          <Sparkles className="h-4 w-4 text-[#c4b5fd]" />
+          <Sparkles className="h-4 w-4 text-white" />
           EasyPost
         </div>
       </div>

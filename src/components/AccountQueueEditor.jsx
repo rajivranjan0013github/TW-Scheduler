@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CalendarPlus, Check, Clock, Info, Loader2, MessageSquareText, MoreVertical, PauseCircle, PlayCircle, Save, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, Check, Clock, Film, Image as ImageIcon, Info, Loader2, MessageSquareText, MoreVertical, PauseCircle, PlayCircle, Save, Trash2, X } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from './LoadingVideoPreview';
@@ -9,10 +9,16 @@ const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 
 const QueueMediaPreview = ({ item }) => {
   const url = getAssetUrl(item?.url);
-  if (!url) {
+  const [imgError, setImgError] = useState(false);
+
+  if (!url || imgError) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#f1f3f4] text-[10px] font-semibold text-[#9aa0a6]">
-        Media
+      <div className="flex h-full w-full flex-col items-center justify-center bg-white/[0.02] border border-white/[0.06] text-zinc-500">
+        {item?.type === 'video' ? (
+          <Film className="h-5 w-5 text-zinc-500" />
+        ) : (
+          <ImageIcon className="h-5 w-5 text-zinc-500" />
+        )}
       </div>
     );
   }
@@ -30,7 +36,14 @@ const QueueMediaPreview = ({ item }) => {
     );
   }
 
-  return <img src={url} className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105" alt="" />;
+  return (
+    <img
+      src={url}
+      className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+      alt=""
+      onError={() => setImgError(true)}
+    />
+  );
 };
 
 const formatQueueScheduleParts = (value) => {
@@ -123,7 +136,7 @@ const getQueueStatusMeta = (statusGroup) => {
     default:
       return {
         icon: Clock,
-        className: 'border-[#7831d6]/30 bg-[#7831d6]/20 text-[#c4b5fd]',
+        className: 'border-sky-500/20 bg-sky-500/10 text-sky-300',
       };
   }
 };
@@ -584,9 +597,9 @@ const AccountQueueEditor = ({
               </p>
             </div>
           )}
-          <div className="flex-shrink-0 rounded-lg border border-[#7831d6]/30 bg-[#7831d6]/15 px-2.5 py-1 text-center">
-            <p className="m-0 text-xs font-bold text-[#c4b5fd]">{postsLeftCount}</p>
-            <p className="m-0 mt-0.5 text-[9px] font-semibold text-[#c4b5fd]">
+          <div className="flex-shrink-0 rounded-[8px] border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-center">
+            <p className="m-0 text-xs font-bold text-white">{postsLeftCount}</p>
+            <p className="m-0 mt-0.5 text-[9px] font-semibold text-zinc-400">
               post{postsLeftCount === 1 ? '' : 's'} left to post
             </p>
           </div>
@@ -597,7 +610,7 @@ const AccountQueueEditor = ({
               type="button"
               onClick={allVisibleSelected ? clearSelection : selectAllPosts}
               disabled={bulkBusy}
-              className="inline-flex h-7 items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 text-[11px] font-semibold text-zinc-200 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-7 items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-2.5 text-[11px] font-semibold text-zinc-200 transition hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Check className="h-3.5 w-3.5" />
               {allVisibleSelected ? 'Clear' : 'Select all'}
@@ -608,7 +621,7 @@ const AccountQueueEditor = ({
               type="button"
               onClick={() => openScheduleAgain(selectedRepeatItems)}
               disabled={repeatBusy}
-              className="inline-flex h-7 items-center gap-1.5 rounded-full bg-[#7831d6] px-2.5 text-[11px] font-semibold text-white transition hover:bg-[#6825bc] disabled:opacity-50"
+              className="inline-flex h-7 items-center gap-1.5 rounded-full bg-white px-2.5 text-[11px] font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50 shadow-sm"
             >
               <CalendarPlus className="h-3.5 w-3.5" />
               Schedule again ({selectedRepeatCount})
@@ -626,7 +639,7 @@ const AccountQueueEditor = ({
             </button>
           )}
           {selectedCount > 0 && (
-            <div className="inline-flex h-7 items-center gap-1.5 rounded-full border border-[#7831d6]/40 bg-[#7831d6]/20 px-2.5 text-[11px] font-bold text-[#c4b5fd]">
+            <div className="inline-flex h-7 items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.08] px-2.5 text-[11px] font-bold text-white">
               <Check className="h-3.5 w-3.5" />
               {selectedCount} selected
             </div>
@@ -841,7 +854,7 @@ const AccountQueueEditor = ({
                   value={rescheduleStart}
                   onChange={(event) => setRescheduleStart(event.target.value)}
                   disabled={bulkBusy}
-                  className="h-10 w-full rounded-lg border border-white/15 bg-black px-3 text-sm font-semibold text-white outline-none transition focus:border-[#7831d6] focus:ring-[3px] focus:ring-[#7831d6]/20 disabled:opacity-60"
+                  className="h-10 w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 text-sm font-semibold text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 disabled:opacity-60"
                 />
               </label>
               {selectedCount > 1 && (
@@ -856,15 +869,15 @@ const AccountQueueEditor = ({
                         value={rescheduleIntervalHours}
                         onChange={(event) => setRescheduleIntervalHours(event.target.value)}
                         disabled={bulkBusy}
-                        className="h-10 w-28 rounded-lg border border-white/15 bg-black px-3 text-sm font-bold text-white outline-none transition focus:border-[#7831d6] focus:ring-[3px] focus:ring-[#7831d6]/20 disabled:opacity-60"
+                        className="h-10 w-28 rounded-lg border border-white/[0.08] bg-black/40 px-3 text-sm font-bold text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 disabled:opacity-60"
                       />
                       <span className="text-sm font-semibold text-zinc-400">hours</span>
                     </div>
                   </label>
-                  <div className="rounded-lg border border-[#7831d6]/30 bg-[#7831d6]/10 px-3 py-2">
-                    <span className="block text-[10px] font-bold uppercase tracking-wide text-[#c4b5fd]">Preview only</span>
+                  <div className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2">
+                    <span className="block text-[10px] font-bold uppercase tracking-wide text-zinc-300">Preview only</span>
                     <div className="mt-1 flex items-center justify-between gap-3">
-                      <span className="text-xs font-semibold text-zinc-300">Last post date</span>
+                      <span className="text-xs font-semibold text-zinc-400">Last post date</span>
                       <span className="text-right text-xs font-bold text-white">
                         {formatPreviewDateTime(lastPostPreviewDate)}
                       </span>
@@ -873,11 +886,11 @@ const AccountQueueEditor = ({
                 </>
               )}
             </div>
-            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
+            <div className="flex items-center justify-end gap-2 border-t border-white/[0.08] px-4 py-3">
               <button
                 type="button"
                 onClick={() => setShowTimeEditor(false)}
-                className="h-9 rounded-md px-3 text-xs font-semibold text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                className="h-9 rounded-[8px] px-3 text-xs font-semibold text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
               >
                 Cancel
               </button>
@@ -885,7 +898,7 @@ const AccountQueueEditor = ({
                 type="button"
                 onClick={saveIntervalChanges}
                 disabled={bulkBusy}
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#7831d6] px-3 text-xs font-semibold text-white transition hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-white px-3 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
               >
                 <Save className="h-3.5 w-3.5" />
                 {bulkBusy ? 'Saving' : 'Apply time'}
@@ -895,34 +908,42 @@ const AccountQueueEditor = ({
         </div>
       )}
 
+      {/* Main Content Area */}
       <div className="min-h-0 flex-1 overflow-hidden">
         <div className="flex h-full min-h-0">
-          <div className="min-w-0 flex-1 overflow-auto p-4">
+          <div className="min-w-0 flex-1 overflow-auto p-4 custom-scrollbar">
             <div className="mx-auto max-w-[1500px]">
               {loading ? (
-                <div className="flex h-72 flex-col items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#0a0a0a] text-zinc-400 shadow-sm">
-                  <Loader2 className="h-6 w-6 animate-spin text-[#c4b5fd]" />
+                <div className="flex h-72 flex-col items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-[#141417]/95 text-zinc-400 shadow-xl">
+                  <Loader2 className="h-6 w-6 animate-spin text-white" />
                   <p className="m-0 text-sm font-semibold text-white">Loading schedule queue...</p>
                 </div>
               ) : items.length === 0 ? (
-                <div className="flex h-72 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-[#0a0a0a] text-center shadow-sm">
+                <div className="flex h-72 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/[0.08] bg-[#141417]/95 text-center shadow-xl">
                   <Clock className="h-8 w-8 text-zinc-600" />
                   <p className="m-0 text-sm font-semibold text-zinc-300">No scheduled or posted content in this queue.</p>
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0a] shadow-sm">
-                  <div className="divide-y divide-white/10 md:hidden">
+                <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 shadow-xl">
+                  <div className="divide-y divide-white/[0.06] md:hidden">
                     {items.map((item) => {
+                      const postId = item.post._id;
                       const editable = editableQueueStatuses.has(item.post.status);
+                      const isSelected = selectedPostIds.includes(postId);
                       const isPosted = item.statusGroup === 'done';
-                      const isSelected = selectedPostIds.includes(item.post._id);
-                      const isRepeatSelected = selectedRepeatPostIds.includes(item.post._id);
+                      const isRepeatSelected = selectedRepeatPostIds.includes(postId);
                       const scheduleParts = formatQueueScheduleParts(item.post.scheduledAt);
                       const postedAt = getPostedAt(item.post);
                       const statusMeta = getQueueStatusMeta(item.statusGroup);
                       const StatusIcon = statusMeta.icon;
+
                       return (
-                        <article key={`mobile-${item.post._id}`} className={`p-3 ${isPosted ? 'bg-emerald-950/25' : item.post.status === 'failed' ? 'bg-rose-950/25' : 'bg-[#0a0a0a]'}`}>
+                        <article
+                          key={postId}
+                          className={`rounded-xl border border-white/[0.08] bg-[#141417]/95 p-3 transition ${
+                            (isSelected || isRepeatSelected) ? 'ring-1 ring-white/30 bg-white/[0.06]' : ''
+                          }`}
+                        >
                           <div className="flex items-start gap-3">
                             {(editable || (isPosted && onScheduleAgain)) && (
                               <input
@@ -933,14 +954,14 @@ const AccountQueueEditor = ({
                                   : toggleRepeatPost(item.post._id))}
                                 disabled={editable ? bulkBusy : repeatBusy}
                                 aria-label={isPosted ? `Select posted video ${item.queueIndex} to schedule again` : `Select post ${item.queueIndex}`}
-                                className="mt-4 h-4 w-4 flex-shrink-0 accent-[#7831d6]"
+                                className="mt-4 h-4 w-4 flex-shrink-0 accent-white"
                               />
                             )}
                             <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-md border border-white/10 bg-black">
                               <QueueMediaPreview item={item.mediaItem} />
                             </div>
                             <div className="min-w-0 flex-1">
-                              {showChannelColumn && <p className="m-0 truncate text-[10px] font-bold text-[#c4b5fd]">@{item.accountLabel}</p>}
+                              {showChannelColumn && <p className="m-0 truncate text-[10px] font-bold text-zinc-300">@{item.accountLabel}</p>}
                               <p className="m-0 mt-0.5 truncate text-xs font-semibold text-white">{getCaptionPreview(item.post.caption)}</p>
                               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                 <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold ${statusMeta.className}`}>
@@ -970,7 +991,7 @@ const AccountQueueEditor = ({
                   </div>
                   <div className="hidden overflow-x-auto md:block">
                     <table className="w-full min-w-[1050px] border-collapse text-left text-xs">
-                      <thead className="sticky top-0 z-10 bg-black/90 backdrop-blur-xs border-b border-white/10 text-[10px] font-bold uppercase tracking-wide text-zinc-400">
+                      <thead className="sticky top-0 z-10 bg-[#0c0c0e]/90 backdrop-blur-md border-b border-white/[0.08] text-[10px] font-bold uppercase tracking-wide text-zinc-400">
                         <tr>
                           <th className="w-10 px-3 py-2.5">
                             <input
@@ -979,7 +1000,7 @@ const AccountQueueEditor = ({
                               onChange={allVisibleSelected ? clearSelection : selectAllPosts}
                               disabled={selectableItems.length === 0 || bulkBusy}
                               aria-label="Select all editable posts"
-                              className="h-3.5 w-3.5 accent-[#7831d6]"
+                              className="h-3.5 w-3.5 accent-white"
                             />
                           </th>
                           <th className="px-3 py-2.5">Media</th>
@@ -1008,15 +1029,15 @@ const AccountQueueEditor = ({
                           return (
                             <tr
                               key={postId}
-                              className={`border-t border-white/10 transition ${
+                              className={`border-t border-white/[0.06] transition ${
                                 isPosted
                                   ? 'bg-emerald-950/20 hover:bg-emerald-950/30'
                                   : item.post.status === 'failed'
                                     ? 'bg-rose-950/20 hover:bg-rose-950/30'
                                     : item.post.status === 'paused'
                                       ? 'bg-zinc-900/40 text-zinc-400 hover:bg-zinc-900/60'
-                                      : 'bg-[#0a0a0a] hover:bg-white/[0.06]'
-                              } ${(isSelected || isRepeatSelected) ? 'bg-[#7831d6]/15 hover:bg-[#7831d6]/20 shadow-[inset_3px_0_0_#7831d6]' : ''}`}
+                                      : 'bg-transparent hover:bg-white/[0.03]'
+                              } ${(isSelected || isRepeatSelected) ? 'bg-white/[0.06] hover:bg-white/[0.08] shadow-[inset_3px_0_0_#ffffff]' : ''}`}
                             >
                               <td className="px-3 py-2.5">
                                 {(editable || (isPosted && onScheduleAgain)) ? (
@@ -1028,7 +1049,7 @@ const AccountQueueEditor = ({
                                       : toggleRepeatPost(postId))}
                                     disabled={editable ? bulkBusy : repeatBusy}
                                     aria-label={isPosted ? `Select posted video ${item.queueIndex} to schedule again` : `Select post ${item.queueIndex}`}
-                                    className="h-3.5 w-3.5 accent-[#7831d6]"
+                                    className="h-3.5 w-3.5 accent-white"
                                   />
                                 ) : (
                                   <Check className={`h-4 w-4 ${isPosted ? 'text-emerald-400' : 'text-zinc-600'}`} />
@@ -1040,7 +1061,7 @@ const AccountQueueEditor = ({
                                 </div>
                               </td>
                               {showChannelColumn && (
-                                <td className="max-w-40 px-3 py-2.5 font-semibold text-[#c4b5fd]">
+                                <td className="max-w-40 px-3 py-2.5 font-semibold text-zinc-300">
                                   <span className="block truncate">@{item.accountLabel || account?.label || 'account'}</span>
                                 </td>
                               )}
@@ -1147,7 +1168,7 @@ const AccountQueueEditor = ({
                         value={singleScheduledAt}
                         onChange={(event) => setSingleScheduledAt(event.target.value)}
                         disabled={savingPostIds.includes(editingItem.post._id)}
-                        className="h-10 w-full rounded-lg border border-white/15 bg-black px-3 text-sm font-semibold text-white outline-none transition focus:border-[#7831d6] focus:ring-[3px] focus:ring-[#7831d6]/20"
+                        className="h-10 w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 text-sm font-semibold text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10"
                       />
                     </label>
                     <label className="block">
@@ -1156,7 +1177,7 @@ const AccountQueueEditor = ({
                         value={singleCaption}
                         onChange={(event) => setSingleCaption(event.target.value)}
                         disabled={savingPostIds.includes(editingItem.post._id)}
-                        className="h-40 w-full resize-none rounded-lg border border-white/15 bg-black px-3 py-2.5 text-sm leading-5 text-white outline-none transition focus:border-[#7831d6] focus:ring-[3px] focus:ring-[#7831d6]/20"
+                        className="h-40 w-full resize-none rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2.5 text-sm leading-5 text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10"
                       />
                     </label>
                   </>
@@ -1183,9 +1204,9 @@ const AccountQueueEditor = ({
                   </>
                 )}
               </div>
-              <div className="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
+              <div className="flex items-center justify-end gap-2 border-t border-white/[0.08] px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setEditingItem(null)} className="h-9 rounded-md px-3 text-xs font-semibold text-zinc-400 transition hover:bg-white/10 hover:text-white">
+                  <button type="button" onClick={() => setEditingItem(null)} className="h-9 rounded-[8px] px-3 text-xs font-semibold text-zinc-400 transition hover:bg-white/[0.06] hover:text-white">
                     Close
                   </button>
                   {editableQueueStatuses.has(editingItem.post.status) && (
@@ -1193,7 +1214,7 @@ const AccountQueueEditor = ({
                       type="button"
                       onClick={saveSinglePost}
                       disabled={savingPostIds.includes(editingItem.post._id)}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#7831d6] px-3 text-xs font-semibold text-white transition hover:bg-[#6825bc] disabled:opacity-50"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-white px-3 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50 shadow-sm"
                     >
                       <Save className="h-3.5 w-3.5" />
                       {savingPostIds.includes(editingItem.post._id) ? 'Saving' : 'Save changes'}
@@ -1210,14 +1231,14 @@ const AccountQueueEditor = ({
               role="dialog"
               aria-modal="true"
               aria-labelledby="schedule-again-title"
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
               onClick={() => setScheduleAgainItems([])}
             >
               <div
-                className="w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0a] text-white shadow-2xl"
+                className="w-full max-w-md overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 text-white shadow-2xl backdrop-blur-2xl"
                 onClick={(event) => event.stopPropagation()}
               >
-                <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
+                <div className="flex items-start justify-between gap-3 border-b border-white/[0.08] px-4 py-3">
                   <div className="min-w-0">
                     <h4 id="schedule-again-title" className="m-0 text-sm font-bold text-white">
                       Schedule {scheduleAgainItems.length === 1 ? 'video' : `${scheduleAgainItems.length} videos`} again
@@ -1238,7 +1259,7 @@ const AccountQueueEditor = ({
                   </button>
                 </div>
                 <div className="space-y-4 p-4">
-                  <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
                     <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border border-white/10 bg-black">
                       <QueueMediaPreview item={scheduleAgainPrimaryItem.mediaItem} />
                     </div>
@@ -1260,7 +1281,7 @@ const AccountQueueEditor = ({
                       min={toDateTimeLocalValue(new Date())}
                       onChange={(event) => setScheduleAgainAt(event.target.value)}
                       disabled={scheduleAgainBusy}
-                      className="h-10 w-full rounded-lg border border-white/15 bg-black px-3 text-sm font-semibold text-white outline-none transition focus:border-[#7831d6] focus:ring-[3px] focus:ring-[#7831d6]/20"
+                      className="h-10 w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 text-sm font-semibold text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10"
                     />
                   </label>
                   {scheduleAgainItems.length > 1 && (
@@ -1275,15 +1296,15 @@ const AccountQueueEditor = ({
                             value={scheduleAgainIntervalHours}
                             onChange={(event) => setScheduleAgainIntervalHours(event.target.value)}
                             disabled={scheduleAgainBusy}
-                            className="h-10 w-28 rounded-lg border border-white/15 bg-black px-3 text-sm font-semibold text-white outline-none transition focus:border-[#7831d6] focus:ring-[3px] focus:ring-[#7831d6]/20"
+                            className="h-10 w-28 rounded-lg border border-white/[0.08] bg-black/40 px-3 text-sm font-semibold text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10"
                           />
                           <span className="text-xs font-semibold text-zinc-400">hours</span>
                         </div>
                       </label>
-                      <div className="rounded-lg border border-[#7831d6]/30 bg-[#7831d6]/10 px-3 py-2.5">
-                        <span className="block text-[10px] font-bold uppercase tracking-wide text-[#c4b5fd]">Schedule preview</span>
+                      <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+                        <span className="block text-[10px] font-bold uppercase tracking-wide text-zinc-300">Schedule preview</span>
                         <div className="mt-1.5 flex items-center justify-between gap-3">
-                          <span className="text-xs font-semibold text-zinc-300">Last video time</span>
+                          <span className="text-xs font-semibold text-zinc-400">Last video time</span>
                           <span className="text-right text-xs font-bold text-white">
                             {formatPreviewDateTime(scheduleAgainLastDate)}
                           </span>
@@ -1291,16 +1312,16 @@ const AccountQueueEditor = ({
                       </div>
                     </div>
                   )}
-                  <div className="flex items-start gap-2 rounded-lg border border-[#7831d6]/30 bg-[#7831d6]/10 p-3 text-xs leading-4 text-[#c4b5fd]">
-                    <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <div className="flex items-start gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-xs leading-4 text-zinc-300">
+                    <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-zinc-400" />
                     <span>The original posted record and the live social-media post will remain unchanged.</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
+                <div className="flex items-center justify-end gap-2 border-t border-white/[0.08] px-4 py-3">
                   <button
                     type="button"
                     onClick={() => setScheduleAgainItems([])}
-                    className="h-9 rounded-md px-3 text-xs font-semibold text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                    className="h-9 rounded-[8px] px-3 text-xs font-semibold text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
                   >
                     Cancel
                   </button>
@@ -1308,7 +1329,7 @@ const AccountQueueEditor = ({
                     type="button"
                     onClick={schedulePostAgain}
                     disabled={scheduleAgainBusy}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#7831d6] px-3 text-xs font-semibold text-white transition hover:bg-[#6825bc] disabled:opacity-50"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-white px-3 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50 shadow-sm"
                   >
                     {scheduleAgainBusy ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1323,8 +1344,8 @@ const AccountQueueEditor = ({
           )}
 
           {showCaptionEditor && selectedCount > 0 && (
-            <aside className="flex w-[380px] flex-shrink-0 flex-col border-l border-white/10 bg-[#0a0a0a] text-white">
-              <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+            <aside className="flex w-[380px] flex-shrink-0 flex-col border-l border-white/[0.08] bg-[#141417]/95 text-white backdrop-blur-xl">
+              <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-white/[0.08] px-4 py-3">
                 <div className="min-w-0">
                   <h4 className="m-0 text-sm font-bold text-white">Edit captions</h4>
                   <p className="m-0 mt-0.5 text-[11px] font-semibold text-zinc-400">
@@ -1340,14 +1361,14 @@ const AccountQueueEditor = ({
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 custom-scrollbar">
                 {selectedItems.map((item) => {
                   const postId = item.post._id;
                   const scheduleParts = formatQueueScheduleParts(item.post.scheduledAt);
                   return (
-                    <div key={`caption-${postId}`} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <div key={`caption-${postId}`} className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
                       <div className="mb-2 flex min-w-0 items-center gap-2">
-                        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#7831d6] text-[10px] font-black text-white">
+                        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-bold text-black shadow-sm">
                           {item.queueIndex}
                         </span>
                         <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-md border border-white/10 bg-black">
@@ -1366,18 +1387,18 @@ const AccountQueueEditor = ({
                           ...current,
                           [postId]: event.target.value,
                         }))}
-                        className="h-28 w-full resize-none rounded-md border border-white/15 bg-black px-2.5 py-2 text-xs leading-4 text-white outline-none transition-all placeholder:text-zinc-500 focus:border-[#7831d6] focus:ring-[3px] focus:ring-[#7831d6]/20"
+                        className="h-28 w-full resize-none rounded-[8px] border border-white/[0.08] bg-black/40 px-2.5 py-2 text-xs leading-4 text-white outline-none transition-all placeholder:text-zinc-500 focus:border-white/30 focus:ring-1 focus:ring-white/10"
                         placeholder="Write caption..."
                       />
                     </div>
                   );
                 })}
               </div>
-              <div className="flex flex-shrink-0 items-center justify-end gap-2 border-t border-white/10 px-4 py-3">
+              <div className="flex flex-shrink-0 items-center justify-end gap-2 border-t border-white/[0.08] px-4 py-3">
                 <button
                   type="button"
                   onClick={() => setShowCaptionEditor(false)}
-                  className="h-8 rounded-md px-3 text-xs font-semibold text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                  className="h-8 rounded-[8px] px-3 text-xs font-semibold text-zinc-400 transition hover:bg-white/[0.06] hover:text-white"
                 >
                   Close
                 </button>
@@ -1385,7 +1406,7 @@ const AccountQueueEditor = ({
                   type="button"
                   onClick={saveCaptionChanges}
                   disabled={bulkBusy || !hasCaptionChanges}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#7831d6] px-3 text-xs font-semibold text-white transition hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-white px-3 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
                 >
                   <Save className="h-3.5 w-3.5" />
                   {bulkBusy ? 'Saving' : 'Save captions'}

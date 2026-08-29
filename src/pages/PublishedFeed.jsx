@@ -30,8 +30,8 @@ const getQueueStatusClass = (status) => {
   if (status === 'manual_ready') return 'border border-amber-500/30 bg-amber-500/15 text-amber-300';
   if (status === 'downloaded') return 'border border-teal-500/30 bg-teal-500/15 text-teal-300';
   if (status === 'paused') return 'border border-zinc-700 bg-zinc-800 text-zinc-400';
-  if (status === 'publishing') return 'border border-[#7831d6]/30 bg-[#7831d6]/20 text-[#c4b5fd]';
-  return 'border border-[#7831d6]/30 bg-[#7831d6]/15 text-[#c4b5fd]';
+  if (status === 'publishing') return 'border border-sky-500/30 bg-sky-500/20 text-sky-300';
+  return 'border border-sky-500/30 bg-sky-500/15 text-sky-300';
 };
 
 const getCaptionPreview = (caption) => Array.from(caption || 'No caption').slice(0, 10).join('');
@@ -563,12 +563,12 @@ export const PublishedFeed = () => {
 
       {/* Tabs Selector */}
       {!loading && channel && (
-        <div className="mb-3 flex border-b border-white/10 gap-4">
+        <div className="mb-3 flex border-b border-white/[0.08] gap-4">
           <button
             onClick={() => setActiveTab('published')}
             className={`pb-2 text-xs font-bold border-b-2 transition-colors ${
               activeTab === 'published'
-                ? 'border-[#7831d6] text-[#c4b5fd]'
+                ? 'border-white text-white'
                 : 'border-transparent text-zinc-400 hover:text-white'
             }`}
           >
@@ -578,7 +578,7 @@ export const PublishedFeed = () => {
             onClick={() => setActiveTab('queued')}
             className={`pb-2 text-xs font-bold border-b-2 transition-colors ${
               activeTab === 'queued'
-                ? 'border-[#7831d6] text-[#c4b5fd]'
+                ? 'border-white text-white'
                 : 'border-transparent text-zinc-400 hover:text-white'
             }`}
           >
@@ -592,37 +592,37 @@ export const PublishedFeed = () => {
         {activeTab === 'published' ? (
           loading ? (
             <div className="flex flex-col items-center justify-center py-32 gap-3">
-              <div className="w-6 h-6 border-2 border-[#7831d6] border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               <span className="text-xs text-zinc-400 font-medium">Loading published posts...</span>
             </div>
           ) : errorPosts ? (
-            <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-8 text-center space-y-2 shadow-sm text-white">
+            <div className="bg-[#141417]/95 border border-white/[0.08] rounded-2xl p-8 text-center space-y-2 shadow-xl text-white">
               <p className="text-sm text-rose-400 font-bold m-0">⚠️ Error Fetching Feed</p>
               <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed m-0">{errorPosts}</p>
             </div>
           ) : publishedPosts.length === 0 ? (
-            <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-16 text-center text-sm text-zinc-400 font-medium shadow-sm">
+            <div className="bg-[#141417]/95 border border-white/[0.08] rounded-2xl p-16 text-center text-sm text-zinc-400 font-medium shadow-xl">
               No cached published posts from the last 30 days. Refresh to sync this channel.
             </div>
           ) : (
             <div className="w-full">
               {selectedGraphDate && (
-                <div className="mb-2 flex items-center justify-between rounded-lg border border-[#7831d6]/30 bg-[#7831d6]/10 px-3 py-2 text-xs text-white">
+                <div className="mb-2 flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-xs text-white">
                   <span>
                     Showing <strong>{displayedPublishedPosts.length}</strong> post{displayedPublishedPosts.length === 1 ? '' : 's'} published on <strong>{selectedGraphDate}</strong>
                   </span>
                   <button
                     type="button"
                     onClick={() => setSelectedGraphDate(null)}
-                    className="font-semibold text-[#c4b5fd] hover:underline"
+                    className="font-semibold text-zinc-200 hover:text-white hover:underline"
                   >
                     Show all 30 days
                   </button>
                 </div>
               )}
-              <div className="w-full overflow-x-auto rounded-xl border border-white/10 bg-[#0a0a0a]">
+              <div className="w-full overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#141417]/95 shadow-xl">
                 <div className="min-w-[620px]">
-                <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] gap-3 border-b border-white/10 bg-black/60 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
+                <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] gap-3 border-b border-white/[0.08] bg-black/40 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
                   <span>Published</span>
                   <span>Views</span>
                   <span>Likes</span>
@@ -639,8 +639,8 @@ export const PublishedFeed = () => {
                       const publishedDate = getPublishedDate(post);
                       const publishedDisplay = formatPublishedDate(publishedDate);
                       return (
-                        <div key={post.id} className="border-b border-white/10 last:border-b-0">
-                          <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] items-center gap-3 px-3 py-2 text-xs transition hover:bg-white/[0.06] text-white">
+                        <div key={post.id} className="border-b border-white/[0.06] last:border-b-0">
+                          <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] items-center gap-3 px-3 py-2 text-xs transition hover:bg-white/[0.04] text-white">
                             <div className="min-w-0">
                               <p className="m-0 truncate font-semibold text-white">{publishedDisplay.date}</p>
                               {publishedDisplay.time && (
@@ -657,7 +657,7 @@ export const PublishedFeed = () => {
                                 type="button"
                                 onClick={() => openLivePost(post)}
                                 disabled={!post.permalink}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-300 transition hover:border-[#7831d6] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                                 title={post.permalink ? 'Open live post' : 'Live-post link unavailable'}
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
@@ -665,7 +665,7 @@ export const PublishedFeed = () => {
                               <button
                                 type="button"
                                 onClick={() => openInsights(post)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#7831d6] text-white transition hover:bg-[#6825bc]"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] bg-white text-black transition hover:bg-zinc-200 shadow-sm"
                                 title="View performance insights"
                               >
                                 <BarChart3 className="h-3.5 w-3.5" />
@@ -684,22 +684,22 @@ export const PublishedFeed = () => {
         ) : (
           loadingQueue ? (
             <div className="flex flex-col items-center justify-center py-32 gap-3">
-              <div className="w-6 h-6 border-2 border-[#7831d6] border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               <span className="text-xs text-zinc-400 font-medium">Loading scheduled queue...</span>
             </div>
           ) : errorQueue ? (
-            <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-8 text-center space-y-2 shadow-sm text-white">
+            <div className="bg-[#141417]/95 border border-white/[0.08] rounded-2xl p-8 text-center space-y-2 shadow-xl text-white">
               <p className="text-sm text-rose-400 font-bold m-0">⚠️ Error Fetching Queue</p>
               <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed m-0">{errorQueue}</p>
             </div>
           ) : queuedPosts.length === 0 ? (
-            <div className="bg-[#0a0a0a] border border-white/10 rounded-xl p-16 text-center text-sm text-zinc-400 font-medium shadow-sm">
+            <div className="bg-[#141417]/95 border border-white/[0.08] rounded-2xl p-16 text-center text-sm text-zinc-400 font-medium shadow-xl">
               No posts in this seven-day queue window.
             </div>
           ) : (
-            <div className="w-full overflow-x-auto rounded-xl border border-white/10 bg-[#0a0a0a]">
+            <div className="w-full overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#141417]/95 shadow-xl">
               <table className="w-full min-w-[760px] border-collapse text-left text-xs">
-                <thead className="bg-black/60 border-b border-white/10 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
+                <thead className="bg-black/40 border-b border-white/[0.08] text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
                   <tr>
                     <th className="px-3 py-2">Media</th>
                     <th className="px-3 py-2">Schedule</th>
@@ -719,7 +719,7 @@ export const PublishedFeed = () => {
                       const isPosted = completedStatuses.has(post.status) || Boolean(post.manualPostedAt);
 
                       return (
-                        <tr key={post._id} className={`border-t border-white/10 transition hover:bg-white/[0.06] ${isPosted ? 'bg-emerald-950/20 hover:bg-emerald-950/30' : ''}`}>
+                        <tr key={post._id} className={`border-t border-white/[0.06] transition hover:bg-white/[0.04] ${isPosted ? 'bg-emerald-950/20 hover:bg-emerald-950/30' : ''}`}>
                           <td className="w-20 px-3 py-2">
                             <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black">
                               {mediaItem ? (
@@ -737,7 +737,7 @@ export const PublishedFeed = () => {
                             <button
                               type="button"
                               onClick={() => setCaptionPost(post)}
-                              className="block w-full truncate text-left font-medium text-zinc-200 hover:text-[#c4b5fd]"
+                              className="block w-full truncate text-left font-medium text-zinc-200 hover:text-white"
                               title="View full caption"
                             >
                               {getCaptionPreview(post.caption)}
@@ -753,7 +753,7 @@ export const PublishedFeed = () => {
                             <button
                               type="button"
                               onClick={() => setCaptionPost(post)}
-                              className="rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] font-semibold text-zinc-200 transition hover:border-[#7831d6] hover:text-white"
+                              className="rounded-[6px] border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-[10px] font-semibold text-zinc-200 transition hover:border-white/30 hover:text-white"
                             >
                               View
                             </button>
@@ -761,7 +761,7 @@ export const PublishedFeed = () => {
                               <button
                                 type="button"
                                 onClick={() => handleDeletePost(post)}
-                                className="ml-2 rounded-md border border-rose-500/30 bg-rose-500/15 px-2.5 py-1.5 text-[10px] font-semibold text-rose-400 transition hover:bg-rose-500/25"
+                                className="ml-2 rounded-[6px] border border-rose-500/30 bg-rose-500/15 px-2.5 py-1.5 text-[10px] font-semibold text-rose-400 transition hover:bg-rose-500/25"
                               >
                                 Delete
                               </button>

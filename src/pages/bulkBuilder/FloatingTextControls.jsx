@@ -96,8 +96,8 @@ export const FloatingTextControls = ({
           type="range" min="0" max="5" step="1"
           value={weightIdx}
           onChange={(e) => onUpdate({ fontWeight: FONT_WEIGHTS[Number(e.target.value)] })}
-          className="w-full accent-[#7831d6] h-1 appearance-none rounded-lg cursor-pointer"
-          style={{ background: `linear-gradient(to right, #7831d6 ${(weightIdx / 5) * 100}%, #35353a ${(weightIdx / 5) * 100}%)` }}
+          className="w-full accent-white h-1 appearance-none rounded-lg cursor-pointer bg-white/20"
+          style={{ background: `linear-gradient(to right, #ffffff ${(weightIdx / 5) * 100}%, rgba(255,255,255,0.15) ${(weightIdx / 5) * 100}%)` }}
         />
       </div>
 
@@ -111,7 +111,7 @@ export const FloatingTextControls = ({
           >
             Color
           </span>
-          <div className="relative w-full h-6 rounded-lg overflow-hidden border border-[#35353a] cursor-pointer">
+          <div className="relative w-full h-6 rounded-[8px] overflow-hidden border border-white/[0.08] cursor-pointer">
             <input
               type="color"
               value={fontColor.toLowerCase()}
@@ -128,7 +128,7 @@ export const FloatingTextControls = ({
           >
             Stroke
           </span>
-          <div className="relative w-full h-6 rounded-lg overflow-hidden border border-[#35353a] cursor-pointer">
+          <div className="relative w-full h-6 rounded-[8px] overflow-hidden border border-white/[0.08] cursor-pointer">
             <input
               type="color"
               value={strokeColor.toLowerCase()}
@@ -152,15 +152,15 @@ export const FloatingTextControls = ({
           type="range" min="0" max="10" step="0.125"
           value={strokeWidth}
           onChange={(e) => onUpdate({ strokeWidth: Number(e.target.value) })}
-          className="w-full accent-[#7831d6] h-1 appearance-none rounded-lg cursor-pointer"
-          style={{ background: `linear-gradient(to right, #7831d6 ${(strokeWidth / 10) * 100}%, #35353a ${(strokeWidth / 10) * 100}%)` }}
+          className="w-full accent-white h-1 appearance-none rounded-lg cursor-pointer bg-white/20"
+          style={{ background: `linear-gradient(to right, #ffffff ${(strokeWidth / 10) * 100}%, rgba(255,255,255,0.15) ${(strokeWidth / 10) * 100}%)` }}
         />
       </div>
 
       {/* Background Type */}
       <div className="space-y-1">
         <span
-          className="cursor-default text-[10px] font-bold text-[#e0e0e5]"
+          className="cursor-default text-[10px] font-bold text-zinc-400"
           title="Double-click to reset background"
           onDoubleClick={() => onUpdate({
             bgType: DEFAULT_TEXT_SETTINGS.bgType,
@@ -175,10 +175,10 @@ export const FloatingTextControls = ({
               key={type}
               type="button"
               onClick={() => handleBgTypeClick(type)}
-              className={`flex-1 py-1 text-[9px] font-semibold rounded-full border transition-all ${
+              className={`flex-1 py-1 text-[9px] font-bold rounded-full border transition-all ${
                 bgType === type
-                  ? 'bg-[#7831d6] border-[#7831d6] text-white shadow-md'
-                  : 'bg-[#232326] border-[#35353a] text-zinc-300 hover:bg-[#2a2a2e] hover:text-white'
+                  ? 'bg-white border-white text-black shadow-sm'
+                  : 'bg-white/[0.04] border-white/[0.08] text-zinc-300 hover:bg-white/[0.08] hover:text-white'
               }`}
             >
               {type}

@@ -237,7 +237,7 @@ const FolderSuggestionMenu = ({
             onMouseEnter={() => onHighlight(index)}
             onClick={() => onSelect(folder)}
             className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left ${selected
-              ? 'bg-[#7831d6]/25 text-white'
+              ? 'bg-white/[0.08] text-white font-semibold'
               : 'text-zinc-300 hover:bg-white/5'
             }`}
           >
@@ -1464,7 +1464,7 @@ export const BulkAgentComposer = ({
               {messages.slice(-8).map((message) => (
                 <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[82%] whitespace-pre-wrap rounded-xl px-2.5 py-2 text-[10px] leading-relaxed ${message.role === 'user'
-                    ? 'bg-[#7831d6] text-white'
+                    ? 'bg-white text-black font-medium shadow-sm'
                     : 'border border-white/10 bg-white/5 text-zinc-300'
                   }`}>
                     {message.content}
@@ -1472,8 +1472,8 @@ export const BulkAgentComposer = ({
                 </div>
               ))}
               {isPlanning && (
-                <div className="flex items-center gap-2 text-[10px] font-semibold text-[#c4b5fd]">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <div className="flex items-center gap-2 text-[10px] font-semibold text-zinc-300">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
                   Checking the board, folders, history and reservations…
                 </div>
               )}
@@ -1484,10 +1484,10 @@ export const BulkAgentComposer = ({
               <div className="border-t border-white/10 bg-[#111113] p-3.5">
                 <div className="mb-2.5 flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#c4b5fd]">Proposed plan</div>
+                    <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-zinc-200">Proposed plan</div>
                     <div className="mt-0.5 text-[9px] text-zinc-500">Nothing changes until you apply it.</div>
                   </div>
-                  <span className="rounded-full border border-[#7831d6]/40 bg-[#7831d6]/15 px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-[#c4b5fd]">
+                  <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-zinc-300">
                     {plan.operation}
                   </span>
                 </div>
@@ -1498,8 +1498,8 @@ export const BulkAgentComposer = ({
                   <SummaryStat label="Audio" value={planSummary.uniqueAudioTracks ?? 0} />
                 </div>
                 {compiledTasks.length > 0 && (
-                  <div className="mt-2.5 max-h-28 space-y-1 overflow-y-auto rounded-lg border border-violet-400/15 bg-violet-400/5 p-2">
-                    <div className="pb-0.5 text-[8px] font-extrabold uppercase tracking-[0.12em] text-violet-300">
+                  <div className="mt-2.5 max-h-28 space-y-1 overflow-y-auto rounded-lg border border-white/[0.08] bg-white/[0.03] p-2">
+                    <div className="pb-0.5 text-[8px] font-extrabold uppercase tracking-[0.12em] text-zinc-300">
                       Compiled tasks
                     </div>
                     {compiledTasks.map((task, index) => (
@@ -1527,7 +1527,7 @@ export const BulkAgentComposer = ({
                             || 'Frame change'}
                         </span>
                         {assignment.video2 && <span className="min-w-0 flex-1 truncate">+ {assignment.video2.name}</span>}
-                        {assignment.audio && <span className="max-w-24 truncate text-[#c4b5fd]">♫ {assignment.audio.name}</span>}
+                        {assignment.audio && <span className="max-w-24 truncate text-sky-300">♫ {assignment.audio.name}</span>}
                         {assignment.clearFields?.includes('audio') && (
                           <span className="max-w-24 truncate text-rose-300">Remove audio</span>
                         )}
@@ -1573,7 +1573,7 @@ export const BulkAgentComposer = ({
                     type="button"
                     onClick={() => void discardPlan(plan)}
                     disabled={controlsLocked}
-                    className="rounded-lg border border-white/10 px-3 py-2 text-[9px] font-bold text-zinc-400 hover:bg-white/5 hover:text-white disabled:opacity-50"
+                    className="rounded-[8px] border border-white/10 px-3 py-2 text-[9px] font-bold text-zinc-400 hover:bg-white/5 hover:text-white disabled:opacity-50"
                   >
                     {isDiscarding ? 'Discarding…' : 'Discard'}
                   </button>
@@ -1581,7 +1581,7 @@ export const BulkAgentComposer = ({
                     type="button"
                     onClick={() => void applyCurrentPlan()}
                     disabled={controlsLocked || isPlanExpired(plan)}
-                    className="flex items-center gap-1.5 rounded-lg bg-[#7831d6] px-3 py-2 text-[9px] font-extrabold text-white hover:bg-[#6825bc] disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-[8px] bg-white px-3 py-2 text-[9px] font-extrabold text-black hover:bg-zinc-200 disabled:opacity-50 shadow-sm"
                   >
                     {isApplying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                     Apply plan

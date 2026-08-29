@@ -205,18 +205,18 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   return (
     <aside className={`relative z-50 w-20 overflow-visible ${
       isAdminViewingUser
-        ? 'bg-gradient-to-b from-[#0f1d38] via-[#091122] to-[#050811] text-zinc-300 border-white/[0.08]'
-        : 'bg-gradient-to-b from-[#130b22] via-[#09060e] to-[#040306] text-zinc-400 border-white/[0.08]'
-    } hidden border-r md:flex flex-col h-screen sticky top-0 transition-all duration-300 shadow-[1px_0_30px_rgba(120,49,214,0.07)] backdrop-blur-xl`}>
+        ? 'bg-[#0e121a] text-zinc-300 border-white/[0.08]'
+        : 'bg-[#0e0e11] text-zinc-400 border-white/[0.08]'
+    } hidden border-r md:flex flex-col h-screen sticky top-0 transition-all duration-300 backdrop-blur-xl`}>
       
       {/* Workspace header */}
       <div className="relative flex min-h-[56px] flex-shrink-0 items-center justify-center border-b border-white/[0.08] px-2 py-2">
         {isCreator ? (
           <div
-            className="flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white shadow-inner"
+            className="flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-[12px] bg-white/[0.03] border border-white/[0.08] text-white shadow-inner"
             title="Creator Hub"
           >
-            <Megaphone className="h-5 w-5 text-[#9d5ce6]" />
+            <Megaphone className="h-5 w-5 text-zinc-200" />
             <span className="max-w-full truncate text-[10px] font-semibold leading-none">Home</span>
           </div>
         ) : (
@@ -224,14 +224,10 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
               <button
                 type="button"
                 onClick={() => setIsCampaignMenuOpen((current) => !current)}
-                className={`group flex h-12 w-14 flex-col items-center justify-center gap-0.5 rounded-xl border transition-all duration-200 ${
-                  isAdminViewingUser
-                    ? 'border-white/10 bg-white/[0.06] hover:bg-white/[0.12] text-white'
-                    : 'border-white/[0.08] bg-white/[0.04] hover:border-[#7831d6]/60 hover:bg-white/[0.08] hover:shadow-[0_0_15px_rgba(120,49,214,0.25)] text-white'
-                }`}
+                className="group flex h-12 w-14 flex-col items-center justify-center gap-0.5 rounded-[12px] border border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.06] text-white transition-all"
                 title={campaignTitle}
               >
-                <Megaphone className="h-5 w-5 text-[#9d5ce6] transition-transform group-hover:scale-110" />
+                <Megaphone className="h-5 w-5 text-zinc-200 transition-transform group-hover:scale-105" />
                 <span className="max-w-full truncate text-[10px] font-semibold leading-none text-zinc-300">
                   {campaignTitle}
                 </span>
@@ -239,13 +235,13 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
               </button>
 
               {isCampaignMenuOpen && (
-                <div className="absolute left-[calc(100%+0.75rem)] top-0 z-[999] w-72 overflow-hidden rounded-2xl border border-white/[0.12] bg-[#0c0717]/95 backdrop-blur-2xl text-white shadow-2xl shadow-black/90 ring-1 ring-white/10">
+                <div className="absolute left-[calc(100%+0.75rem)] top-0 z-[999] w-72 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 backdrop-blur-2xl text-white shadow-2xl ring-1 ring-white/10">
                   <div className="border-b border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5">
-                    <p className="m-0 text-[9px] font-bold uppercase tracking-wider text-[#c4b5fd]">
+                    <p className="m-0 text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-400">
                       Switch product
                     </p>
                   </div>
-                  <div className="max-h-72 overflow-y-auto p-1.5 space-y-0.5">
+                  <div className="max-h-72 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar">
                     {campaigns.length > 0 ? campaigns.map((campaign) => {
                       const isSelected = campaign._id === activeCampaignId;
                       return (
@@ -253,22 +249,22 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
                           key={campaign._id}
                           type="button"
                           onClick={() => selectCampaign(campaign)}
-                          className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-all ${
+                          className={`flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-all ${
                             isSelected
-                              ? 'bg-[#7831d6] text-white shadow-md shadow-[#7831d6]/30 font-semibold'
-                              : 'text-zinc-300 hover:bg-white/[0.08] hover:text-white'
+                              ? 'bg-white text-black font-semibold shadow-sm'
+                              : 'text-zinc-300 hover:bg-white/[0.05] hover:text-white'
                           }`}
                         >
-                          <span className={`h-2 w-2 flex-shrink-0 rounded-full ${isSelected ? 'bg-white shadow-[0_0_6px_#fff]' : 'bg-zinc-600'}`} />
+                          <span className={`h-2 w-2 flex-shrink-0 rounded-full ${isSelected ? 'bg-black' : 'bg-zinc-600'}`} />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-xs">{campaign.name || 'Untitled product'}</span>
                             {(campaign.mainEmail || campaign.createdBy?.email) && (
-                              <span className={`mt-0.5 block truncate text-[9px] ${isSelected ? 'text-inherit opacity-80' : 'text-zinc-400'}`}>
+                              <span className={`mt-0.5 block truncate text-[9px] ${isSelected ? 'text-zinc-600' : 'text-zinc-400'}`}>
                                 {campaign.mainEmail || campaign.createdBy?.email}
                               </span>
                             )}
                           </span>
-                          {isSelected && <Check className="h-3.5 w-3.5 flex-shrink-0" />}
+                          {isSelected && <Check className="h-3.5 w-3.5 flex-shrink-0 text-black" />}
                         </button>
                       );
                     }) : (
@@ -292,10 +288,10 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
             end
             title={item.name}
             className={({ isActive }) =>
-              `flex h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 transition-all duration-200 ${
+              `flex h-12 flex-col items-center justify-center gap-0.5 rounded-[12px] px-1 transition-all duration-200 ${
                 isActive
-                  ? 'bg-gradient-to-b from-[#8a3ff2] to-[#6d24cf] text-white font-semibold shadow-[0_0_18px_rgba(120,49,214,0.45)] ring-1 ring-white/20 scale-[1.02]'
-                  : 'text-zinc-400 hover:bg-white/[0.08] hover:text-white hover:scale-[1.02]'
+                  ? 'bg-white text-black font-semibold shadow-sm scale-[1.02]'
+                  : 'text-zinc-400 hover:bg-white/[0.05] hover:text-white hover:scale-[1.02]'
               }`
             }
           >
@@ -346,15 +342,29 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
             <button
               type="button"
               onClick={logout}
-              className="rounded-full transition hover:opacity-80 hover:scale-105"
+              className="relative h-6 w-6 rounded-full transition hover:opacity-80 hover:scale-105"
               title={`Logout ${displayedUserEmail || user?.email || ''}`.trim()}
             >
-              <img
-                src={displayedAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-                crossOrigin="anonymous"
-                className="h-6 w-6 rounded-full object-cover border border-white/20 shadow-sm"
-                alt=""
-              />
+              {displayedAvatar ? (
+                <img
+                  src={displayedAvatar}
+                  crossOrigin="anonymous"
+                  className="h-6 w-6 rounded-full object-cover border border-white/20 shadow-sm"
+                  alt=""
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    if (e.currentTarget.nextElementSibling) {
+                      e.currentTarget.nextElementSibling.style.display = 'flex';
+                    }
+                  }}
+                />
+              ) : null}
+              <div
+                className="h-6 w-6 rounded-full bg-white/[0.06] border border-white/20 flex items-center justify-center text-zinc-300 text-[10px] font-bold"
+                style={{ display: displayedAvatar ? 'none' : 'flex' }}
+              >
+                {(displayedUserEmail || user?.email || 'U').charAt(0).toUpperCase()}
+              </div>
             </button>
         </div>
 
