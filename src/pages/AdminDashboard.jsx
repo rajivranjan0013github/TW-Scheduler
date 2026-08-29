@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, Eye, Megaphone, RefreshCw, Rows3, Loader2, Sparkles } from 'lucide-react';
+import { CalendarClock, Eye, Megaphone, RefreshCw, Rows3, Loader2, Sparkles, Search, Filter, X } from 'lucide-react';
 import { getActiveCampaignId, invalidateAllCampaignQueries } from '../utils/campaignScope';
 import {
   AccountIdentity,
@@ -85,9 +85,8 @@ export const AdminDashboard = () => {
   const queryClient = useQueryClient();
   const [requestedCampaignId, setRequestedCampaignId] = useState(getActiveCampaignId);
   const [selectedTimeRange, setSelectedTimeRange] = useState('today');
-  const [searchChannel, setSearchChannel] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterPlatform, setFilterPlatform] = useState('all');
-  const [searchUser, setSearchUser] = useState('');
   const [selectedGraphDate, setSelectedGraphDate] = useState(null);
   const [syncingCampaign, setSyncingCampaign] = useState(false);
   const [syncBanner, setSyncBanner] = useState(null);
@@ -115,9 +114,8 @@ export const AdminDashboard = () => {
     if (!campaign) return;
 
     setRequestedCampaignId(campaignId);
-    setSearchChannel('');
+    setSearchQuery('');
     setFilterPlatform('all');
-    setSearchUser('');
     setSelectedGraphDate(null);
     if (!persist) return;
 
@@ -137,9 +135,8 @@ export const AdminDashboard = () => {
     const syncSelectedCampaign = (event) => {
       if (event.detail?.campaignId) {
         setRequestedCampaignId(event.detail.campaignId);
-        setSearchChannel('');
+        setSearchQuery('');
         setFilterPlatform('all');
-        setSearchUser('');
         setSelectedGraphDate(null);
       }
     };
@@ -157,24 +154,24 @@ export const AdminDashboard = () => {
   const upcomingPosts = activeMetrics.upcomingPosts || 0;
 
   const filteredAccountRows = useMemo(() => {
-    const normalizedChannelSearch = searchChannel.trim().toLowerCase();
-    const normalizedUserSearch = searchUser.trim().toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
     return (activeMetrics.accountRows || []).filter((account) => {
       const channelName = (account.name || '').toLowerCase();
       const channelUsername = (account.username || '').toLowerCase();
       const userName = (account.user?.name || '').toLowerCase();
       const userEmail = (account.user?.email || '').toLowerCase();
       const platform = (account.platform || '').toLowerCase();
-      const matchesChannel = !normalizedChannelSearch
-        || channelName.includes(normalizedChannelSearch)
-        || channelUsername.includes(normalizedChannelSearch);
+
+      const matchesSearch = !q
+        || channelName.includes(q)
+        || channelUsername.includes(q)
+        || userName.includes(q)
+        || userEmail.includes(q);
+
       const matchesPlatform = filterPlatform === 'all' || platform === filterPlatform;
-      const matchesUser = !normalizedUserSearch
-        || userName.includes(normalizedUserSearch)
-        || userEmail.includes(normalizedUserSearch);
-      return matchesChannel && matchesPlatform && matchesUser;
+      return matchesSearch && matchesPlatform;
     });
-  }, [activeMetrics.accountRows, filterPlatform, searchChannel, searchUser]);
+  }, [activeMetrics.accountRows, filterPlatform, searchQuery]);
   const loading = campaignsQuery.isPending;
   const metricsLoading = metricsQuery.isFetching;
   const error = campaignsQuery.error?.message || metricsQuery.error?.message || '';
@@ -249,12 +246,12 @@ export const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] p-3 pb-6 text-[#1d1d1f]">
-      <div className="mb-2 flex flex-col gap-2 border-b border-[#e5e5ea] pb-2 lg:flex-row lg:items-center lg:justify-between">
+    <div className="min-h-screen bg-[#09090b] p-4 pb-8 text-zinc-100 lg:p-6">
+      <div className="mb-3 flex flex-col gap-3 border-b border-white/10 pb-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="m-0 text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">Campaign Manager</p>
-          <h2 className="m-0 text-base font-semibold tracking-tight text-[#1d1d1f]">Performance</h2>
-          <p className={`m-0 mt-0.5 text-[10px] ${activeMetrics.syncIssues > 0 ? 'font-semibold text-red-600' : 'text-[#8e8e93]'}`}>
+          <p className="m-0 text-xs font-semibold uppercase tracking-wider text-zinc-400">Campaign Manager</p>
+          <h2 className="m-0 text-xl font-bold tracking-tight text-zinc-100 sm:text-2xl">Performance</h2>
+          <p className={`m-0 mt-1 text-xs ${activeMetrics.syncIssues > 0 ? 'font-semibold text-rose-400' : 'text-zinc-400'}`}>
             {activeMetrics.lastSyncedAt
               ? `Metrics synced ${new Date(activeMetrics.lastSyncedAt).toLocaleString()}`
               : 'Metrics have not synced yet'}
@@ -262,45 +259,55 @@ export const AdminDashboard = () => {
           </p>
         </div>
 
-        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-end">
-          <div className="flex flex-col gap-0.5 sm:w-56">
-            <label htmlFor="campaign-select" className="text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-1 sm:w-60">
+            <label htmlFor="campaign-select" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
               Campaign
             </label>
-            <select
-              id="campaign-select"
-              value={selectedCampaignId}
-              onChange={(event) => selectCampaign(event.target.value)}
-              disabled={campaigns.length === 0}
-              className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6] disabled:bg-[#f5f5f7] disabled:text-[#8e8e93]"
-            >
-              {campaigns.length === 0 ? (
-                <option value="">No campaigns</option>
-              ) : campaigns.map((campaign) => (
-                <option key={campaign._id} value={campaign._id}>
-                  {campaign.name}
-                </option>
-              ))}
-            </select>
+            <div className="group relative rounded-xl p-[1px] bg-gradient-to-r from-white/15 via-purple-500/20 to-white/10 hover:from-[#7831d6]/50 hover:via-purple-400/50 hover:to-[#6366f1]/50 focus-within:from-[#8a3ff2] focus-within:via-[#a855f7] focus-within:to-[#6366f1] focus-within:shadow-[0_0_14px_rgba(120,49,214,0.35)] transition-all duration-200">
+              <div className="relative flex items-center rounded-[11px] bg-[#16161a]">
+                <select
+                  id="campaign-select"
+                  value={selectedCampaignId}
+                  onChange={(event) => selectCampaign(event.target.value)}
+                  disabled={campaigns.length === 0}
+                  className="h-9 w-full appearance-none rounded-[11px] bg-transparent pl-3 pr-7 text-xs font-semibold text-zinc-100 outline-none focus:outline-none disabled:text-zinc-500 cursor-pointer"
+                >
+                  {campaigns.length === 0 ? (
+                    <option value="" className="bg-[#18181b] text-zinc-400">No campaigns</option>
+                  ) : campaigns.map((campaign) => (
+                    <option key={campaign._id} value={campaign._id} className="bg-[#18181b] text-zinc-100">
+                      {campaign.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-2.5 text-[10px] text-zinc-400">▾</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-0.5 sm:w-32">
-            <label htmlFor="time-range-select" className="text-[9px] font-semibold uppercase tracking-wider text-[#6e6e73]">
+          <div className="flex flex-col gap-1 sm:w-36">
+            <label htmlFor="time-range-select" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
               Time
             </label>
-            <select
-              id="time-range-select"
-              value={selectedTimeRange}
-              onChange={(event) => {
-                setSelectedTimeRange(event.target.value);
-                setSelectedGraphDate(null);
-              }}
-              className="h-7 rounded-md border border-[#d2d2d7] bg-white px-2 text-[11px] font-semibold text-[#1d1d1f] outline-none transition focus:border-[#3478f6]"
-            >
-              {Object.entries(timeRanges).map(([value, config]) => (
-                <option key={value} value={value}>{config.label}</option>
-              ))}
-            </select>
+            <div className="group relative rounded-xl p-[1px] bg-gradient-to-r from-white/15 via-purple-500/20 to-white/10 hover:from-[#7831d6]/50 hover:via-purple-400/50 hover:to-[#6366f1]/50 focus-within:from-[#8a3ff2] focus-within:via-[#a855f7] focus-within:to-[#6366f1] focus-within:shadow-[0_0_14px_rgba(120,49,214,0.35)] transition-all duration-200">
+              <div className="relative flex items-center rounded-[11px] bg-[#16161a]">
+                <select
+                  id="time-range-select"
+                  value={selectedTimeRange}
+                  onChange={(event) => {
+                    setSelectedTimeRange(event.target.value);
+                    setSelectedGraphDate(null);
+                  }}
+                  className="h-9 w-full appearance-none rounded-[11px] bg-transparent pl-3 pr-7 text-xs font-semibold text-zinc-100 outline-none focus:outline-none cursor-pointer"
+                >
+                  {Object.entries(timeRanges).map(([value, config]) => (
+                    <option key={value} value={value} className="bg-[#18181b] text-zinc-100">{config.label}</option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-2.5 text-[10px] text-zinc-400">▾</span>
+              </div>
+            </div>
           </div>
 
           <button
@@ -310,10 +317,10 @@ export const AdminDashboard = () => {
               selectedCampaignId ? metricsQuery.refetch() : Promise.resolve(),
             ])}
             disabled={loading || metricsLoading || syncingCampaign}
-            className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-[#d2d2d7] bg-white px-2.5 text-[11px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7] disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#16161a] px-3.5 text-xs font-semibold text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             title="Reload metrics from database"
           >
-            <RefreshCw className={`h-3 w-3 ${loading || metricsLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading || metricsLoading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
 
@@ -321,17 +328,17 @@ export const AdminDashboard = () => {
             type="button"
             onClick={handleSyncCampaign}
             disabled={!selectedCampaignId || syncingCampaign || loading}
-            className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md bg-[#3478f6] px-3 text-[11px] font-semibold text-white transition hover:bg-[#2860c7] shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#7831d6] px-4 text-xs font-semibold text-white transition hover:bg-[#6825bc] shadow-sm shadow-[#7831d6]/30 disabled:opacity-50 disabled:cursor-not-allowed"
             title="Fetch fresh views, likes, and comments from Meta Graph API"
           >
             {syncingCampaign ? (
               <>
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Syncing...
               </>
             ) : (
               <>
-                <Sparkles className="h-3 w-3" />
+                <Sparkles className="h-3.5 w-3.5" />
                 Sync Campaign
               </>
             )}
@@ -342,12 +349,12 @@ export const AdminDashboard = () => {
       {syncBanner && (
         <div className={`mb-3 rounded-lg border px-3 py-2 text-xs font-medium flex items-center justify-between ${
           syncBanner.type === 'error'
-            ? 'border-red-200 bg-red-50 text-red-700'
+            ? 'border-rose-500/30 bg-rose-500/15 text-rose-300'
             : syncBanner.type === 'warning'
-            ? 'border-amber-200 bg-amber-50 text-amber-700'
+            ? 'border-amber-500/30 bg-amber-500/15 text-amber-300'
             : syncBanner.type === 'success'
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-            : 'border-blue-200 bg-blue-50 text-blue-700'
+            ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+            : 'border-[#7831d6]/30 bg-[#7831d6]/15 text-[#c4b5fd]'
         }`}>
           <span>{syncBanner.message}</span>
           <button
@@ -361,43 +368,43 @@ export const AdminDashboard = () => {
       )}
 
       {error && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+        <div className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-sm font-medium text-rose-300">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="rounded-xl border border-[#d2d2d7] bg-white p-12 text-center text-sm text-[#6e6e73] flex flex-col items-center justify-center gap-3">
-          <Loader2 className="h-6 w-6 animate-spin text-[#3478f6]" />
+        <div className="rounded-xl border border-white/10 bg-[#121215] p-12 text-center text-sm text-zinc-400 flex flex-col items-center justify-center gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-[#7831d6]" />
           <span className="font-medium">Loading campaign dashboard...</span>
         </div>
       ) : campaigns.length === 0 ? (
-        <div className="rounded-xl border border-[#d2d2d7] bg-white p-8 text-center">
-          <Megaphone className="mx-auto h-7 w-7 text-[#c7c7cc]" />
-          <p className="m-0 mt-2 text-sm font-semibold text-[#1d1d1f]">No campaigns yet</p>
-          <p className="m-0 mt-1 text-xs text-[#6e6e73]">Create campaigns from Campaign Setup and attach publishing channels.</p>
+        <div className="rounded-xl border border-white/10 bg-[#121215] p-8 text-center">
+          <Megaphone className="mx-auto h-7 w-7 text-zinc-600" />
+          <p className="m-0 mt-2 text-sm font-semibold text-zinc-100">No campaigns yet</p>
+          <p className="m-0 mt-1 text-xs text-zinc-400">Create campaigns from Campaign Setup and attach publishing channels.</p>
         </div>
       ) : metricsQuery.isError && !metricsQuery.data ? (
-        <div className="rounded-xl border border-red-200 bg-white p-8 text-center">
-          <p className="m-0 text-sm font-semibold text-[#1d1d1f]">Campaign metrics could not be loaded</p>
+        <div className="rounded-xl border border-rose-500/30 bg-[#121215] p-8 text-center">
+          <p className="m-0 text-sm font-semibold text-zinc-100">Campaign metrics could not be loaded</p>
           <button
             type="button"
             onClick={() => metricsQuery.refetch()}
-            className="mt-3 inline-flex h-8 items-center justify-center rounded-md border border-[#d2d2d7] bg-white px-3 text-xs font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+            className="mt-3 inline-flex h-8 items-center justify-center rounded-md border border-white/10 bg-zinc-900 px-3 text-xs font-semibold text-zinc-200 transition hover:bg-zinc-800"
           >
             Try again
           </button>
         </div>
       ) : metricsQuery.isPending ? (
-        <div className="rounded-xl border border-[#d2d2d7] bg-white p-12 text-center text-sm text-[#6e6e73] flex flex-col items-center justify-center gap-3">
-          <Loader2 className="h-6 w-6 animate-spin text-[#3478f6]" />
+        <div className="rounded-xl border border-white/10 bg-[#121215] p-12 text-center text-sm text-zinc-400 flex flex-col items-center justify-center gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-[#7831d6]" />
           <span className="font-medium">Loading campaign metrics...</span>
         </div>
       ) : (
         <div className="flex flex-col">
           {metricsLoading && (
-            <div className="mb-2 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 text-xs font-semibold text-[#6e6e73] flex items-center gap-2 shadow-sm">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#3478f6]" />
+            <div className="mb-2 rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-300 flex items-center gap-2 shadow-sm">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[#7831d6]" />
               <span>Updating campaign metrics...</span>
             </div>
           )}
@@ -435,85 +442,106 @@ export const AdminDashboard = () => {
           />
 
           {selectedGraphDate && (
-            <div className="mt-3 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm">
+            <div className="mt-3.5 flex flex-col gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-4 py-2.5 text-sm font-medium text-emerald-300 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <span>
-                Filtering channel activity for date: <strong>{new Date(`${selectedGraphDate}T00:00:00`).toLocaleDateString([], { dateStyle: 'medium' })}</strong> ({selectedGraphDate})
+                Filtering channel activity for date: <strong className="font-bold text-white">{new Date(`${selectedGraphDate}T00:00:00`).toLocaleDateString([], { dateStyle: 'medium' })}</strong> ({selectedGraphDate})
               </span>
               <button
                 type="button"
                 onClick={() => setSelectedGraphDate(null)}
-                className="rounded-md bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-emerald-700 shadow-xs"
+                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-500 shadow-sm"
               >
                 Clear Selection (Reset to {selectedTimeLabel})
               </button>
             </div>
           )}
 
-          {/* Table Filters Bar */}
-          <div className="mt-3 grid gap-2.5 rounded-xl border border-white/10 bg-[#0a0a0a] p-3 sm:grid-cols-3">
-            <div className="flex flex-col gap-0.5">
-              <label htmlFor="search-channel" className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
-                Search Channel
-              </label>
-              <input
-                id="search-channel"
-                type="text"
-                value={searchChannel}
-                onChange={(e) => setSearchChannel(e.target.value)}
-                placeholder="Search channel or username..."
-                className="h-7 rounded-md border border-white/10 bg-black px-2 text-[11px] font-semibold text-white outline-none transition focus:border-[#7831d6]"
-              />
-            </div>
-
-            <div className="flex flex-col gap-0.5">
-              <label htmlFor="filter-platform" className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
-                Filter Channel / Platform
-              </label>
-              <select
-                id="filter-platform"
-                value={filterPlatform}
-                onChange={(e) => setFilterPlatform(e.target.value)}
-                className="h-7 rounded-md border border-white/10 bg-black px-2 text-[11px] font-semibold text-white outline-none transition focus:border-[#7831d6]"
-              >
-                <option value="all">All Platforms</option>
-                <option value="youtube">YouTube</option>
-                <option value="instagram">Instagram</option>
-                <option value="tiktok">TikTok</option>
-                <option value="facebook">Facebook</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-0.5">
-              <label htmlFor="search-user" className="text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
-                Search User (Name/Email)
-              </label>
-              <input
-                id="search-user"
-                type="text"
-                value={searchUser}
-                onChange={(e) => setSearchUser(e.target.value)}
-                placeholder="Search by user name or email..."
-                className="h-7 rounded-md border border-white/10 bg-black px-2 text-[11px] font-semibold text-white outline-none transition focus:border-[#7831d6]"
-              />
-            </div>
-          </div>
-          <div className="mt-3 overflow-x-auto rounded-xl border border-white/10 bg-[#0a0a0a]">
-            <div className="min-w-[900px]">
-              <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] gap-3 border-b border-white/10 bg-black/60 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
-                <span>Channel</span>
-                <span>User</span>
-                <span>{selectedGraphDate ? `Activity (${selectedGraphDate})` : 'Activity'}</span>
-                <span>{selectedGraphDate ? `Posts (${selectedGraphDate})` : 'Posts'}</span>
-                <span>{selectedGraphDate ? `Views (${selectedGraphDate})` : `${selectedTimeLabel} views`}</span>
-                <span>Upcoming</span>
-                <span>{selectedGraphDate ? `Engagement (${selectedGraphDate})` : 'Engagement'}</span>
+          {/* Channel Table Card with Integrated Toolbar */}
+          <div className="mt-3.5 overflow-hidden rounded-xl border border-white/10 bg-[#121215] shadow-sm">
+            {/* Integrated Table Toolbar */}
+            <div className="flex flex-col gap-3 border-b border-white/10 bg-[#151519] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              {/* Search input with Gradient Outline */}
+              <div className="group relative w-full sm:w-64 rounded-xl p-[1px] bg-gradient-to-r from-white/15 via-purple-500/20 to-white/10 hover:from-[#7831d6]/50 hover:via-purple-400/50 hover:to-[#6366f1]/50 focus-within:from-[#8a3ff2] focus-within:via-[#a855f7] focus-within:to-[#6366f1] focus-within:shadow-[0_0_14px_rgba(120,49,214,0.35)] transition-all duration-200">
+                <div className="relative flex items-center rounded-[11px] bg-[#16161a]">
+                  <Search className="pointer-events-none absolute left-3 h-4 w-4 text-zinc-400 group-focus-within:text-[#c4b5fd] transition-colors" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search channels, users..."
+                    className="h-9 w-full rounded-[11px] bg-transparent pl-9 pr-8 text-xs font-medium text-zinc-100 placeholder:text-zinc-500 outline-none focus:outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 text-zinc-400 hover:text-zinc-200 transition-colors"
+                      title="Clear search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {/* Filter Controls & Counts */}
+              <div className="flex items-center gap-2.5">
+                <div className="group relative rounded-xl p-[1px] bg-gradient-to-r from-white/15 via-purple-500/20 to-white/10 hover:from-[#7831d6]/50 hover:via-purple-400/50 hover:to-[#6366f1]/50 focus-within:from-[#8a3ff2] focus-within:via-[#a855f7] focus-within:to-[#6366f1] focus-within:shadow-[0_0_14px_rgba(120,49,214,0.35)] transition-all duration-200">
+                  <div className="relative flex items-center rounded-[11px] bg-[#16161a]">
+                    <Filter className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-zinc-400 group-focus-within:text-[#c4b5fd] transition-colors" />
+                    <select
+                      id="filter-platform"
+                      value={filterPlatform}
+                      onChange={(e) => setFilterPlatform(e.target.value)}
+                      className="h-9 appearance-none rounded-[11px] bg-transparent pl-8 pr-7 text-xs font-semibold text-zinc-200 outline-none focus:outline-none cursor-pointer"
+                    >
+                      <option value="all" className="bg-[#18181b] text-zinc-100">All Platforms</option>
+                      <option value="youtube" className="bg-[#18181b] text-zinc-100">YouTube</option>
+                      <option value="instagram" className="bg-[#18181b] text-zinc-100">Instagram</option>
+                      <option value="tiktok" className="bg-[#18181b] text-zinc-100">TikTok</option>
+                      <option value="facebook" className="bg-[#18181b] text-zinc-100">Facebook</option>
+                    </select>
+                    <span className="pointer-events-none absolute right-2.5 text-[10px] text-zinc-400">▾</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pl-1">
+                  <span className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-zinc-300">
+                    {filteredAccountRows.length} {filteredAccountRows.length === 1 ? 'channel' : 'channels'}
+                  </span>
+                  {(searchQuery || filterPlatform !== 'all') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setFilterPlatform('all');
+                      }}
+                      className="text-xs font-semibold text-[#c4b5fd] hover:underline"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <div className="min-w-[900px]">
+                <div className="grid grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] gap-3 border-b border-white/10 bg-black/50 px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-300">
+                  <span>Channel</span>
+                  <span>User</span>
+                  <span>{selectedGraphDate ? `Activity (${selectedGraphDate})` : 'Activity'}</span>
+                  <span>{selectedGraphDate ? `Posts (${selectedGraphDate})` : 'Posts'}</span>
+                  <span>{selectedGraphDate ? `Views (${selectedGraphDate})` : `${selectedTimeLabel} views`}</span>
+                  <span>Upcoming</span>
+                  <span>{selectedGraphDate ? `Engagement (${selectedGraphDate})` : 'Engagement'}</span>
+                </div>
               {(activeMetrics.accountRows || []).length === 0 ? (
-                <div className="px-5 py-8 text-center text-sm text-zinc-400">
+                <div className="px-5 py-10 text-center text-sm text-zinc-400">
                   No publishing channels are associated with this campaign.
                 </div>
               ) : filteredAccountRows.length === 0 ? (
-                <div className="px-5 py-8 text-center text-sm text-zinc-400">
+                <div className="px-5 py-10 text-center text-sm text-zinc-400">
                   No publishing channels match the filter criteria.
                 </div>
               ) : (
@@ -527,7 +555,7 @@ export const AdminDashboard = () => {
                       <div
                         key={account._id}
                         onClick={() => openAccountFeed(account)}
-                        className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] items-center gap-3 border-b border-white/10 px-3 py-2 text-xs transition hover:bg-white/[0.08] last:border-b-0 text-white"
+                        className="grid cursor-pointer grid-cols-[1.1fr_0.85fr_1.15fr_0.4fr_0.6fr_0.55fr_0.65fr] items-center gap-3 border-b border-white/10 px-4 py-3 text-sm transition hover:bg-white/[0.04] last:border-b-0 text-zinc-200"
                         role="button"
                         tabIndex={0}
                         onKeyDown={(event) => {
@@ -539,8 +567,8 @@ export const AdminDashboard = () => {
                       >
                         <AccountIdentity account={account} />
                         <div className="min-w-0">
-                          <p className="m-0 truncate font-semibold text-white">{account.user?.name || 'Unknown user'}</p>
-                          <p className="m-0 truncate text-[10px] text-zinc-400">{account.user?.email || 'No email'}</p>
+                          <p className="m-0 truncate text-sm font-semibold text-zinc-100">{account.user?.name || 'Unknown user'}</p>
+                          <p className="m-0 truncate text-xs text-zinc-400">{account.user?.email || 'No email'}</p>
                         </div>
                         <ActivityCell
                           account={account}
@@ -548,27 +576,27 @@ export const AdminDashboard = () => {
                           selectedRange={selectedRange}
                           selectedGraphDate={selectedGraphDate}
                         />
-                        <span className="text-zinc-300">
+                        <span className="text-sm font-medium text-zinc-200">
                           {selectedGraphDate ? (dateActivity?.count || 0) : (account[selectedRange.postsKey] || 0)}
                         </span>
                         <div>
                           {selectedGraphDate ? (
-                            <span className="font-semibold text-white">
+                            <span className="text-sm font-semibold text-zinc-100">
                               {numberFormat.format(dateActivity?.views || 0)}
                             </span>
                           ) : (
-                            <span className="text-zinc-300">
+                            <span className="text-sm font-medium text-zinc-200">
                               {numberFormat.format(account[selectedRange.viewsKey] || 0)}
                               {(account.recentViewDelta || 0) > 0 && (
-                                <span className="ml-1 text-[9px] font-semibold text-emerald-400">+{numberFormat.format(account.recentViewDelta)}</span>
+                                <span className="ml-1.5 text-xs font-semibold text-emerald-400">+{numberFormat.format(account.recentViewDelta)}</span>
                               )}
                             </span>
                           )}
                         </div>
-                        <span className={(account.upcomingPosts || 0) < 3 ? 'text-rose-400 font-medium' : 'text-zinc-300'}>
+                        <span className={`text-sm font-semibold ${(account.upcomingPosts || 0) < 3 ? 'text-rose-400' : 'text-zinc-200'}`}>
                           {numberFormat.format(account.upcomingPosts || 0)}
                         </span>
-                        <span className="text-zinc-300">
+                        <span className="text-sm text-zinc-300">
                           {selectedGraphDate ? (
                             `${numberFormat.format(dateActivity?.likes || 0)} / ${numberFormat.format(dateActivity?.comments || 0)}`
                           ) : (
@@ -578,8 +606,9 @@ export const AdminDashboard = () => {
                       </div>
                     );
                   })}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
