@@ -69,10 +69,15 @@ const AssetCard = ({ asset, onAdd }) => {
     setIsPreviewing(false);
   };
 
+  const effectiveAsset = {
+    ...asset,
+    ...(detectedDuration > 0 ? { duration: detectedDuration } : {}),
+  };
+
   const handleDragStart = (event) => {
     stopAudioPreview();
     stopVideoPreview();
-    setEditorDragData(event, { kind: 'asset', asset });
+    setEditorDragData(event, { kind: 'asset', asset: effectiveAsset });
   };
 
   if (isAudio) {
@@ -81,7 +86,7 @@ const AssetCard = ({ asset, onAdd }) => {
         type="button"
         draggable
         onDragStart={handleDragStart}
-        onClick={() => onAdd(asset)}
+        onClick={() => onAdd(effectiveAsset)}
         onMouseEnter={startAudioPreview}
         onMouseLeave={stopAudioPreview}
         className="group flex min-w-0 cursor-grab items-center gap-3 rounded-xl border border-[#35353a] bg-[#1c1c1f] p-2.5 text-left transition hover:border-[#7831d6]/50 hover:bg-[#232326] hover:shadow-lg hover:shadow-black/20 active:cursor-grabbing"
@@ -136,7 +141,7 @@ const AssetCard = ({ asset, onAdd }) => {
     >
       <button
         type="button"
-        onClick={() => onAdd(asset)}
+        onClick={() => onAdd(effectiveAsset)}
         className="block w-full text-left"
         title={isVideo
           ? `Drag ${asset.name} to the timeline, or click to add it`
