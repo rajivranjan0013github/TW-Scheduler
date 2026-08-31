@@ -1911,26 +1911,26 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
   }, [showCalendarHandlerMenu]);
 
   return (
-    <div className="py-2 px-0 bg-[#f5f5f7] h-screen text-[#1d1d1f] font-sans flex flex-col overflow-hidden">
+    <div className="bg-[#0c0c0e] h-screen text-white font-sans flex flex-col overflow-hidden antialiased">
 
       {!showComposer && (
         <>
           {/* Page Header */}
-          <div className="flex items-center justify-between pb-1.5 border-b border-[#e5e5ea] px-3 flex-shrink-0">
-            <h2 className="text-sm font-bold text-black tracking-tight m-0">Scheduled Queue</h2>
+          <div className="flex items-center justify-between border-b border-white/[0.08] bg-[#141417]/95 px-4 py-2.5 backdrop-blur-xl flex-shrink-0">
+            <h2 className="text-sm font-bold text-white tracking-tight m-0">Scheduled Queue</h2>
 
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => moveCalendarRange(-1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dadce0] bg-white text-[#5f6368] transition-colors hover:bg-[#f8f9fa]"
+                  className="flex h-8 w-8 items-center justify-center rounded-[8px] border border-white/[0.08] bg-white/[0.03] text-zinc-300 transition hover:bg-white/[0.06] hover:text-white"
                   title="Previous range"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                <div className="flex h-8 items-center gap-1.5 rounded-lg border border-[#dadce0] bg-white px-3 text-[12px] font-medium text-[#3c4043]">
-                  <svg className="h-3.5 w-3.5 text-[#5f6368]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                <div className="flex h-8 items-center gap-1.5 rounded-[8px] border border-white/[0.08] bg-white/[0.03] px-3 text-[11px] font-semibold text-zinc-300">
+                  <svg className="h-3.5 w-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                   <span>
                     {(() => {
                       const s = parseInputDate(calendarRangeStart);
@@ -1939,12 +1939,12 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                       return `${s.toLocaleDateString([], { month: 'short', day: 'numeric' })} - ${e.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
                     })()}
                   </span>
-                  <ChevronLeft className="h-3 w-3 -rotate-90 text-[#80868b]" />
+                  <ChevronLeft className="h-3 w-3 -rotate-90 text-zinc-400" />
                 </div>
                 <button
                   type="button"
                   onClick={() => moveCalendarRange(1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dadce0] bg-white text-[#5f6368] transition-colors hover:bg-[#f8f9fa]"
+                  className="flex h-8 w-8 items-center justify-center rounded-[8px] border border-white/[0.08] bg-white/[0.03] text-zinc-300 transition hover:bg-white/[0.06] hover:text-white"
                   title="Next range"
                 >
                   <ChevronLeft className="h-3.5 w-3.5 rotate-180" />
@@ -1954,7 +1954,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                 <button
                   type="button"
                   onClick={() => navigate('/scheduler/new')}
-                  className="flex items-center gap-1 bg-[#0071e3] hover:bg-[#147ce5] text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all shadow-sm"
+                  className="flex items-center gap-1.5 bg-[#0071e3] hover:bg-[#147ce5] text-white px-3 py-1.5 rounded-[8px] text-xs font-semibold transition-all shadow-sm"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>New Schedule Queue</span>
@@ -1966,25 +1966,25 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
       )}
 
       {queueError && (
-        <div className="mx-2 mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+        <div className="mx-4 mt-3 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-xs font-semibold text-rose-400 flex-shrink-0">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{queueError}</span>
         </div>
       )}
 
       {showComposer && (
-        <section className="flex-1 min-h-0 bg-white border-t border-[#d8e0f4] flex flex-col overflow-hidden">
+        <section className="flex-1 min-h-0 bg-[#0c0c0e] flex flex-col overflow-hidden text-white">
           {/* Header Area */}
-          <div className="flex items-center justify-between gap-4 border-b border-[#e5e5ea] px-4 py-2 flex-shrink-0">
+          <div className="flex items-center justify-between gap-4 border-b border-white/[0.08] bg-[#141417]/95 px-4 py-2.5 flex-shrink-0 backdrop-blur-xl">
             <div>
-              <h3 className="text-xs font-bold text-[#0b1645] tracking-tight m-0">Streamlined Scheduling Flow</h3>
-              <p className="m-0 mt-0.5 text-[9px] text-[#536079]">Multi-step scheduling flow for social media. Select channels, content, customize mode & post.</p>
+              <h3 className="text-xs font-bold text-white tracking-tight m-0">Streamlined Scheduling Flow</h3>
+              <p className="m-0 mt-0.5 text-[10px] text-zinc-400">Multi-step scheduling flow for social media. Select channels, content, customize mode & post.</p>
             </div>
             <button
               type="button"
               onClick={() => navigate('/scheduler')}
               disabled={submittingSchedule}
-              className="px-2.5 py-1 bg-[#f5f5f7] hover:bg-[#e5e5ea] rounded-md text-xs font-semibold border border-[#e5e5ea] transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              className="px-3 py-1.5 bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white rounded-[8px] text-xs font-semibold border border-white/[0.08] transition-all disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
@@ -1992,12 +1992,12 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 
           <form onSubmit={handleComposeSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {/* Step Indicator Wizard Bar */}
-            <div className="flex items-center justify-center py-2 px-8 border-b border-[#f3f4f6] bg-[#fbfbfb] flex-shrink-0">
+            <div className="flex items-center justify-center py-2.5 px-8 border-b border-white/[0.08] bg-[#141417]/80 backdrop-blur flex-shrink-0">
               <div className="flex items-center w-full max-w-4xl justify-between relative">
                 {/* Connecting Lines */}
-                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[#e5e7eb] -translate-y-1/2 z-0" />
+                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/[0.08] -translate-y-1/2 z-0" />
                 <div
-                  className="absolute top-1/2 left-0 h-0.5 bg-[#bfdbfe] -translate-y-1/2 z-0 transition-all duration-300"
+                  className="absolute top-1/2 left-0 h-0.5 bg-blue-500 -translate-y-1/2 z-0 transition-all duration-300"
                   style={{
                     width: selectedChannels.length > 0
                       ? (selectedMedia.length > 0 || selectedCarouselSets.length > 0)
@@ -2036,8 +2036,8 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                     <span
                       className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border shadow-sm ${
                         s.active
-                          ? 'bg-[#e0f2fe] border-[#38bdf8] text-[#0369a1]'
-                          : 'bg-white border-[#e5e7eb] text-[#6b7280]'
+                          ? 'bg-blue-500/15 border-blue-500/40 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.15)]'
+                          : 'bg-[#141417] border-white/[0.08] text-zinc-500'
                       }`}
                     >
                       {s.label}
@@ -2048,32 +2048,35 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
             </div>
 
             {/* 4 Column Grid */}
-            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-2.5 p-2.5 overflow-hidden">
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-3 p-3 bg-[#0c0c0e] overflow-hidden">
               
-              <div className="rounded-xl border border-[#e5e7eb] bg-white shadow-sm flex flex-col overflow-hidden h-full">
-                <div className="flex items-center justify-between border-b border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 flex-shrink-0">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Accounts</span>
+              {/* Column 1: Accounts */}
+              <div className="rounded-xl border border-white/[0.08] bg-[#141417] shadow-xl flex flex-col overflow-hidden h-full">
+                <div className="flex items-center justify-between border-b border-white/[0.08] bg-white/[0.02] px-3 py-2 flex-shrink-0">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">Accounts</span>
                   <button
                     type="button"
                     onClick={selectAllChannels}
-                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800"
+                    className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition"
                   >
                     Select all
                   </button>
                 </div>
-                <div className="p-2 border-b border-[#e5e7eb] bg-[#f8fafc]/50 flex-shrink-0">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      value={accountsSearchQuery}
-                      onChange={(e) => setAccountsSearchQuery(e.target.value)}
-                      placeholder="Search accounts"
-                      className="h-7 w-full rounded-md border border-[#e2e8f0] bg-white pl-7 pr-2 text-[11px] font-semibold text-slate-700 placeholder:text-slate-400 focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]/20"
-                    />
+                <div className="p-2 border-b border-white/[0.08] bg-white/[0.01] flex-shrink-0">
+                  <div className="group relative rounded-[9px] p-[1px] bg-gradient-to-r from-white/15 via-white/5 to-white/15 hover:from-blue-500/40 hover:via-indigo-500/40 hover:to-purple-500/40 focus-within:from-[#0071e3] focus-within:via-[#6366f1] focus-within:to-[#8a3ff2] focus-within:shadow-[0_0_12px_rgba(99,102,241,0.25)] transition-all duration-200">
+                    <div className="relative flex items-center rounded-[8px] bg-[#101013]">
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500 group-focus-within:text-blue-400 transition-colors" />
+                      <input
+                        type="text"
+                        value={accountsSearchQuery}
+                        onChange={(e) => setAccountsSearchQuery(e.target.value)}
+                        placeholder="Search accounts"
+                        className="h-8 w-full rounded-[8px] bg-transparent pl-8 pr-2.5 text-xs font-medium text-white placeholder:text-zinc-500 outline-none border-0"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="p-2 space-y-1 flex-1 overflow-y-auto">
+                <div className="p-2 space-y-1 flex-1 overflow-y-auto custom-scrollbar">
                   {filteredComposerChannels.map(chan => {
                     const isSelected = selectedChannels.includes(chan._id);
                     const isVerified = isChannelVerified(chan);
@@ -2085,27 +2088,27 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                         type="button"
                         onClick={() => toggleChannel(chan._id)}
                         disabled={!canSelect}
-                        className={`w-full flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all ${
+                        className={`w-full flex items-center gap-2.5 rounded-[8px] border px-2.5 py-1.5 text-left transition-all ${
                           isSelected
-                            ? 'border-[#2563eb] bg-[#f0f7ff] text-[#0f172a] shadow-sm'
+                            ? 'border-blue-500/40 bg-blue-500/15 text-white ring-1 ring-blue-500/20 shadow-sm'
                             : canSelect
-                              ? 'border-[#e5e7eb] bg-white text-[#334155] hover:border-[#cbd5e1]'
-                              : 'border-[#e5e7eb] bg-[#f8fafc] text-[#94a3b8] opacity-80 cursor-not-allowed'
+                              ? 'border-white/[0.06] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12] hover:text-white'
+                              : 'border-white/[0.04] bg-white/[0.01] text-zinc-600 opacity-60 cursor-not-allowed'
                         }`}
                       >
                         {chan.avatarUrl ? (
-                          <img src={chan.avatarUrl} crossOrigin="anonymous" className="w-7 h-7 rounded-full object-cover border border-black/5" alt="" />
+                          <img src={chan.avatarUrl} crossOrigin="anonymous" className="w-7 h-7 rounded-full object-cover border border-white/10" alt="" />
                         ) : (
-                          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 text-[#6b7280]">
+                          <div className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center border border-white/[0.08] text-zinc-400">
                             <Users className="w-3.5 h-3.5" />
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-semibold leading-tight">{getAccountLabel(chan)}</span>
+                          <span className="block truncate text-xs font-semibold leading-tight text-white">{getAccountLabel(chan)}</span>
                           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 leading-none">
                             <PlatformIcon platform={chan.platform} className="h-3.5 w-3.5" />
                             {assignedHandlerLabel && (
-                              <span className="min-w-0 truncate text-[10px] font-semibold text-slate-500">
+                              <span className="min-w-0 truncate text-[10px] font-medium text-zinc-400">
                                 {assignedHandlerLabel}
                               </span>
                             )}
@@ -2114,8 +2117,8 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                         {!isVerified && (
                           <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase ${
                             isPureManualMode && canSelect
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'bg-slate-100 text-slate-500 border border-slate-200'
+                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                              : 'bg-white/[0.06] text-zinc-400 border border-white/[0.08]'
                           }`}>
                             Manual
                           </span>
@@ -2124,43 +2127,44 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                     );
                   })}
                   {filteredComposerChannels.length === 0 && (
-                    <div className="h-32 flex items-center justify-center text-[10px] text-slate-400 text-center p-4">
+                    <div className="h-32 flex items-center justify-center text-xs text-zinc-500 text-center p-4">
                       {accountsSearchQuery.trim() ? 'No matching accounts' : 'No accounts available'}
                     </div>
                   )}
                 </div>
-                <div className="border-t border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 text-[10px] font-semibold text-[#64748b]">
+                <div className="border-t border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[10px] font-semibold text-zinc-400">
                   {selectedChannels.length} channel{selectedChannels.length === 1 ? '' : 's'} selected
                 </div>
               </div>
 
-              <div className="rounded-xl border border-[#e5e7eb] bg-white shadow-sm flex flex-col overflow-hidden h-full">
+              {/* Column 2: Source Content */}
+              <div className="rounded-xl border border-white/[0.08] bg-[#141417] shadow-xl flex flex-col overflow-hidden h-full">
                 {directMediaSelection ? (
                   <>
-                    <div className="flex-shrink-0 border-b border-[#e5e7eb] bg-[#f8fafc] px-3 py-2">
+                    <div className="flex-shrink-0 border-b border-white/[0.08] bg-white/[0.02] px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Selected Files</span>
-                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[9px] font-bold text-blue-700">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">Selected Files</span>
+                        <span className="rounded-full bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 text-[9px] font-bold text-blue-400">
                           {selectedMediaItems.length} {selectedMediaTypes[0] || 'media'}
                         </span>
                       </div>
                     </div>
-                    <div className="flex-1 min-h-0 overflow-y-auto bg-[#fafafa] p-2 space-y-1.5">
+                    <div className="flex-1 min-h-0 overflow-y-auto bg-[#0c0c0e] p-2 space-y-1.5 custom-scrollbar">
                       {selectedMediaItems.map((item) => (
-                        <div key={item._id} className="flex items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white p-2 shadow-sm">
-                          <div className="h-10 w-8 flex-shrink-0 overflow-hidden rounded-md border border-[#e2e8f0] bg-slate-100">
+                        <div key={item._id} className="flex items-center gap-2 rounded-[8px] border border-white/[0.08] bg-[#141417] p-2 shadow-sm">
+                          <div className="h-10 w-8 flex-shrink-0 overflow-hidden rounded-md border border-white/[0.08] bg-black/40">
                             <MediaPreview item={item} />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="m-0 truncate text-xs font-bold text-[#0f172a]" title={getMediaLabel(item)}>{getMediaLabel(item)}</p>
-                            <p className="m-0 mt-0.5 truncate text-[9px] font-semibold text-[#64748b]">
+                            <p className="m-0 truncate text-xs font-bold text-white" title={getMediaLabel(item)}>{getMediaLabel(item)}</p>
+                            <p className="m-0 mt-0.5 truncate text-[9px] font-semibold text-zinc-400">
                               {item.type} • {getMediaLocationLabel(item)}
                             </p>
                           </div>
                           <button
                             type="button"
                             onClick={() => setSelectedMedia((current) => current.filter((mediaId) => mediaId !== item._id))}
-                            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-[#e5e7eb] bg-white text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#0f172a]"
+                            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.08] hover:text-white transition"
                             title="Remove from schedule"
                             aria-label="Remove from schedule"
                           >
@@ -2169,21 +2173,21 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                         </div>
                       ))}
                       {selectedMediaItems.length === 0 && (
-                        <div className="h-32 flex items-center justify-center rounded-lg border border-dashed border-slate-300 p-4 text-center text-[10px] text-slate-400">
+                        <div className="h-32 flex items-center justify-center rounded-lg border border-dashed border-white/[0.08] p-4 text-center text-xs text-zinc-500">
                           No selected files.
                         </div>
                       )}
                     </div>
-                    <div className="border-t border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 text-[10px] font-semibold text-[#64748b] truncate">
+                    <div className="border-t border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[10px] font-semibold text-zinc-400 truncate">
                       Direct media selection
                     </div>
                   </>
                 ) : (
                   <>
                 {/* Full-width Nested Content Source List with Back Navigation */}
-                <div className="flex-shrink-0 border-b border-[#e5e7eb]">
+                <div className="flex-shrink-0 border-b border-white/[0.08]">
                   {activeFolderId !== 'root' ? (
-                    <div className="bg-[#f8fafc] px-3 py-2 flex items-center gap-1.5">
+                    <div className="bg-white/[0.02] px-3 py-2 flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => {
@@ -2194,28 +2198,30 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                           setScheduleContentMode('assets');
                           setSelectedMedia([]);
                         }}
-                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-0.5"
+                        className="text-[10px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-0.5 transition"
                       >
                         <ChevronLeft className="w-3 h-3 stroke-[2.5px]" />
                         <span>Back</span>
                       </button>
-                      <span className="text-[10px] font-bold text-slate-300">/</span>
-                      <span className="text-[10px] font-bold text-slate-700 truncate max-w-[120px]">{currentFolderObj?.name}</span>
+                      <span className="text-[10px] font-bold text-zinc-600">/</span>
+                      <span className="text-[10px] font-bold text-white truncate max-w-[120px]">{currentFolderObj?.name}</span>
                     </div>
                   ) : (
-                    <div className="bg-[#f8fafc] px-3 py-2 space-y-2">
+                    <div className="bg-white/[0.02] px-3 py-2 space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold text-slate-700">Campaign Library</span>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">Campaign Library</span>
                       </div>
-                      <div className="relative">
-                        <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          value={librarySearchQuery}
-                          onChange={(e) => setLibrarySearchQuery(e.target.value)}
-                          placeholder="Search campaign library"
-                          className="h-7 w-full rounded-md border border-[#e2e8f0] bg-white pl-7 pr-2 text-[11px] font-semibold text-slate-700 placeholder:text-slate-400 focus:border-[#2563eb] focus:outline-none focus:ring-1 focus:ring-[#2563eb]/20"
-                        />
+                      <div className="group relative rounded-[9px] p-[1px] bg-gradient-to-r from-white/15 via-white/5 to-white/15 hover:from-blue-500/40 hover:via-indigo-500/40 hover:to-purple-500/40 focus-within:from-[#0071e3] focus-within:via-[#6366f1] focus-within:to-[#8a3ff2] focus-within:shadow-[0_0_12px_rgba(99,102,241,0.25)] transition-all duration-200">
+                        <div className="relative flex items-center rounded-[8px] bg-[#101013]">
+                          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500 group-focus-within:text-blue-400 transition-colors" />
+                          <input
+                            type="text"
+                            value={librarySearchQuery}
+                            onChange={(e) => setLibrarySearchQuery(e.target.value)}
+                            placeholder="Search campaign library"
+                            className="h-8 w-full rounded-[8px] bg-transparent pl-8 pr-2.5 text-xs font-medium text-white placeholder:text-zinc-500 outline-none border-0"
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -2224,13 +2230,9 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                   
                   {/* Folders & Sets List */}
-                  <div className="w-full flex-1 overflow-y-auto p-2 space-y-1 bg-[#fafafa]">
+                  <div className="w-full flex-1 overflow-y-auto p-2 space-y-1 bg-[#0c0c0e] custom-scrollbar">
                     {visibleLevelFolders.map(folder => {
                       const isCarousel = folder.kind === 'carousel_set';
-                      
-                      // Active state calculation:
-                      // - For folders: active if selectedFolderId matches (and not in carousel mode)
-                      // - For carousel sets: active if selectedCarouselSets contains its ID
                       const isActive = isCarousel 
                         ? selectedCarouselSets.includes(folder._id)
                         : (selectedFolderId === folder._id && !isCarouselMode);
@@ -2247,27 +2249,24 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                           onClick={() => {
                             if (isCarousel) {
                               setScheduleContentMode('carousel');
-                          const parentId = normalizeFolderId(folder.parentFolderId) || 'root';
-                          setActiveFolderId(parentId);
-                          setSelectedFolderId(folder._id);
-                          setSelectedCarouselSets([folder._id]);
-                          setSelectedMedia([]);
+                              const parentId = normalizeFolderId(folder.parentFolderId) || 'root';
+                              setActiveFolderId(parentId);
+                              setSelectedFolderId(folder._id);
+                              setSelectedCarouselSets([folder._id]);
+                              setSelectedMedia([]);
                             } else {
-                              // Check if this regular folder contains any carousel sets
                               const childCarouselSets = folders.filter(f => 
                                 f.kind === 'carousel_set' && 
                                 (normalizeFolderId(f.parentFolderId) || 'root') === folder._id
                               );
                               
                               if (childCarouselSets.length > 0) {
-                                // It's a Carousel holding folder. Show its sets in review, unselected by default.
                                 setScheduleContentMode('carousel');
                                 setActiveFolderId(folder._id);
                                 setSelectedFolderId(folder._id);
                                 setSelectedCarouselSets(childCarouselSets.map(c => c._id));
                                 setSelectedMedia([]);
                               } else {
-                                // Standard campaign folder: show its assets in review, unselected by default.
                                 setScheduleContentMode('assets');
                                 setSelectedFolderId(folder._id);
                                 setSelectedCarouselSets([]);
@@ -2275,19 +2274,19 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                               }
                             }
                           }}
-                          className={`w-full h-8 flex items-center justify-between rounded-lg px-2 text-left transition-all flex-shrink-0 ${
+                          className={`w-full h-9 flex items-center justify-between rounded-[8px] px-2.5 text-left transition-all flex-shrink-0 ${
                             isActive
                               ? isCarousel
-                                ? 'bg-purple-50 border border-purple-200 text-purple-950 font-bold shadow-sm'
-                                : 'bg-[#f0f7ff] border border-blue-200 text-blue-950 font-bold shadow-sm'
-                              : 'text-slate-600 hover:bg-[#f1f5f9] border border-transparent'
+                                ? 'bg-purple-500/15 border border-purple-500/40 text-purple-200 font-bold shadow-sm'
+                                : 'bg-blue-500/15 border border-blue-500/40 text-blue-200 font-bold shadow-sm'
+                              : 'text-zinc-300 hover:bg-white/[0.04] border border-transparent hover:border-white/[0.08] hover:text-white'
                           }`}
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             {isCarousel ? (
-                              <Images className={`h-3.5 w-3.5 flex-shrink-0 ${isActive ? 'text-purple-600' : 'text-purple-400'}`} />
+                              <Images className={`h-3.5 w-3.5 flex-shrink-0 ${isActive ? 'text-purple-400' : 'text-purple-400/70'}`} />
                             ) : (
-                              <Folder className={`h-3.5 w-3.5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                              <Folder className={`h-3.5 w-3.5 flex-shrink-0 ${isActive ? 'text-blue-400' : 'text-zinc-400'}`} />
                             )}
                             <span className="truncate text-xs font-semibold leading-none">{folder.name}</span>
                           </div>
@@ -2295,7 +2294,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                           <div className="flex-shrink-0 ml-2">
                             {isCarousel ? (
                               <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
-                                isActive ? 'bg-purple-200 text-purple-800' : 'bg-purple-50 text-purple-600 border border-purple-100'
+                                isActive ? 'bg-purple-500/30 text-purple-200 border border-purple-500/40' : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
                               }`}>
                                 {slideCount} slides
                               </span>
@@ -2304,7 +2303,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                               const subCount = childSubs.length || Number(folder.subfolderCount || 0);
                               return (
                                 <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
-                                  isActive ? 'bg-blue-200 text-blue-800' : 'bg-slate-100 text-slate-500'
+                                  isActive ? 'bg-blue-500/30 text-blue-200 border border-blue-500/40' : 'bg-white/[0.06] text-zinc-400 border border-white/[0.08]'
                                 }`}>
                                   {subCount > 0 && count === 0
                                     ? `${subCount} ${subCount === 1 ? 'folder' : 'folders'}`
@@ -2318,14 +2317,14 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                     })}
 
                     {visibleLevelFolders.length === 0 && (
-                      <div className="h-32 flex items-center justify-center text-[10px] text-slate-400 text-center p-4">
+                      <div className="h-32 flex items-center justify-center text-xs text-zinc-500 text-center p-4">
                         {librarySearchQuery.trim() ? 'No matching folders' : 'Empty folder'}
                       </div>
                     )}
                   </div>
 
                 </div>
-                <div className="border-t border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 text-[10px] font-semibold text-[#64748b] truncate">
+                <div className="border-t border-white/[0.08] bg-white/[0.02] px-3 py-2 text-[10px] font-semibold text-zinc-400 truncate">
                   {isCarouselMode 
                     ? `Carousel Set: ${folders.find(f => f._id === selectedCarouselSets[0])?.name || 'None'}` 
                     : `Campaign Folder: ${activeFolderName}`}
@@ -2334,11 +2333,12 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                 )}
               </div>
 
-              <div className="rounded-xl border border-[#e5e7eb] bg-white shadow-sm flex flex-col overflow-hidden h-full">
-                <div className="p-3 space-y-3 flex-1 overflow-y-auto">
+              {/* Column 3: Post Settings */}
+              <div className="rounded-xl border border-white/[0.08] bg-[#141417] shadow-xl flex flex-col overflow-hidden h-full">
+                <div className="p-3 space-y-3.5 flex-1 overflow-y-auto custom-scrollbar">
                   {/* Mode Card Toggles */}
                   <div className="space-y-1.5">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Post Mode</span>
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">Post Mode</span>
                     <div className="space-y-1">
                       {['auto', 'manual', 'hybrid'].map(mode => {
                         const isActive = scheduleMode === mode;
@@ -2347,16 +2347,16 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                             key={mode}
                             type="button"
                             onClick={() => handleScheduleModeChange(mode)}
-                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-all ${
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-[8px] border text-left transition-all ${
                               isActive
-                                ? 'border-[#2563eb] bg-[#f0f7ff] text-[#0f172a]'
-                                : 'border-[#e2e8f0] bg-white hover:border-slate-300'
+                                ? 'border-blue-500/40 bg-blue-500/15 text-white ring-1 ring-blue-500/20 shadow-sm'
+                                : 'border-white/[0.08] bg-white/[0.02] text-zinc-300 hover:bg-white/[0.05] hover:border-white/[0.12] hover:text-white'
                             }`}
                           >
                             <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center flex-shrink-0 ${
-                              isActive ? 'border-[#2563eb]' : 'border-slate-300'
+                              isActive ? 'border-blue-400' : 'border-zinc-600'
                             }`}>
-                              {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#2563eb]" />}
+                              {isActive && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
                             </span>
                             <span className="text-xs font-semibold">{getScheduleModeLabel(mode)}</span>
                           </button>
@@ -2367,22 +2367,24 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 
                   {/* Date & Time Picker */}
                   <div className="space-y-1.5">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">
                       {isPureManualMode
                         ? (isBulk || isCarouselMode ? 'Target Start' : 'Target Time')
                         : (isBulk || isCarouselMode ? 'Start Time' : 'Post Time')}
                     </span>
                     <div className="flex items-center gap-2">
-                      <input
-                        type="datetime-local"
-                        value={scheduleTime}
-                        onChange={(e) => setScheduleTime(e.target.value)}
-                        className="min-w-0 flex-1 rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#2563eb] focus:border-[#2563eb]"
-                      />
+                      <div className="group relative min-w-0 flex-1 rounded-[9px] p-[1px] bg-gradient-to-r from-white/15 via-white/5 to-white/15 hover:from-blue-500/40 hover:via-indigo-500/40 hover:to-purple-500/40 focus-within:from-[#0071e3] focus-within:via-[#6366f1] focus-within:to-[#8a3ff2] focus-within:shadow-[0_0_12px_rgba(99,102,241,0.25)] transition-all duration-200">
+                        <input
+                          type="datetime-local"
+                          value={scheduleTime}
+                          onChange={(e) => setScheduleTime(e.target.value)}
+                          className="w-full rounded-[8px] bg-[#101013] px-2.5 py-1.5 text-xs text-white placeholder:text-zinc-500 outline-none border-0 [color-scheme:dark]"
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={() => setScheduleTime(toCurrentDateTimeLocalValue(new Date()))}
-                        className="shrink-0 rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-[#2563eb] hover:text-[#2563eb]"
+                        className="shrink-0 rounded-[8px] border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:bg-white/[0.08] hover:text-white transition"
                       >
                         Now
                       </button>
@@ -2392,35 +2394,37 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   {/* Interval selector */}
                   {(isBulk || isCarouselMode) && (
                     <div className="space-y-1.5">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Post Interval</span>
-                      <select
-                        value={bulkInterval}
-                        onChange={(e) => setBulkInterval(e.target.value)}
-                        className="w-full rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
-                      >
-                        <option value="6">Every 6 hours</option>
-                        <option value="8">Every 8 hours</option>
-                        <option value="10">Every 10 hours</option>
-                        <option value="12">Every 12 hours</option>
-                        <option value="24">Every 1 day</option>
-                      </select>
+                      <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">Post Interval</span>
+                      <div className="group relative w-full rounded-[9px] p-[1px] bg-gradient-to-r from-white/15 via-white/5 to-white/15 hover:from-blue-500/40 hover:via-indigo-500/40 hover:to-purple-500/40 focus-within:from-[#0071e3] focus-within:via-[#6366f1] focus-within:to-[#8a3ff2] focus-within:shadow-[0_0_12px_rgba(99,102,241,0.25)] transition-all duration-200">
+                        <select
+                          value={bulkInterval}
+                          onChange={(e) => setBulkInterval(e.target.value)}
+                          className="w-full rounded-[8px] bg-[#101013] px-2.5 py-1.5 text-xs text-white outline-none border-0 [color-scheme:dark] cursor-pointer"
+                        >
+                          <option value="6" className="bg-[#141417] text-white">Every 6 hours</option>
+                          <option value="8" className="bg-[#141417] text-white">Every 8 hours</option>
+                          <option value="10" className="bg-[#141417] text-white">Every 10 hours</option>
+                          <option value="12" className="bg-[#141417] text-white">Every 12 hours</option>
+                          <option value="24" className="bg-[#141417] text-white">Every 1 day</option>
+                        </select>
+                      </div>
                     </div>
                   )}
 
                   {/* Format selector */}
                   {!isCarouselMode && (
                     <div className="space-y-1.5">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Format</span>
-                      <div className="grid grid-cols-3 gap-1">
+                      <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">Format</span>
+                      <div className="grid grid-cols-3 gap-1.5">
                         {(hasYoutubeSelected ? ['video', 'short'] : ['reels', 'post', 'story']).map(t => (
                           <button
                             key={t}
                             type="button"
                             onClick={() => setPostType(t)}
-                            className={`py-1 rounded-md text-[10px] font-semibold capitalize border transition-all ${
+                            className={`py-1.5 rounded-[8px] text-[10px] font-semibold capitalize border transition-all ${
                               postType === t
-                                ? 'bg-[#0f172a] text-white border-[#0f172a]'
-                                : 'bg-white text-slate-500 border-[#e2e8f0] hover:text-[#0f172a]'
+                                ? 'bg-white text-black font-bold border-white shadow-sm'
+                                : 'bg-white/[0.03] text-zinc-400 border-white/[0.08] hover:text-white hover:bg-white/[0.06]'
                             }`}
                           >
                             {t}
@@ -2432,70 +2436,77 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 
                   {/* Youtube specific options */}
                   {shouldUseYoutubePublishing && (
-                    <div className="border border-red-100 bg-red-50/50 rounded-lg p-2.5 space-y-2">
-                      <span className="block text-[9px] font-bold uppercase tracking-wider text-red-600">YouTube Specifics</span>
-                      <input
-                        value={youtubeTitle}
-                        onChange={(e) => setYoutubeTitle(e.target.value)}
-                        placeholder="Video Title"
-                        className="w-full bg-white border border-[#e2e8f0] px-2 py-1 rounded text-[11px] focus:outline-none focus:ring-1 focus:ring-red-500"
-                      />
-                      <input
-                        value={youtubeTags}
-                        onChange={(e) => setYoutubeTags(e.target.value)}
-                        placeholder="Tags (tag1, tag2)"
-                        className="w-full bg-white border border-[#e2e8f0] px-2 py-1 rounded text-[11px] focus:outline-none"
-                      />
+                    <div className="border border-red-500/30 bg-red-500/10 rounded-lg p-2.5 space-y-2">
+                      <span className="block text-[9px] font-bold uppercase tracking-wider text-red-400">YouTube Specifics</span>
+                      <div className="group relative rounded-[8px] p-[1px] bg-gradient-to-r from-red-500/30 via-red-500/10 to-red-500/30 hover:from-red-500/50 hover:via-orange-500/40 hover:to-red-500/50 focus-within:from-red-500 focus-within:via-orange-500 focus-within:to-red-500 focus-within:shadow-[0_0_10px_rgba(239,68,68,0.3)] transition-all duration-200">
+                        <input
+                          value={youtubeTitle}
+                          onChange={(e) => setYoutubeTitle(e.target.value)}
+                          placeholder="Video Title"
+                          className="w-full bg-[#101013] rounded-[7px] px-2.5 py-1.5 text-[11px] text-white placeholder:text-zinc-500 outline-none border-0"
+                        />
+                      </div>
+                      <div className="group relative rounded-[8px] p-[1px] bg-gradient-to-r from-red-500/30 via-red-500/10 to-red-500/30 hover:from-red-500/50 hover:via-orange-500/40 hover:to-red-500/50 focus-within:from-red-500 focus-within:via-orange-500 focus-within:to-red-500 focus-within:shadow-[0_0_10px_rgba(239,68,68,0.3)] transition-all duration-200">
+                        <input
+                          value={youtubeTags}
+                          onChange={(e) => setYoutubeTags(e.target.value)}
+                          placeholder="Tags (tag1, tag2)"
+                          className="w-full bg-[#101013] rounded-[7px] px-2.5 py-1.5 text-[11px] text-white placeholder:text-zinc-500 outline-none border-0"
+                        />
+                      </div>
                     </div>
                   )}
 
                   {/* Textarea Fallback Caption */}
                   <div className="space-y-1.5">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Fallback Caption</span>
-                    <textarea
-                      placeholder="Enter caption..."
-                      value={caption}
-                      onChange={(e) => setCaption(e.target.value)}
-                      className="w-full h-20 rounded-lg border border-[#e2e8f0] p-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#2563eb] resize-none"
-                    />
+                    <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">Fallback Caption</span>
+                    <div className="group relative rounded-[9px] p-[1px] bg-gradient-to-r from-white/15 via-white/5 to-white/15 hover:from-blue-500/40 hover:via-indigo-500/40 hover:to-purple-500/40 focus-within:from-[#0071e3] focus-within:via-[#6366f1] focus-within:to-[#8a3ff2] focus-within:shadow-[0_0_12px_rgba(99,102,241,0.25)] transition-all duration-200">
+                      <textarea
+                        placeholder="Enter caption..."
+                        value={caption}
+                        onChange={(e) => setCaption(e.target.value)}
+                        className="w-full h-20 rounded-[8px] bg-[#101013] p-2.5 text-xs text-white placeholder:text-zinc-500 outline-none border-0 resize-none block"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-[#e5e7eb] bg-white shadow-sm flex flex-col overflow-hidden h-full">
+              {/* Column 4: Review & Schedule */}
+              <div className="rounded-xl border border-white/[0.08] bg-[#141417] shadow-xl flex flex-col overflow-hidden h-full">
                 {/* Summarized stats block */}
-                <div className="p-3 border-b border-[#f1f5f9] bg-[#f8fafc] space-y-1 flex-shrink-0">
+                <div className="p-3 border-b border-white/[0.08] bg-white/[0.02] space-y-1.5 flex-shrink-0">
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Selected Channels:</span>
-                    <span className="font-bold text-[#0f172a]">{selectedChannels.length}</span>
+                    <span className="text-zinc-400 font-medium">Selected Channels:</span>
+                    <span className="font-bold text-white">{selectedChannels.length}</span>
                   </div>
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Selected Posts:</span>
-                    <span className="font-bold text-[#0f172a]">
+                    <span className="text-zinc-400 font-medium">Selected Posts:</span>
+                    <span className="font-bold text-white">
                       {displaySchedulePlan.length > 0 ? `${activeDisplaySchedulePlanCount}/${displaySchedulePlan.length}` : 0}
                     </span>
                   </div>
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Post Mode:</span>
-                    <span className="font-bold text-[#0f172a] capitalize">{scheduleMode}</span>
+                    <span className="text-zinc-400 font-medium">Post Mode:</span>
+                    <span className="font-bold text-white capitalize">{scheduleMode}</span>
                   </div>
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Schedule Time:</span>
-                    <span className="font-bold text-blue-600 truncate max-w-[160px]" title={activeScheduleTimeLabel}>
+                    <span className="text-zinc-400 font-medium">Schedule Time:</span>
+                    <span className="font-bold text-blue-400 truncate max-w-[160px]" title={activeScheduleTimeLabel}>
                       {activeScheduleTimeLabel}
                     </span>
                   </div>
                 </div>
 
                 {/* Scrollable list of planned posts inside column 4 */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-1.5 bg-slate-50">
+                <div className="flex-1 overflow-y-auto p-2 space-y-1.5 bg-[#0c0c0e] custom-scrollbar">
                   <div className="flex items-center justify-between px-1">
-                    <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Planned Sequence ({activeDisplaySchedulePlanCount}/{displaySchedulePlan.length})</span>
+                    <span className="block text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-400">Planned Sequence ({activeDisplaySchedulePlanCount}/${displaySchedulePlan.length})</span>
                     {hasDeselectedPlanRows && (
                       <button
                         type="button"
                         onClick={() => setDeselectedPlanRows([])}
-                        className="text-[9px] font-semibold text-blue-600 hover:text-blue-700"
+                        className="text-[9px] font-semibold text-blue-400 hover:text-blue-300 transition"
                       >
                         Select all
                       </button>
@@ -2513,30 +2524,30 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                         key={row.displayKey}
                         onClick={() => togglePlanGroup(row.planKeys)}
                         aria-pressed={isRowSelected}
-                        className={`w-full text-left rounded-lg p-2 flex gap-2 items-center shadow-sm relative transition-all ${
+                        className={`w-full text-left rounded-[8px] p-2 flex gap-2 items-center shadow-sm relative transition-all ${
                           isRowSelected
-                            ? 'bg-white border border-blue-200 ring-1 ring-blue-100'
-                            : 'bg-slate-100 border border-slate-200 opacity-60'
+                            ? 'bg-[#141417] border border-blue-500/40 ring-1 ring-blue-500/20 text-white shadow-sm'
+                            : 'bg-white/[0.02] border border-white/[0.06] opacity-50 text-zinc-500'
                         }`}
                       >
-                        <div className="h-8 w-10 overflow-hidden rounded border border-[#e2e8f0] bg-slate-100 flex-shrink-0">
+                        <div className="h-8 w-10 overflow-hidden rounded border border-white/[0.08] bg-black/40 flex-shrink-0">
                           <MediaPreview item={row.mediaItem} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex justify-between items-center gap-1">
-                            <span className={`text-[10px] font-bold truncate ${isRowSelected ? 'text-slate-800' : 'text-slate-500 line-through'}`}>
+                            <span className={`text-[10px] font-bold truncate ${isRowSelected ? 'text-white' : 'text-zinc-500 line-through'}`}>
                               {row.carouselSet ? row.carouselSet.name : getMediaLabel(row.mediaItem)}
                             </span>
-                            <span className={`text-[8px] font-semibold flex-shrink-0 ${isRowSelected ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <span className={`text-[8px] font-semibold flex-shrink-0 ${isRowSelected ? 'text-zinc-400' : 'text-zinc-600'}`}>
                               #{row.index}
                             </span>
                           </div>
-                          <div className="flex items-center gap-1.5 mt-0.5 text-[8px] text-slate-500">
+                          <div className="flex items-center gap-1.5 mt-0.5 text-[8px] text-zinc-400">
                             <span className="font-medium truncate max-w-[90px]">
                               {row.accountCount > 1 ? `${row.accountCount} accounts` : getAccountLabel(row.channel)}
                             </span>
                             <span>•</span>
-                            <span className={`font-semibold ${isRowSelected ? 'text-blue-600' : 'text-slate-500'}`}>
+                            <span className={`font-semibold ${isRowSelected ? 'text-blue-400' : 'text-zinc-600'}`}>
                               {isRowSelected
                                 ? `${visibleScheduledAt ? formatScheduleTime(visibleScheduledAt) : 'Manual'}${isPartiallySelected ? ' partial' : ''}`
                                 : 'Skipped'}
@@ -2548,18 +2559,18 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   })}
 
                   {displaySchedulePlan.length === 0 && (
-                    <div className="h-32 flex items-center justify-center text-[10px] text-slate-400 text-center p-4 border border-dashed border-slate-300 rounded-lg">
+                    <div className="h-32 flex items-center justify-center text-xs text-zinc-500 text-center p-4 border border-dashed border-white/[0.08] rounded-lg">
                       {isPureManualMode ? 'Select accounts, content and target time.' : 'Select accounts, folder and schedule time.'}
                     </div>
                   )}
                 </div>
 
                 {/* Big scheduling button */}
-                <div className="p-3 border-t border-[#e5e7eb] flex-shrink-0">
+                <div className="p-3 border-t border-white/[0.08] bg-white/[0.02] flex-shrink-0">
                   <button
                     type="submit"
                     disabled={submittingSchedule || (schedulePlan.length > 0 && activeSchedulePlan.length === 0)}
-                    className="w-full py-2 bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-600 disabled:border-white/[0.04] disabled:cursor-not-allowed text-white rounded-[8px] text-xs font-semibold transition-all shadow-lg flex items-center justify-center gap-2"
                   >
                     {submittingSchedule && (
                       <span className="h-3.5 w-3.5 rounded-full border-2 border-white/70 border-t-transparent animate-spin" />
@@ -2608,15 +2619,17 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
 	                  {showCalendarAccountMenu && (
                     <div className="absolute left-0 top-9 z-[9999] w-[24rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 shadow-2xl backdrop-blur-2xl">
                       <div className="p-2 border-b border-white/[0.08] bg-white/[0.02]">
-                        <div className="relative">
-                          <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-500" />
-                          <input
-                            type="text"
-                            value={calendarAccountSearchQuery}
-                            onChange={(e) => setCalendarAccountSearchQuery(e.target.value)}
-                            placeholder="Search accounts..."
-                            className="h-7 w-full rounded-[8px] border border-white/[0.08] bg-black/40 pl-7 pr-2 text-[11px] font-semibold text-white placeholder:text-zinc-500 focus:border-white/30 focus:outline-none focus:ring-1 focus:ring-white/10"
-                          />
+                        <div className="group relative rounded-[8px] p-[1px] bg-gradient-to-r from-white/15 via-white/5 to-white/15 hover:from-blue-500/40 hover:via-indigo-500/40 hover:to-purple-500/40 focus-within:from-[#0071e3] focus-within:via-[#6366f1] focus-within:to-[#8a3ff2] focus-within:shadow-[0_0_10px_rgba(99,102,241,0.25)] transition-all duration-200">
+                          <div className="relative flex items-center rounded-[7px] bg-[#101013]">
+                            <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-500 group-focus-within:text-blue-400 transition-colors" />
+                            <input
+                              type="text"
+                              value={calendarAccountSearchQuery}
+                              onChange={(e) => setCalendarAccountSearchQuery(e.target.value)}
+                              placeholder="Search accounts..."
+                              className="h-7 w-full rounded-[7px] bg-transparent pl-7 pr-2 text-[11px] font-semibold text-white placeholder:text-zinc-500 outline-none border-0"
+                            />
+                          </div>
                         </div>
                       </div>
 	                      <button

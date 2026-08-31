@@ -5,6 +5,7 @@ import {
   Loader2,
   Redo2,
   Settings,
+  Trash2,
   Undo2,
 } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export const EditorToolbar = ({
   onExport,
   exportLabel = 'Export',
   onOpenBulkBuilder,
+  onClearTimeline,
   onBack,
   backLabel,
 }) => (
@@ -82,6 +84,23 @@ export const EditorToolbar = ({
           <Redo2 className="h-3.5 w-3.5" />
         </button>
       </div>
+
+      {!isBulkProject && onClearTimeline && (
+        <>
+          <div className="hidden h-5 w-px bg-[#303034] sm:block" />
+          <button
+            type="button"
+            onClick={onClearTimeline}
+            className="flex h-7 items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 text-[10px] font-bold text-red-300 transition hover:border-red-500/60 hover:bg-red-500/20 hover:text-red-200 active:scale-[0.98]"
+            aria-label="Clear Timeline"
+            title="Clear all clips from timeline and start fresh"
+          >
+            <Trash2 className="h-3.5 w-3.5 text-red-400" />
+            <span className="hidden sm:inline">Clear Timeline</span>
+            <span className="sm:hidden">Clear</span>
+          </button>
+        </>
+      )}
 
       <div className="hidden h-5 w-px bg-[#303034] sm:block" />
 

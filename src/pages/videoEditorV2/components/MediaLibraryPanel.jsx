@@ -43,7 +43,7 @@ const proxiedMediaUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL, pr
 const AUDIO_PROGRESS_RADIUS = 22;
 const AUDIO_PROGRESS_CIRCUMFERENCE = 2 * Math.PI * AUDIO_PROGRESS_RADIUS;
 
-const mediaItemToEditorAsset = (item) => ({
+const mediaItemToEditorAsset = (item, overrides = {}) => ({
   id: item._id || item.id,
   mediaId: item._id || item.id,
   name: item.name || `Library ${item.type || 'media'}`,
@@ -52,7 +52,7 @@ const mediaItemToEditorAsset = (item) => ({
   url: mediaUrl(item.url),
   originalUrl: item.url,
   thumbnailUrl: item.thumbnailUrl ? mediaUrl(item.thumbnailUrl) : '',
-  duration: item.duration || item.metadata?.duration || 0,
+  duration: overrides.duration ?? (item.duration || item.metadata?.duration || 0),
   width: item.width || item.metadata?.width || 0,
   height: item.height || item.metadata?.height || 0,
   mimeType: item.mimeType || item.mimetype || '',
@@ -251,7 +251,10 @@ const AudioLibraryRow = ({
       draggable={!disabled}
       onDragStart={(event) => {
         stopPreview();
-        onDragStart(event, item);
+        onDragStart(event, {
+          ...item,
+          ...(detectedDuration > 0 ? { duration: detectedDuration } : {}),
+        });
       }}
       className="group flex min-w-0 cursor-grab items-center gap-3 rounded-xl px-1.5 py-2.5 transition hover:bg-white/[0.05] active:cursor-grabbing"
       title={`Drag ${item.name || 'audio'} to the audio track, or click its name to add it`}
@@ -300,7 +303,10 @@ const AudioLibraryRow = ({
 
       <button
         type="button"
-        onClick={() => onAdd(item)}
+        onClick={() => onAdd({
+          ...item,
+          ...(detectedDuration > 0 ? { duration: detectedDuration } : {}),
+        })}
         disabled={disabled}
         className="min-w-0 flex-1 py-1 text-left disabled:cursor-wait disabled:opacity-60"
         title={`Add ${item.name || 'audio'} to the timeline`}

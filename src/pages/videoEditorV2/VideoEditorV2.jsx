@@ -1076,10 +1076,11 @@ export const VideoEditorV2 = () => {
         ? await createLibraryAsset(asset)
         : asset;
       const sourceDuration = Number(resolvedAsset.duration || 0);
-
-      if (type === 'audio' && sourceDuration <= 0) {
-        throw new Error('The full audio duration could not be read. Try the track again after it finishes loading.');
-      }
+      const currentProjectDuration = calculateProjectDuration(project);
+      const fallbackDuration = type === 'image'
+        ? 3
+        : Math.max(0.1, sourceDuration || (currentProjectDuration > 0 ? currentProjectDuration : 10));
+      const duration = fallbackDuration;
 
       const mainVideoTrack = getPrimaryTrackByType(project, 'video');
       const mainAudioTrack = getPrimaryTrackByType(project, 'audio');
@@ -1118,7 +1119,6 @@ export const VideoEditorV2 = () => {
             ? Math.max(0, currentTime)
             : getNextTrackStart(mainTrack, currentTime);
 
-      const duration = type === 'image' ? 3 : Math.max(0.1, sourceDuration || 5);
       const input = {
         name: resolvedAsset.name,
         mediaId: resolvedAsset.id,
@@ -1126,7 +1126,7 @@ export const VideoEditorV2 = () => {
         originalUrl: resolvedAsset.originalUrl || '',
         sourceType: resolvedAsset.sourceType,
         mimeType: resolvedAsset.mimeType || '',
-        sourceDuration: type === 'image' ? 0 : (sourceDuration || duration),
+        sourceDuration: type === 'image' ? 0 : (sourceDuration > 0 ? sourceDuration : duration),
         timelineStart,
         duration,
         ...(type === 'video' && placement === 'overlay'
@@ -1544,6 +1544,39 @@ export const VideoEditorV2 = () => {
     saveProject,
     savingResult,
   ]);
+
+  const handleClearTimeline = useCallback(() => {
+    if (bulkQueueState.running || exportState.exporting || savingResult || extractingAudioClipId) {
+      setStatus({
+        type: 'error',
+        text: 'Finish or cancel the active task before clearing the timeline.',
+      });
+      return;
+    }
+
+    const totalClips = project.tracks.reduce((count, track) => count + (track.clips?.length || 0), 0);
+    if (totalClips > 0) {
+      const confirmed = window.confirm('Are you sure you want to clear the timeline? All clips will be removed.');
+      if (!confirmed) return;
+    }
+
+    setPlaying(false);
+    seek(0);
+
+    const freshProject = createEditorProject();
+    dispatch(editorActions.loadProject(freshProject));
+
+    try {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch (_) {}
+
+    savedProjectRef.current = serializeProject(freshProject);
+    setAssets([]);
+    setStatus({
+      type: 'success',
+      text: 'Timeline cleared.',
+    });
+  }, [bulkQueueState.running, exportState.exporting, extractingAudioClipId, project, savingResult, seek, setPlaying]);
 
   const openBulkQueueRow = useCallback((nextRowId) => {
     if (!isBulkProject || !nextRowId || String(nextRowId) === String(bulkRowId)) return;
@@ -2106,6 +2139,7 @@ export const VideoEditorV2 = () => {
         exportLabel={universalExportLabel}
         onSaveProject={saveProject}
         onOpenBulkBuilder={openBulkVideoBuilder}
+        onClearTimeline={handleClearTimeline}
         onBack={handleBack}
       />
 

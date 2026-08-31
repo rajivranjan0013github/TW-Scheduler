@@ -1,3 +1,6 @@
+import { getMediaUrl } from '../../../utils/mediaUrls';
+import { API_BASE_URL } from '../../videoEditor/videoEditorConstants';
+
 const createId = () => globalThis.crypto?.randomUUID?.() || `media-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 const getMediaType = (file) => {
@@ -7,6 +10,48 @@ const getMediaType = (file) => {
   return null;
 };
 
+let audioCtxSingleton = null;
+const getAudioContext = () => {
+  if (typeof window === 'undefined') return null;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!audioCtxSingleton || audioCtxSingleton.state === 'closed') {
+    audioCtxSingleton = new AudioContextClass();
+  }
+  return audioCtxSingleton;
+};
+
+export const readAudioDurationViaWebAudio = async (url) => {
+  if (!url || typeof window === 'undefined') return 0;
+  const audioCtx = getAudioContext();
+  if (!audioCtx) return 0;
+
+  const tryDecode = async (fetchUrl) => {
+    try {
+      const response = await fetch(fetchUrl);
+      if (!response.ok) return 0;
+      const arrayBuffer = await response.arrayBuffer();
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) return 0;
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+      const duration = Number(audioBuffer?.duration);
+      return Number.isFinite(duration) && duration > 0 ? duration : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  let duration = await tryDecode(url);
+  if (duration > 0) return duration;
+
+  const proxyUrl = getMediaUrl(url, { proxy: true, apiBaseUrl: API_BASE_URL });
+  if (proxyUrl && proxyUrl !== url) {
+    duration = await tryDecode(proxyUrl);
+    if (duration > 0) return duration;
+  }
+
+  return 0;
+};
+
 export const readTimedMediaMetadata = (url, type = 'video') => new Promise((resolve) => {
   if (!url) {
     resolve({ duration: 0, width: 0, height: 0 });
@@ -14,14 +59,8 @@ export const readTimedMediaMetadata = (url, type = 'video') => new Promise((reso
   }
   const element = document.createElement(type === 'audio' ? 'audio' : 'video');
   element.preload = 'metadata';
+  element.crossOrigin = 'anonymous';
   let settled = false;
-  const timeoutId = setTimeout(() => {
-    if (!settled) {
-      settled = true;
-      cleanup();
-      resolve({ duration: 0, width: 0, height: 0 });
-    }
-  }, 10000);
 
   const cleanup = () => {
     clearTimeout(timeoutId);
@@ -29,23 +68,48 @@ export const readTimedMediaMetadata = (url, type = 'video') => new Promise((reso
     element.load?.();
   };
 
-  element.onloadedmetadata = () => {
+  const finishWithFallback = async () => {
     if (settled) return;
     settled = true;
-    const metadata = {
-      duration: Number.isFinite(element.duration) ? element.duration : 0,
-      width: type === 'video' ? (element.videoWidth || 0) : 0,
-      height: type === 'video' ? (element.videoHeight || 0) : 0,
-    };
     cleanup();
-    resolve(metadata);
+
+    if (type === 'audio') {
+      const webAudioDuration = await readAudioDurationViaWebAudio(url);
+      if (webAudioDuration > 0) {
+        resolve({ duration: webAudioDuration, width: 0, height: 0 });
+        return;
+      }
+    }
+    resolve({ duration: 0, width: 0, height: 0 });
   };
 
-  element.onerror = () => {
+  const timeoutId = setTimeout(() => {
+    void finishWithFallback();
+  }, 6000);
+
+  const handleLoaded = () => {
     if (settled) return;
-    settled = true;
-    cleanup();
-    resolve({ duration: 0, width: 0, height: 0 });
+    const dur = Number(element.duration);
+    if (Number.isFinite(dur) && dur > 0) {
+      settled = true;
+      const metadata = {
+        duration: dur,
+        width: type === 'video' ? (element.videoWidth || 0) : 0,
+        height: type === 'video' ? (element.videoHeight || 0) : 0,
+      };
+      cleanup();
+      resolve(metadata);
+    } else if (type === 'audio') {
+      void finishWithFallback();
+    }
+  };
+
+  element.onloadedmetadata = handleLoaded;
+  element.ondurationchange = handleLoaded;
+  element.oncanplay = handleLoaded;
+
+  element.onerror = () => {
+    void finishWithFallback();
   };
 
   element.src = url;
@@ -99,6 +163,17 @@ export const createLibraryAsset = async (item) => {
       metadata = { ...metadata, ...await readTimedMediaMetadata(url, type) };
     } catch {
       // The exporter will validate unreadable remote sources again.
+    }
+  }
+
+  if (type === 'audio' && (!metadata.duration || metadata.duration <= 0) && url) {
+    try {
+      const audioDuration = await readAudioDurationViaWebAudio(url);
+      if (audioDuration > 0) {
+        metadata.duration = audioDuration;
+      }
+    } catch {
+      // Fallback handled downstream
     }
   }
 
