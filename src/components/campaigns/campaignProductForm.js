@@ -14,4 +14,9 @@ export const emptyProductFields = {
   keyMessaging: [],
   positioningStatement: '',
   screenshots: [],
+  showcaseMediaIds: [],
+  showcaseLearning: null,
+  creativeBlueprints: [],
+  strategyStatus: 'none',
+  promoFolderId: null,
 };

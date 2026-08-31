@@ -8,9 +8,11 @@ import {
   Sparkles,
   Smartphone,
   Star,
-  ExternalLink
+  ExternalLink,
+  Video,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
+import CampaignVideoFormatsPreview from './CampaignVideoFormatsPreview';
 
 const SOURCE_OPTIONS = [
   { id: 'app_store', label: 'App Store', icon: '🍎', placeholder: 'https://apps.apple.com/app/id...' },
@@ -93,6 +95,13 @@ export const ProductDetailsFields = ({
         targetAudience: data.targetAudience || current.targetAudience || '',
         rating: data.rating || current.rating,
         ratingCount: data.ratingCount || current.ratingCount,
+        keyBenefit: data.keyBenefit || current.keyBenefit || '',
+        coreFunction: data.coreFunction || current.coreFunction || '',
+        useCases: Array.isArray(data.useCases) ? data.useCases : current.useCases || [],
+        targetAudienceList: Array.isArray(data.targetAudienceList) ? data.targetAudienceList : current.targetAudienceList || [],
+        marketingStrategies: Array.isArray(data.marketingStrategies) ? data.marketingStrategies : current.marketingStrategies || [],
+        keyMessaging: Array.isArray(data.keyMessaging) ? data.keyMessaging : current.keyMessaging || [],
+        positioningStatement: data.positioningStatement || current.positioningStatement || '',
       }));
 
       setExtractedSuccess(true);
@@ -212,6 +221,7 @@ export const ProductDetailsFields = ({
               <img
                 src={form.iconUrl}
                 alt={form.productName || 'App icon'}
+                crossOrigin="anonymous"
                 className="h-11 w-11 rounded-xl object-cover border border-white/10 shadow-sm"
               />
             ) : (
@@ -290,6 +300,16 @@ export const ProductDetailsFields = ({
             className="w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-xs text-white outline-none transition placeholder:text-zinc-600 focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
           />
         </label>
+
+        {/* Video Formats Preview */}
+        {(form.marketingStrategies && form.marketingStrategies.length > 0) && (
+          <div className="pt-2">
+            <CampaignVideoFormatsPreview
+              marketingStrategies={form.marketingStrategies}
+              keyMessaging={form.keyMessaging || []}
+            />
+          </div>
+        )}
       </div>
     </section>
   );

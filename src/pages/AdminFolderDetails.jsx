@@ -81,8 +81,12 @@ export const AdminFolderDetails = () => {
     formData.append('folderId', id);
     formData.append('tags', uploadTags);
     formData.append('caption', uploadCaption);
-    formData.append('socialAccountIds', selectedAccountIds.join(','));
-    formData.append('campaignId', getActiveCampaignId());
+    const folderName = (folder?.name || '').toLowerCase();
+    const folderTags = (folder?.tags || []).map((t) => String(t || '').toLowerCase());
+    const isShowcaseFolder = folderName.includes('showcase') || folderName.includes('promo') || folderName.includes('demo') || folderTags.includes('app-showcase') || folderTags.includes('showcase') || folderTags.includes('promo');
+    const isHookFolder = folderName.includes('hook') || folderTags.includes('hooks') || folderTags.includes('hook');
+    const aiMode = isShowcaseFolder ? 'app_showcase' : isHookFolder ? 'reaction' : undefined;
+    if (aiMode) formData.append('aiMode', aiMode);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/media/upload`, {

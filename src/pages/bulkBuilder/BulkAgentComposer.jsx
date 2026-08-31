@@ -40,6 +40,43 @@ const MAX_STORED_MESSAGES = 20;
 const PLANNING_TIMEOUT_MS = 75_000;
 const BLOCK_NODE_NAMES = new Set(['DIV', 'P', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'PRE']);
 
+const AssignmentThumbnail = ({ src, className = 'h-5 w-5 rounded-md object-cover border border-white/10 shrink-0', fallbackIcon: FallbackIcon = Video }) => {
+  const [hasError, setHasError] = useState(false);
+  const [useProxy, setUseProxy] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+    setUseProxy(false);
+  }, [src]);
+
+  if (!src || hasError) {
+    return (
+      <div className="h-5 w-5 rounded-md bg-zinc-800 border border-white/10 flex items-center justify-center shrink-0">
+        <FallbackIcon className="h-2.5 w-2.5 text-zinc-400" />
+      </div>
+    );
+  }
+
+  const effectiveUrl = useProxy && !src.startsWith('blob:') && !src.includes('/api/media/proxy')
+    ? `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(src)}`
+    : src;
+
+  return (
+    <img
+      src={effectiveUrl}
+      alt=""
+      className={className}
+      onError={() => {
+        if (!useProxy && !src.startsWith('blob:') && !src.includes('/api/media/proxy')) {
+          setUseProxy(true);
+        } else {
+          setHasError(true);
+        }
+      }}
+    />
+  );
+};
+
 const normalizeFolderId = (folder) => String(folder?._id || folder?.id || '');
 const historyStorageKey = (campaignId) => `tw_bulk_agent_history:${campaignId || 'none'}`;
 const draftStorageKey = (campaignId) => `tw_bulk_agent_draft:${campaignId || 'none'}`;
@@ -1592,8 +1629,8 @@ export const BulkAgentComposer = ({
                     <Sparkles className="h-5 w-5" />
                   </div>
                   <h4 className="text-xs font-bold text-zinc-200">How can I help you build?</h4>
-                  <p className="mt-1 text-[10px] text-zinc-500 max-w-60 leading-relaxed">
-                    Type <code className="rounded bg-white/5 px-1 py-0.5 font-mono text-violet-300 font-medium">@</code> to attach Media Folders and generate bulk video variations.
+                  <p className="mt-1 text-[10px] text-zinc-500 max-w-64 leading-relaxed">
+                    Uses campaign <span className="text-zinc-300 font-medium">Hooks</span> & <span className="text-zinc-300 font-medium">App Showcase</span> automatically. Type <code className="rounded bg-white/5 px-1 py-0.5 font-mono text-violet-300 font-medium">@</code> for specific folders.
                   </p>
                   <div className="mt-4 flex flex-col gap-1.5 w-full max-w-72">
                     {[
@@ -1718,17 +1755,7 @@ export const BulkAgentComposer = ({
 
                             {/* Video 1 Preview */}
                             <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
-                              {assignment.video1?.thumbnailUrl ? (
-                                <img
-                                  src={assignment.video1.thumbnailUrl}
-                                  alt=""
-                                  className="h-5 w-5 rounded-md object-cover border border-white/10 shrink-0"
-                                />
-                              ) : (
-                                <div className="h-5 w-5 rounded-md bg-zinc-800 border border-white/10 flex items-center justify-center shrink-0">
-                                  <Video className="h-2.5 w-2.5 text-zinc-400" />
-                                </div>
-                              )}
+                              <AssignmentThumbnail src={assignment.video1?.thumbnailUrl} />
                               <span className="truncate text-zinc-200 font-medium" title={assignment.video1?.name}>
                                 {assignment.video1?.name || (assignment.caption ? `“${assignment.caption}”` : '') || 'Video 1'}
                               </span>
@@ -1737,17 +1764,7 @@ export const BulkAgentComposer = ({
                             {/* Video 2 Preview (Dual Mode) */}
                             {assignment.video2 && (
                               <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate border-l border-white/10 pl-1.5">
-                                {assignment.video2.thumbnailUrl ? (
-                                  <img
-                                    src={assignment.video2.thumbnailUrl}
-                                    alt=""
-                                    className="h-5 w-5 rounded-md object-cover border border-white/10 shrink-0"
-                                  />
-                                ) : (
-                                  <div className="h-5 w-5 rounded-md bg-zinc-800 border border-white/10 flex items-center justify-center shrink-0">
-                                    <Video className="h-2.5 w-2.5 text-violet-300" />
-                                  </div>
-                                )}
+                                <AssignmentThumbnail src={assignment.video2?.thumbnailUrl} />
                                 <span className="truncate text-zinc-300 font-medium" title={assignment.video2.name}>
                                   {assignment.video2.name}
                                 </span>
@@ -1866,7 +1883,7 @@ export const BulkAgentComposer = ({
               onHighlight={setSuggestionIndex}
               onSelect={selectFolderSuggestion}
             />
-            {composerEditor('What do you want to create? (type @ for folders)', 'max-h-28 min-h-10 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent px-1 py-1 text-[12px] leading-5 text-white outline-none placeholder:text-zinc-500')}
+            {composerEditor('What do you want to create? (type @ for specific folders)', 'max-h-28 min-h-10 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent px-1 py-1 text-[12px] leading-5 text-white outline-none placeholder:text-zinc-500')}
             {showDefaultAudioHint && (
               <div className="px-1 text-[8px] leading-relaxed text-sky-300/70" role="status">
                 When no audio folder is attached, music uses Trending Songs automatically.
@@ -1917,7 +1934,7 @@ export const BulkAgentComposer = ({
               onHighlight={setSuggestionIndex}
               onSelect={selectFolderSuggestion}
             />
-            {composerEditor('Ask AI to build or edit frames... (type @ for folders)', 'max-h-32 min-h-12 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent py-1.5 pl-2 pr-12 text-[12px] leading-5 text-white outline-none placeholder:text-zinc-500')}
+            {composerEditor('Ask AI to build or edit frames... (type @ for specific folders)', 'max-h-32 min-h-12 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent py-1.5 pl-2 pr-12 text-[12px] leading-5 text-white outline-none placeholder:text-zinc-500')}
             {showDefaultAudioHint && (
               <div className="px-2 text-[8px] leading-relaxed text-sky-300/70" role="status">
                 When no audio folder is attached, music uses Trending Songs automatically.

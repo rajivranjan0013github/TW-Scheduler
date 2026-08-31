@@ -11,6 +11,7 @@ import { DEFAULT_DRAG_POS } from './useBulkRows';
 import { FloatingTextControls } from './FloatingTextControls';
 import LoadingVideoPreview from '../../components/LoadingVideoPreview';
 import { getMediaUrl } from '../../utils/mediaUrls';
+import { API_BASE_URL } from '../../config';
 
 const SOURCE_PREVIEW_WIDTH = PREVIEW_FRAME_WIDTH;
 const SOURCE_PREVIEW_HEIGHT = PREVIEW_FRAME_HEIGHT;
@@ -233,8 +234,8 @@ export const BulkVideoRow = ({
   const resolveBulkPreviewUrl = (video, selectedUrl) => {
     if (selectedUrl) return selectedUrl;
     if (!video) return '';
-    if (video.sourceType === 'library') return getMediaUrl(video.originalUrl || video.url);
-    return video.url || '';
+    if (video.sourceType === 'library') return getMediaUrl(video.originalUrl || video.url, { apiBaseUrl: API_BASE_URL });
+    return getMediaUrl(video.url || '', { apiBaseUrl: API_BASE_URL });
   };
 
   const resolvedVideo1Url = resolveBulkPreviewUrl(video1, video1Url);

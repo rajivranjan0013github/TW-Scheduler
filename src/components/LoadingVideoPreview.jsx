@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 const LoadingVideoPreview = forwardRef(({
   src,
@@ -14,11 +15,17 @@ const LoadingVideoPreview = forwardRef(({
 }, ref) => {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [useProxyFallback, setUseProxyFallback] = useState(false);
 
   useEffect(() => {
     setLoaded(false);
     setFailed(false);
+    setUseProxyFallback(false);
   }, [src]);
+
+  const effectiveSrc = useProxyFallback && src && !src.startsWith('blob:') && !src.startsWith('data:') && !src.includes('/api/media/proxy')
+    ? `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(src)}`
+    : src;
 
   const handleLoaded = (event, callback) => {
     setLoaded(true);
@@ -27,6 +34,10 @@ const LoadingVideoPreview = forwardRef(({
   };
 
   const handleError = (event) => {
+    if (!useProxyFallback && src && !src.startsWith('blob:') && !src.startsWith('data:') && !src.includes('/api/media/proxy')) {
+      setUseProxyFallback(true);
+      return;
+    }
     setFailed(true);
     setLoaded(false);
     onError?.(event);
@@ -37,7 +48,7 @@ const LoadingVideoPreview = forwardRef(({
       <video
         ref={ref}
         {...videoProps}
-        src={src}
+        src={effectiveSrc}
         className={videoClassName}
         onLoadedMetadata={(event) => {
           onLoadedMetadata?.(event);
@@ -68,3 +79,4 @@ const LoadingVideoPreview = forwardRef(({
 LoadingVideoPreview.displayName = 'LoadingVideoPreview';
 
 export default LoadingVideoPreview;
+

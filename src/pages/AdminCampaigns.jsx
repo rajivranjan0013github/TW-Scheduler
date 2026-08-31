@@ -15,12 +15,14 @@ import {
   Settings,
   Trash2,
   Users,
+  Video,
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getActiveCampaignId } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
 import ProductDetailsFields from '../components/campaigns/ProductDetailsFields';
+import VideoFormatsStudio from '../components/campaigns/VideoFormatsStudio';
 import { emptyProductFields } from '../components/campaigns/campaignProductForm';
 
 const statusOptions = ['active', 'paused', 'archived'];
@@ -30,6 +32,7 @@ const getFolderParentId = (folder) => normalizeFolderId(folder?.parentFolderId) 
 
 const tabConfig = [
   { id: 'details', label: 'Details', icon: Settings },
+  { id: 'formats', label: 'Video Formats', icon: Video },
   { id: 'accounts', label: 'Accounts', icon: Users },
 ];
 
@@ -78,6 +81,17 @@ export const AdminCampaigns = () => {
         productWebsite: nextCampaign.productWebsite || '',
         productName: nextCampaign.productName || nextCampaign.name || '',
         productDescription: nextCampaign.productDescription || nextCampaign.description || '',
+        category: nextCampaign.category || '',
+        iconUrl: nextCampaign.iconUrl || '',
+        targetAudience: nextCampaign.targetAudience || '',
+        keyBenefit: nextCampaign.keyBenefit || '',
+        coreFunction: nextCampaign.coreFunction || '',
+        useCases: nextCampaign.useCases || [],
+        targetAudienceList: nextCampaign.targetAudienceList || [],
+        marketingStrategies: nextCampaign.marketingStrategies || [],
+        keyMessaging: nextCampaign.keyMessaging || [],
+        positioningStatement: nextCampaign.positioningStatement || '',
+        screenshots: nextCampaign.screenshots || [],
         mainEmail: nextCampaign.mainEmail || nextCampaign.createdBy?.email || '',
         status: nextCampaign.status || 'active',
         promoFolderId: String(nextCampaign.promoFolderId?._id || nextCampaign.promoFolderId || ''),
@@ -548,6 +562,17 @@ export const AdminCampaigns = () => {
                       </p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* ── Video Formats Tab ── */}
+              {activeTab === 'formats' && (
+                <div className="p-6">
+                  <VideoFormatsStudio
+                    marketingStrategies={form.marketingStrategies || []}
+                    onChange={(updatedStrategies) => setForm((c) => ({ ...c, marketingStrategies: updatedStrategies }))}
+                    keyMessaging={form.keyMessaging || []}
+                  />
                 </div>
               )}
 

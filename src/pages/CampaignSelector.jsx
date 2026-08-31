@@ -8,13 +8,16 @@ import {
   Clock,
   Edit3,
   ExternalLink,
+  Flame,
   Package,
   Plus,
   RefreshCw,
   Sparkles,
+  Video,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ProductEditorPage from '../components/campaigns/ProductEditorPage';
+import CampaignVideoFormatsPreview from '../components/campaigns/CampaignVideoFormatsPreview';
 import { emptyProductFields } from '../components/campaigns/campaignProductForm';
 
 const emptyCampaignForm = {
@@ -190,6 +193,11 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
       rating: campaign.rating,
       ratingCount: campaign.ratingCount,
       screenshots: campaign.screenshots || [],
+      showcaseMediaIds: campaign.showcaseMediaIds || [],
+      showcaseLearning: campaign.showcaseLearning || null,
+      creativeBlueprints: campaign.creativeBlueprints || [],
+      strategyStatus: campaign.strategyStatus || 'none',
+      promoFolderId: campaign.promoFolderId || null,
     });
   };
 
@@ -207,14 +215,8 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
     e?.preventDefault?.();
     const activeForm = customForm || campaignForm;
 
-    if (!String(activeForm.productName || '').trim()) {
-      setFormError('Product name is required.');
-      return;
-    }
-    if (!String(activeForm.productDescription || '').trim()) {
-      setFormError('Product description is required.');
-      return;
-    }
+    const resolvedName = String(activeForm.productName || activeForm.name || '').trim() || 'My App';
+    const resolvedDesc = String(activeForm.productDescription || activeForm.description || '').trim() || resolvedName;
 
     try {
       setSaving(true);
@@ -226,10 +228,10 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
       };
 
       const payload = {
-        name: activeForm.productName,
-        description: activeForm.productDescription,
-        productName: activeForm.productName,
-        productDescription: activeForm.productDescription,
+        name: resolvedName,
+        description: resolvedDesc,
+        productName: resolvedName,
+        productDescription: resolvedDesc,
         productSource: activeForm.productSource || 'app_store',
         productUrl: activeForm.productUrl || '',
         category: activeForm.category || '',
@@ -293,7 +295,9 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
 
         savedData = data;
         setCampaigns((current) => [data, ...current]);
-        persistCampaign(data);
+        // Auto-saving after link analysis must not remount the keyed route tree.
+        // The builder needs to remain mounted so it can advance to Showcase.
+        persistCampaign(data, { emitEvent: !stayInEditor });
 
         if (stayInEditor) {
           setEditingCampaign(data);
@@ -334,6 +338,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
         onSubmit={(e) => handleSaveCampaign(e, { thenNavigateQueue: false })}
         onSaveAndOpenQueue={(e) => handleSaveCampaign(e, { thenNavigateQueue: true })}
         onAutoSave={(analyzedForm) => handleSaveCampaign(null, { stayInEditor: true, customForm: analyzedForm })}
+        campaignId={editingCampaign?._id || ''}
       />
     );
   }
@@ -427,6 +432,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
                             <img
                               src={campaign.iconUrl}
                               alt={campaign.name || 'App icon'}
+                              crossOrigin="anonymous"
                               className="h-11 w-11 rounded-[10px] object-cover border border-white/10 shadow-sm"
                               onError={(e) => {
                                 e.currentTarget.style.display = 'none';
@@ -481,53 +487,39 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
 
                       {/* Active indicator */}
                       {isActive && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-400 shrink-0">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[9px] font-mono text-white shrink-0">
+                          <span className="h-1.5 w-1.5 rounded-full bg-white" />
                           Active
                         </span>
                       )}
                     </div>
 
-                    {/* Product Description */}
-                    <div className="mt-3.5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-                      <p className="m-0 text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-500 mb-1">
-                        Product Description & Hook
-                      </p>
-                      {description ? (
-                        <div>
-                          <p className={`m-0 text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap ${
-                            !isExpanded && isLongDescription ? 'line-clamp-4' : ''
-                          }`}>
-                            {description}
-                          </p>
-                          {isLongDescription && (
-                            <button
-                              type="button"
-                              onClick={(e) => toggleExpandDesc(campaign._id, e)}
-                              className="mt-1 text-[10px] font-medium text-zinc-400 hover:text-white transition-colors underline underline-offset-2"
-                            >
-                              {isExpanded ? 'Show less' : 'Read full description'}
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="m-0 text-xs italic text-zinc-500">
-                          No description provided. Click &apos;Edit Details&apos; to add one.
-                        </p>
-                      )}
+                    {/* Video Formats Preview */}
+                    <div className="mt-3">
+                      <CampaignVideoFormatsPreview
+                        marketingStrategies={campaign.marketingStrategies || []}
+                        keyMessaging={campaign.keyMessaging || []}
+                      />
                     </div>
+
+                    {/* Product Description */}
+                    {description && (
+                      <p className="m-0 mt-2 text-xs leading-relaxed text-zinc-400 line-clamp-2">
+                        {description}
+                      </p>
+                    )}
                   </div>
 
                   {/* Card Bottom / Actions */}
-                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/[0.08] pt-3.5">
+                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/[0.08] pt-3">
                     <button
                       type="button"
                       onClick={(e) => openEditForm(campaign, e)}
-                      className="inline-flex items-center gap-1.5 rounded-[10px] border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-white/[0.14] hover:bg-white/[0.06] hover:text-white"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors"
                       title="View or edit product details"
                     >
                       <Edit3 className="h-3.5 w-3.5 text-zinc-400" />
-                      Edit Details
+                      Edit & Formats
                     </button>
 
                     <div className="flex items-center gap-2">
