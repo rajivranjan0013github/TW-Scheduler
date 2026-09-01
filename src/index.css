@@ -122,6 +122,44 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+@keyframes distribution-line-flow {
+  to {
+    stroke-dashoffset: -34;
+  }
+}
+
+@keyframes distribution-node-glow {
+  0%, 100% {
+    box-shadow: 0 0 22px rgba(244, 239, 231, 0.14);
+  }
+  50% {
+    box-shadow: 0 0 46px rgba(244, 239, 231, 0.28);
+  }
+}
+
+.distribution-flow {
+  animation: distribution-line-flow 1.4s linear infinite;
+}
+
+.distribution-flow-delay {
+  animation-delay: -0.45s;
+}
+
+.distribution-flow-delay-long {
+  animation-delay: -0.9s;
+}
+
+.distribution-node-pulse {
+  animation: distribution-node-glow 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .distribution-flow,
+  .distribution-node-pulse {
+    animation: none;
+  }
+}
+
 /* Mobile Navigation Safe Area Adjustments */
 @media (max-width: 767px) {
   .mobile-safe-nav {
@@ -330,4 +368,3 @@ textarea::placeholder {
   background-color: rgba(255, 255, 255, 0.08) !important;
   color: #ffffff !important;
 }
-
