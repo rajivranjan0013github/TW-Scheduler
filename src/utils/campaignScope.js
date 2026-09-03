@@ -1,5 +1,17 @@
 export const getActiveCampaignId = () => localStorage.getItem('active-campaign-id') || '';
 
+export const clearActiveCampaign = (userId = '') => {
+  localStorage.removeItem('active-campaign-id');
+  localStorage.removeItem('active-campaign-name');
+  localStorage.removeItem('active-campaign-main-email');
+  if (userId) {
+    localStorage.removeItem(`active-campaign-id:${userId}`);
+  }
+  window.dispatchEvent(new CustomEvent('campaign-selected', {
+    detail: { campaignId: '', campaignName: '', mainEmail: '' }
+  }));
+};
+
 export const withCampaignScope = (baseQuery = '') => {
   const params = new URLSearchParams(baseQuery);
   const campaignId = getActiveCampaignId();

@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search, Trash2, Loader2, ExternalLink } from 'lucide-react';
-import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
+import { getActiveCampaignId, withCampaignScope, clearActiveCampaign } from '../utils/campaignScope';
 import {
   MEDIA_LIBRARY_STALE_TIME,
   MEDIA_LIBRARY_GC_TIME,
@@ -1139,7 +1139,15 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
       setPosts(filtered);
     } catch (error) {
       console.error('Failed to load scheduled posts:', error);
-      setQueueError(error.message || 'Failed to load scheduled posts.');
+      const isAccessDenied = error?.message?.toLowerCase().includes('campaign access denied') ||
+        error?.message?.toLowerCase().includes('not found');
+      if (isAccessDenied) {
+        clearActiveCampaign();
+        setPosts([]);
+        setQueueError('You do not have access to this campaign. Please select or create a product from the Products page.');
+      } else {
+        setQueueError(error.message || 'Failed to load scheduled posts.');
+      }
     } finally {
       calendarLoadingRequestCountRef.current = Math.max(0, calendarLoadingRequestCountRef.current - 1);
       if (calendarLoadingRequestCountRef.current === 0) {

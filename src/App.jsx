@@ -141,12 +141,13 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
               <Route path="/" element={<CreatorCampaigns />} />
               <Route path="/campaigns" element={<CreatorCampaigns />} />
               <Route path="/channels" element={<Channels selectedAccounts={selectedAccounts} />} />
+              <Route path="/channels/:id/feed" element={<PublishedFeed />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           ) : (
             <>
-              <Route path="/" element={hasActiveCampaign ? <Navigate to="/scheduler" replace /> : <CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
+              <Route path="/" element={<CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
               <Route path="/campaigns" element={<CampaignSelector setSelectedAccounts={setSelectedAccounts} />} />
               <Route path="/dashboard" element={canViewAdmin ? <AdminDashboard /> : <Navigate to="/scheduler" replace />} />
               <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
@@ -179,9 +180,12 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const location = useLocation();
   const [selectedAccounts, setSelectedAccounts] = useState([]);
 
-  if (loading) {
+  const isAuthCallback = location.pathname.startsWith('/auth/');
+
+  if (loading && !isAuthCallback) {
     return (
       <div className="min-h-screen bg-[#06040a] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -193,35 +197,33 @@ function AppContent() {
   }
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
-        <Route path="/auth/facebook-login/callback" element={<FacebookLoginCallback />} />
-        <Route path="/auth/google/callback" element={<GoogleLoginCallback />} />
-        <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
-        {!user ? (
-          <>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </>
-        ) : !user.userType ? (
-          <>
-            <Route path="*" element={<OnboardingScreen />} />
-          </>
-        ) : (
-          <>
-            <Route path="/auth/youtube/callback" element={<YoutubeCallback />} />
-            <Route
-              path="*"
-              element={<AuthenticatedShell selectedAccounts={selectedAccounts} setSelectedAccounts={setSelectedAccounts} />}
-            />
-          </>
-        )}
+    <Routes>
+      <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
+      <Route path="/auth/facebook-login/callback" element={<FacebookLoginCallback />} />
+      <Route path="/auth/google/callback" element={<GoogleLoginCallback />} />
+      <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+      {!user ? (
+        <>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </>
+      ) : !user.userType ? (
+        <>
+          <Route path="*" element={<OnboardingScreen />} />
+        </>
+      ) : (
+        <>
+          <Route path="/auth/youtube/callback" element={<YoutubeCallback />} />
+          <Route
+            path="*"
+            element={<AuthenticatedShell selectedAccounts={selectedAccounts} setSelectedAccounts={setSelectedAccounts} />}
+          />
+        </>
+      )}
     </Routes>
-    </Router >
   );
 }
 
@@ -230,7 +232,9 @@ function App() {
   return (
     <GoogleOAuthProvider clientId={clientId}>
       <AuthProvider>
-        <AppContent />
+        <Router>
+          <AppContent />
+        </Router>
       </AuthProvider>
     </GoogleOAuthProvider>
   );

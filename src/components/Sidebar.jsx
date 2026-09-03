@@ -109,9 +109,12 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
           if (campaignData.length > 0) {
             applyCampaign(campaignData, getPreferredCampaignId());
             return;
+          } else {
+            applyCampaign([], '');
           }
         } else {
           setCampaigns([]);
+          applyCampaign([], '');
         }
 
         const accountQuery = withCampaignScope(adminViewUserId ? `userId=${adminViewUserId}` : '');

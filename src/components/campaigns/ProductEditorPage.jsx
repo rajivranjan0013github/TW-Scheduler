@@ -381,7 +381,7 @@ export const ProductEditorPage = ({
         <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-400/10 text-violet-200">
           <Link2 className="h-5 w-5" />
         </span>
-        <h1 className="m-0 text-2xl font-semibold tracking-tight text-white">What are we promoting?</h1>
+        <h1 className="m-0 text-2xl font-semibold tracking-tight text-white">What are you promoting?</h1>
         <p className="m-0 mt-2 max-w-xl text-sm leading-6 text-zinc-400">
           Paste the official app or product link. AI will read the listing first, so every later hook is grounded in the actual product.
         </p>

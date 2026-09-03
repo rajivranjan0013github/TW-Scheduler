@@ -1,45 +1,31 @@
 import { useState } from 'react';
 import {
   ArrowRight,
-  CalendarClock,
   Check,
-  CheckCircle2,
-  CircleUserRound,
   Layers3,
+  LogOut,
   Sparkles,
   UsersRound,
-  WandSparkles,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import creatorStrip from '../assets/onboarding-creators.jpg';
 
 const workspaceTypes = [
   {
     value: 'campaign_maker',
-    eyebrow: 'Create + orchestrate',
-    title: 'I run campaigns',
-    description: 'Generate content, route it to human posters, or schedule it directly from one workspace.',
+    title: 'Run campaigns',
+    description: 'Create content, manage schedules, and coordinate posters.',
     icon: Layers3,
-    points: ['AI content studio', 'Human + direct distribution'],
   },
   {
     value: 'account_handler',
-    eyebrow: 'Review + publish',
-    title: 'I post for campaigns',
-    description: 'Receive approved content, connect verified channels, and keep every assigned campaign moving.',
-    icon: CircleUserRound,
-    points: ['Assigned campaign queue', 'Channel-safe publishing'],
+    title: 'Post content',
+    description: 'Connect social channels and publish assigned posts.',
+    icon: UsersRound,
   },
 ];
 
-const workflow = [
-  { index: '01', label: 'Generate', icon: WandSparkles },
-  { index: '02', label: 'Choose route', icon: UsersRound },
-  { index: '03', label: 'Go live', icon: CalendarClock },
-];
-
 export const OnboardingScreen = () => {
-  const { updateProfile } = useAuth();
+  const { user, updateProfile, logout } = useAuth();
   const [selectedRole, setSelectedRole] = useState('campaign_maker');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -51,7 +37,7 @@ export const OnboardingScreen = () => {
     try {
       const success = await updateProfile({ userType: selectedRole });
       if (!success) {
-        throw new Error('We could not set up your workspace. Please try again.');
+        throw new Error('Could not set role. Please try again.');
       }
     } catch (err) {
       setError(err.message);
@@ -61,176 +47,143 @@ export const OnboardingScreen = () => {
   };
 
   return (
-    <div className="h-[100dvh] overflow-y-auto bg-[#0b0b0b] text-[#f7f3ed] selection:bg-[#ff6b3d] selection:text-[#0b0b0b]">
-      <div
-        className="pointer-events-none fixed inset-0 opacity-[0.18]"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px)',
-          backgroundSize: '64px 64px',
-        }}
-      />
-
-      <header className="relative z-20 flex h-20 items-center justify-between border-b border-white/[0.09] px-5 sm:px-8 lg:px-12">
-        <div className="flex items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-[#ff6b3d] text-[#0b0b0b] shadow-[0_0_30px_rgba(255,107,61,.25)]">
-            <Sparkles className="h-4 w-4" strokeWidth={2.5} />
-          </span>
-          <div>
-            <p className="m-0 text-sm font-black uppercase tracking-[0.16em] text-[#f7f3ed]">EasyPost</p>
-            <p className="m-0 mt-0.5 text-[9px] font-bold uppercase tracking-[0.22em] text-[#77736e]">
-              Content operating system
-            </p>
+    <div className="relative flex h-full min-h-[100dvh] w-full flex-col overflow-x-hidden overflow-y-auto bg-[#080807] text-[#f5f0e8] selection:bg-[#f3eee5] selection:text-[#11110f]">
+      {/* Top Header Navigation */}
+      <header className="sticky top-0 z-30 flex-shrink-0 border-b border-white/[0.08] bg-[#080807]/90 backdrop-blur-2xl">
+        <div className="mx-auto flex h-16 sm:h-[72px] max-w-[1280px] items-center justify-between px-4 sm:px-8">
+          <div className="inline-flex items-center gap-2.5 sm:gap-3">
+            <span className="grid h-8 w-8 sm:h-10 sm:w-10 place-items-center rounded-[11px] sm:rounded-[13px] bg-[#f3eee5] text-[#11110f] shadow-[0_0_30px_rgba(244,239,231,.14)]">
+              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.7} />
+            </span>
+            <div>
+              <p className="m-0 text-sm sm:text-[15px] font-black tracking-[-0.03em] text-[#f5f0e8]">EasyPost</p>
+              <p className="m-0 mt-0.5 text-[7px] sm:text-[8px] font-black uppercase tracking-[0.22em] text-[#77726c]">
+                Generate · Distribute
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#817c76]">
-          <span className="hidden sm:inline">Workspace setup</span>
-          <span className="h-px w-8 bg-white/20" />
-          <span className="text-[#ff8b66]">01 / 01</span>
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {user?.email && (
+              <span className="hidden max-w-[200px] truncate text-xs font-semibold text-[#8f8982] md:inline">
+                {user.email}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={logout}
+              className="inline-flex items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 sm:px-3.5 sm:py-2 text-[10px] sm:text-[11px] font-black text-[#8f8982] transition hover:border-white/20 hover:bg-white/[0.06] hover:text-[#f5f0e8]"
+              title="Log out"
+            >
+              <LogOut className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              <span>Log out</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto grid min-h-[calc(100dvh-5rem)] max-w-[1600px] lg:grid-cols-[minmax(0,1.15fr)_minmax(440px,.85fr)]">
-        <section className="flex flex-col justify-between border-b border-white/[0.09] px-5 py-10 sm:px-8 sm:py-12 lg:border-b-0 lg:border-r lg:px-12 xl:px-16 xl:py-16">
-          <div>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#ff6b3d]/30 bg-[#ff6b3d]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#ff9a77]">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#ff6b3d]" />
-              Built to ship content
+      {/* Main Selection Area */}
+      <main className="relative flex flex-1 items-center justify-center px-4 py-8 pb-16 sm:px-6 sm:py-12">
+        {/* Ambient background lighting and grid */}
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-[350px] w-[350px] sm:h-[600px] sm:w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f3eee5]/[0.025] blur-[100px] sm:blur-[140px]" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-15 sm:opacity-20"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,.1) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+            maskImage: 'radial-gradient(circle at center, black 40%, transparent 85%)',
+          }}
+        />
+
+        <div className="relative w-full max-w-md sm:max-w-lg">
+          {/* Card Container */}
+          <div className="rounded-2xl sm:rounded-[28px] border border-white/[0.1] bg-[#11110f]/95 p-5 sm:p-8 shadow-[0_25px_80px_rgba(0,0,0,.55)] backdrop-blur-2xl">
+            {/* Header */}
+            <div className="text-center">
+              <h1 className="m-0 text-xl sm:text-2xl md:text-3xl font-black tracking-[-0.04em] text-[#f5f0e8]">
+                Select your role
+              </h1>
+              <p className="m-0 mt-1 text-xs sm:text-sm text-[#89837c]">
+                Choose how you want to use EasyPost.
+              </p>
             </div>
 
-            <h1 className="m-0 max-w-4xl text-[clamp(3rem,6.2vw,6.9rem)] font-black leading-[0.88] tracking-[-0.07em] text-[#f7f3ed]">
-              Create once.
-              <span className="mt-2 block text-[#ff6b3d]">Move everywhere.</span>
-            </h1>
-
-            <p className="mt-7 max-w-2xl text-base font-medium leading-7 text-[#aaa49d] sm:text-lg">
-              Generate campaign-ready content, hand it to real posters, or send it straight to the schedule. One pipeline. Zero chaos.
-            </p>
-          </div>
-
-          <div className="mt-10 xl:mt-14">
-            <div className="group relative overflow-hidden rounded-[24px] border border-white/[0.12] bg-[#151412] shadow-[0_30px_80px_rgba(0,0,0,.42)]">
-              <img
-                src={creatorStrip}
-                alt="Four creators presenting campaign content"
-                className="h-[230px] w-full object-cover saturate-[.9] transition duration-700 group-hover:scale-[1.015] sm:h-[285px] xl:h-[330px]"
-              />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b0b0b] via-transparent to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-4 sm:p-6">
-                <div>
-                  <p className="m-0 text-[10px] font-black uppercase tracking-[0.2em] text-[#ff9a77]">Human distribution network</p>
-                  <p className="m-0 mt-1 text-base font-bold text-[#f7f3ed] sm:text-lg">Real people. Real channels. Ready to post.</p>
-                </div>
-                <span className="hidden rounded-full border border-white/15 bg-black/55 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#ddd7cf] backdrop-blur-md sm:inline-flex">
-                  Route: Human
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-3 overflow-hidden rounded-2xl border border-white/[0.09] bg-[#11100f]">
-              {workflow.map((step, index) => (
-                <div
-                  key={step.index}
-                  className={`relative px-3 py-4 sm:px-5 ${index !== workflow.length - 1 ? 'border-r border-white/[0.09]' : ''}`}
-                >
-                  <div className="flex items-center gap-2 text-[#ff8b66]">
-                    <step.icon className="h-3.5 w-3.5" />
-                    <span className="text-[9px] font-black tracking-[0.18em]">{step.index}</span>
-                  </div>
-                  <p className="m-0 mt-2 text-[11px] font-bold text-[#d6d0c8] sm:text-xs">{step.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="flex items-center px-5 py-10 sm:px-8 lg:px-10 xl:px-14">
-          <div className="mx-auto w-full max-w-xl">
-            <p className="m-0 text-[10px] font-black uppercase tracking-[0.22em] text-[#817c76]">Pick your side of the pipeline</p>
-            <h2 className="m-0 mt-3 text-3xl font-black leading-tight tracking-[-0.045em] text-[#f7f3ed] sm:text-4xl">
-              How will you use EasyPost?
-            </h2>
-            <p className="m-0 mt-3 text-sm leading-6 text-[#918c85]">
-              We’ll shape the workspace around your role. You can switch this later in settings.
-            </p>
-
+            {/* Error banner */}
             {error && (
-              <div className="mt-6 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-xs font-semibold text-red-200" role="alert">
+              <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-semibold text-red-200">
                 {error}
               </div>
             )}
 
-            <div className="mt-7 space-y-3">
+            {/* Role Options */}
+            <div className="mt-6 space-y-3">
               {workspaceTypes.map((type) => {
-                const selected = selectedRole === type.value;
+                const isSelected = selectedRole === type.value;
                 return (
                   <button
                     key={type.value}
                     type="button"
                     onClick={() => setSelectedRole(type.value)}
-                    aria-pressed={selected}
-                    className={`group w-full rounded-[20px] border p-5 text-left transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b3d] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0b0b] sm:p-6 ${
-                      selected
-                        ? 'border-[#ff6b3d] bg-[#1b1512] shadow-[0_18px_55px_rgba(255,107,61,.08)]'
-                        : 'border-white/[0.1] bg-[#11100f] hover:border-white/25 hover:bg-[#151412]'
+                    aria-pressed={isSelected}
+                    className={`group w-full rounded-xl sm:rounded-2xl border p-4 text-left transition duration-200 focus:outline-none ${
+                      isSelected
+                        ? 'border-[#ded8cf] bg-[#1a1917]/90 shadow-[0_0_25px_rgba(244,239,231,.08)]'
+                        : 'border-white/[0.08] bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
                     }`}
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-center gap-3.5 sm:gap-4">
+                      {/* Icon */}
                       <span
-                        className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition ${
-                          selected
-                            ? 'border-[#ff6b3d]/40 bg-[#ff6b3d] text-[#0b0b0b]'
-                            : 'border-white/10 bg-white/[0.04] text-[#a39d96] group-hover:text-[#f7f3ed]'
+                        className={`grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 place-items-center rounded-xl border transition ${
+                          isSelected
+                            ? 'border-black/10 bg-[#f3eee5] text-[#11110f]'
+                            : 'border-white/[0.1] bg-white/[0.04] text-[#8f8982] group-hover:text-[#f5f0e8]'
                         }`}
                       >
-                        <type.icon className="h-5 w-5" />
+                        <type.icon className="h-5 w-5" strokeWidth={2.2} />
                       </span>
 
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-3">
-                          <span>
-                            <span className={`block text-[9px] font-black uppercase tracking-[0.2em] ${selected ? 'text-[#ff8b66]' : 'text-[#77736e]'}`}>
-                              {type.eyebrow}
-                            </span>
-                            <span className="mt-1.5 block text-lg font-black tracking-[-0.025em] text-[#f7f3ed]">{type.title}</span>
-                          </span>
-                          <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border ${selected ? 'border-[#ff6b3d] bg-[#ff6b3d] text-[#0b0b0b]' : 'border-white/20 text-transparent'}`}>
-                            <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                          </span>
-                        </span>
+                      {/* Content */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <h2 className="m-0 text-sm sm:text-base font-black text-[#f5f0e8]">
+                            {type.title}
+                          </h2>
 
-                        <span className="mt-2 block text-xs leading-5 text-[#9d9790] sm:text-sm">{type.description}</span>
-                        <span className="mt-4 flex flex-wrap gap-2">
-                          {type.points.map((point) => (
-                            <span key={point} className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-black/30 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[#aaa49d]">
-                              <CheckCircle2 className="h-3 w-3 text-[#ff8b66]" />
-                              {point}
-                            </span>
-                          ))}
-                        </span>
-                      </span>
+                          {/* Checkbox indicator */}
+                          <span
+                            className={`grid h-5 w-5 sm:h-6 sm:w-6 shrink-0 place-items-center rounded-full border transition ${
+                              isSelected
+                                ? 'border-transparent bg-[#f3eee5] text-[#11110f]'
+                                : 'border-white/20 text-transparent'
+                            }`}
+                          >
+                            <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" strokeWidth={3} />
+                          </span>
+                        </div>
+
+                        <p className="m-0 mt-0.5 text-[11px] sm:text-xs text-[#89837c]">
+                          {type.description}
+                        </p>
+                      </div>
                     </div>
                   </button>
                 );
               })}
             </div>
 
+            {/* Submit Button */}
             <button
               type="button"
               onClick={handleConfirm}
               disabled={submitting}
-              className="mt-6 inline-flex w-full items-center justify-between rounded-2xl bg-[#ff6b3d] px-5 py-4 text-sm font-black text-[#160c08] shadow-[0_16px_50px_rgba(255,107,61,.22)] transition hover:bg-[#ff7d55] hover:shadow-[0_20px_60px_rgba(255,107,61,.3)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffb096] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0b0b] disabled:cursor-wait disabled:opacity-60"
+              className="group mt-6 flex min-h-[46px] sm:min-h-[50px] w-full items-center justify-between rounded-xl sm:rounded-2xl bg-[#f3eee5] px-4 sm:px-5 py-3 text-xs sm:text-sm font-black text-[#11110f] shadow-[0_12px_30px_rgba(244,239,231,.1)] transition hover:-translate-y-0.5 hover:bg-[#fffdf9] active:translate-y-0 disabled:cursor-wait disabled:opacity-60"
             >
-              <span>{submitting ? 'Building your workspace…' : 'Enter my workspace'}</span>
-              <ArrowRight className="h-4 w-4" />
+              <span>{submitting ? 'Setting up…' : 'Continue'}</span>
+              <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-
-            <p className="m-0 mt-4 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-[#625e59]">
-              No setup maze · Start creating immediately
-            </p>
           </div>
-        </section>
+        </div>
       </main>
     </div>
   );

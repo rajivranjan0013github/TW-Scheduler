@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { queryClient } from '../lib/queryClient';
+import { clearActiveCampaign } from '../utils/campaignScope';
 
 const AuthContext = createContext(null);
 
@@ -39,8 +40,8 @@ export const AuthProvider = ({ children }) => {
   const effectiveUser = buildPreviewUser(user, previewContext);
 
   useEffect(() => {
-    // Validate local token
-    if (token) {
+    // Validate local token on initial load
+    if (token && !user) {
       fetchUserProfile(token);
     } else {
       setLoading(false);
@@ -56,6 +57,13 @@ export const AuthProvider = ({ children }) => {
       });
       if (response.ok) {
         const userData = await response.json();
+        const userStorageKey = `active-campaign-id:${userData?._id || userData?.email || 'default'}`;
+        const userActiveCampaign = localStorage.getItem(userStorageKey);
+        if (userActiveCampaign) {
+          localStorage.setItem('active-campaign-id', userActiveCampaign);
+        } else {
+          clearActiveCampaign();
+        }
         setUser(userData);
       } else {
         logout();
@@ -69,7 +77,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (credential, accessToken) => {
-    setLoading(true);
     try {
       const body = credential ? { credential } : { accessToken };
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
@@ -84,9 +91,17 @@ export const AuthProvider = ({ children }) => {
         const data = await response.json();
         queryClient.clear();
         localStorage.setItem('tw_token', data.token);
+        const userStorageKey = `active-campaign-id:${data.user?._id || data.user?.email || 'default'}`;
+        const userActiveCampaign = localStorage.getItem(userStorageKey);
+        if (userActiveCampaign) {
+          localStorage.setItem('active-campaign-id', userActiveCampaign);
+        } else {
+          clearActiveCampaign();
+        }
         setToken(data.token);
         setUser(data.user);
-        return true;
+        setLoading(false);
+        return data.user || true;
       }
       setLoading(false);
       return false;
@@ -98,7 +113,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const facebookLogin = async (code, redirectUri) => {
-    setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/facebook-login`, {
         method: 'POST',
@@ -112,9 +126,17 @@ export const AuthProvider = ({ children }) => {
         const data = await response.json();
         queryClient.clear();
         localStorage.setItem('tw_token', data.token);
+        const userStorageKey = `active-campaign-id:${data.user?._id || data.user?.email || 'default'}`;
+        const userActiveCampaign = localStorage.getItem(userStorageKey);
+        if (userActiveCampaign) {
+          localStorage.setItem('active-campaign-id', userActiveCampaign);
+        } else {
+          clearActiveCampaign();
+        }
         setToken(data.token);
         setUser(data.user);
-        return true;
+        setLoading(false);
+        return data.user || true;
       }
       setLoading(false);
       return false;
@@ -127,6 +149,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('tw_token');
+    clearActiveCampaign();
     queryClient.clear();
     sessionStorage.removeItem('admin_view_context');
     window.dispatchEvent(new CustomEvent('handler-preview-changed'));

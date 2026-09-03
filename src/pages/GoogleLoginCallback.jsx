@@ -1,13 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export const GoogleLoginCallback = () => {
-  const { login } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
   const [message, setMessage] = useState('Completing Google sign in...');
+  const handledRef = useRef(false);
 
   useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true });
+      return;
+    }
+
+    if (handledRef.current) return;
+    handledRef.current = true;
+
     const finishLogin = async () => {
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
       const searchParams = new URLSearchParams(window.location.search);
@@ -29,7 +38,6 @@ export const GoogleLoginCallback = () => {
         return;
       }
 
-      window.history.replaceState(null, '', '/auth/google/callback');
       const success = await login(null, accessToken);
       sessionStorage.removeItem('google_login_redirect_uri');
 
@@ -42,13 +50,13 @@ export const GoogleLoginCallback = () => {
     };
 
     finishLogin();
-  }, [login, navigate]);
+  }, [user, login, navigate]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#fbfbfd] px-6 text-center text-[#1d1d1f]">
-      <div className="rounded-xl border border-[#d2d2d7] bg-white p-8 shadow-sm">
-        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-[#3478f6] border-t-transparent" />
-        <p className="m-0 text-sm font-semibold">{message}</p>
+    <div className="flex min-h-screen items-center justify-center bg-[#06040a] px-6 text-center text-white">
+      <div className="rounded-2xl border border-white/10 bg-[#121118] p-8 shadow-2xl backdrop-blur-xl">
+        <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-4 border-purple-500 border-t-transparent" />
+        <p className="m-0 text-sm font-semibold text-zinc-300">{message}</p>
       </div>
     </div>
   );

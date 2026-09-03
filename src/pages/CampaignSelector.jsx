@@ -8,12 +8,9 @@ import {
   Clock,
   Edit3,
   ExternalLink,
-  Flame,
   Package,
   Plus,
   RefreshCw,
-  Sparkles,
-  Video,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ProductEditorPage from '../components/campaigns/ProductEditorPage';
@@ -33,10 +30,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
   const storageKey = `active-campaign-id:${user?._id || user?.email || 'default'}`;
   const [campaigns, setCampaigns] = useState([]);
   const [activeCampaignId, setActiveCampaignId] = useState(
-    () =>
-      localStorage.getItem(storageKey) ||
-      localStorage.getItem('active-campaign-id') ||
-      ''
+    () => localStorage.getItem(storageKey) || ''
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -115,10 +109,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
       setCampaigns(campaignData);
 
       if (campaignData.length > 0) {
-        const savedId =
-          localStorage.getItem(storageKey) ||
-          localStorage.getItem('active-campaign-id') ||
-          '';
+        const savedId = localStorage.getItem(storageKey) || '';
         const nextCampaign =
           campaignData.find((campaign) => campaign._id === savedId) ||
           campaignData[0];
@@ -142,7 +133,18 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
   };
 
   useEffect(() => {
-    fetchCampaigns();
+    let active = true;
+    const load = async () => {
+      try {
+        await fetchCampaigns();
+      } catch (err) {
+        if (active) setError(err.message || 'Failed to load products.');
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id, user?.email]);
 

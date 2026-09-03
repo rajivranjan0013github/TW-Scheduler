@@ -3,7 +3,7 @@ import { API_BASE_URL } from '../config';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Trash2, ShieldCheck, Link2, Eye, Plus, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Trash2, ShieldCheck, Link2, Eye } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
 import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
@@ -116,26 +116,26 @@ export const Channels = () => {
     }
   };
 
-  const connectInstagramOAuth = () => {
+  const connectInstagramOAuth = (targetCampaignId = activeConnectCampaignId) => {
     const token = localStorage.getItem('tw_token');
     const returnUrl = window.location.origin + '/instagram-callback';
     const params = new URLSearchParams({ returnUrl });
-    if (activeConnectCampaignId) {
-      params.set('campaignId', activeConnectCampaignId);
+    if (targetCampaignId) {
+      params.set('campaignId', targetCampaignId);
     }
     const connectUrl = `${API_BASE_URL}/api/accounts/connect/instagram?token=${token}&${params.toString()}`;
-    window.location.href = connectUrl;
+    window.location.assign(connectUrl);
   };
 
-  const connectYoutubeOAuth = () => {
+  const connectYoutubeOAuth = (targetCampaignId = activeConnectCampaignId) => {
     const token = localStorage.getItem('tw_token');
     const returnUrl = window.location.origin + '/youtube-callback';
     const params = new URLSearchParams({ returnUrl });
-    if (activeConnectCampaignId) {
-      params.set('campaignId', activeConnectCampaignId);
+    if (targetCampaignId) {
+      params.set('campaignId', targetCampaignId);
     }
     const connectUrl = `${API_BASE_URL}/api/accounts/connect/youtube?token=${token}&${params.toString()}`;
-    window.location.href = connectUrl;
+    window.location.assign(connectUrl);
   };
 
   const connectMetaOAuth = (targetCampaignId = activeConnectCampaignId, targetSocialAccountId = null) => {
@@ -150,16 +150,16 @@ export const Channels = () => {
       params.set('reconnect', 'true');
     }
     const connectUrl = `${API_BASE_URL}/api/accounts/connect/facebook?token=${token}&${params.toString()}`;
-    window.location.href = connectUrl;
+    window.location.assign(connectUrl);
   };
 
   const handleVerifyChannel = (channel) => {
     if (channel.platform === 'instagram') {
-      connectInstagramOAuth();
+      connectInstagramOAuth(channel.campaignId);
     } else if (channel.platform === 'youtube') {
-      connectYoutubeOAuth();
+      connectYoutubeOAuth(channel.campaignId);
     } else {
-      connectMetaOAuth(channel.campaignId);
+      connectMetaOAuth(channel.campaignId, channel.socialAccountId);
     }
   };
 
@@ -185,14 +185,44 @@ export const Channels = () => {
         }))
     ))
     : [];
-  const visibleChannels = normalizedChannels.filter((channel) => {
+
+  const allCreatorChannels = useMemo(() => {
+    if (!isCreator) return normalizedChannels;
+
+    const campaignChannels = (creatorCampaignsQuery.data || []).flatMap((campaign) => (
+      (campaign.channels || []).map((channel) => ({
+        ...channel,
+        campaignId: campaign._id,
+        campaignName: campaign.name,
+      }))
+    ));
+
+    const combined = [...normalizedChannels, ...campaignChannels];
+    const seen = new Set();
+    return combined.filter((channel) => {
+      const key = channel.socialAccountId
+        ? `social-${channel.socialAccountId}`
+        : channel._id
+          ? `channel-${channel._id}`
+          : `${channel.platform}:${channel.handle || channel.username}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [isCreator, normalizedChannels, creatorCampaignsQuery.data]);
+
+  const channelsToDisplay = isCreator ? allCreatorChannels : normalizedChannels;
+
+  const visibleChannels = channelsToDisplay.filter((channel) => {
     const accountId = getChannelAccountId(channel);
     return !disconnectedChannelIds.includes(accountId) && !disconnectedChannelIds.includes(channel._id);
   });
   const channelsMissingAnalyticsPermission = visibleChannels.filter((channel) => (
     channel.platform === 'facebook' && channel.analyticsStatus === 'permission_missing'
   ));
-  const loading = channelsQuery.isLoading && normalizedChannels.length === 0;
+  const loading = isCreator
+    ? (creatorCampaignsQuery.isLoading && channelsQuery.isLoading && visibleChannels.length === 0)
+    : (channelsQuery.isLoading && visibleChannels.length === 0);
 
   return (
     <div className="p-4 sm:p-8 bg-[#0c0c0e] min-h-screen text-white space-y-6 sm:space-y-8 font-sans antialiased">
