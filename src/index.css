@@ -163,11 +163,11 @@ h1, h2, h3, h4, h5, h6 {
 /* Mobile Navigation Safe Area Adjustments */
 @media (max-width: 767px) {
   .mobile-safe-nav {
-    height: calc(3.25rem + env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(3.6rem + env(safe-area-inset-bottom, 0px)) !important;
     padding-bottom: env(safe-area-inset-bottom, 0px) !important;
   }
   .mobile-safe-main-padding {
-    padding-bottom: calc(3.25rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(3.6rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
@@ -337,14 +337,14 @@ textarea.bg-transparent,
 input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent):not([class*="bg-transparent"]):not([class*="!bg-transparent"]),
 textarea:not(.bg-transparent):not([class*="bg-transparent"]):not([class*="!bg-transparent"]),
 select:not(.bg-transparent):not([class*="bg-transparent"]):not([class*="!bg-transparent"]) {
-  background-color: #050505 !important;
+  background-color: #282828 !important;
   color: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
+  border-color: #343434 !important;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #71717a !important;
+  color: #898989 !important;
 }
 
 /* Universal Hover Overrides - prevent any white/light flash on hover */

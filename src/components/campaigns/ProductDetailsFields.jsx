@@ -1,15 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
-  Globe,
   Loader2,
   Package,
   Sparkles,
   Smartphone,
   Star,
-  ExternalLink,
-  Video,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
 import CampaignVideoFormatsPreview from './CampaignVideoFormatsPreview';
@@ -26,6 +23,7 @@ export const ProductDetailsFields = ({
   heading = 'Product & App Details',
   showHeader = true,
   requireLink = false,
+  showVideoFormats = false,
 }) => {
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState('');
@@ -149,10 +147,10 @@ export const ProductDetailsFields = ({
                   key={opt.id}
                   type="button"
                   onClick={() => setForm((c) => ({ ...c, productSource: opt.id }))}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition shadow-sm ${
                     isSelected
-                      ? 'bg-[#7831d6]/30 text-purple-200 border border-[#7831d6]/50'
-                      : 'bg-white/5 text-zinc-400 border border-white/5 hover:bg-white/10 hover:text-zinc-200'
+                      ? 'bg-[#7831d6] text-white border border-[#7831d6] shadow-[#7831d6]/25'
+                      : 'bg-white/10 text-zinc-200 border border-white/15 hover:bg-white/15 hover:text-white'
                   }`}
                 >
                   <span>{opt.icon}</span>
@@ -179,7 +177,7 @@ export const ProductDetailsFields = ({
                   SOURCE_OPTIONS.find((s) => s.id === form.productSource)?.placeholder ||
                   'https://apps.apple.com/app/id...'
                 }
-                className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-xs text-white outline-none transition placeholder:text-zinc-600 focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
+                className="w-full rounded-lg border border-[#343434] bg-[#282828] px-3 py-2.5 text-xs text-white outline-none transition placeholder:text-[#898989] focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
               />
             </div>
             <button
@@ -214,9 +212,9 @@ export const ProductDetailsFields = ({
           )}
         </div>
 
-        {/* Extracted App Preview Card */}
+        {/* Extracted App Preview */}
         {(form.iconUrl || form.category) && (
-          <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+          <div className="flex items-center gap-3 py-2">
             {form.iconUrl ? (
               <img
                 src={form.iconUrl}
@@ -263,7 +261,7 @@ export const ProductDetailsFields = ({
               setForm((current) => ({ ...current, productName, name: productName }));
             }}
             placeholder="e.g. Penguin - Couples App"
-            className="w-full rounded-lg border border-white/10 bg-black px-3 py-2.5 text-xs text-white outline-none transition placeholder:text-zinc-600 focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
+            className="w-full rounded-lg border border-[#343434] bg-[#282828] px-3 py-2.5 text-xs text-white outline-none transition placeholder:text-[#898989] focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
           />
         </label>
 
@@ -281,7 +279,7 @@ export const ProductDetailsFields = ({
             }}
             placeholder="Describe what your app does and why people download it..."
             rows={3}
-            className="w-full resize-y rounded-lg border border-white/10 bg-black px-3 py-2.5 text-xs leading-5 text-white outline-none transition placeholder:text-zinc-600 focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
+            className="w-full resize-y rounded-lg border border-[#343434] bg-[#282828] px-3 py-2.5 text-xs leading-5 text-white outline-none transition placeholder:text-[#898989] focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
           />
         </label>
 
@@ -297,12 +295,12 @@ export const ProductDetailsFields = ({
               setForm((current) => ({ ...current, targetAudience }));
             }}
             placeholder="e.g. Couples in long-distance relationships, college students"
-            className="w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-xs text-white outline-none transition placeholder:text-zinc-600 focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
+            className="w-full rounded-lg border border-[#343434] bg-[#282828] px-3 py-2 text-xs text-white outline-none transition placeholder:text-[#898989] focus:border-[#7831d6] focus:ring-2 focus:ring-[#7831d6]/20"
           />
         </label>
 
-        {/* Video Formats Preview */}
-        {(form.marketingStrategies && form.marketingStrategies.length > 0) && (
+        {/* Video Formats Preview (optional) */}
+        {showVideoFormats && form.marketingStrategies && form.marketingStrategies.length > 0 && (
           <div className="pt-2">
             <CampaignVideoFormatsPreview
               marketingStrategies={form.marketingStrategies}

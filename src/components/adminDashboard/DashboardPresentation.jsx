@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { User } from 'lucide-react';
 import PlatformIcon from '../PlatformIcon';
+import { API_BASE_URL } from '../../config';
 
 const numberFormat = new Intl.NumberFormat();
-const fallbackAvatarUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+export const fallbackAvatarUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
 
 export const MetricCard = ({ icon: Icon, label, value, note }) => (
   <div className="rounded-xl border border-white/10 bg-[#121215] p-3.5 shadow-sm">
@@ -42,6 +44,16 @@ const CustomChartTooltip = ({ active, payload }) => {
 };
 
 export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }) => {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const chartData = data.map((item) => {
     const date = item.dateStr ? new Date(`${item.dateStr}T00:00:00`) : null;
     return {
@@ -54,6 +66,7 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
   });
 
   const renderCustomAxisTick = ({ x, y, payload, index }) => {
+    if (isMobile) return null;
     const item = chartData[index];
     const postCount = item?.posts || 0;
     const isSelected = item?.isSelected;
@@ -64,23 +77,25 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
           y={0}
           dy={8}
           textAnchor="middle"
-          fill={isSelected ? '#c4b5fd' : '#d4d4d8'}
+          fill={isSelected ? '#c4b5fd' : '#a1a1aa'}
           fontSize={11}
           fontWeight={isSelected ? 700 : 500}
         >
           {payload.value}
         </text>
-        <text
-          x={0}
-          y={0}
-          dy={20}
-          textAnchor="middle"
-          fill={postCount > 0 ? (isSelected ? '#c4b5fd' : '#a855f7') : '#71717a'}
-          fontSize={10}
-          fontWeight={postCount > 0 ? 700 : 400}
-        >
-          {postCount > 0 ? `${postCount}p` : '0'}
-        </text>
+        {postCount > 0 && (
+          <text
+            x={0}
+            y={0}
+            dy={20}
+            textAnchor="middle"
+            fill={isSelected ? '#c4b5fd' : '#a855f7'}
+            fontSize={10}
+            fontWeight={700}
+          >
+            {`${postCount}p`}
+          </text>
+        )}
       </g>
     );
   };
@@ -91,7 +106,7 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
         <div className="min-w-0">
           <p className="m-0 text-xs font-semibold uppercase tracking-wider text-zinc-400">Last 30 days</p>
           <p className="m-0 mt-0.5 text-base font-semibold text-zinc-100">
-            Views by publish day <span className="text-xs font-normal text-zinc-400">(Date / Posts)</span>
+            Views by publish day <span className="hidden sm:inline text-xs font-normal text-zinc-400">(Date / Posts)</span>
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -104,7 +119,7 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
               Clear date selection
             </button>
           )}
-          <p className="m-0 text-xs font-medium text-zinc-400">Click any bar to inspect date activity</p>
+          <p className="m-0 text-xs font-medium text-zinc-400 hidden sm:block">Click any bar to inspect date activity</p>
         </div>
       </div>
       <div className="h-44 w-full cursor-pointer outline-none focus:outline-none focus-visible:outline-none [&_*]:outline-none [&_*]:focus:outline-none [&_*]:focus-visible:outline-none select-none">
@@ -112,17 +127,17 @@ export const DailyViewsChart = ({ data = [], selectedDate = null, onSelectDate }
           <BarChart data={chartData} margin={{ top: 6, right: 6, bottom: 4, left: 0 }} style={{ outline: 'none' }}>
             <XAxis
               dataKey="label"
-              tick={renderCustomAxisTick}
+              tick={isMobile ? false : renderCustomAxisTick}
               tickLine={false}
               axisLine={false}
               interval={0}
-              height={30}
+              height={isMobile ? 6 : 30}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#d4d4d8' }}
+              tick={{ fontSize: isMobile ? 10 : 11, fill: '#a1a1aa' }}
               tickLine={false}
               axisLine={false}
-              width={40}
+              width={isMobile ? 32 : 40}
               tickFormatter={(value) => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}
             />
             <Tooltip
@@ -258,25 +273,47 @@ export const ActivityCell = ({ account, selectedTimeRange, selectedRange, select
   return <span className="text-sm font-medium text-zinc-200">{numberFormat.format(account[selectedRange.postsKey] || 0)} posts</span>;
 };
 
-export const AccountAvatar = ({ account }) => {
-  const [imageFailed, setImageFailed] = useState(false);
-  const initial = String(account.name || account.username || '?').trim().charAt(0).toUpperCase() || '?';
+export const AccountAvatar = ({
+  account,
+  className = 'h-8 w-8 flex-shrink-0 rounded-full border border-white/10 object-cover shadow-xs',
+}) => {
+  const rawAvatarUrl = account?.avatarUrl
+    || account?.profilePictureUrl
+    || account?.profile_picture_url
+    || account?.picture
+    || '';
 
-  if (!imageFailed) {
+  const resolvedAvatar = rawAvatarUrl && rawAvatarUrl.startsWith('/') && API_BASE_URL
+    ? `${API_BASE_URL}${rawAvatarUrl}`
+    : rawAvatarUrl;
+
+  const [imageFailed, setImageFailed] = useState(!resolvedAvatar);
+  const [currentAvatar, setCurrentAvatar] = useState(resolvedAvatar);
+
+  if (currentAvatar !== resolvedAvatar) {
+    setCurrentAvatar(resolvedAvatar);
+    setImageFailed(!resolvedAvatar);
+  }
+
+  if (resolvedAvatar && !imageFailed) {
     return (
       <img
-        src={account.avatarUrl || fallbackAvatarUrl}
+        src={resolvedAvatar}
         crossOrigin="anonymous"
-        alt={`${account.name || 'Publishing channel'} avatar`}
+        referrerPolicy="no-referrer"
+        alt={`${account?.name || account?.displayName || 'Publishing channel'} avatar`}
         onError={() => setImageFailed(true)}
-        className="h-8 w-8 flex-shrink-0 rounded-full border border-white/10 object-cover shadow-xs"
+        className={className}
       />
     );
   }
 
   return (
-    <span aria-hidden="true" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#7831d6]/20 text-xs font-bold text-[#c4b5fd]">
-      {initial}
+    <span
+      aria-hidden="true"
+      className={`flex items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-400 ${className}`}
+    >
+      <User className="h-1/2 w-1/2" />
     </span>
   );
 };

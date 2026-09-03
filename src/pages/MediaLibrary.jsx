@@ -3223,6 +3223,38 @@ export const MediaLibrary = () => {
                           )}
                         </div>
 
+                        {/* Caption snippet or Add Caption button */}
+                        {item.caption?.trim() ? (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => openCaptionDialog(item, e)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                openCaptionDialog(item, e);
+                              }
+                            }}
+                            className="group/caption flex items-center gap-1.5 rounded-md bg-white/[0.025] hover:bg-white/[0.06] border border-white/[0.05] hover:border-white/10 px-2 py-1 cursor-pointer transition-colors"
+                            title="Click to edit caption"
+                          >
+                            <MessageSquareCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+                            <span className="text-[10px] text-zinc-400 group-hover/caption:text-zinc-200 truncate flex-1 leading-tight">
+                              {item.caption.trim()}
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => openCaptionDialog(item, e)}
+                            className="flex items-center gap-1.5 text-[10px] font-medium text-zinc-400 hover:text-[#c4b5fd] transition-colors self-start py-0.5"
+                            title="Add caption to this media"
+                          >
+                            <MessageSquareWarning className="w-3 h-3 text-amber-400/90 shrink-0" />
+                            <span>Add caption</span>
+                          </button>
+                        )}
+
                         {item.type === 'video' && item.aiAnalysis?.summary && (
                           <div
                             role="button"
@@ -3289,6 +3321,29 @@ export const MediaLibrary = () => {
                                 <Pencil className="h-3.5 w-3.5 text-[#c4b5fd]" />
                                 <span>Rename</span>
                               </button>
+                              <button
+                                type="button"
+                                onClick={(e) => openCaptionDialog(item, e)}
+                                disabled={!canManageThisMedia}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10 disabled:opacity-50"
+                              >
+                                {item.caption?.trim() ? (
+                                  <MessageSquareCheck className="h-3.5 w-3.5 text-emerald-400" />
+                                ) : (
+                                  <MessageSquareWarning className="h-3.5 w-3.5 text-amber-400" />
+                                )}
+                                <span>{item.caption?.trim() ? 'Edit caption' : 'Add caption'}</span>
+                              </button>
+                              {canUpload && canManageThisMedia && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => openMediaTagsModal(item, e)}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-semibold text-white hover:bg-white/10"
+                                >
+                                  <Tags className="h-3.5 w-3.5 text-[#c4b5fd]" />
+                                  <span>Manage tags</span>
+                                </button>
+                              )}
                               {item.type === 'video' && (
                                 <>
                                   <button

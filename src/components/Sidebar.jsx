@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
-import { Clock, FolderHeart, Film, Layers, Link2, Settings as SettingsIcon, X, Megaphone, Users, BarChart3, ChevronDown, Check } from 'lucide-react';
+import { Clock, FolderHeart, Film, Layers, Link2, Settings as SettingsIcon, X, Megaphone, Users, BarChart3, CalendarPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PwaInstallButton } from './PwaInstallButton';
 import { withCampaignScope } from '../utils/campaignScope';
@@ -12,11 +11,8 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const campaignMenuRef = useRef(null);
-  const [campaigns, setCampaigns] = useState([]);
+  const [, setCampaigns] = useState([]);
   const [activeCampaignId, setActiveCampaignId] = useState('');
-  const [isCampaignMenuOpen, setIsCampaignMenuOpen] = useState(false);
   const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
   const isChannelInsightRoute = /^\/channels\/[^/]+\/(feed|posts\/)/.test(location.pathname);
   const rawAdminViewContext = (() => {
@@ -60,26 +56,6 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
       localStorage.removeItem('active-campaign-main-email');
     }
     return nextCampaign;
-  };
-
-  const selectCampaign = (campaign) => {
-    if (!campaign || campaign._id === activeCampaignId) {
-      setIsCampaignMenuOpen(false);
-      return;
-    }
-
-    applyCampaign(campaigns, campaign._id);
-    setSelectedAccounts([]);
-    setIsCampaignMenuOpen(false);
-    queryClient.invalidateQueries();
-    window.dispatchEvent(new CustomEvent('campaign-selected', {
-      detail: {
-        campaignId: campaign._id,
-        campaignName: campaign.name || '',
-        mainEmail: campaign.mainEmail || campaign.createdBy?.email || '',
-      },
-    }));
-    navigate('/scheduler');
   };
 
   useEffect(() => {
@@ -158,19 +134,6 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     return () => window.removeEventListener('campaign-selected', syncSelectedCampaign);
   }, []);
 
-  useEffect(() => {
-    if (!isCampaignMenuOpen) return undefined;
-
-    const handlePointerDown = (event) => {
-      if (campaignMenuRef.current && !campaignMenuRef.current.contains(event.target)) {
-        setIsCampaignMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [isCampaignMenuOpen]);
-
   const exitAdminUserView = () => {
     sessionStorage.removeItem('admin_view_context');
     window.dispatchEvent(new CustomEvent('handler-preview-changed'));
@@ -181,11 +144,13 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   const isCreator = user?.userType === 'account_handler';
 
   const navItems = isCreator ? [
-    { name: 'My Products', label: 'Products', path: '/campaigns', icon: Megaphone },
+    { name: 'My Campaigns', label: 'Campaigns', path: '/campaigns', icon: Megaphone },
+    { name: 'Schedule Post', label: 'Schedule', path: '/schedule', icon: CalendarPlus },
+    { name: 'Analytics', label: 'Analytics', path: '/analytics', icon: BarChart3 },
     { name: 'My Channels', label: 'Channels', path: '/channels', icon: Link2 },
     { name: 'Settings', label: 'Settings', path: '/settings', icon: SettingsIcon },
   ] : [
-    { name: 'Products', label: 'Products', path: '/campaigns', icon: Megaphone },
+    { name: 'Campaigns', label: 'Campaigns', path: '/campaigns', icon: Megaphone },
     ...(canViewAdmin ? [{ name: 'Performance', label: 'Perf', path: '/dashboard', icon: BarChart3 }] : []),
     { name: 'Scheduled Queue', label: 'Queue', path: '/scheduler', icon: Clock },
     { name: 'Media Library', label: 'Media', path: '/media', icon: FolderHeart },
@@ -196,89 +161,17 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   ];
 
   const managerItems = (!isCreator && canViewAdmin) ? [
-    { name: 'Product Setup', label: 'Setup', path: '/admin/campaign', icon: Megaphone },
+    { name: 'Campaign Setup', label: 'Setup', path: '/admin/campaign', icon: Megaphone },
     { name: 'Team Access', label: 'Team', path: '/admin/users', icon: Users },
   ] : [];
-  const activeCampaign = campaigns.find(campaign => campaign._id === activeCampaignId);
-  const campaignTitle = activeCampaign?.name || (isAdminViewingUser ? (adminViewContext.userName || 'Product View') : 'Select product');
 
   return (
-    <aside className={`relative z-50 w-20 overflow-visible ${
+    <aside className={`relative z-50 w-20 ${
       isAdminViewingUser
-        ? 'bg-[#0e121a] text-zinc-300 border-white/[0.08]'
-        : 'bg-[#0e0e11] text-zinc-400 border-white/[0.08]'
-    } hidden border-r md:flex flex-col h-screen sticky top-0 transition-all duration-300 backdrop-blur-xl`}>
+        ? 'bg-[#0e121a] text-zinc-300'
+        : 'bg-[#0e0e11] text-zinc-400'
+    } hidden md:flex flex-col h-screen sticky top-0 transition-all duration-300 backdrop-blur-xl border-none`}>
       
-      {/* Workspace header */}
-      <div className="relative flex min-h-[56px] flex-shrink-0 items-center justify-center border-b border-white/[0.08] px-2 py-2">
-        {isCreator ? (
-          <div
-            className="flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-[12px] bg-white/[0.03] border border-white/[0.08] text-white shadow-inner"
-            title="Creator Hub"
-          >
-            <Megaphone className="h-5 w-5 text-zinc-200" />
-            <span className="max-w-full truncate text-[10px] font-semibold leading-none">Home</span>
-          </div>
-        ) : (
-          <div ref={campaignMenuRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setIsCampaignMenuOpen((current) => !current)}
-                className="group flex h-12 w-14 flex-col items-center justify-center gap-0.5 rounded-[12px] border border-white/[0.08] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.06] text-white transition-all"
-                title={campaignTitle}
-              >
-                <Megaphone className="h-5 w-5 text-zinc-200 transition-transform group-hover:scale-105" />
-                <span className="max-w-full truncate text-[10px] font-semibold leading-none text-zinc-300">
-                  {campaignTitle}
-                </span>
-                <ChevronDown className={`absolute bottom-1 right-1 h-3 w-3 transition-transform text-zinc-400 ${isCampaignMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isCampaignMenuOpen && (
-                <div className="absolute left-[calc(100%+0.75rem)] top-0 z-[999] w-72 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 backdrop-blur-2xl text-white shadow-2xl ring-1 ring-white/10">
-                  <div className="border-b border-white/[0.08] bg-white/[0.02] px-3.5 py-2.5">
-                    <p className="m-0 text-[9px] font-bold uppercase tracking-[0.16em] text-zinc-400">
-                      Switch product
-                    </p>
-                  </div>
-                  <div className="max-h-72 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar">
-                    {campaigns.length > 0 ? campaigns.map((campaign) => {
-                      const isSelected = campaign._id === activeCampaignId;
-                      return (
-                        <button
-                          key={campaign._id}
-                          type="button"
-                          onClick={() => selectCampaign(campaign)}
-                          className={`flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-all ${
-                            isSelected
-                              ? 'bg-white text-black font-semibold shadow-sm'
-                              : 'text-zinc-300 hover:bg-white/[0.05] hover:text-white'
-                          }`}
-                        >
-                          <span className={`h-2 w-2 flex-shrink-0 rounded-full ${isSelected ? 'bg-black' : 'bg-zinc-600'}`} />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs">{campaign.name || 'Untitled product'}</span>
-                            {(campaign.mainEmail || campaign.createdBy?.email) && (
-                              <span className={`mt-0.5 block truncate text-[9px] ${isSelected ? 'text-zinc-600' : 'text-zinc-400'}`}>
-                                {campaign.mainEmail || campaign.createdBy?.email}
-                              </span>
-                            )}
-                          </span>
-                          {isSelected && <Check className="h-3.5 w-3.5 flex-shrink-0 text-black" />}
-                        </button>
-                      );
-                    }) : (
-                      <div className="px-2 py-4 text-center text-[10px] text-zinc-400">
-                        No products available
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-        )}
-      </div>
-
       {/* Navigation */}
       <nav className="flex-1 space-y-1.5 overflow-y-auto p-2 scrollbar-none">
         {navItems.map((item) => (
@@ -303,7 +196,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
         ))}
 
         {managerItems.length > 0 && (
-          <div className="mt-2.5 pt-2 border-t border-white/[0.08] space-y-1.5">
+          <div className="mt-2.5 pt-2 space-y-1.5">
             {managerItems.map((item) => (
               <NavLink
                 key={item.name}
@@ -330,7 +223,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
       </nav>
 
       {/* Sidebar Footer */}
-      <div className="relative flex-shrink-0 space-y-2 border-t border-white/[0.08] p-2 text-[10px]">
+      <div className="relative flex-shrink-0 space-y-2 p-2 text-[10px]">
         <PwaInstallButton
           collapsed
           dark={true}
@@ -338,7 +231,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
           popoverClassName="left-0"
         />
 
-        <div className="flex items-center justify-center rounded-xl p-1 bg-white/[0.04] border border-white/[0.06] hover:border-white/[0.15] transition-all">
+        <div className="flex items-center justify-center rounded-xl p-1 bg-white/[0.04] transition-all">
             <button
               type="button"
               onClick={logout}

@@ -6,12 +6,13 @@ import { useAuth } from '../context/AuthContext';
 import { AlertCircle, Calendar, CheckCircle, MoreVertical, Share2, SkipForward, TimerOff, RefreshCw } from 'lucide-react';
 import { getMediaUrl } from '../utils/mediaUrls';
 import PlatformIcon from '../components/PlatformIcon';
-import { PwaInstallButton } from '../components/PwaInstallButton';
+import { AccountAvatar } from '../components/adminDashboard/DashboardPresentation';
 import { getHandlerPreviewContext, withHandlerPreviewHeaders } from '../utils/handlerPreview';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 const POST_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const HANDLER_DATA_REFRESH_MS = 30 * 60 * 1000;
+const PULL_THRESHOLD = 60;
 
 const copyToClipboard = (text) => {
   if (navigator.clipboard && window.isSecureContext) {
@@ -51,7 +52,7 @@ export const CreatorCampaigns = () => {
   const [bypassingPostId, setBypassingPostId] = useState(null);
   const [openQueueMenuId, setOpenQueueMenuId] = useState(null);
   const [postedToast, setPostedToast] = useState(null);
-  const [nowMs, setNowMs] = useState(0);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const shareBlobRef = useRef(null);
   const lastDataRefreshAtRef = useRef(0);
   const foregroundRefreshInFlightRef = useRef(false);
@@ -110,14 +111,6 @@ export const CreatorCampaigns = () => {
   };
 
   const getPostDisplayPublishedAt = (post) => post?.publishedAt || post?.manualPostedAt;
-
-  const sortPostsByPublishedAt = (items = []) => (
-    [...items].sort((a, b) => {
-      const aTime = parseDateValue(getPostDisplayPublishedAt(a))?.getTime() || 0;
-      const bTime = parseDateValue(getPostDisplayPublishedAt(b))?.getTime() || 0;
-      return aTime - bTime;
-    })
-  );
 
   const isTodayDate = (value) => {
     const date = parseDateValue(value);
@@ -530,7 +523,7 @@ export const CreatorCampaigns = () => {
     isReadyToPullRef.current = false;
     startYRef.current = null;
 
-    if (pullDistance >= 60) {
+    if (pullDistance >= PULL_THRESHOLD) {
       setIsRefreshing(true);
       setPullDistance(50);
       try {
@@ -548,52 +541,22 @@ export const CreatorCampaigns = () => {
 
   useEffect(() => {
     let active = true;
-    const initialFetch = async () => {
+    const fetchInitialData = async () => {
       try {
-        const headers = withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` });
-        const fetchJson = async (url) => {
-          const response = await fetch(url, { headers });
-          if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error(data.message || `Request failed: ${response.status}`);
-          }
-          return response.json();
-        };
-        const [campData, postData, trackingData] = await Promise.all([
-          queryClient.fetchQuery({
-            queryKey: ['creator', handlerPreviewUserId, 'campaigns'],
-            queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
-            staleTime: 2 * 60 * 1000,
-          }),
-          queryClient.fetchQuery({
-            queryKey: ['creator', handlerPreviewUserId, 'posts'],
-            queryFn: () => fetchJson(`${API_BASE_URL}/api/scheduler/creator/posts`),
-            staleTime: 20 * 1000,
-          }),
-          fetchTodayTracking(headers),
-        ]);
-
-        if (!active) return;
-
-        setCampaigns(campData);
-        setPosts(postData);
-        setTodayTracking(trackingData.accounts || {});
-        lastDataRefreshAtRef.current = Date.now();
+        await loadData();
       } catch (err) {
         if (active) setError(err.message);
-      } finally {
-        if (active) setLoading(false);
       }
     };
 
     if (token) {
-      initialFetch();
+      void fetchInitialData();
     }
 
     return () => {
       active = false;
     };
-  }, [fetchTodayTracking, handlerPreviewUserId, queryClient, token]);
+  }, [loadData, token]);
 
   useEffect(() => {
     const refreshStaleHandlerData = () => {
@@ -627,16 +590,8 @@ export const CreatorCampaigns = () => {
   }, [loadData, token]);
 
   useEffect(() => {
-    const updateNow = () => {
-      setNowMs(Date.now());
-    };
-    const initialTimer = window.setTimeout(updateNow, 0);
-    const timer = window.setInterval(updateNow, 60 * 1000);
-
-    return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(timer);
-    };
+    const timer = window.setInterval(() => setNowMs(Date.now()), 60 * 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -770,6 +725,16 @@ export const CreatorCampaigns = () => {
             posts: [],
           });
           groupAliasMap.set(accountId, groupId);
+        } else {
+          const existing = groups.get(groupId);
+          const existingAvatar = existing.account?.avatarUrl || existing.account?.profilePictureUrl || existing.account?.picture;
+          const incomingAvatar = account?.avatarUrl || account?.profilePictureUrl || account?.picture;
+          if (!existingAvatar && incomingAvatar) {
+            existing.account = {
+              ...existing.account,
+              avatarUrl: incomingAvatar,
+            };
+          }
         }
         groups.get(groupId).posts.push(post);
       });
@@ -829,7 +794,7 @@ export const CreatorCampaigns = () => {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
-      className="px-4 pb-4 pt-2 text-[#1d1d1f] sm:px-6 sm:pt-3 md:px-8 md:py-5 min-h-screen"
+      className="px-4 pb-4 pt-2 text-white sm:px-6 sm:pt-3 md:px-8 md:py-5 min-h-screen"
     >
       {postedToast && (
         <div className="fixed right-4 top-4 z-50 w-[calc(100vw-2rem)] max-w-sm sm:right-6 sm:top-6">
@@ -867,26 +832,22 @@ export const CreatorCampaigns = () => {
       </div>
 
       <div className="mx-auto max-w-4xl space-y-2 sm:space-y-3 md:space-y-4">
-        {syncWarning && (
+        {error && (
           <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-200">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <div className="min-w-0 flex-1">{syncWarning}</div>
+            <div className="min-w-0 flex-1">{error}</div>
           </div>
         )}
 
         {loading ? (
           <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-8 text-center text-sm text-zinc-400">
-            Syncing products and calendar...
+            Syncing campaigns and calendar...
           </div>
         ) : (
           <div className="space-y-3 md:space-y-4">
             <section className="space-y-5 md:space-y-6">
-              <div className="flex items-center justify-between gap-3 px-1">
-                <h2 className="m-0 text-2xl font-semibold text-white">My Products</h2>
-                <PwaInstallButton
-                  collapsed
-                  popoverClassName="right-0"
-                />
+              <div className="px-1">
+                <h2 className="m-0 text-2xl font-semibold text-white">My Campaigns</h2>
               </div>
               {campaignConnectionIssues.length > 0 && (
                 <section className="overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0a] shadow-sm">
@@ -902,18 +863,10 @@ export const CreatorCampaigns = () => {
                         <div className="flex min-w-0 items-center gap-3">
                           <div className="flex shrink-0 items-center gap-1.5">
                             <PlatformIcon platform={channel.platform} className="h-7 w-7 md:h-8 md:w-8" />
-                            {channel.avatarUrl ? (
-                              <img
-                                src={channel.avatarUrl}
-                                crossOrigin="anonymous"
-                                className="h-7 w-7 rounded-full border border-amber-500/30 object-cover shadow-sm md:h-8 md:w-8"
-                                alt=""
-                              />
-                            ) : (
-                              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/20 text-xs font-bold text-amber-300 md:h-8 md:w-8">
-                                {(getAccountLabel(channel).charAt(0) || '@').toUpperCase()}
-                              </div>
-                            )}
+                            <AccountAvatar
+                              account={channel}
+                              className="h-7 w-7 rounded-full border border-amber-500/30 object-cover shadow-sm md:h-8 md:w-8"
+                            />
                           </div>
                           <div className="min-w-0">
                             <p className="m-0 truncate text-sm font-semibold text-white">
@@ -928,7 +881,7 @@ export const CreatorCampaigns = () => {
                         <button
                           type="button"
                           onClick={() => navigate('/channels', { state: { campaignId: camp._id } })}
-                          className="shrink-0 rounded-[8px] bg-white px-3 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200 shadow-sm"
+                          className="shrink-0 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors shadow-sm"
                         >
                           Reconnect
                         </button>
@@ -962,12 +915,9 @@ export const CreatorCampaigns = () => {
                         ...manualPostedToday,
                       ].sort((a, b) => new Date(getPostDisplayPublishedAt(b) || 0) - new Date(getPostDisplayPublishedAt(a) || 0));
 
-                      const postingCooldown = getPostingCooldown(queue.account, postedToday);
-                      const awaitingPostedDecision = Boolean(
-                        pendingSharePost &&
-                        pendingSharePost.channelId === queue.accountId &&
-                        pendingSharePost.postId === queuePost?._id
-                      );
+                      const latestManualPostedAt = getLatestManualPostedAt(queue.posts);
+                      const postingCooldown = getPostingCooldown(tracking, latestManualPostedAt, queuePost);
+                      const awaitingPostedDecision = isAwaitingPostedDecision(queuePost);
                       const canConfirmAndContinue = queuePost && (
                         postingCooldown.isLocked ||
                         queuePost.status === 'awaiting_confirmation'
@@ -987,17 +937,10 @@ export const CreatorCampaigns = () => {
                             <div className="flex min-w-0 items-center gap-3">
                               <div className="flex items-center gap-2 shrink-0">
                                 <PlatformIcon platform={queue.account?.platform} className="h-8 w-8" />
-                                {queue.account?.avatarUrl ? (
-                                  <img 
-                                    src={queue.account.avatarUrl} 
-                                    alt={queue.account.name} 
-                                    className="h-8 w-8 rounded-full object-cover border border-white/10" 
-                                  />
-                                ) : (
-                                  <div className="h-8 w-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-xs font-bold text-zinc-400">
-                                    {(getAccountLabel(queue.account).charAt(0) || '@').toUpperCase()}
-                                  </div>
-                                )}
+                                <AccountAvatar
+                                  account={queue.account}
+                                  className="h-8 w-8 rounded-full border border-white/10 object-cover shadow-xs"
+                                />
                               </div>
                               <div className="min-w-0">
                                 <p className="m-0 truncate text-sm font-semibold text-white">
@@ -1062,8 +1005,8 @@ export const CreatorCampaigns = () => {
                             </div>
                           </div>
 
-                          <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-2">
-                            {postedToday.length > 0 ? (
+                          {postedToday.length > 0 && (
+                            <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-2">
                               <div className="flex flex-wrap gap-1.5">
                                 {postedToday.slice(0, 6).map((post) => (
                                   <span
@@ -1086,10 +1029,8 @@ export const CreatorCampaigns = () => {
                                   </span>
                                 )}
                               </div>
-                            ) : (
-                              <p className="m-0 text-[10px] font-semibold text-zinc-500">No live posts detected today</p>
-                            )}
-                          </div>
+                            </div>
+                          )}
 
                           {queuePost ? (
                             awaitingPostedDecision ? (
@@ -1097,7 +1038,7 @@ export const CreatorCampaigns = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleNotPosted(queuePost)}
-                                  className="inline-flex min-h-[36px] items-center justify-center rounded-[8px] border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-400 transition-colors hover:bg-rose-500/25"
+                                  className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-300 transition-colors hover:bg-rose-500/25"
                                 >
                                   Not Posted
                                 </button>
@@ -1105,10 +1046,10 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleMarkManualPosted(queuePost)}
                                   disabled={markingPostId === queuePost._id}
-                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-[8px] bg-white px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:opacity-60 shadow-sm"
+                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-60 shadow-md shadow-[#7831d6]/25"
                                 >
                                   <CheckCircle className="h-3.5 w-3.5" />
-                                  {markingPostId === queuePost._id ? 'Checking' : 'Mark as Posted'}
+                                  {markingPostId === queuePost._id ? 'Checking...' : 'Mark as Posted'}
                                 </button>
                               </div>
                             ) : (
@@ -1117,11 +1058,15 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleSharePost(queuePost, postingCooldown)}
                                   disabled={sharingPostId === queuePost._id || postingCooldown.isLocked}
-                                  className="inline-flex min-h-[36px] w-full items-center justify-center gap-1.5 rounded-[8px] bg-white px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60 shadow-sm"
+                                  className={`inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-all ${
+                                    postingCooldown.isLocked
+                                      ? 'border border-white/15 bg-white/5 text-zinc-400 cursor-not-allowed shadow-none'
+                                      : 'bg-[#7831d6] hover:bg-[#6825bc] text-white shadow-md shadow-[#7831d6]/30 active:scale-[0.99]'
+                                  } ${sharingPostId === queuePost._id ? 'opacity-70 cursor-wait' : ''}`}
                                 >
-                                  <Share2 className="h-3.5 w-3.5" />
+                                  <Share2 className="h-4 w-4 shrink-0" />
                                   {sharingPostId === queuePost._id
-                                    ? 'Opening'
+                                    ? 'Opening...'
                                     : postingCooldown.isLocked
                                       ? postingCooldown.label
                                       : 'Share Video'}
@@ -1142,8 +1087,8 @@ export const CreatorCampaigns = () => {
               ) : (
                 <div className="p-5 text-center text-sm text-zinc-400 md:p-6">
                   <Calendar className="mx-auto h-7 w-7 text-zinc-600" />
-                  <p className="m-0 mt-2 font-semibold text-white">No products yet</p>
-                  <p className="m-0 mt-1 text-xs">Assigned products will appear here.</p>
+                  <p className="m-0 mt-2 font-semibold text-white">No campaigns yet</p>
+                  <p className="m-0 mt-1 text-xs">Assigned campaigns will appear here.</p>
                 </div>
               )}
             </section>
