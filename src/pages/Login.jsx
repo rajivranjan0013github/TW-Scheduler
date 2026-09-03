@@ -41,7 +41,7 @@ export const Login = () => {
     const params = new URLSearchParams({
       client_id: appId,
       redirect_uri: rawRedirectUri,
-      scope: 'pages_show_list',
+      scope: 'public_profile,email',
       response_type: 'code',
       auth_type: 'rerequest',
     });
@@ -169,10 +169,14 @@ export const Login = () => {
               By continuing, you agree to our{' '}
               <Link to="/terms-and-conditions" className="font-bold text-[#cfc8bd] transition hover:text-[#fffdf9]">
                 Terms
-              </Link>{' '}
-              and{' '}
+              </Link>
+              {', '}
               <Link to="/privacy-policy" className="font-bold text-[#cfc8bd] transition hover:text-[#fffdf9]">
                 Privacy Policy
+              </Link>
+              {', and '}
+              <Link to="/data-deletion" className="font-bold text-[#cfc8bd] transition hover:text-[#fffdf9]">
+                Data Deletion
               </Link>
               .
             </p>

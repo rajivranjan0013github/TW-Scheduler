@@ -368,3 +368,19 @@ textarea::placeholder {
   background-color: rgba(255, 255, 255, 0.08) !important;
   color: #ffffff !important;
 }
+
+/* Explicit Solid White Button (e.g. CTA cards) */
+.btn-white-solid {
+  background-color: #ffffff !important;
+  color: #09090b !important;
+}
+
+.btn-white-solid * {
+  color: #09090b !important;
+}
+
+.btn-white-solid:hover {
+  background-color: #f4f4f5 !important;
+  color: #000000 !important;
+}
+

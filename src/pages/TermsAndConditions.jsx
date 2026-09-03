@@ -5,27 +5,77 @@ import { ArrowLeft, Sparkles } from 'lucide-react';
 const sections = [
   {
     title: 'Use of EasyPost',
-    body: 'You may use EasyPost to connect supported publishing channels, manage media assets, schedule content, view insights, and moderate comments. You are responsible for ensuring your use complies with applicable laws and platform policies.',
+    body: (
+      <span>
+        You may use EasyPost to connect supported publishing channels, manage media assets, schedule content, view insights, and moderate comments. You are responsible for ensuring your use complies with applicable laws and third-party platform policies.
+      </span>
+    ),
   },
   {
     title: 'Account Access',
-    body: 'You are responsible for maintaining access to your Google account and connected publishing channels. Do not share credentials, tokens, or workspace access with unauthorized users.',
+    body: (
+      <span>
+        You are responsible for maintaining access to your Google account and connected publishing channels. Do not share credentials, tokens, or workspace access with unauthorized users.
+      </span>
+    ),
   },
   {
-    title: 'Connected Social Platforms',
-    body: 'Publishing, insights, feed, and comment features depend on third-party platform APIs. Meta, Instagram, Facebook, Google, and other providers may change permissions, limits, review requirements, or API availability.',
+    title: 'YouTube Terms of Service',
+    body: (
+      <span>
+        EasyPost integrates with YouTube API Services. By connecting a YouTube channel or using EasyPost features that interact with YouTube, you agree to be bound by the{' '}
+        <a
+          href="https://www.youtube.com/t/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-red-400 underline hover:text-red-300 font-medium"
+        >
+          YouTube Terms of Service (https://www.youtube.com/t/terms)
+        </a>
+        . Please review the YouTube Terms of Service carefully before connecting your channel.
+      </span>
+    ),
+  },
+  {
+    title: 'Connected Social Platforms & Meta Platform Terms',
+    body: (
+      <span>
+        Publishing, insights, feed, and comment features depend on third-party platform APIs. By connecting Facebook or Instagram accounts, you agree to comply with all applicable{' '}
+        <a
+          href="https://developers.facebook.com/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-400 underline hover:text-blue-300 font-medium"
+        >
+          Meta Platform Terms
+        </a>{' '}
+        and Developer Policies. Meta, Instagram, Facebook, Google, and other providers may change permissions, limits, review requirements, or API availability at any time.
+      </span>
+    ),
   },
   {
     title: 'Content Responsibility',
-    body: 'You are responsible for all captions, media, comments, scheduled posts, and other content submitted through EasyPost. Do not upload or publish content that violates rights, laws, or platform rules.',
+    body: (
+      <span>
+        You are responsible for all captions, media, comments, scheduled posts, and other content submitted through EasyPost. Do not upload or publish content that violates copyright, intellectual property, laws, or platform community guidelines.
+      </span>
+    ),
   },
   {
     title: 'Service Availability',
-    body: 'EasyPost is provided as available. Scheduled publishing may be affected by internet connectivity, token expiry, platform API errors, invalid media formats, or service outages.',
+    body: (
+      <span>
+        EasyPost is provided on an as-available basis. Scheduled publishing may be affected by internet connectivity, token expiry, platform API errors, invalid media formats, rate limits, or service outages.
+      </span>
+    ),
   },
   {
     title: 'Limitation of Liability',
-    body: 'To the maximum extent allowed by law, EasyPost is not liable for indirect losses, missed publishing times, platform restrictions, account actions, or business losses caused by use of the service.',
+    body: (
+      <span>
+        To the maximum extent allowed by law, EasyPost is not liable for indirect losses, missed publishing times, platform restrictions, account suspensions, or business losses caused by use of the service.
+      </span>
+    ),
   },
 ];
 
