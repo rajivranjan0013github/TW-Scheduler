@@ -5,7 +5,6 @@ import {
   Edit3,
   Plus,
   RotateCw,
-  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -126,7 +125,7 @@ export const VideoFormatsStudio = ({
               type="button"
               onClick={onRegenerate}
               disabled={isExtracting}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-zinc-400 hover:text-white transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:bg-white/15 hover:text-white disabled:opacity-50 shadow-sm"
               title="Regenerate formats with AI"
             >
               <RotateCw className={`h-3.5 w-3.5 ${isExtracting ? 'animate-spin text-white' : ''}`} />
@@ -141,7 +140,7 @@ export const VideoFormatsStudio = ({
                 setIsAddingNew(true);
                 handleSelectNewType('reaction_showcase');
               }}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white hover:text-zinc-300 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#7831d6] px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-[#7831d6]/25 transition hover:bg-[#6825bc]"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Add Format</span>
@@ -161,7 +160,7 @@ export const VideoFormatsStudio = ({
               key={pIdx}
               type="button"
               onClick={() => handleAddPreset(preset)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-white/10 bg-white/[0.02] text-zinc-300 hover:text-white hover:bg-white/10 hover:border-white/20 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-zinc-200 transition hover:bg-white/15 hover:border-white/30 hover:text-white shadow-sm"
               title={preset.body}
             >
               <Plus className="h-3 w-3 text-zinc-400" />
@@ -173,13 +172,13 @@ export const VideoFormatsStudio = ({
 
       {/* ── Add New Format Form (Inline) ── */}
       {isAddingNew && (
-        <div className="p-3.5 rounded-lg bg-white/[0.02] border border-white/10 space-y-3">
+        <div className="py-4 border-b border-white/10 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-white">New Format Blueprint</span>
             <button
               type="button"
               onClick={() => setIsAddingNew(false)}
-              className="text-zinc-500 hover:text-white"
+              className="text-zinc-400 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
@@ -191,10 +190,10 @@ export const VideoFormatsStudio = ({
                 key={key}
                 type="button"
                 onClick={() => handleSelectNewType(key)}
-                className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                className={`px-3 py-1 text-xs font-semibold rounded-lg transition shadow-sm ${
                   newFormatType === key
-                    ? 'bg-white text-black font-semibold'
-                    : 'text-zinc-400 hover:text-white bg-white/5'
+                    ? 'bg-[#7831d6] text-white shadow-[#7831d6]/25'
+                    : 'text-zinc-200 hover:text-white bg-white/10 border border-white/15 hover:bg-white/15'
                 }`}
               >
                 {meta.label}
@@ -223,7 +222,7 @@ export const VideoFormatsStudio = ({
             <button
               type="button"
               onClick={() => setIsAddingNew(false)}
-              className="px-2.5 py-1 text-xs text-zinc-400 hover:text-white"
+              className="rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:bg-white/15 hover:text-white"
             >
               Cancel
             </button>
@@ -231,7 +230,7 @@ export const VideoFormatsStudio = ({
               type="button"
               onClick={handleAddNew}
               disabled={!newFormatText.trim()}
-              className="px-3 py-1 text-xs font-semibold rounded bg-white text-black hover:bg-zinc-200 disabled:opacity-50"
+              className="rounded-lg bg-[#7831d6] px-4 py-1.5 text-xs font-semibold text-white shadow-md shadow-[#7831d6]/25 transition hover:bg-[#6825bc] disabled:opacity-50"
             >
               Save
             </button>
@@ -273,14 +272,14 @@ export const VideoFormatsStudio = ({
                   <button
                     type="button"
                     onClick={handleCancelEdit}
-                    className="px-2 py-0.5 text-xs text-zinc-400 hover:text-white"
+                    className="rounded-lg border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-zinc-200 transition hover:bg-white/15 hover:text-white"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSaveEdit(idx)}
-                    className="px-2.5 py-0.5 text-xs font-semibold rounded bg-white text-black hover:bg-zinc-200"
+                    className="rounded-lg bg-[#7831d6] px-3.5 py-1 text-xs font-semibold text-white shadow-md shadow-[#7831d6]/25 transition hover:bg-[#6825bc]"
                   >
                     Save
                   </button>

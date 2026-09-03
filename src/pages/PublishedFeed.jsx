@@ -161,6 +161,17 @@ export const PublishedFeed = () => {
       let targetChan = channels.find(c => c._id === id);
 
       if (!targetChan) {
+        const creatorRes = await fetch(`${API_BASE_URL}/api/accounts/creator/campaigns`, { headers });
+        if (creatorRes.ok) {
+          const creatorData = await creatorRes.json();
+          const allChannels = (Array.isArray(creatorData) ? creatorData : []).flatMap(c =>
+            (c.channels || []).map(ch => ({ ...ch, campaignId: c._id || ch.campaignId }))
+          );
+          targetChan = allChannels.find(c => c._id === id || c.socialAccountId === id);
+        }
+      }
+
+      if (!targetChan) {
         const adminRes = await fetch(`${API_BASE_URL}/api/admin/social-accounts`, { headers });
         channels = adminRes.ok ? await adminRes.json() : [];
         targetChan = channels.find(c => c._id === id);
@@ -200,9 +211,11 @@ export const PublishedFeed = () => {
     staleTime: 2 * 60 * 1000,
   });
 
+  const channel = channelQuery.data;
+
   // 3. Queued Scheduler Posts Query
   const queuedPostsQuery = useQuery({
-    queryKey: ['queuedPosts', id, campaignId],
+    queryKey: ['queuedPosts', id, campaignId, channel?.campaignId],
     queryFn: async () => {
       const token = localStorage.getItem('tw_token');
       const params = new URLSearchParams();
@@ -218,7 +231,12 @@ export const PublishedFeed = () => {
       params.set('from', startDate.toISOString());
       params.set('to', endDate.toISOString());
       params.set('includeManualPostedRange', 'true');
-      const url = `${API_BASE_URL}/api/scheduler${withCampaignScope(params.toString())}`;
+
+      const effectiveCampaignId = campaignId || channel?.campaignId || channel?.campaign?._id || channel?.campaign;
+      if (effectiveCampaignId) {
+        params.set('campaignId', effectiveCampaignId);
+      }
+      const url = `${API_BASE_URL}/api/scheduler?${params.toString()}`;
 
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -234,7 +252,6 @@ export const PublishedFeed = () => {
     staleTime: 2 * 60 * 1000,
   });
 
-  const channel = channelQuery.data;
   const publishedPosts = useMemo(() => publishedPostsQuery.data || [], [publishedPostsQuery.data]);
   const queuedPosts = useMemo(() => queuedPostsQuery.data || [], [queuedPostsQuery.data]);
 
@@ -250,7 +267,9 @@ export const PublishedFeed = () => {
     if (!canDeleteQueuePost || !cancellableStatuses.has(post?.status)) return;
     if (!window.confirm('Are you sure you want to delete this scheduled post?')) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}${withCampaignScope()}`, {
+      const effectiveCampaignId = campaignId || channel?.campaignId || channel?.campaign?._id || channel?.campaign;
+      const campaignParam = effectiveCampaignId ? `?campaignId=${effectiveCampaignId}` : '';
+      const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}${campaignParam}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
@@ -471,11 +490,17 @@ export const PublishedFeed = () => {
       {/* Header Container */}
       <div className="mb-3 w-full">
         <button
-          onClick={() => navigate(location.state?.fromAdmin ? '/dashboard' : '/channels')}
+          onClick={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate(location.state?.fromAdmin ? '/dashboard' : '/channels');
+            }
+          }}
           className="mb-2 flex items-center gap-1.5 text-xs text-zinc-400 transition-colors hover:text-white"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>{location.state?.fromAdmin ? 'Back to Campaign Manager' : 'Back to Channels'}</span>
+          <span>Back</span>
         </button>
 
         {loading ? (
@@ -487,18 +512,20 @@ export const PublishedFeed = () => {
             {errorChannel}
           </div>
         ) : channel ? (
-          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#121215] px-4 py-3 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-1">
             <div className="flex items-center gap-3 min-w-0">
-              <AccountAvatar account={channel} />
+              <AccountAvatar account={channel} sizeClass="h-10 w-10" />
               <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="m-0 truncate text-base font-semibold leading-tight text-zinc-100">
+                    {channel.name}
+                  </h2>
+                  <span className="flex items-center gap-1 truncate text-xs text-zinc-400">
+                    <PlatformIcon platform={channel.platform} className="h-3.5 w-3.5" />
+                    <span>@{channel.username || 'unspecified'}</span>
+                  </span>
+                </div>
                 <p className="m-0 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Published feed</p>
-                <h2 className="m-0 mt-0.5 truncate text-base font-semibold leading-tight text-zinc-100">
-                  {channel.name}
-                </h2>
-                <p className="m-0 mt-0.5 flex items-center gap-1 truncate text-xs text-zinc-400">
-                  <PlatformIcon platform={channel.platform} className="h-3.5 w-3.5" />
-                  <span className="truncate">@{channel.username || 'unspecified'}</span>
-                </p>
               </div>
             </div>
 

@@ -9,31 +9,26 @@ import {
   Folder,
   FolderOpen,
   Loader2,
-  Plus,
   Save,
   Search,
   Settings,
   Trash2,
-  Users,
   Video,
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getActiveCampaignId } from '../utils/campaignScope';
-import PlatformIcon from '../components/PlatformIcon';
 import ProductDetailsFields from '../components/campaigns/ProductDetailsFields';
 import VideoFormatsStudio from '../components/campaigns/VideoFormatsStudio';
 import { emptyProductFields } from '../components/campaigns/campaignProductForm';
 
 const statusOptions = ['active', 'paused', 'archived'];
-const platformOptions = ['instagram', 'facebook', 'youtube'];
 const normalizeFolderId = (value) => String(value?._id || value || '');
 const getFolderParentId = (folder) => normalizeFolderId(folder?.parentFolderId) || 'root';
 
 const tabConfig = [
   { id: 'details', label: 'Details', icon: Settings },
   { id: 'formats', label: 'Video Formats', icon: Video },
-  { id: 'accounts', label: 'Accounts', icon: Users },
 ];
 
 export const AdminCampaigns = () => {
@@ -59,12 +54,6 @@ export const AdminCampaigns = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
-  // States for adding a channel inline
-  const [newChannelPlatform, setNewChannelPlatform] = useState('instagram');
-  const [newChannelHandle, setNewChannelHandle] = useState('');
-  const [newChannelDisplayName, setNewChannelDisplayName] = useState('');
-  const [newChannelHandlerEmail, setNewChannelHandlerEmail] = useState('');
 
   const [activeTab, setActiveTab] = useState('details');
 
@@ -170,81 +159,6 @@ export const AdminCampaigns = () => {
     return () => controller.abort();
   }, [campaignId]);
 
-  const addChannel = () => {
-    if (!newChannelHandle.trim()) return;
-    const cleanHandle = newChannelHandle.trim();
-
-    // Check if channel already exists in form.channels (case-insensitive handle check)
-    const exists = form.channels.some(
-      (ch) => ch.platform === newChannelPlatform && ch.handle.toLowerCase() === cleanHandle.toLowerCase()
-    );
-    if (exists) {
-      setError(`This ${newChannelPlatform} account is already added to the product.`);
-      return;
-    }
-
-    setError('');
-    setForm((c) => ({
-      ...c,
-      channels: [
-        ...c.channels,
-        {
-          platform: newChannelPlatform,
-          handle: cleanHandle,
-          displayName: newChannelDisplayName.trim(),
-          assignedHandlerEmail: newChannelHandlerEmail.trim().toLowerCase(),
-          addedAt: new Date().toISOString(),
-        },
-      ],
-    }));
-
-    setNewChannelHandle('');
-    setNewChannelDisplayName('');
-    setNewChannelHandlerEmail('');
-  };
-
-  const removeChannel = (indexToRemove) => {
-    setForm((c) => ({
-      ...c,
-      channels: c.channels.filter((_, idx) => idx !== indexToRemove),
-    }));
-  };
-
-  const getPlatformPlaceholder = (platform) => {
-    switch (platform) {
-      case 'instagram':
-        return 'e.g., @cristiano or cristiano';
-      case 'youtube':
-        return 'e.g., @mrbeast or UC-lHJZR3Gqxm24_Vd_AJ5Yw';
-      case 'facebook':
-        return 'e.g., Page Name, Page Username, or ID';
-      default:
-        return 'Enter handle';
-    }
-  };
-
-  const getPlatformFormatHelp = (platform) => {
-    switch (platform) {
-      case 'instagram':
-        return "Instagram handles should be the user's exact username (e.g., @cristiano).";
-      case 'youtube':
-        return 'YouTube channels can be specified by their custom handle (e.g., @mrbeast) or unique Channel ID.';
-      case 'facebook':
-        return 'Facebook accounts should be the Page Name, Page Username, or numerical Page ID.';
-      default:
-        return '';
-    }
-  };
-
-  const updateChannel = (index, updates) => {
-    setForm((current) => ({
-      ...current,
-      channels: current.channels.map((channel, idx) => (
-        idx === index ? { ...channel, ...updates } : channel
-      )),
-    }));
-  };
-
   const selectedPromoFolder = promoFolders.find((folder) => (
     normalizeFolderId(folder) === String(form.promoFolderId)
   ));
@@ -312,33 +226,6 @@ export const AdminCampaigns = () => {
         </div>
       );
     });
-
-  const getChannelStatusMeta = (channel) => {
-    if (channel.isVerified) {
-      const verifiedOwner = channel.assignedHandlerName || channel.assignedHandlerEmail || channel.name || channel.username;
-      return {
-        label: 'Verified',
-        className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        detail: verifiedOwner
-          ? `Verified by ${verifiedOwner}`
-          : 'OAuth connected',
-      };
-    }
-
-    if (channel.assignedHandlerEmail) {
-      return {
-        label: 'Manual only',
-        className: 'bg-blue-50 text-blue-700 border-blue-200',
-        detail: `Assigned to ${channel.assignedHandlerEmail}`,
-      };
-    }
-
-    return {
-      label: 'Unassigned',
-      className: 'bg-amber-50 text-amber-700 border-amber-200',
-      detail: 'Add handler email for manual tasks',
-    };
-  };
 
   const saveCampaign = async (event) => {
     event.preventDefault();
@@ -414,8 +301,8 @@ export const AdminCampaigns = () => {
   /* ───────── No campaign selected ───────── */
   if (!campaignId) {
     return (
-      <div className="min-h-screen bg-black px-3 py-3 text-white lg:px-5">
-        <div className="mx-auto max-w-5xl space-y-3">
+      <div className="min-h-screen bg-black p-4 pb-8 text-white lg:p-6">
+        <div className="w-full space-y-4">
           <div className="border-b border-white/10 pb-2">
             <h2 className="m-0 text-base font-semibold tracking-tight text-white">Product Setup</h2>
           </div>
@@ -436,8 +323,8 @@ export const AdminCampaigns = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0c0c0e] px-3 py-3 text-white lg:px-5">
-      <div className="mx-auto max-w-5xl space-y-3">
+    <div className="min-h-screen bg-[#0c0c0e] p-4 pb-8 text-white lg:p-6">
+      <div className="w-full space-y-4">
         <div className="border-b border-white/[0.08] pb-2">
           <h2 className="m-0 text-base font-semibold tracking-tight text-white">Product Setup</h2>
           <p className="m-0 mt-0.5 text-xs text-zinc-400">
@@ -453,17 +340,17 @@ export const AdminCampaigns = () => {
         )}
 
         {loading ? (
-          <div className="rounded-2xl border border-white/[0.08] bg-[#141417]/95 p-10 text-center text-sm text-zinc-400">Loading product...</div>
+          <div className="py-16 text-center text-sm text-zinc-400">Loading product...</div>
         ) : !campaign ? (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/[0.08] bg-[#141417]/95 p-12 text-center">
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
             <p className="m-0 text-sm font-semibold text-white">Product not found</p>
             <p className="m-0 mt-1 text-xs text-zinc-400">The selected product could not be loaded.</p>
           </div>
         ) : (
-          <form onSubmit={saveCampaign}>
-            <section className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#141417]/95 shadow-xl backdrop-blur-xl">
-              {/* ── Tab Bar ── */}
-              <div className="flex border-b border-white/[0.08]">
+          <form onSubmit={saveCampaign} className="space-y-6">
+            {/* ── Tab Bar & Channels Link ── */}
+            <div className="flex items-center justify-between border-b border-white/[0.08]">
+              <div className="flex gap-4">
                 {tabConfig.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -472,35 +359,41 @@ export const AdminCampaigns = () => {
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-2 border-b-2 px-5 py-3.5 text-sm font-semibold transition ${
+                      className={`flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-semibold transition -mb-px ${
                         isActive
-                          ? 'border-white text-white'
+                          ? 'border-[#7831d6] text-white'
                           : 'border-transparent text-zinc-400 hover:text-white'
                       }`}
                     >
                       <Icon className="h-4 w-4" />
                       {tab.label}
-                      {tab.id === 'accounts' && (
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-zinc-300">
-                          {form.channels?.length || 0}
-                        </span>
-                      )}
                     </button>
                   );
                 })}
               </div>
 
-              {/* ── Details Tab ── */}
-              {activeTab === 'details' && (
-                <div className="p-6 space-y-5">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <ProductDetailsFields
-                        form={form}
-                        setForm={setForm}
-                        heading="Product profile"
-                      />
-                    </div>
+              <button
+                type="button"
+                onClick={() => navigate('/channels', { state: { campaignId } })}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:bg-white/10 hover:text-white"
+              >
+                <span>Channels: <strong className="text-white">{form.channels?.length || 0}</strong> active</span>
+                <span className="text-[#c4b5fd] font-bold">Manage in Channels →</span>
+              </button>
+            </div>
+
+            {/* ── Details Tab ── */}
+            {activeTab === 'details' && (
+              <div className="py-2 space-y-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <ProductDetailsFields
+                      form={form}
+                      setForm={setForm}
+                      showHeader={false}
+                      showVideoFormats={false}
+                    />
+                  </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold text-zinc-300">Main Contact Email</label>
                       <input
@@ -528,13 +421,12 @@ export const AdminCampaigns = () => {
                         <FolderOpen className="h-3.5 w-3.5 text-white" />
                         Promo Video Folder
                       </label>
-                      <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] p-2.5">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-black text-white shadow-sm ring-1 ring-white/10">
+                      <div className="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-black/40 p-2">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black text-white shadow-sm ring-1 ring-white/10">
                           <Folder className="h-4 w-4" />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="m-0 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Selected folder</p>
-                          <p className="m-0 mt-0.5 truncate text-xs font-semibold text-white">
+                          <p className="m-0 truncate text-xs font-semibold text-white">
                             {selectedPromoFolder?.name || 'No promo folder assigned'}
                           </p>
                         </div>
@@ -542,7 +434,7 @@ export const AdminCampaigns = () => {
                           <button
                             type="button"
                             onClick={() => setForm((current) => ({ ...current, promoFolderId: '' }))}
-                            className="h-8 rounded-lg px-2.5 text-[10px] font-semibold text-zinc-400 transition hover:bg-white/10 hover:text-rose-400"
+                            className="h-8 rounded-lg border border-white/15 bg-white/10 px-3 text-xs font-semibold text-zinc-300 transition hover:border-rose-500/40 hover:bg-rose-500/15 hover:text-rose-300"
                           >
                             Clear
                           </button>
@@ -551,7 +443,7 @@ export const AdminCampaigns = () => {
                           type="button"
                           onClick={openPromoFolderPicker}
                           disabled={foldersLoading}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-white px-3 text-[10px] font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-wait disabled:opacity-60 shadow-sm"
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#7831d6] px-3.5 text-xs font-semibold text-white shadow-md shadow-[#7831d6]/25 transition hover:bg-[#6825bc] disabled:cursor-wait disabled:opacity-60"
                         >
                           {foldersLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
                           Choose folder
@@ -564,10 +456,9 @@ export const AdminCampaigns = () => {
                   </div>
                 </div>
               )}
-
-              {/* ── Video Formats Tab ── */}
+                          {/* ── Video Formats Tab ── */}
               {activeTab === 'formats' && (
-                <div className="p-6">
+                <div className="py-4">
                   <VideoFormatsStudio
                     marketingStrategies={form.marketingStrategies || []}
                     onChange={(updatedStrategies) => setForm((c) => ({ ...c, marketingStrategies: updatedStrategies }))}
@@ -576,238 +467,15 @@ export const AdminCampaigns = () => {
                 </div>
               )}
 
-              {/* ── Accounts Tab ── */}
-              {activeTab === 'accounts' && (
-                <div className="p-6 space-y-6">
-                  {/* Info Header */}
-                  <div>
-                    <h3 className="text-base font-semibold text-white m-0">Product Social Channels</h3>
-                    <p className="text-xs text-zinc-400 mt-1 m-0">
-                      Add the social media accounts or channels associated with this product.
-                      The system will automatically check their verification status by scanning connected accounts.
-                    </p>
-                  </div>
 
-                  {/* Inline Add Form */}
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-5">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mt-0 mb-4">
-                      Add New Channel
-                    </h4>
-
-                    <div className="space-y-4">
-                      {/* Platform Selector (Premium Pill buttons) */}
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-zinc-300">Select Platform</label>
-                        <div className="flex gap-2">
-                          {platformOptions.map((platform) => {
-                            const isSelected = newChannelPlatform === platform;
-                            let activeStyle = '';
-                            if (platform === 'instagram') {
-                              activeStyle = isSelected
-                                ? 'bg-gradient-to-tr from-[#feda75] via-[#d62976] to-[#4f5bd5] text-white shadow-sm border-transparent'
-                                : 'bg-[#0a0a0a] hover:bg-white/10 border-white/10 text-white';
-                            } else if (platform === 'youtube') {
-                              activeStyle = isSelected
-                                ? 'bg-[#ff0000] text-white shadow-sm border-transparent'
-                                : 'bg-[#0a0a0a] hover:bg-white/10 border-white/10 text-white';
-                            } else if (platform === 'facebook') {
-                              activeStyle = isSelected
-                                ? 'bg-[#1877f2] text-white shadow-sm border-transparent'
-                                : 'bg-[#0a0a0a] hover:bg-white/10 border-white/10 text-white';
-                            }
-
-                            return (
-                              <button
-                                key={platform}
-                                type="button"
-                                onClick={() => setNewChannelPlatform(platform)}
-                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-semibold capitalize transition ${activeStyle}`}
-                              >
-                                <PlatformIcon platform={platform} className="h-4 w-4" />
-                                {platform === 'youtube' ? 'YouTube' : platform}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Inputs row */}
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-zinc-300">
-                            Handle / Channel ID <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={newChannelHandle}
-                            onChange={(e) => setNewChannelHandle(e.target.value)}
-                            placeholder={getPlatformPlaceholder(newChannelPlatform)}
-                            className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2.5 text-sm text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 placeholder:text-zinc-600"
-                          />
-                          <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">
-                            {getPlatformFormatHelp(newChannelPlatform)}
-                          </p>
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-zinc-300">
-                            Display Name <span className="text-zinc-500 font-normal">(Optional)</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={newChannelDisplayName}
-                            onChange={(e) => setNewChannelDisplayName(e.target.value)}
-                            placeholder="e.g. Cristiano Ronaldo"
-                            className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2.5 text-sm text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 placeholder:text-zinc-600"
-                          />
-                          <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">
-                            A friendly name to display in lists and reports.
-                          </p>
-                        </div>
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-zinc-300">
-                            Handler Email <span className="text-zinc-500 font-normal">(Manual)</span>
-                          </label>
-                          <input
-                            type="email"
-                            value={newChannelHandlerEmail}
-                            onChange={(e) => setNewChannelHandlerEmail(e.target.value)}
-                            placeholder="creator@example.com"
-                            className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2.5 text-sm text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 placeholder:text-zinc-600"
-                          />
-                          <p className="mt-1 text-[11px] text-zinc-500 leading-relaxed">
-                            Required only when this unverified handle should receive manual tasks.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Form action */}
-                      <div className="flex justify-end pt-2">
-                        <button
-                          type="button"
-                          onClick={addChannel}
-                          disabled={!newChannelHandle.trim()}
-                          className="inline-flex items-center gap-1.5 rounded-[8px] bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add Channel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* List of Added Channels */}
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 m-0">
-                      Added Channels ({form.channels?.length || 0})
-                    </h4>
-
-                    {(form.channels?.length || 0) === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-white/[0.08] p-8 text-center bg-white/[0.02]">
-                        <p className="m-0 text-sm font-semibold text-white">No channels added yet</p>
-                        <p className="m-0 mt-1 text-xs text-zinc-500">
-                          Fill in the details above to add social channels to this product.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02] overflow-hidden">
-                        {(form.channels || []).map((ch, idx) => {
-                          const statusMeta = getChannelStatusMeta(ch);
-                          return (
-                            <div key={idx} className="flex items-center gap-3 p-4 hover:bg-white/[0.04] transition">
-                              <div className="relative h-10 w-10 shrink-0">
-                                {ch.avatarUrl ? (
-                                  <img
-                                    src={ch.avatarUrl}
-                                    crossOrigin="anonymous"
-                                    alt=""
-                                    className="h-10 w-10 rounded-full border border-white/10 object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-400">
-                                    <Users className="h-4 w-4" />
-                                  </div>
-                                )}
-                                <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-black bg-[#141417] shadow-sm">
-                                  <PlatformIcon platform={ch.platform} className="h-3.5 w-3.5" />
-                                </span>
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-baseline gap-2">
-                                  <span className="truncate text-xs font-semibold text-white capitalize">
-                                    {ch.platform}
-                                  </span>
-                                  {ch.displayName && (
-                                    <span className="truncate text-xs text-zinc-400">
-                                      ({ch.displayName})
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="m-0 mt-0.5 text-[11px] text-zinc-500">
-                                  {ch.addedAt ? `Added on ${new Date(ch.addedAt).toLocaleDateString()}` : 'Publishing channel'}
-                                </p>
-                              </div>
-
-                              <div className="w-44">
-                                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-                                  Handle / ID
-                                </label>
-                                <input
-                                  type="text"
-                                  value={ch.handle || ch.requestedHandle || ''}
-                                  onChange={(e) => updateChannel(idx, { handle: e.target.value.trim(), requestedHandle: e.target.value.trim() })}
-                                  placeholder="@handle or ID"
-                                  disabled={ch.isVerified}
-                                  className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 disabled:bg-white/5 disabled:text-zinc-500 disabled:cursor-not-allowed"
-                                />
-                              </div>
-
-                              <div className="w-48">
-                                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-                                  Handler Email
-                                </label>
-                                <input
-                                  type="email"
-                                  value={ch.assignedHandlerEmail || ''}
-                                  onChange={(e) => updateChannel(idx, { assignedHandlerEmail: e.target.value.trim().toLowerCase() })}
-                                  placeholder="creator@example.com"
-                                  disabled={ch.isVerified}
-                                  className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-2.5 py-1.5 text-xs text-white outline-none transition focus:border-white/30 focus:ring-1 focus:ring-white/10 disabled:bg-white/5 disabled:text-zinc-500 disabled:cursor-not-allowed"
-                                />
-                              </div>
-
-                              <div className="flex flex-col items-end gap-1">
-                                <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold border ${statusMeta.className}`}>
-                                  {statusMeta.label}
-                                </span>
-                                <span className="text-[10px] text-zinc-400 max-w-[190px] text-right leading-tight">
-                                  {statusMeta.detail}
-                                </span>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => removeChannel(idx)}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-rose-500/20 hover:text-rose-400 ml-2"
-                                aria-label={`Remove ${ch.handle}`}
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* ── Action Bar ── */}
-              <div className="flex items-center justify-between border-t border-white/[0.08] px-5 py-3 bg-black/40">
+              <div className="flex items-center justify-between border-t border-white/[0.08] pt-6 pb-12">
                 <button
                   type="button"
                   onClick={deleteCampaign}
                   disabled={!canDelete || saving}
-                  className="inline-flex items-center gap-1.5 rounded-[8px] border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/15 px-4 py-2.5 text-xs font-semibold text-rose-300 shadow-sm transition hover:bg-rose-500/25 hover:border-rose-500/50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete
@@ -815,13 +483,12 @@ export const AdminCampaigns = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-[8px] bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-60 shadow-sm"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#7831d6] px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-[#7831d6]/25 transition hover:bg-[#6825bc] disabled:opacity-60"
                 >
                   <Save className="h-3.5 w-3.5" />
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
-            </section>
           </form>
         )}
       </div>
@@ -907,7 +574,7 @@ export const AdminCampaigns = () => {
               <button
                 type="button"
                 onClick={() => setPromoFolderPickerOpen(false)}
-                className="rounded-[8px] border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-[11px] font-bold text-zinc-300 hover:bg-white/10"
+                className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold text-zinc-200 transition hover:bg-white/15 hover:text-white"
               >
                 Cancel
               </button>
@@ -918,7 +585,7 @@ export const AdminCampaigns = () => {
                   setPromoFolderPickerOpen(false);
                 }}
                 disabled={!pendingPromoFolderId || foldersLoading}
-                className="rounded-[8px] bg-white px-4 py-2 text-[11px] font-bold text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40 shadow-sm"
+                className="rounded-lg bg-[#7831d6] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-[#7831d6]/25 transition hover:bg-[#6825bc] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Use This Folder
               </button>

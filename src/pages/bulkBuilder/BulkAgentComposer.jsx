@@ -258,7 +258,7 @@ const FolderSuggestionMenu = ({
       id="bulk-agent-folder-suggestions"
       role="listbox"
       aria-label="Media Library folders"
-      className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-20 max-h-64 overflow-y-auto rounded-xl border border-[#3b3b42] bg-[#18181b] p-1.5 shadow-2xl"
+      className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-20 max-h-64 overflow-y-auto rounded-xl border border-[#343434] bg-[#282828] p-1.5 shadow-2xl"
     >
       <div className="flex items-center justify-between px-2 py-1.5 text-[8px] font-extrabold uppercase tracking-[0.14em] text-zinc-500">
         <span>Media Library folders</span>
@@ -594,7 +594,7 @@ const InlineFolderEditor = forwardRef(({
       onDrop={handleDrop}
       onDragOver={(event) => event.preventDefault()}
       onKeyDown={handleEditorKeyDown}
-      className={`${className} empty:before:pointer-events-none empty:before:text-zinc-600 empty:before:content-[attr(data-placeholder)] ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+      className={`${className} empty:before:pointer-events-none empty:before:text-[#898989] empty:before:content-[attr(data-placeholder)] ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
     />
   );
 });
@@ -1873,7 +1873,7 @@ export const BulkAgentComposer = ({
           )}
 
           {/* Drawer Composer Input Box */}
-          <div className="relative mx-3.5 mb-3.5 shrink-0 rounded-2xl border border-white/[0.1] bg-[#141418] p-3 shadow-xl transition-all focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/20">
+          <div className="relative mx-3.5 mb-3.5 shrink-0 rounded-2xl border border-[#343434] bg-[#282828] p-3 shadow-xl transition-all focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/20">
             <FolderSuggestionMenu
               isVisible={Boolean(mentionMatch) && !controlsLocked}
               foldersLoading={foldersLoading}
@@ -1883,7 +1883,7 @@ export const BulkAgentComposer = ({
               onHighlight={setSuggestionIndex}
               onSelect={selectFolderSuggestion}
             />
-            {composerEditor('What do you want to create? (type @ for specific folders)', 'max-h-28 min-h-10 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent px-1 py-1 text-[12px] leading-5 text-white outline-none placeholder:text-zinc-500')}
+            {composerEditor('What do you want to create? (type @ for specific folders)', 'max-h-28 min-h-10 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent px-1 py-1 text-[12px] leading-5 text-white outline-none placeholder:text-[#898989]')}
             {showDefaultAudioHint && (
               <div className="px-1 text-[8px] leading-relaxed text-sky-300/70" role="status">
                 When no audio folder is attached, music uses Trending Songs automatically.
@@ -1921,7 +1921,7 @@ export const BulkAgentComposer = ({
         >
           <section
             aria-label="Bulk Builder AI composer"
-            className="pointer-events-auto relative w-full max-w-2xl select-text rounded-2xl border border-white/[0.1] bg-[#101014]/[0.94] p-3 text-zinc-100 shadow-[0_20px_70px_rgba(0,0,0,0.75)] backdrop-blur-2xl transition-all focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/20"
+            className="pointer-events-auto relative w-full max-w-2xl select-text rounded-2xl border border-[#343434] bg-[#282828] p-3 text-zinc-100 shadow-[0_20px_70px_rgba(0,0,0,0.75)] backdrop-blur-2xl transition-all focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/20"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
           >
@@ -1934,7 +1934,7 @@ export const BulkAgentComposer = ({
               onHighlight={setSuggestionIndex}
               onSelect={selectFolderSuggestion}
             />
-            {composerEditor('Ask AI to build or edit frames... (type @ for specific folders)', 'max-h-32 min-h-12 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent py-1.5 pl-2 pr-12 text-[12px] leading-5 text-white outline-none placeholder:text-zinc-500')}
+            {composerEditor('Ask AI to build or edit frames... (type @ for specific folders)', 'max-h-32 min-h-12 w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent py-1.5 pl-2 pr-12 text-[12px] leading-5 text-white outline-none placeholder:text-[#898989]')}
             {showDefaultAudioHint && (
               <div className="px-2 text-[8px] leading-relaxed text-sky-300/70" role="status">
                 When no audio folder is attached, music uses Trending Songs automatically.

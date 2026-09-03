@@ -1,10 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { BarChart3, Clock, FolderHeart, Link2, Megaphone, Settings as SettingsIcon } from 'lucide-react';
+import { BarChart3, CalendarPlus, Clock, FolderHeart, Link2, Megaphone, Settings as SettingsIcon } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
-import { PwaInstallButton } from './components/PwaInstallButton';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import CampaignSelector from './pages/CampaignSelector';
@@ -18,6 +17,7 @@ import PostDetails from './pages/PostDetails';
 import Settings from './pages/Settings';
 import AdminUsers from './pages/AdminUsers';
 import AdminDashboard from './pages/AdminDashboard';
+import CreatorAnalytics from './pages/CreatorAnalytics';
 import AdminCampaigns from './pages/AdminCampaigns';
 import AdminFolders from './pages/AdminFolders';
 import AdminFolderDetails from './pages/AdminFolderDetails';
@@ -31,6 +31,7 @@ import YoutubeCallback from './pages/YoutubeCallback';
 import { BulkVideoBuilder } from './pages/BulkVideoBuilder';
 import OnboardingScreen from './pages/OnboardingScreen';
 import CreatorCampaigns from './pages/CreatorCampaigns';
+import CreatorSchedulePost from './pages/CreatorSchedulePost';
 
 const VideoEditorV2 = lazy(() => import('./pages/videoEditorV2/VideoEditorV2'));
 
@@ -44,46 +45,56 @@ const TimelineEditorFallback = () => (
 );
 
 function MobileNav({ isCreator, canViewAdmin }) {
+  const location = useLocation();
   const items = isCreator
     ? [
-        { name: 'Products', path: '/campaigns', icon: Megaphone },
+        { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
+        { name: 'Schedule', path: '/schedule', icon: CalendarPlus },
+        { name: 'Analytics', path: '/analytics', icon: BarChart3 },
         { name: 'Channels', path: '/channels', icon: Link2 },
         { name: 'Settings', path: '/settings', icon: SettingsIcon },
       ]
     : [
-        { name: 'Products', path: '/campaigns', icon: Megaphone },
+        { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
         ...(canViewAdmin ? [{ name: 'Performance', path: '/dashboard', icon: BarChart3 }] : []),
         { name: 'Queue', path: '/scheduler', icon: Clock },
         { name: 'Media', path: '/media', icon: FolderHeart },
         { name: 'Channels', path: '/channels', icon: Link2 },
       ];
 
+  const checkIsActive = (path) => {
+    if (path === '/campaigns') {
+      return location.pathname === '/' || location.pathname === '/campaigns';
+    }
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
+
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#09060e]/95 backdrop-blur-2xl px-1 pt-0.5 shadow-[0_-4px_25px_rgba(120,49,214,0.12)] md:hidden mobile-safe-nav text-white">
-      <div className="absolute -top-8 right-2">
-        <PwaInstallButton
-          collapsed
-          popoverClassName="right-0"
-        />
-      </div>
-      <div className={`mx-auto grid h-full gap-0.5 ${isCreator ? 'max-w-xs grid-cols-3' : `max-w-md ${canViewAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}`}>
-        {items.map((item) => (
-          <NavLink
-            key={item.name}
-            to={item.path}
-            end
-            className={({ isActive }) =>
-              `flex h-full flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[9px] font-semibold leading-none transition-all ${
-                isActive
-                  ? 'bg-gradient-to-b from-[#8a3ff2] to-[#6d24cf] text-white shadow-[0_0_12px_rgba(120,49,214,0.4)] font-bold'
-                  : 'text-zinc-400 hover:text-white active:bg-white/[0.08]'
-              }`
-            }
-          >
-            <item.icon className="h-3.5 w-3.5" />
-            <span>{item.name}</span>
-          </NavLink>
-        ))}
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0c0c0e]/95 backdrop-blur-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.5)] md:hidden mobile-safe-nav text-white">
+      <div className="mx-auto flex h-full items-center justify-around px-2 max-w-md">
+        {items.map((item) => {
+          const isActive = checkIsActive(item.path);
+          return (
+            <NavLink
+              key={item.name}
+              to={item.path}
+              className="flex flex-col items-center justify-center gap-1 transition-all py-1 px-3 rounded-xl active:scale-95"
+            >
+              <div
+                className={`flex items-center justify-center rounded-xl transition-all ${
+                  isActive
+                    ? 'bg-white/10 text-white px-3 py-1'
+                    : 'text-zinc-500 hover:text-zinc-300 px-3 py-1'
+                }`}
+              >
+                <item.icon className={`h-4 w-4 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+              </div>
+              <span className={`text-[10px] tracking-tight leading-none ${isActive ? 'font-semibold text-white' : 'font-medium text-zinc-400'}`}>
+                {item.name}
+              </span>
+            </NavLink>
+          );
+        })}
       </div>
     </nav>
   );
@@ -94,7 +105,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const location = useLocation();
   const [campaignVersion, setCampaignVersion] = useState(0);
   const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
-  const canEditQueue = ['owner', 'admin', 'editor'].includes(user?.role);
+  const canEditQueue = ['owner', 'admin', 'editor'].includes(user?.role) || isCreator;
   const handlerPreviewContext = (() => {
     try {
       return JSON.parse(sessionStorage.getItem('admin_view_context') || 'null');
@@ -140,8 +151,15 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
             <>
               <Route path="/" element={<CreatorCampaigns />} />
               <Route path="/campaigns" element={<CreatorCampaigns />} />
+              <Route path="/schedule" element={<CreatorSchedulePost />} />
+              <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
+              <Route path="/scheduler/new" element={canEditQueue ? <ScheduleQueue selectedAccounts={selectedAccounts} /> : <Navigate to="/scheduler" replace />} />
+              <Route path="/scheduler/queue" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
+              <Route path="/scheduler/queue/:accountId" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
+              <Route path="/analytics" element={<CreatorAnalytics />} />
               <Route path="/channels" element={<Channels selectedAccounts={selectedAccounts} />} />
               <Route path="/channels/:id/feed" element={<PublishedFeed />} />
+              <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </>

@@ -252,14 +252,14 @@ export const CaptionDrawer = ({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <label className="mb-3 flex items-center gap-2 rounded-[10px] border border-white/[0.08] bg-black/40 px-3 py-2.5 text-zinc-500 focus-within:border-white/30 focus-within:text-white">
+                  <label className="mb-3 flex items-center gap-2 rounded-[10px] border border-[#343434] bg-[#282828] px-3 py-2.5 text-zinc-500 focus-within:border-white/30 focus-within:text-white">
                     <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
                     <input
                       type="search"
                       value={savedCaptionSearch}
                       onChange={(event) => setSavedCaptionSearch(event.target.value)}
                       placeholder="Filter saved captions..."
-                      className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-gray-200 outline-none placeholder:text-zinc-500"
+                      className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-gray-200 outline-none placeholder:text-[#898989]"
                     />
                   </label>
                   {savedCaptions
@@ -306,7 +306,7 @@ export const CaptionDrawer = ({
                   onChange={(e) => setManualText(e.target.value)}
                   rows={3}
                   placeholder={manualPlaceholder}
-                  className="w-full text-xs border border-white/[0.08] rounded-xl p-3 bg-black/40 focus:bg-black/60 transition-all outline-none resize-none text-white focus:border-white/30 focus:ring-1 focus:ring-white/10"
+                  className="w-full text-xs border border-[#343434] rounded-xl p-3 bg-[#282828] focus:bg-[#282828] transition-all outline-none resize-none text-white focus:border-white/30 focus:ring-1 focus:ring-white/10 placeholder:text-[#898989]"
                 />
                 <div className="flex gap-2">
                   <button
@@ -348,7 +348,7 @@ export const CaptionDrawer = ({
                     value={vibe}
                     onChange={(e) => onVibeChange(e.target.value)}
                     placeholder="Optional topic/vibe..."
-                    className="flex-1 rounded-[10px] border border-white/[0.08] bg-black/40 px-3 py-2.5 text-xs outline-none focus:border-white/30 focus:ring-1 focus:ring-white/10 transition-all text-white"
+                    className="flex-1 rounded-[10px] border border-[#343434] bg-[#282828] px-3 py-2.5 text-xs outline-none focus:border-white/30 focus:ring-1 focus:ring-white/10 transition-all text-white placeholder:text-[#898989]"
                   />
                   <button
                     type="button"
