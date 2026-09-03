@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { User, Mail, Save, Check, Trash2, LogOut, ChevronDown } from 'lucide-react';
 
@@ -10,6 +10,27 @@ export const Settings = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+
+  useEffect(() => {
+    if (!showLogoutDialog) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowLogoutDialog(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showLogoutDialog]);
+
+  const handleLogout = () => {
+    setShowLogoutDialog(true);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutDialog(false);
+    logout();
+  };
 
   const handleDeleteAccount = async () => {
     setErrorMessage('');
@@ -53,7 +74,7 @@ export const Settings = () => {
           <h2 className="m-0 text-2xl font-bold tracking-tight text-white">Settings</h2>
           <button
             type="button"
-            onClick={logout}
+            onClick={handleLogout}
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-medium text-zinc-300 shadow-sm transition hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300"
             title="Log out"
           >
@@ -217,6 +238,57 @@ export const Settings = () => {
           </div>
         </div>
       </div>
+
+      {/* Logout Confirmation Dialog Alert */}
+      {showLogoutDialog && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="logout-dialog-title"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setShowLogoutDialog(false)}
+        >
+          <div
+            className="w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 bg-[#121216] p-6 shadow-2xl shadow-black/80 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3.5 mb-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400">
+                <LogOut className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 id="logout-dialog-title" className="m-0 text-base font-semibold text-white">
+                  Log Out
+                </h3>
+                <p className="m-0 mt-0.5 text-xs text-zinc-400">
+                  Are you sure you want to log out?
+                </p>
+              </div>
+            </div>
+
+            <p className="mb-6 text-xs text-zinc-400 leading-relaxed">
+              You will need to sign back in to access your workspace campaigns and channels.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowLogoutDialog(false)}
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-zinc-300 shadow-sm transition hover:bg-white/10 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmLogout}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-500 active:scale-[0.98]"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

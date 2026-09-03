@@ -153,41 +153,73 @@ export const Channels = () => {
     }
   };
 
-  const connectInstagramOAuth = (targetCampaignId = activeConnectCampaignId) => {
+  const connectInstagramOAuth = async (targetCampaignId = activeConnectCampaignId) => {
     const token = localStorage.getItem('tw_token');
-    const returnUrl = `${window.location.origin}/instagram-callback`;
-    const params = new URLSearchParams({ returnUrl });
+    const returnUrl = `${window.location.origin}/auth/instagram/callback`;
     if (targetCampaignId) {
-      params.set('campaignId', targetCampaignId);
+      sessionStorage.setItem('connect_campaign_id', targetCampaignId);
     }
-    const connectUrl = `${API_BASE_URL}/api/accounts/connect/instagram?token=${token}&${params.toString()}`;
-    window.location.assign(connectUrl);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/accounts/instagram/auth-url?redirectUri=${encodeURIComponent(returnUrl)}&campaignId=${encodeURIComponent(targetCampaignId || '')}`,
+        { headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }) }
+      );
+      const data = await response.json();
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch Instagram auth URL from backend:', err);
+    }
+    window.location.assign(`${API_BASE_URL}/api/accounts/connect/instagram?campaignId=${encodeURIComponent(targetCampaignId || '')}`);
   };
 
-  const connectYoutubeOAuth = (targetCampaignId = activeConnectCampaignId) => {
+  const connectYoutubeOAuth = async (targetCampaignId = activeConnectCampaignId) => {
     const token = localStorage.getItem('tw_token');
-    const returnUrl = `${window.location.origin}/youtube-callback`;
-    const params = new URLSearchParams({ returnUrl });
+    const returnUrl = `${window.location.origin}/auth/youtube/callback`;
     if (targetCampaignId) {
-      params.set('campaignId', targetCampaignId);
+      sessionStorage.setItem('connect_campaign_id', targetCampaignId);
     }
-    const connectUrl = `${API_BASE_URL}/api/accounts/connect/youtube?token=${token}&${params.toString()}`;
-    window.location.assign(connectUrl);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/accounts/youtube/auth-url?redirectUri=${encodeURIComponent(returnUrl)}&campaignId=${encodeURIComponent(targetCampaignId || '')}`,
+        { headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }) }
+      );
+      const data = await response.json();
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch YouTube auth URL from backend:', err);
+    }
+    window.location.assign(`${API_BASE_URL}/api/accounts/connect/youtube?campaignId=${encodeURIComponent(targetCampaignId || '')}`);
   };
 
-  const connectMetaOAuth = (targetCampaignId = activeConnectCampaignId, targetSocialAccountId = null) => {
+  const connectMetaOAuth = async (targetCampaignId = activeConnectCampaignId, targetSocialAccountId = null) => {
     const token = localStorage.getItem('tw_token');
-    const returnUrl = `${window.location.origin}/facebook-callback`;
-    const params = new URLSearchParams({ returnUrl });
+    const returnUrl = `${window.location.origin}/auth/facebook/callback`;
     if (targetCampaignId) {
-      params.set('campaignId', targetCampaignId);
+      sessionStorage.setItem('connect_campaign_id', targetCampaignId);
     }
     if (targetSocialAccountId) {
-      params.set('socialAccountId', targetSocialAccountId);
-      params.set('reconnect', 'true');
+      sessionStorage.setItem('reauthorize_account_id', targetSocialAccountId);
     }
-    const connectUrl = `${API_BASE_URL}/api/accounts/connect/facebook?token=${token}&${params.toString()}`;
-    window.location.assign(connectUrl);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/accounts/facebook/auth-url?redirectUri=${encodeURIComponent(returnUrl)}&campaignId=${encodeURIComponent(targetCampaignId || '')}&reauthorizeAccountId=${encodeURIComponent(targetSocialAccountId || '')}`,
+        { headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }) }
+      );
+      const data = await response.json();
+      if (data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch Facebook auth URL from backend:', err);
+    }
+    window.location.assign(`${API_BASE_URL}/api/accounts/connect/facebook?campaignId=${encodeURIComponent(targetCampaignId || '')}&socialAccountId=${encodeURIComponent(targetSocialAccountId || '')}`);
   };
 
   const handleVerifyChannel = (channel) => {

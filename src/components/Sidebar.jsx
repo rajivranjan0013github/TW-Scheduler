@@ -3,12 +3,11 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import { Clock, FolderHeart, Film, Layers, Link2, Settings as SettingsIcon, X, Megaphone, Users, BarChart3, CalendarPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { PwaInstallButton } from './PwaInstallButton';
 import { withCampaignScope } from '../utils/campaignScope';
 import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
 
 export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} }) => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [, setCampaigns] = useState([]);
@@ -227,41 +226,37 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
 
       {/* Sidebar Footer */}
       <div className="relative flex-shrink-0 space-y-2 p-2 text-[10px]">
-        <PwaInstallButton
-          collapsed
-          dark={true}
-          className="flex justify-center"
-          popoverClassName="left-0"
-        />
-
         <div className="flex items-center justify-center rounded-xl p-1 bg-white/[0.04] transition-all">
-            <button
-              type="button"
-              onClick={logout}
-              className="relative h-6 w-6 rounded-full transition hover:opacity-80 hover:scale-105"
-              title={`Logout ${displayedUserEmail || user?.email || ''}`.trim()}
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              `relative flex h-6 w-6 items-center justify-center rounded-full transition hover:opacity-80 hover:scale-105 ${
+                isActive ? 'ring-2 ring-[#8a3ff2] ring-offset-2 ring-offset-[#0e0e11]' : ''
+              }`
+            }
+            title={`Settings (${displayedUserEmail || user?.email || ''})`.trim()}
+          >
+            {displayedAvatar ? (
+              <img
+                src={displayedAvatar}
+                crossOrigin="anonymous"
+                className="h-6 w-6 rounded-full object-cover border border-white/20 shadow-sm"
+                alt=""
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  if (e.currentTarget.nextElementSibling) {
+                    e.currentTarget.nextElementSibling.style.display = 'flex';
+                  }
+                }}
+              />
+            ) : null}
+            <div
+              className="h-6 w-6 rounded-full bg-white/[0.06] border border-white/20 flex items-center justify-center text-zinc-300 text-[10px] font-bold"
+              style={{ display: displayedAvatar ? 'none' : 'flex' }}
             >
-              {displayedAvatar ? (
-                <img
-                  src={displayedAvatar}
-                  crossOrigin="anonymous"
-                  className="h-6 w-6 rounded-full object-cover border border-white/20 shadow-sm"
-                  alt=""
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    if (e.currentTarget.nextElementSibling) {
-                      e.currentTarget.nextElementSibling.style.display = 'flex';
-                    }
-                  }}
-                />
-              ) : null}
-              <div
-                className="h-6 w-6 rounded-full bg-white/[0.06] border border-white/20 flex items-center justify-center text-zinc-300 text-[10px] font-bold"
-                style={{ display: displayedAvatar ? 'none' : 'flex' }}
-              >
-                {(displayedUserEmail || user?.email || 'U').charAt(0).toUpperCase()}
-              </div>
-            </button>
+              {(displayedUserEmail || user?.email || 'U').charAt(0).toUpperCase()}
+            </div>
+          </NavLink>
         </div>
 
         {isAdminViewingUser && (

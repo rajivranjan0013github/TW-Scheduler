@@ -5,35 +5,109 @@ import { ArrowLeft, Sparkles } from 'lucide-react';
 const sections = [
   {
     title: 'Information We Collect',
-    body: 'EasyPost may collect account details you provide, Google sign-in profile information, connected social account metadata, media assets, captions, scheduled post data, comments, and usage activity needed to operate the workspace.',
+    body: (
+      <span>
+        EasyPost collects account details you provide (name, email), Google sign-in profile information, connected social channel identifiers, media assets you upload, post captions, scheduled publication timestamps, and performance metrics (views, likes, comments) fetched from authorized platform APIs.
+      </span>
+    ),
   },
   {
     title: 'How We Use Information',
-    body: 'We use your information to authenticate users, connect social channels, schedule and publish content, fetch insights, manage comments, maintain security, troubleshoot issues, and improve the product experience.',
+    body: (
+      <span>
+        We use your information to authenticate workspace users, link social channels upon request, schedule and publish media to authorized destinations, aggregate post performance insights, maintain account security, and troubleshoot issues. We do not sell your personal information or platform data to third parties, data brokers, or advertising networks.
+      </span>
+    ),
   },
   {
-    title: 'Social Platform Data',
-    body: 'When you connect Facebook or Instagram, EasyPost uses authorized platform permissions to access only the data required for publishing, insights, feed display, and comment workflows. You can disconnect accounts from the app or from the social platform settings.',
+    title: 'YouTube API Services & Google User Data',
+    body: (
+      <span>
+        EasyPost uses YouTube API Services to authenticate your channel, upload scheduled video content, and retrieve video engagement statistics. By connecting your YouTube channel, you acknowledge that EasyPost processes data via YouTube API Services and that your use is subject to the{' '}
+        <a
+          href="https://policies.google.com/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-red-400 underline hover:text-red-300 font-medium"
+        >
+          Google Privacy Policy (https://policies.google.com/privacy)
+        </a>
+        .<br /><br />
+        <strong>Revoking Access:</strong> In addition to disconnecting your channel in EasyPost settings, you can revoke EasyPost's access to your Google and YouTube data at any time via the{' '}
+        <a
+          href="https://security.google.com/settings/security/permissions"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-red-400 underline hover:text-red-300 font-medium"
+        >
+          Google Security Settings page (https://security.google.com/settings/security/permissions)
+        </a>
+        .<br /><br />
+        <strong>Google Limited Use Disclosure:</strong> EasyPost's use and transfer to any other app of information received from Google APIs adheres to the{' '}
+        <a
+          href="https://developers.google.com/terms/api-services-user-data-policy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-red-400 underline hover:text-red-300 font-medium"
+        >
+          Google API Services User Data Policy
+        </a>
+        , including the Limited Use requirements.<br /><br />
+        <strong>Data Retention:</strong> In compliance with YouTube Developer Policies, numeric YouTube API metric snapshots are retained for no longer than 30 calendar days before being refreshed or purged.
+      </span>
+    ),
+  },
+  {
+    title: 'Meta Platform Data (Facebook & Instagram)',
+    body: (
+      <span>
+        When you connect a Facebook Page or Instagram Professional account, EasyPost uses authorized platform permissions (such as <code>pages_show_list</code>, <code>pages_manage_posts</code>, <code>instagram_basic</code>, and <code>instagram_content_publish</code>) solely to publish user-approved content, verify channel ownership, and display feed metrics. We never use Meta user data for surveillance, profiling, or unauthorized targeting. You can disconnect your accounts at any time from EasyPost or directly within your Meta settings.
+      </span>
+    ),
   },
   {
     title: 'Data Storage and Security',
-    body: 'We use reasonable technical safeguards to protect stored data. Access tokens, uploaded media, and workspace records should be treated as sensitive operational data and protected from unauthorized access.',
+    body: (
+      <span>
+        We implement administrative, technical, and physical safeguards to protect stored data. Access tokens are treated as sensitive credentials, transmission is encrypted via HTTPS/TLS, and access to internal databases is restricted.
+      </span>
+    ),
   },
   {
     title: 'Data Sharing',
-    body: 'We do not sell your personal information. We may share data with service providers only when needed to operate core product features such as authentication, hosting, storage, analytics, or platform API integrations.',
+    body: (
+      <span>
+        We do not sell, rent, or trade your personal information or social platform data. We share data with third-party service providers only when necessary to operate core features (e.g. Cloudflare R2 / AWS S3 for media storage, cloud hosting, and official platform APIs).
+      </span>
+    ),
   },
   {
-    title: 'Your Choices',
-    body: 'You may stop using EasyPost, disconnect publishing channels, request deletion of workspace data, or revoke platform permissions through Facebook, Instagram, or Google account settings.',
+    title: 'Your Choices & Revocation',
+    body: (
+      <span>
+        You may stop using EasyPost at any time, disconnect individual publishing channels, delete your entire workspace data, or revoke platform access through your Facebook, Instagram, or Google account settings.
+      </span>
+    ),
   },
   {
     title: 'Data Deletion Instructions',
-    body: 'If you wish to delete your EasyPost account and associated social profile metadata, you can delete your account from your profile dashboard, or contact us at support@easypost.com to request complete removal. To revoke Facebook/Instagram API permissions, go to your Facebook account Settings & Privacy > Settings > Business Integrations, select EasyPost, and click Remove.',
+    body: (
+      <span>
+        We respect your right to have your data erased. You can permanently delete your EasyPost account and all connected platform data from your account settings, or visit our dedicated{' '}
+        <Link to="/data-deletion" className="text-blue-400 underline hover:text-blue-300 font-medium">
+          Data Deletion Instructions Page
+        </Link>{' '}
+        for step-by-step guidance on how to remove permissions and submit manual deletion requests.
+      </span>
+    ),
   },
   {
     title: "Children's Privacy",
-    body: 'EasyPost does not knowingly collect or solicit personal information from children under 13. If we learn we have collected info from a child under 13, we will delete it promptly.',
+    body: (
+      <span>
+        EasyPost is not intended for individuals under 13 years of age. We do not knowingly collect personal information from children under 13.
+      </span>
+    ),
   },
 ];
 

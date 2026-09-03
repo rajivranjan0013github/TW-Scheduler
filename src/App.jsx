@@ -27,6 +27,7 @@ import GoogleLoginCallback from './pages/GoogleLoginCallback';
 import InstagramCallback from './pages/InstagramCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsAndConditions from './pages/TermsAndConditions';
+import DataDeletion from './pages/DataDeletion';
 import YoutubeCallback from './pages/YoutubeCallback';
 import { BulkVideoBuilder } from './pages/BulkVideoBuilder';
 import OnboardingScreen from './pages/OnboardingScreen';
@@ -220,8 +221,13 @@ function AppContent() {
       <Route path="/auth/facebook-login/callback" element={<FacebookLoginCallback />} />
       <Route path="/auth/google/callback" element={<GoogleLoginCallback />} />
       <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
+      <Route path="/auth/youtube/callback" element={<YoutubeCallback />} />
+      <Route path="/youtube-callback" element={<YoutubeCallback />} />
+      <Route path="/facebook-callback" element={<FacebookCallback />} />
+      <Route path="/instagram-callback" element={<InstagramCallback />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+      <Route path="/data-deletion" element={<DataDeletion />} />
       {!user ? (
         <>
           <Route path="/" element={<Home />} />
@@ -234,7 +240,6 @@ function AppContent() {
         </>
       ) : (
         <>
-          <Route path="/auth/youtube/callback" element={<YoutubeCallback />} />
           <Route
             path="*"
             element={<AuthenticatedShell selectedAccounts={selectedAccounts} setSelectedAccounts={setSelectedAccounts} />}
