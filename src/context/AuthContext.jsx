@@ -103,6 +103,8 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
         return data.user || true;
       }
+      const errData = await response.json().catch(() => ({}));
+      console.error('Login failed with status:', response.status, errData);
       setLoading(false);
       return false;
     } catch (error) {
