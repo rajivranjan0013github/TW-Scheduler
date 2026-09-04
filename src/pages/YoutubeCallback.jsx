@@ -7,6 +7,7 @@ export const YoutubeCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const code = searchParams.get('code');
+  const state = searchParams.get('state');
   const error = searchParams.get('error');
   const exchangeStartedRef = useRef(false);
 
@@ -35,7 +36,7 @@ export const YoutubeCallback = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         }),
-        body: JSON.stringify({ code, campaignId, reauthorizeAccountId }),
+        body: JSON.stringify({ code, state, campaignId, reauthorizeAccountId }),
       });
 
       const data = await response.json();
@@ -50,7 +51,7 @@ export const YoutubeCallback = () => {
     } finally {
       navigateAfterConnect();
     }
-  }, [code, navigateAfterConnect]);
+  }, [code, state, navigateAfterConnect]);
 
   useEffect(() => {
     if (error) {

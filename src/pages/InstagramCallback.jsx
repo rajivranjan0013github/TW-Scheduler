@@ -7,6 +7,7 @@ export const InstagramCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const code = searchParams.get('code');
+  const state = searchParams.get('state');
   const exchangeStartedRef = useRef(false);
 
   const navigateAfterConnect = useCallback(() => {
@@ -45,7 +46,7 @@ export const InstagramCallback = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         }),
-        body: JSON.stringify({ code, redirectUri, campaignId, reauthorizeAccountId }),
+        body: JSON.stringify({ code, state, redirectUri, campaignId, reauthorizeAccountId }),
       });
 
       const data = await response.json();
@@ -60,7 +61,7 @@ export const InstagramCallback = () => {
     } finally {
       navigateAfterConnect();
     }
-  }, [code, navigateAfterConnect]);
+  }, [code, state, navigateAfterConnect]);
 
   useEffect(() => {
     if (code) {

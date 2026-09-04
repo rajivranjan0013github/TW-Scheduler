@@ -23,7 +23,16 @@ const sections = [
     title: 'YouTube API Services & Google User Data',
     body: (
       <span>
-        ThousandPost uses YouTube API Services to authenticate your channel, upload scheduled video content, and retrieve video engagement statistics. By connecting your YouTube channel, you acknowledge that ThousandPost processes data via YouTube API Services and that your use is subject to the{' '}
+        ThousandPost uses YouTube API Services to authenticate your channel, upload scheduled video content, and retrieve video engagement statistics. By connecting your YouTube channel or using features that interact with YouTube, you acknowledge and agree to be bound by the{' '}
+        <a
+          href="https://www.youtube.com/t/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-red-400 underline hover:text-red-300 font-medium"
+        >
+          YouTube Terms of Service (https://www.youtube.com/t/terms)
+        </a>
+        {' '}and acknowledge that your use is subject to the{' '}
         <a
           href="https://policies.google.com/privacy"
           target="_blank"
