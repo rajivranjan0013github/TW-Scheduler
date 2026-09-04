@@ -1,32 +1,55 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Sparkles, Trash2, ShieldCheck, Mail, ExternalLink, RefreshCw } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Sparkles, Trash2, ShieldCheck, Mail, ExternalLink, RefreshCw, CheckCircle2 } from 'lucide-react';
 
-export const DataDeletion = () => (
-  <div className="h-screen overflow-y-auto bg-[#0c0c0e] text-white font-sans selection:bg-white selection:text-black">
-    <header className="border-b border-white/[0.08] bg-[#0c0c0e]/80 backdrop-blur-xl px-5 py-4">
-      <div className="mx-auto flex max-w-4xl items-center justify-between">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-300 transition hover:text-white">
-          <ArrowLeft className="h-4 w-4" />
-          Back to ThousandPost
-        </Link>
-        <div className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
-          <Sparkles className="h-4 w-4 text-white" />
-          ThousandPost
+export const DataDeletion = () => {
+  const [searchParams] = useSearchParams();
+  const confirmationCode = searchParams.get('code');
+
+  return (
+    <div className="h-screen overflow-y-auto bg-[#0c0c0e] text-white font-sans selection:bg-white selection:text-black">
+      <header className="border-b border-white/[0.08] bg-[#0c0c0e]/80 backdrop-blur-xl px-5 py-4">
+        <div className="mx-auto flex max-w-4xl items-center justify-between">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-300 transition hover:text-white">
+            <ArrowLeft className="h-4 w-4" />
+            Back to ThousandPost
+          </Link>
+          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
+            <Sparkles className="h-4 w-4 text-white" />
+            ThousandPost
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <main className="mx-auto max-w-4xl px-5 py-12">
-      <p className="m-0 text-xs font-bold uppercase tracking-wider text-zinc-400">User Rights & Compliance</p>
-      <h1 className="m-0 mt-3 text-4xl font-black tracking-tight text-white">User Data Deletion Instructions</h1>
-      <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: June 16, 2026</p>
+      <main className="mx-auto max-w-4xl px-5 py-12">
+        <p className="m-0 text-xs font-bold uppercase tracking-wider text-zinc-400">User Rights & Compliance</p>
+        <h1 className="m-0 mt-3 text-4xl font-black tracking-tight text-white">User Data Deletion Instructions</h1>
+        <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: June 16, 2026</p>
 
-      <div className="mt-8 rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-xl space-y-3">
-        <p className="m-0 text-base leading-7 text-zinc-300">
-          In accordance with the <strong>Meta Platform Terms</strong>, the <strong>YouTube API Services Terms of Service</strong>, and global privacy regulations (including GDPR and CCPA), ThousandPost provides clear instructions on how you can request and execute the deletion of all data associated with your account and connected social channels.
-        </p>
-      </div>
+        {confirmationCode && (
+          <div className="mt-8 rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-6 text-white shadow-xl">
+            <div className="flex items-start gap-4">
+              <div className="rounded-lg bg-emerald-500/20 p-2.5 text-emerald-400 border border-emerald-500/30">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="m-0 text-lg font-bold text-emerald-400">Data Deletion Request Acknowledged</h2>
+                <p className="m-0 text-sm text-zinc-300">
+                  Confirmation Code: <span className="font-mono font-semibold text-emerald-200 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded">{confirmationCode}</span>
+                </p>
+                <p className="m-0 pt-2 text-xs text-zinc-400 leading-relaxed">
+                  Your request has been successfully processed in accordance with the Meta Platform Terms and global privacy regulations. All personal data, social tokens, and cached analytics associated with your user identity have been permanently purged or scheduled for complete erasure.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-8 rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-xl space-y-3">
+          <p className="m-0 text-base leading-7 text-zinc-300">
+            In accordance with the <strong>Meta Platform Terms</strong>, the <strong>YouTube API Services Terms of Service</strong>, and global privacy regulations (including GDPR and CCPA), ThousandPost provides clear instructions on how you can request and execute the deletion of all data associated with your account and connected social channels.
+          </p>
+        </div>
 
       <div className="mt-8 space-y-6">
         {/* Method 1: In-App Self-Service Deletion */}
@@ -176,6 +199,7 @@ export const DataDeletion = () => (
       </div>
     </main>
   </div>
-);
+  );
+};
 
 export default DataDeletion;

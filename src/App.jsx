@@ -22,7 +22,6 @@ import AdminCampaigns from './pages/AdminCampaigns';
 import AdminFolders from './pages/AdminFolders';
 import AdminFolderDetails from './pages/AdminFolderDetails';
 import FacebookCallback from './pages/FacebookCallback';
-import FacebookLoginCallback from './pages/FacebookLoginCallback';
 import GoogleLoginCallback from './pages/GoogleLoginCallback';
 import InstagramCallback from './pages/InstagramCallback';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -218,7 +217,6 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/auth/facebook/callback" element={<FacebookCallback />} />
-      <Route path="/auth/facebook-login/callback" element={<FacebookLoginCallback />} />
       <Route path="/auth/google/callback" element={<GoogleLoginCallback />} />
       <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
       <Route path="/auth/youtube/callback" element={<YoutubeCallback />} />

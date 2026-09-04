@@ -112,41 +112,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const facebookLogin = async (code, redirectUri) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/facebook-login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code, redirectUri }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        queryClient.clear();
-        localStorage.setItem('tw_token', data.token);
-        const userStorageKey = `active-campaign-id:${data.user?._id || data.user?.email || 'default'}`;
-        const userActiveCampaign = localStorage.getItem(userStorageKey);
-        if (userActiveCampaign) {
-          localStorage.setItem('active-campaign-id', userActiveCampaign);
-        } else {
-          clearActiveCampaign();
-        }
-        setToken(data.token);
-        setUser(data.user);
-        setLoading(false);
-        return data.user || true;
-      }
-      setLoading(false);
-      return false;
-    } catch (error) {
-      console.error('Facebook authentication request failed:', error);
-      setLoading(false);
-      return false;
-    }
-  };
-
   const logout = () => {
     localStorage.removeItem('tw_token');
     clearActiveCampaign();
@@ -214,7 +179,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user: effectiveUser, token, loading, login, facebookLogin, logout, updateProfile, deleteAccount, previewContextVersion }}>
+    <AuthContext.Provider value={{ user: effectiveUser, token, loading, login, logout, updateProfile, deleteAccount, previewContextVersion }}>
       {children}
     </AuthContext.Provider>
   );

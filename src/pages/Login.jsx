@@ -22,26 +22,6 @@ export const Login = () => {
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   };
 
-  const handleFacebookLogin = () => {
-    const appId = import.meta.env.VITE_META_APP_ID || import.meta.env.VITE_FACEBOOK_APP_ID;
-    if (!appId) {
-      alert('Set VITE_META_APP_ID in tw-frontend/.env to enable Facebook login.');
-      return;
-    }
-
-    const rawRedirectUri = `${window.location.origin}/auth/facebook-login/callback`;
-    sessionStorage.setItem('facebook_login_redirect_uri', rawRedirectUri);
-    const params = new URLSearchParams({
-      client_id: appId,
-      redirect_uri: rawRedirectUri,
-      scope: 'public_profile,email',
-      response_type: 'code',
-      auth_type: 'rerequest',
-    });
-
-    window.location.href = `https://www.facebook.com/v20.0/dialog/oauth?${params.toString()}`;
-  };
-
   return (
     <div className="flex min-h-screen flex-col bg-[#09090b] text-[#f4f4f5] selection:bg-[#8a3ff2] selection:text-white">
       {/* Top Navigation */}
@@ -106,20 +86,6 @@ export const Login = () => {
                   </svg>
                 </span>
                 <span>Continue with Google</span>
-              </button>
-
-              {/* Facebook Login Button */}
-              <button
-                type="button"
-                onClick={handleFacebookLogin}
-                className="flex w-full items-center justify-center gap-3 rounded-xl bg-[#1877f2] px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-[#1877f2]/20 transition hover:bg-[#166fe5] active:scale-[0.99]"
-              >
-                <span className="grid h-6 w-6 place-items-center">
-                  <svg className="h-5 w-5 fill-white" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                  </svg>
-                </span>
-                <span>Continue with Facebook</span>
               </button>
             </div>
 
