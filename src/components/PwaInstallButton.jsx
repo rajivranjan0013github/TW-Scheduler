@@ -24,7 +24,7 @@ export const PwaInstallButton = ({
 
   const helpText = isIOS
     ? 'On iPhone or iPad, open this in Safari, tap the Share button, then choose Add to Home Screen.'
-    : 'If the install prompt does not open, use your browser menu and choose Install Easy Post or Add to Home Screen.';
+    : 'If the install prompt does not open, use your browser menu and choose Install ThousandPost or Add to Home Screen.';
 
   return (
     <div className={`relative ${className}`}>
@@ -38,7 +38,7 @@ export const PwaInstallButton = ({
             ? 'border-white/10 bg-white/5 text-[#cbd5e1] hover:bg-white/10 hover:text-white'
             : 'border-[#d2d2d7] bg-white text-[#1d1d1f] hover:border-[#a1a1aa] hover:bg-[#f8fafc]'
         }`}
-        title="Install Easy Post"
+        title="Install ThousandPost"
       >
         <Download className="h-3.5 w-3.5 flex-shrink-0" />
         {!collapsed && <span>Install App</span>}
@@ -51,7 +51,7 @@ export const PwaInstallButton = ({
             : 'border-[#e5e5ea] bg-white text-[#1d1d1f] shadow-black/10'
         } ${popoverClassName}`}>
           <div className="mb-2 flex items-start justify-between gap-2">
-            <p className="m-0 text-xs font-bold">Install Easy Post</p>
+            <p className="m-0 text-xs font-bold">Install ThousandPost</p>
             <button
               type="button"
               onClick={() => setIsHelpOpen(false)}

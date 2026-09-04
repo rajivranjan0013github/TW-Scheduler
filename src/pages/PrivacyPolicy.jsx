@@ -7,7 +7,7 @@ const sections = [
     title: 'Information We Collect',
     body: (
       <span>
-        EasyPost collects account details you provide (name, email), Google sign-in profile information, connected social channel identifiers, media assets you upload, post captions, scheduled publication timestamps, and performance metrics (views, likes, comments) fetched from authorized platform APIs.
+        ThousandPost collects account details you provide (name, email), Google sign-in profile information, connected social channel identifiers, media assets you upload, post captions, scheduled publication timestamps, and performance metrics (views, likes, comments) fetched from authorized platform APIs.
       </span>
     ),
   },
@@ -23,7 +23,7 @@ const sections = [
     title: 'YouTube API Services & Google User Data',
     body: (
       <span>
-        EasyPost uses YouTube API Services to authenticate your channel, upload scheduled video content, and retrieve video engagement statistics. By connecting your YouTube channel, you acknowledge that EasyPost processes data via YouTube API Services and that your use is subject to the{' '}
+        ThousandPost uses YouTube API Services to authenticate your channel, upload scheduled video content, and retrieve video engagement statistics. By connecting your YouTube channel, you acknowledge that ThousandPost processes data via YouTube API Services and that your use is subject to the{' '}
         <a
           href="https://policies.google.com/privacy"
           target="_blank"
@@ -33,7 +33,7 @@ const sections = [
           Google Privacy Policy (https://policies.google.com/privacy)
         </a>
         .<br /><br />
-        <strong>Revoking Access:</strong> In addition to disconnecting your channel in EasyPost settings, you can revoke EasyPost's access to your Google and YouTube data at any time via the{' '}
+        <strong>Revoking Access:</strong> In addition to disconnecting your channel in ThousandPost settings, you can revoke ThousandPost's access to your Google and YouTube data at any time via the{' '}
         <a
           href="https://security.google.com/settings/security/permissions"
           target="_blank"
@@ -43,7 +43,7 @@ const sections = [
           Google Security Settings page (https://security.google.com/settings/security/permissions)
         </a>
         .<br /><br />
-        <strong>Google Limited Use Disclosure:</strong> EasyPost's use and transfer to any other app of information received from Google APIs adheres to the{' '}
+        <strong>Google Limited Use Disclosure:</strong> ThousandPost's use and transfer to any other app of information received from Google APIs adheres to the{' '}
         <a
           href="https://developers.google.com/terms/api-services-user-data-policy"
           target="_blank"
@@ -61,7 +61,7 @@ const sections = [
     title: 'Meta Platform Data (Facebook & Instagram)',
     body: (
       <span>
-        When you connect a Facebook Page or Instagram Professional account, EasyPost uses authorized platform permissions (such as <code>pages_show_list</code>, <code>pages_manage_posts</code>, <code>instagram_basic</code>, and <code>instagram_content_publish</code>) solely to publish user-approved content, verify channel ownership, and display feed metrics. We never use Meta user data for surveillance, profiling, or unauthorized targeting. You can disconnect your accounts at any time from EasyPost or directly within your Meta settings.
+        When you connect a Facebook Page or Instagram Professional account, ThousandPost uses authorized platform permissions (such as <code>pages_show_list</code>, <code>pages_manage_posts</code>, <code>instagram_basic</code>, and <code>instagram_content_publish</code>) solely to publish user-approved content, verify channel ownership, and display feed metrics. We never use Meta user data for surveillance, profiling, or unauthorized targeting. You can disconnect your accounts at any time from ThousandPost or directly within your Meta settings.
       </span>
     ),
   },
@@ -85,7 +85,7 @@ const sections = [
     title: 'Your Choices & Revocation',
     body: (
       <span>
-        You may stop using EasyPost at any time, disconnect individual publishing channels, delete your entire workspace data, or revoke platform access through your Facebook, Instagram, or Google account settings.
+        You may stop using ThousandPost at any time, disconnect individual publishing channels, delete your entire workspace data, or revoke platform access through your Facebook, Instagram, or Google account settings.
       </span>
     ),
   },
@@ -93,7 +93,7 @@ const sections = [
     title: 'Data Deletion Instructions',
     body: (
       <span>
-        We respect your right to have your data erased. You can permanently delete your EasyPost account and all connected platform data from your account settings, or visit our dedicated{' '}
+        We respect your right to have your data erased. You can permanently delete your ThousandPost account and all connected platform data from your account settings, or visit our dedicated{' '}
         <Link to="/data-deletion" className="text-blue-400 underline hover:text-blue-300 font-medium">
           Data Deletion Instructions Page
         </Link>{' '}
@@ -105,7 +105,7 @@ const sections = [
     title: "Children's Privacy",
     body: (
       <span>
-        EasyPost is not intended for individuals under 13 years of age. We do not knowingly collect personal information from children under 13.
+        ThousandPost is not intended for individuals under 13 years of age. We do not knowingly collect personal information from children under 13.
       </span>
     ),
   },
@@ -117,11 +117,11 @@ export const PrivacyPolicy = () => (
       <div className="mx-auto flex max-w-4xl items-center justify-between">
         <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-300 transition hover:text-white">
           <ArrowLeft className="h-4 w-4" />
-          Back to EasyPost
+          Back to ThousandPost
         </Link>
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
           <Sparkles className="h-4 w-4 text-white" />
-          EasyPost
+          ThousandPost
         </div>
       </div>
     </header>
@@ -133,7 +133,7 @@ export const PrivacyPolicy = () => (
 
       <div className="mt-8 rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-xl">
         <p className="m-0 text-base leading-7 text-zinc-300">
-          This Privacy Policy explains how EasyPost collects, uses, and protects information when you use the platform to manage social publishing workflows.
+          This Privacy Policy explains how ThousandPost collects, uses, and protects information when you use the platform to manage social publishing workflows.
         </p>
       </div>
 
@@ -147,12 +147,16 @@ export const PrivacyPolicy = () => (
       </div>
 
       <p className="m-0 mt-8 text-sm leading-7 text-zinc-400">
-        For privacy requests, data deletion, or general inquiries, please contact us at support@easypost.com.
+        For privacy requests, data deletion, or general inquiries, please contact us at{' '}
+        <a href="mailto:admin@thethousandways.com" className="text-zinc-300 underline hover:text-white transition">
+          admin@thethousandways.com
+        </a>
+        .
       </p>
       <p className="m-0 mt-4 text-xs text-zinc-500">
-        This product is powered by{' '}
-        <a href="https://thethousandways.com/" target="_blank" rel="noopener noreferrer" className="underline text-zinc-400 hover:text-white">
-          thousandway to make
+        This app is managed by{' '}
+        <a href="https://thethousandways.com/" target="_blank" rel="noopener noreferrer" className="underline text-zinc-400 hover:text-white transition">
+          Thousand Ways
         </a>
       </p>
     </main>

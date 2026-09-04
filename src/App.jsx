@@ -209,7 +209,7 @@ function AppContent() {
       <div className="min-h-screen bg-[#06040a] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-sm text-gray-400 font-semibold tracking-wide">Syncing EasyPost...</span>
+          <span className="text-sm text-gray-400 font-semibold tracking-wide">Syncing ThousandPost...</span>
         </div>
       </div>
     );

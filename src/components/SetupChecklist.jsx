@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { getActiveCampaignId } from '../utils/campaignScope';
 
-const DISMISS_KEY = 'easypost-setup-dismissed';
+const DISMISS_KEY = 'thousandpost-setup-dismissed';
 
 export const SetupChecklist = ({ channelsCount = 0, mediaCount = 0, postsCount = 0 }) => {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ export const SetupChecklist = ({ channelsCount = 0, mediaCount = 0, postsCount =
       id: 'channels',
       title: 'Connect your first channel',
       description:
-        'Link your Instagram, Facebook, or YouTube account so EasyPost can publish content for you.',
+        'Link your Instagram, Facebook, or YouTube account so ThousandPost can publish content for you.',
       done: channelsCount > 0,
       unlocked: true,
       action: () => navigate('/channels'),
@@ -55,7 +55,7 @@ export const SetupChecklist = ({ channelsCount = 0, mediaCount = 0, postsCount =
       id: 'schedule',
       title: 'Schedule your first post',
       description:
-        'Pick your content, choose a time, and let EasyPost handle the publishing automatically.',
+        'Pick your content, choose a time, and let ThousandPost handle the publishing automatically.',
       done: postsCount > 0,
       unlocked: channelsCount > 0 && mediaCount > 0,
       action: () => navigate('/scheduler'),
@@ -84,7 +84,7 @@ export const SetupChecklist = ({ channelsCount = 0, mediaCount = 0, postsCount =
             </div>
             <div>
               <h2 className="m-0 text-lg font-semibold tracking-tight text-[#1d1d1f]">
-                Get started with EasyPost
+                Get started with ThousandPost
               </h2>
               <p className="m-0 mt-1 text-sm text-[#6e6e73]">
                 Complete these 3 steps and you'll be scheduling your first post in
