@@ -15,11 +15,54 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  UserCheck,
   Video,
   WandSparkles,
 } from 'lucide-react';
 import { API_BASE_URL } from '../../config';
+import { getMediaUrl } from '../../utils/mediaUrls';
 import { mediaLibraryKeys } from '../../pages/videoEditorV2/media/mediaLibraryCache';
+import LoadingVideoPreview from '../LoadingVideoPreview';
+
+const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
+
+const ShowcaseVideoCardPreview = ({ item }) => {
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const thumbnailUrl = item?.thumbnailUrl ? getAssetUrl(item.thumbnailUrl) : '';
+  const videoSrc = item?.localPreviewUrl || (item?.url ? getAssetUrl(item.url) : '');
+
+  if (thumbnailUrl && !thumbFailed) {
+    return (
+      <img
+        src={thumbnailUrl}
+        alt={item?.name || 'Showcase thumbnail'}
+        className="h-full w-full object-cover"
+        onError={() => setThumbFailed(true)}
+      />
+    );
+  }
+
+  if (videoSrc) {
+    return (
+      <LoadingVideoPreview
+        src={videoSrc}
+        className="h-full w-full"
+        videoClassName="h-full w-full object-cover"
+        loadingLabel="Loading video"
+        muted
+        playsInline
+        preload="metadata"
+        crossOrigin="anonymous"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-zinc-950">
+      <FileVideo2 className="h-6 w-6 text-zinc-600" />
+    </div>
+  );
+};
 
 const SOURCE_OPTIONS = [
   { id: 'app_store', label: 'App Store', placeholder: 'https://apps.apple.com/app/...' },
@@ -101,23 +144,54 @@ export const ProductEditorPage = ({
   const allAnalysisFinished = showcaseVideos.length > 0 && processingVideos.length === 0;
 
   useEffect(() => {
-    const mediaIds = (form.showcaseMediaIds || []).map(getMediaId).filter(Boolean);
-    if (!campaignWorkspaceId || mediaIds.length === 0 || showcaseVideos.length > 0) return;
+    if (!campaignWorkspaceId) return;
 
     let cancelled = false;
-    Promise.all(mediaIds.map(async (mediaId) => {
-      const response = await fetch(
-        `${API_BASE_URL}/api/media/${mediaId}/analyze-ai?campaignId=${encodeURIComponent(campaignWorkspaceId)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!response.ok) return null;
-      return response.json();
-    })).then((items) => {
-      if (!cancelled) setShowcaseVideos(items.filter(Boolean));
-    });
+    const loadShowcaseVideos = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/media/showcase?campaignId=${encodeURIComponent(campaignWorkspaceId)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.ok) {
+          const list = await response.json();
+          if (!cancelled && Array.isArray(list) && list.length > 0) {
+            setShowcaseVideos(list);
+            const ids = list.map((m) => getMediaId(m)).filter(Boolean);
+            if (ids.length > 0 && JSON.stringify(ids) !== JSON.stringify(form.showcaseMediaIds)) {
+              setForm((current) => ({ ...current, showcaseMediaIds: ids }));
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Showcase media fetch failed:', err);
+      }
+
+      // Fallback to explicit IDs if showcase endpoint returned empty
+      const explicitIds = (form.showcaseMediaIds || []).map(getMediaId).filter(Boolean);
+      if (explicitIds.length > 0) {
+        const results = await Promise.all(explicitIds.map(async (mediaId) => {
+          try {
+            const res = await fetch(
+              `${API_BASE_URL}/api/media/${mediaId}/analyze-ai?campaignId=${encodeURIComponent(campaignWorkspaceId)}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            return res.ok ? res.json() : null;
+          } catch {
+            return null;
+          }
+        }));
+        if (!cancelled && results.filter(Boolean).length > 0) {
+          setShowcaseVideos(results.filter(Boolean));
+        }
+      }
+    };
+
+    void loadShowcaseVideos();
 
     return () => { cancelled = true; };
-  }, [form.showcaseMediaIds, campaignWorkspaceId, showcaseVideos.length, token]);
+  }, [campaignWorkspaceId, token]);
 
   useEffect(() => {
     const pendingIds = showcaseVideos
@@ -139,7 +213,15 @@ export const ProductEditorPage = ({
       }));
       const byId = new Map(updates.filter(Boolean).map((item) => [getMediaId(item), item]));
       if (byId.size > 0) {
-        setShowcaseVideos((current) => current.map((item) => byId.get(getMediaId(item)) || item));
+        setShowcaseVideos((current) => current.map((item) => {
+          const updated = byId.get(getMediaId(item));
+          if (!updated) return item;
+          return {
+            ...item,
+            ...updated,
+            localPreviewUrl: item.localPreviewUrl,
+          };
+        }));
       }
     }, 3000);
 
@@ -375,74 +457,200 @@ export const ProductEditorPage = ({
     else onSubmit(event);
   };
 
-  const renderAppStep = () => (
-    <div className="mx-auto max-w-3xl py-4 md:py-10">
-      <div className="mb-7">
-        <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-400/10 text-violet-200">
-          <Link2 className="h-5 w-5" />
-        </span>
-        <h1 className="m-0 text-2xl font-semibold tracking-tight text-white">What are you promoting?</h1>
-        <p className="m-0 mt-2 max-w-xl text-sm leading-6 text-zinc-400">
-          Paste the official app or product link. AI will read the listing first, so every later hook is grounded in the actual product.
-        </p>
-      </div>
+  const renderAppStep = () => {
+    const hasProductInfo = Boolean(form.productName || form.productDescription || form.iconUrl);
+    return (
+      <div className={`mx-auto w-full ${hasProductInfo ? 'grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]' : 'max-w-4xl py-4 md:py-6'}`}>
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-white/[0.08] bg-[#141417] p-5 md:p-6">
+            <div className="mb-4">
+              <span className="mb-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-400/10 text-violet-200">
+                <Link2 className="h-4 w-4" />
+              </span>
+              <h1 className="m-0 text-xl font-semibold tracking-tight text-white">What are you promoting?</h1>
+              <p className="m-0 mt-1.5 text-xs leading-5 text-zinc-400">
+                Paste the official app or product link. AI reads the listing so every strategy is grounded in actual features.
+              </p>
+            </div>
 
-      <div className="rounded-2xl border border-white/[0.08] bg-[#141417] p-5 md:p-6">
-        <div className="mb-4 flex flex-wrap gap-2">
-          {SOURCE_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => setForm((current) => ({ ...current, productSource: option.id }))}
-              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                (form.productSource || 'app_store') === option.id
-                  ? 'border-violet-400/40 bg-violet-400/10 text-violet-100'
-                  : 'border-white/[0.08] bg-white/[0.025] text-zinc-400 hover:text-white'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <label className="mb-2 block text-xs font-medium text-zinc-300" htmlFor="campaign-product-url">
-          App Store, Play Store, or website link
-        </label>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input
-            id="campaign-product-url"
-            type="url"
-            value={form.productUrl || ''}
-            onChange={(event) => handleUrlChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                handleAnalyzeProduct();
-              }
-            }}
-            placeholder={SOURCE_OPTIONS.find((item) => item.id === form.productSource)?.placeholder || SOURCE_OPTIONS[0].placeholder}
-            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/10"
-          />
-          <button
-            type="button"
-            onClick={handleAnalyzeProduct}
-            disabled={extracting || !form.productUrl?.trim()}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {extracting ? 'Learning the app…' : 'Learn this app'}
-          </button>
-        </div>
-        {extractError && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {extractError}
+            <div className="mb-3.5 flex flex-wrap gap-2">
+              {SOURCE_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setForm((current) => ({ ...current, productSource: option.id }))}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    (form.productSource || 'app_store') === option.id
+                      ? 'border-violet-400/40 bg-violet-400/10 text-violet-100'
+                      : 'border-white/[0.08] bg-white/[0.025] text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <label className="mb-2 block text-xs font-medium text-zinc-300" htmlFor="campaign-product-url">
+              App Store, Play Store, or website link
+            </label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                id="campaign-product-url"
+                type="url"
+                value={form.productUrl || ''}
+                onChange={(event) => handleUrlChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleAnalyzeProduct();
+                  }
+                }}
+                placeholder={SOURCE_OPTIONS.find((item) => item.id === form.productSource)?.placeholder || SOURCE_OPTIONS[0].placeholder}
+                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/10"
+              />
+              <button
+                type="button"
+                onClick={handleAnalyzeProduct}
+                disabled={extracting || !form.productUrl?.trim()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {extracting ? 'Learning the app…' : 'Learn this app'}
+              </button>
+            </div>
+            {extractError && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {extractError}
+              </div>
+            )}
           </div>
+
+          {hasProductInfo && (
+            <div className="rounded-2xl border border-white/[0.08] bg-[#141417] p-5 md:p-6 space-y-4">
+              <div>
+                <h2 className="m-0 text-sm font-semibold text-white">Product details</h2>
+                <p className="m-0 mt-1 text-xs text-zinc-400">Extracted from the store page. You can review or edit any field.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">App / Product Name</label>
+                  <input
+                    type="text"
+                    value={form.productName || ''}
+                    onChange={(e) => setForm((c) => ({ ...c, productName: e.target.value, name: e.target.value }))}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 px-3.5 py-2.5 text-xs text-white outline-none focus:border-violet-400/60"
+                    placeholder="App Name"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Category</label>
+                  <input
+                    type="text"
+                    value={form.category || ''}
+                    onChange={(e) => setForm((c) => ({ ...c, category: e.target.value }))}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 px-3.5 py-2.5 text-xs text-white outline-none focus:border-violet-400/60"
+                    placeholder="e.g. Lifestyle / Utilities"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">Key Benefit / Core Function</label>
+                <input
+                  type="text"
+                  value={form.keyBenefit || form.coreFunction || ''}
+                  onChange={(e) => setForm((c) => ({ ...c, keyBenefit: e.target.value, coreFunction: e.target.value }))}
+                  className="w-full rounded-xl border border-white/10 bg-black/50 px-3.5 py-2.5 text-xs text-white outline-none focus:border-violet-400/60"
+                  placeholder="What makes this app special"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">Product Description</label>
+                <textarea
+                  rows={3}
+                  value={form.productDescription || ''}
+                  onChange={(e) => setForm((c) => ({ ...c, productDescription: e.target.value, description: e.target.value }))}
+                  className="w-full rounded-xl border border-white/10 bg-black/50 px-3.5 py-2.5 text-xs leading-5 text-white outline-none focus:border-violet-400/60"
+                  placeholder="Full app description"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">Assigned Handler / Creator Email</label>
+                <div className="relative">
+                  <UserCheck className="absolute left-3.5 top-3 h-3.5 w-3.5 text-zinc-500" />
+                  <input
+                    type="email"
+                    value={form.mainEmail || ''}
+                    onChange={(e) => setForm((c) => ({ ...c, mainEmail: e.target.value }))}
+                    className="w-full rounded-xl border border-white/10 bg-black/50 pl-9 pr-3.5 py-2.5 text-xs text-white outline-none focus:border-violet-400/60 placeholder:text-zinc-600"
+                    placeholder="e.g. creator@agency.com or your email"
+                  />
+                </div>
+                <p className="m-0 mt-1 text-[11px] text-zinc-500">The assigned creator or handler for this campaign workspace.</p>
+              </div>
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveStep('showcase')}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-xs font-semibold text-black transition hover:bg-zinc-200"
+                >
+                  Continue to Showcase <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {hasProductInfo && (
+          <aside className="h-fit rounded-2xl border border-white/[0.08] bg-[#141417] p-5 lg:sticky lg:top-5 space-y-4">
+            <div className="flex items-center gap-3 border-b border-white/[0.08] pb-4">
+              {form.iconUrl ? (
+                <img src={form.iconUrl} alt="" crossOrigin="anonymous" className="h-12 w-12 rounded-xl border border-white/10 object-cover" />
+              ) : (
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]"><Sparkles className="h-5 w-5 text-violet-300" /></span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="m-0 truncate text-sm font-semibold text-white">{form.productName || 'App Preview'}</p>
+                <p className="m-0 mt-0.5 truncate text-xs text-zinc-500">{form.category || 'Product'}</p>
+              </div>
+            </div>
+            <div>
+              <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Target Audience</p>
+              <p className="m-0 mt-1.5 text-xs leading-5 text-zinc-300">{form.targetAudience || 'General audience'}</p>
+            </div>
+            {form.positioningStatement && (
+              <div className="border-t border-white/[0.08] pt-3">
+                <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Positioning</p>
+                <p className="m-0 mt-1.5 text-xs leading-5 text-zinc-300">{form.positioningStatement}</p>
+              </div>
+            )}
+            <div className="border-t border-white/[0.08] pt-3">
+              <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Assigned Handler</p>
+              <p className="m-0 mt-1.5 truncate text-xs leading-5 text-zinc-300">
+                {form.mainEmail ? (
+                  <span className="inline-flex items-center gap-1.5 font-medium text-violet-300">
+                    <UserCheck className="h-3 w-3" /> {form.mainEmail}
+                  </span>
+                ) : (
+                  <span className="text-zinc-500 italic">Unassigned (You)</span>
+                )}
+              </p>
+            </div>
+            <div className="border-t border-white/[0.08] pt-3">
+              <button
+                type="button"
+                onClick={() => setActiveStep('showcase')}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-black transition hover:bg-zinc-200"
+              >
+                Next: Showcase Videos <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </aside>
         )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderShowcaseStep = () => (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_290px]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <section className="min-w-0 rounded-2xl border border-white/[0.08] bg-[#141417] p-5 md:p-6">
         <div className="mb-5">
           <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-300">Now show, don’t tell</p>
@@ -474,7 +682,7 @@ export const ProductEditorPage = ({
             setDragActive(false);
             uploadShowcaseFiles(event.dataTransfer.files);
           }}
-          className={`flex min-h-44 w-full flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-8 text-center transition ${
+          className={`flex min-h-40 w-full flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-7 text-center transition ${
             dragActive
               ? 'border-violet-400 bg-violet-400/10'
               : 'border-white/15 bg-black/30 hover:border-white/30 hover:bg-white/[0.025]'
@@ -496,24 +704,17 @@ export const ProductEditorPage = ({
         )}
 
         {showcaseVideos.length > 0 && (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-5 grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {showcaseVideos.map((item) => {
               const mediaId = getMediaId(item);
-              const previewUrl = item.localPreviewUrl || item.thumbnailUrl || item.url;
               return (
                 <div key={mediaId} className="overflow-hidden rounded-xl border border-white/[0.08] bg-black/40">
-                  <div className="relative aspect-video bg-zinc-950">
-                    {item.thumbnailUrl ? (
-                      <img src={item.thumbnailUrl} alt="" className="h-full w-full object-cover" />
-                    ) : previewUrl ? (
-                      <video src={previewUrl} className="h-full w-full object-cover" muted preload="metadata" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center"><FileVideo2 className="h-6 w-6 text-zinc-600" /></div>
-                    )}
+                  <div className="relative aspect-[9/16] bg-zinc-950">
+                    <ShowcaseVideoCardPreview item={item} />
                     <button
                       type="button"
                       onClick={() => removeShowcaseVideo(mediaId)}
-                      className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-black/70 text-zinc-400 hover:text-white"
+                      className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-black/70 text-zinc-400 hover:text-white"
                       title="Remove from this campaign"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -610,7 +811,19 @@ export const ProductEditorPage = ({
                       <p className="m-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Video {index + 1}</p>
                       <h3 className="m-0 mt-1 truncate text-sm font-medium text-white">{item.name || 'Showcase recording'}</h3>
                     </div>
-                    <StatusPill status={item.aiStatus || 'processing'} />
+                    <div className="flex items-center gap-2">
+                      <StatusPill status={item.aiStatus || 'processing'} />
+                      {item.aiStatus === 'completed' && (
+                        <button
+                          type="button"
+                          onClick={() => retryAnalysis(mediaId)}
+                          className="rounded-lg border border-white/10 bg-white/[0.04] p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                          title="Re-analyze video with updated feature extraction"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {item.aiStatus === 'completed' && (
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -799,8 +1012,8 @@ export const ProductEditorPage = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#0c0c0e] px-4 py-5 text-white sm:px-7 md:py-7">
-      <div className="mx-auto max-w-7xl">
+    <div className="min-h-screen bg-[#0c0c0e] px-4 py-5 text-white sm:px-8 md:py-6">
+      <div className="mx-auto w-full max-w-[1520px]">
         <header className="mb-6 flex flex-col gap-4 border-b border-white/[0.08] pb-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             {canCancel && (

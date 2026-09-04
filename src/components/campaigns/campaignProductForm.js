@@ -19,4 +19,5 @@ export const emptyProductFields = {
   creativeBlueprints: [],
   strategyStatus: 'none',
   promoFolderId: null,
+  mainEmail: '',
 };

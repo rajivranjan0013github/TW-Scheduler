@@ -48,13 +48,13 @@ export const Channels = () => {
   const [assignPlatform, setAssignPlatform] = useState('instagram');
   const [assignHandle, setAssignHandle] = useState('');
   const [assignEmail, setAssignEmail] = useState('');
-  const [assignDisplayName, setAssignDisplayName] = useState('');
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState('');
 
   // Confirmation dialog state for removing a channel
   const [channelToRemove, setChannelToRemove] = useState(null);
   const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState('');
 
   const channelQueryParam = activeConnectCampaignId
     ? `?${new URLSearchParams({ campaignId: activeConnectCampaignId }).toString()}`
@@ -134,24 +134,7 @@ export const Channels = () => {
     }
   }, [channelsQuery.error]);
 
-  const disconnectChannel = async (id) => {
-    if (!window.confirm('Are you sure you want to disconnect this channel? Scheduled posts might fail.')) {
-      return;
-    }
-    try {
-      const token = localStorage.getItem('tw_token');
-      const response = await fetch(`${API_BASE_URL}/api/accounts/${id}`, {
-        method: 'DELETE',
-        headers: withHandlerPreviewHeaders({ 'Authorization': `Bearer ${token}` })
-      });
-      if (response.ok) {
-        setDisconnectedChannelIds(prev => [...prev, id]);
-        queryClient.invalidateQueries({ queryKey: ['channels'] });
-      }
-    } catch (error) {
-      console.error('Failed to disconnect:', error);
-    }
-  };
+
 
   const connectInstagramOAuth = async (targetCampaignId = activeConnectCampaignId) => {
     const token = localStorage.getItem('tw_token');
@@ -276,7 +259,6 @@ export const Channels = () => {
           campaignId: activeConnectCampaignId,
           platform: assignPlatform,
           requestedHandle: assignHandle.trim(),
-          displayName: assignDisplayName.trim(),
           assignedHandlerEmail: assignEmail.trim().toLowerCase(),
         }),
       });
@@ -286,7 +268,6 @@ export const Channels = () => {
       }
       setAssignHandle('');
       setAssignEmail('');
-      setAssignDisplayName('');
       queryClient.invalidateQueries({ queryKey: ['channels'] });
       queryClient.invalidateQueries({ queryKey: ['admin'] });
     } catch (err) {
@@ -296,25 +277,36 @@ export const Channels = () => {
     }
   };
 
-  // Remove channel from campaign (invoked from confirmation dialog)
+  // Remove channel from campaign or disconnect from workspace
   const confirmRemoveChannel = async () => {
     if (!channelToRemove) return;
     const channelId = channelToRemove._id || channelToRemove.socialAccountId;
     setRemoving(true);
+    setRemoveError('');
     try {
       const token = localStorage.getItem('tw_token');
-      const response = await fetch(`${API_BASE_URL}/api/accounts/campaign-channels/${channelId}`, {
+      const isWorkspaceDisconnect = !activeConnectCampaignId || channelToRemove.isWorkspaceAccount;
+      const url = isWorkspaceDisconnect
+        ? `${API_BASE_URL}/api/accounts/${channelToRemove.socialAccountId || channelToRemove._id}`
+        : `${API_BASE_URL}/api/accounts/campaign-channels/${channelId}?campaignId=${encodeURIComponent(activeConnectCampaignId)}`;
+
+      const response = await fetch(url, {
         method: 'DELETE',
         headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }),
       });
-      if (response.ok) {
-        queryClient.invalidateQueries({ queryKey: ['channels'] });
-        queryClient.invalidateQueries({ queryKey: ['all-social-accounts'] });
-        queryClient.invalidateQueries({ queryKey: ['admin'] });
-        setChannelToRemove(null);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to remove channel.');
       }
+
+      queryClient.invalidateQueries({ queryKey: ['channels'] });
+      queryClient.invalidateQueries({ queryKey: ['all-social-accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
+      queryClient.invalidateQueries({ queryKey: ['creator'] });
+      setChannelToRemove(null);
     } catch (err) {
-      console.error('Failed to remove campaign channel:', err);
+      console.error('Failed to remove channel:', err);
+      setRemoveError(err.message || 'Failed to remove channel.');
     } finally {
       setRemoving(false);
     }
@@ -452,10 +444,10 @@ export const Channels = () => {
             </div>
           </div>
 
-          <div className="grid gap-3 grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] items-end">
+          <div className="grid gap-3 grid-cols-1 md:grid-cols-[1fr_1fr_auto] items-end">
             <div>
               <label className="mb-1 block text-xs font-semibold text-zinc-300">
-                Target Handle / ID <span className="text-red-400">*</span>
+              Handler's Social Media <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
@@ -464,16 +456,6 @@ export const Channels = () => {
                 placeholder={assignPlatform === 'instagram' ? '@creatorhandle' : assignPlatform === 'youtube' ? '@channel or UC...' : 'Page Name or ID'}
                 className="w-full h-9 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-white/30"
                 required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-zinc-300">Display Name (Optional)</label>
-              <input
-                type="text"
-                value={assignDisplayName}
-                onChange={(e) => setAssignDisplayName(e.target.value)}
-                placeholder="e.g. John Creator"
-                className="w-full h-9 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white outline-none focus:border-white/30"
               />
             </div>
             <div>
@@ -490,7 +472,7 @@ export const Channels = () => {
               <button
                 type="submit"
                 disabled={assigning || !assignHandle.trim()}
-                className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg bg-[#7831d6] px-4 text-xs font-semibold text-white shadow-md shadow-[#7831d6]/25 transition hover:bg-[#6825bc] disabled:opacity-50"
+                className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg bg-white px-4 text-xs font-semibold text-black shadow-sm transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {assigning ? 'Assigning...' : 'Assign to Campaign'}
               </button>
@@ -649,12 +631,15 @@ export const Channels = () => {
                       <div className="flex items-center justify-end">
                         <button
                           type="button"
-                          onClick={() => setChannelToRemove(chan)}
+                          onClick={() => {
+                            setRemoveError('');
+                            setChannelToRemove(chan);
+                          }}
                           className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 text-xs font-semibold text-zinc-300 transition hover:border-rose-500/30 hover:bg-rose-500/15 hover:text-rose-300 shadow-sm"
-                          title="Remove from Campaign"
+                          title={activeConnectCampaignId ? 'Remove from Campaign' : 'Disconnect Account'}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                          <span>Remove</span>
+                          <span>{activeConnectCampaignId ? 'Remove' : 'Disconnect'}</span>
                         </button>
                       </div>
                     </td>
@@ -700,21 +685,34 @@ export const Channels = () => {
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleToggleCampaignLink(acc._id)}
-                  className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition active:scale-95"
-                >
-                  <Plus className="h-3 w-3" />
-                  <span>Link</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRemoveError('');
+                      setChannelToRemove({ ...acc, isWorkspaceAccount: true });
+                    }}
+                    className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition"
+                    title="Disconnect from Workspace"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleCampaignLink(acc._id)}
+                    className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition active:scale-95"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Link</span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {/* Remove Channel Confirmation Dialog */}
+      {/* Remove / Disconnect Channel Confirmation Dialog */}
       {channelToRemove && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#121215] p-6 shadow-2xl space-y-4">
@@ -723,24 +721,40 @@ export const Channels = () => {
                 <Trash2 className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-base font-semibold text-white m-0">Remove Channel from Campaign</h3>
+                <h3 className="text-base font-semibold text-white m-0">
+                  {(!activeConnectCampaignId || channelToRemove.isWorkspaceAccount)
+                    ? 'Disconnect Social Account'
+                    : 'Remove Channel from Campaign'}
+                </h3>
                 <p className="mt-1.5 text-xs text-zinc-300 m-0 leading-relaxed">
-                  Are you sure you want to remove{' '}
+                  Are you sure you want to {(!activeConnectCampaignId || channelToRemove.isWorkspaceAccount) ? 'disconnect' : 'remove'}{' '}
                   <strong className="text-white font-semibold">
-                    {channelToRemove.displayName || channelToRemove.name || formatHandle(channelToRemove.handle || channelToRemove.requestedHandle || 'this channel')}
-                  </strong>{' '}
-                  from this campaign?
+                    {channelToRemove.displayName || channelToRemove.name || formatHandle(channelToRemove.handle || channelToRemove.requestedHandle || channelToRemove.username || 'this channel')}
+                  </strong>
+                  {(!activeConnectCampaignId || channelToRemove.isWorkspaceAccount) ? ' from your workspace?' : ' from this campaign?'}
                 </p>
                 <p className="mt-2 text-[11px] text-zinc-500 m-0 leading-relaxed">
-                  This will unlink the channel from this product. The account remains connected to your workspace and can be re-linked anytime.
+                  {(!activeConnectCampaignId || channelToRemove.isWorkspaceAccount)
+                    ? 'This will remove the connected account from your workspace. Scheduled posts for this account may fail.'
+                    : 'This will unlink the channel from this product. The account remains connected to your workspace and can be re-linked anytime.'}
                 </p>
               </div>
             </div>
 
+            {removeError && (
+              <div className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/30 p-2.5 text-xs text-rose-300">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{removeError}</span>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/[0.06]">
               <button
                 type="button"
-                onClick={() => setChannelToRemove(null)}
+                onClick={() => {
+                  setChannelToRemove(null);
+                  setRemoveError('');
+                }}
                 disabled={removing}
                 className="rounded-lg border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-semibold text-zinc-300 transition hover:bg-white/15 hover:text-white disabled:opacity-50"
               >
@@ -753,7 +767,13 @@ export const Channels = () => {
                 className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/20 px-4 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/30 hover:text-white shadow-sm disabled:opacity-50"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>{removing ? 'Removing...' : 'Remove Channel'}</span>
+                <span>
+                  {removing
+                    ? 'Removing...'
+                    : (!activeConnectCampaignId || channelToRemove.isWorkspaceAccount)
+                      ? 'Disconnect Account'
+                      : 'Remove Channel'}
+                </span>
               </button>
             </div>
           </div>

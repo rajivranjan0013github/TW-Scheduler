@@ -200,6 +200,7 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
       creativeBlueprints: campaign.creativeBlueprints || [],
       strategyStatus: campaign.strategyStatus || 'none',
       promoFolderId: campaign.promoFolderId || null,
+      mainEmail: campaign.mainEmail || '',
     });
   };
 
@@ -247,6 +248,12 @@ export const CampaignSelector = ({ setSelectedAccounts = () => {} }) => {
         keyMessaging: activeForm.keyMessaging || [],
         positioningStatement: activeForm.positioningStatement || '',
         screenshots: activeForm.screenshots || [],
+        showcaseMediaIds: activeForm.showcaseMediaIds || [],
+        showcaseLearning: activeForm.showcaseLearning || null,
+        creativeBlueprints: activeForm.creativeBlueprints || [],
+        strategyStatus: activeForm.strategyStatus || 'none',
+        promoFolderId: activeForm.promoFolderId || null,
+        mainEmail: (activeForm.mainEmail || '').trim().toLowerCase(),
         primaryGoal: activeForm.primaryGoal || 'app_downloads',
       };
 

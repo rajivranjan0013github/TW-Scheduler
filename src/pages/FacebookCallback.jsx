@@ -29,13 +29,14 @@ export const FacebookCallback = () => {
       const campaignId = sessionStorage.getItem('connect_campaign_id') || localStorage.getItem('active-campaign-id') || '';
       const reauthorizeAccountId = sessionStorage.getItem('reauthorize_account_id') || '';
       const apiBaseUrl = API_BASE_URL;
+      const redirectUri = `${window.location.origin}/auth/facebook/callback`;
       const response = await fetch(`${apiBaseUrl}/api/accounts/facebook-callback`, {
         method: 'POST',
         headers: withHandlerPreviewHeaders({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         }),
-        body: JSON.stringify({ code, campaignId, reauthorizeAccountId }),
+        body: JSON.stringify({ code, redirectUri, campaignId, reauthorizeAccountId }),
       });
 
       const data = await response.json();

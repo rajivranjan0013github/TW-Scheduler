@@ -822,7 +822,7 @@ export const CreatorCampaigns = () => {
       >
         <div className="flex flex-col items-center justify-center gap-1 py-1.5 text-[#8e8e93]">
           <RefreshCw 
-            className={`w-5 h-5 text-[#c4b5fd] ${
+            className={`w-5 h-5 text-zinc-400 ${
               isRefreshing ? 'animate-spin' : ''
             }`} 
           />
@@ -886,7 +886,7 @@ export const CreatorCampaigns = () => {
                         <button
                           type="button"
                           onClick={() => navigate('/channels', { state: { campaignId: camp._id } })}
-                          className="shrink-0 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors shadow-sm"
+                          className="shrink-0 rounded-lg bg-white hover:bg-zinc-200 px-3.5 py-1.5 text-xs font-semibold text-black transition-colors shadow-sm"
                         >
                           Reconnect
                         </button>
@@ -987,7 +987,7 @@ export const CreatorCampaigns = () => {
                                             disabled={markingPostId === queuePost._id}
                                             className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition hover:bg-white/10 disabled:opacity-60"
                                           >
-                                            <SkipForward className="mt-0.5 h-4 w-4 shrink-0 text-[#c4b5fd]" />
+                                            <SkipForward className="mt-0.5 h-4 w-4 shrink-0 text-zinc-300" />
                                             <span className="text-[11px] font-bold text-white">Confirm posted & move next</span>
                                           </button>
                                         )}
@@ -998,7 +998,7 @@ export const CreatorCampaigns = () => {
                                             disabled={bypassingPostId === queuePost._id}
                                             className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition hover:bg-white/10 disabled:opacity-60"
                                           >
-                                            <TimerOff className="mt-0.5 h-4 w-4 shrink-0 text-[#c4b5fd]" />
+                                            <TimerOff className="mt-0.5 h-4 w-4 shrink-0 text-zinc-300" />
                                             <span className="text-[11px] font-bold text-white">Allow next post now</span>
                                           </button>
                                         )}
@@ -1051,7 +1051,7 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleMarkManualPosted(queuePost)}
                                   disabled={markingPostId === queuePost._id}
-                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-60 shadow-md shadow-[#7831d6]/25"
+                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg bg-white hover:bg-zinc-200 px-3 py-1.5 text-xs font-semibold text-black transition-colors disabled:opacity-60 shadow-sm"
                                 >
                                   <CheckCircle className="h-3.5 w-3.5" />
                                   {markingPostId === queuePost._id ? 'Checking...' : 'Mark as Posted'}
@@ -1063,10 +1063,10 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleSharePost(queuePost, postingCooldown)}
                                   disabled={sharingPostId === queuePost._id || postingCooldown.isLocked}
-                                  className={`inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-all ${
+                                  className={`inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-lg bg-white text-black text-xs font-semibold shadow-sm transition-all ${
                                     postingCooldown.isLocked
-                                      ? 'border border-white/15 bg-white/5 text-zinc-400 cursor-not-allowed shadow-none'
-                                      : 'bg-[#7831d6] hover:bg-[#6825bc] text-white shadow-md shadow-[#7831d6]/30 active:scale-[0.99]'
+                                      ? 'opacity-60 cursor-not-allowed'
+                                      : 'hover:bg-zinc-200 active:scale-[0.99]'
                                   } ${sharingPostId === queuePost._id ? 'opacity-70 cursor-wait' : ''}`}
                                 >
                                   <Share2 className="h-4 w-4 shrink-0" />
