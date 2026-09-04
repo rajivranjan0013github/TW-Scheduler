@@ -4,7 +4,6 @@ import {
   Check,
   Layers3,
   LogOut,
-  Sparkles,
   UsersRound,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -51,16 +50,10 @@ export const OnboardingScreen = () => {
       {/* Top Header Navigation */}
       <header className="sticky top-0 z-30 flex-shrink-0 border-b border-white/[0.08] bg-[#080807]/90 backdrop-blur-2xl">
         <div className="mx-auto flex h-16 sm:h-[72px] max-w-[1280px] items-center justify-between px-4 sm:px-8">
-          <div className="inline-flex items-center gap-2.5 sm:gap-3">
-            <span className="grid h-8 w-8 sm:h-10 sm:w-10 place-items-center rounded-[11px] sm:rounded-[13px] bg-[#f3eee5] text-[#11110f] shadow-[0_0_30px_rgba(244,239,231,.14)]">
-              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={2.7} />
+          <div className="inline-flex items-center">
+            <span className="text-xl sm:text-2xl font-black tracking-tight text-white">
+              ThousandPost
             </span>
-            <div>
-              <p className="m-0 text-sm sm:text-[15px] font-black tracking-[-0.03em] text-[#f5f0e8]">EasyPost</p>
-              <p className="m-0 mt-0.5 text-[7px] sm:text-[8px] font-black uppercase tracking-[0.22em] text-[#77726c]">
-                Generate · Distribute
-              </p>
-            </div>
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -104,7 +97,7 @@ export const OnboardingScreen = () => {
                 Select your role
               </h1>
               <p className="m-0 mt-1 text-xs sm:text-sm text-[#89837c]">
-                Choose how you want to use EasyPost.
+                Choose how you want to use ThousandPost.
               </p>
             </div>
 

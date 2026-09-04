@@ -13,9 +13,9 @@ export default defineConfig({
         enabled: true,
       },
       manifest: {
-        name: 'Easy Post',
-        short_name: 'Easy Post',
-        description: 'Easy Post helps teams manage campaigns, channels, media, and scheduled posts.',
+        name: 'ThousandPost',
+        short_name: 'ThousandPost',
+        description: 'ThousandPost helps teams manage campaigns, channels, media, and scheduled posts.',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',

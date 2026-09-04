@@ -4,10 +4,10 @@ import { ArrowLeft, Sparkles } from 'lucide-react';
 
 const sections = [
   {
-    title: 'Use of EasyPost',
+    title: 'Use of ThousandPost',
     body: (
       <span>
-        You may use EasyPost to connect supported publishing channels, manage media assets, schedule content, view insights, and moderate comments. You are responsible for ensuring your use complies with applicable laws and third-party platform policies.
+        You may use ThousandPost to connect supported publishing channels, manage media assets, schedule content, view insights, and moderate comments. You are responsible for ensuring your use complies with applicable laws and third-party platform policies.
       </span>
     ),
   },
@@ -23,7 +23,7 @@ const sections = [
     title: 'YouTube Terms of Service',
     body: (
       <span>
-        EasyPost integrates with YouTube API Services. By connecting a YouTube channel or using EasyPost features that interact with YouTube, you agree to be bound by the{' '}
+        ThousandPost integrates with YouTube API Services. By connecting a YouTube channel or using ThousandPost features that interact with YouTube, you agree to be bound by the{' '}
         <a
           href="https://www.youtube.com/t/terms"
           target="_blank"
@@ -57,7 +57,7 @@ const sections = [
     title: 'Content Responsibility',
     body: (
       <span>
-        You are responsible for all captions, media, comments, scheduled posts, and other content submitted through EasyPost. Do not upload or publish content that violates copyright, intellectual property, laws, or platform community guidelines.
+        You are responsible for all captions, media, comments, scheduled posts, and other content submitted through ThousandPost. Do not upload or publish content that violates copyright, intellectual property, laws, or platform community guidelines.
       </span>
     ),
   },
@@ -65,7 +65,7 @@ const sections = [
     title: 'Service Availability',
     body: (
       <span>
-        EasyPost is provided on an as-available basis. Scheduled publishing may be affected by internet connectivity, token expiry, platform API errors, invalid media formats, rate limits, or service outages.
+        ThousandPost is provided on an as-available basis. Scheduled publishing may be affected by internet connectivity, token expiry, platform API errors, invalid media formats, rate limits, or service outages.
       </span>
     ),
   },
@@ -73,7 +73,7 @@ const sections = [
     title: 'Limitation of Liability',
     body: (
       <span>
-        To the maximum extent allowed by law, EasyPost is not liable for indirect losses, missed publishing times, platform restrictions, account suspensions, or business losses caused by use of the service.
+        To the maximum extent allowed by law, ThousandPost is not liable for indirect losses, missed publishing times, platform restrictions, account suspensions, or business losses caused by use of the service.
       </span>
     ),
   },
@@ -85,11 +85,11 @@ export const TermsAndConditions = () => (
       <div className="mx-auto flex max-w-4xl items-center justify-between">
         <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-300 transition hover:text-white">
           <ArrowLeft className="h-4 w-4" />
-          Back to EasyPost
+          Back to ThousandPost
         </Link>
         <div className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
           <Sparkles className="h-4 w-4 text-white" />
-          EasyPost
+          ThousandPost
         </div>
       </div>
     </header>
@@ -101,7 +101,7 @@ export const TermsAndConditions = () => (
 
       <div className="mt-8 rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-xl">
         <p className="m-0 text-base leading-7 text-zinc-300">
-          These Terms and Conditions govern your use of EasyPost. By accessing the platform, you agree to use it responsibly and only with accounts and content you are authorized to manage.
+          These Terms and Conditions govern your use of ThousandPost. By accessing the platform, you agree to use it responsibly and only with accounts and content you are authorized to manage.
         </p>
       </div>
 
@@ -115,12 +115,16 @@ export const TermsAndConditions = () => (
       </div>
 
       <p className="m-0 mt-8 text-sm leading-7 text-zinc-400">
-        If you do not agree with these terms, do not use EasyPost or connect publishing channels to the workspace.
+        If you have questions regarding these Terms or need support, please contact us at{' '}
+        <a href="mailto:admin@thethousandways.com" className="text-zinc-300 underline hover:text-white transition">
+          admin@thethousandways.com
+        </a>
+        .
       </p>
       <p className="m-0 mt-4 text-xs text-zinc-500">
-        This product is powered by{' '}
-        <a href="https://thethousandways.com/" target="_blank" rel="noopener noreferrer" className="underline text-zinc-400 hover:text-white">
-          thousandway to make
+        This app is managed by{' '}
+        <a href="https://thethousandways.com/" target="_blank" rel="noopener noreferrer" className="underline text-zinc-400 hover:text-white transition">
+          Thousand Ways
         </a>
       </p>
     </main>

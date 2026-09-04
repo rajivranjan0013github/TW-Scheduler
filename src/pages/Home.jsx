@@ -3,84 +3,29 @@ import {
   Sparkles,
   ArrowRight,
   Film,
-  CalendarPlus,
   Users,
-  Layers,
   Zap,
   Check,
   Megaphone,
   CheckCircle2,
-  TrendingUp,
-  X,
   BarChart3,
+  Smartphone,
+  Send,
 } from 'lucide-react';
 import PlatformIcon from '../components/PlatformIcon';
 
-const BrandMark = ({ compact = false }) => (
-  <div className="flex items-center gap-3">
-    <span className={`${compact ? 'h-8 w-8' : 'h-9 w-9'} grid shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#8a3ff2] to-[#6320be] text-white shadow-[0_0_20px_rgba(120,49,214,0.35)]`}>
-      <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+const BrandMark = () => (
+  <Link to="/" className="inline-flex items-center">
+    <span className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+      ThousandPost
     </span>
-    <div>
-      <p className="m-0 text-base font-bold tracking-tight text-white">EasyPost</p>
-      {!compact && (
-        <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-purple-300">
-          UGC Campaign Platform
-        </p>
-      )}
-    </div>
-  </div>
+  </Link>
 );
 
 const platforms = [
-  { id: 'instagram', name: 'Instagram', label: 'Reels & Stories' },
-  { id: 'youtube', name: 'YouTube', label: 'Shorts' },
-  { id: 'facebook', name: 'Facebook', label: 'Pages & Reels' },
-];
-
-const features = [
-  {
-    icon: Users,
-    title: 'Hire & Coordinate Real Creators',
-    description: 'Recruit authentic UGC creators and account handlers. Assign 30-day deliverables, set posting guidelines, and track verified live post links.',
-    badge: 'Creator Hiring & Roster',
-  },
-  {
-    icon: Layers,
-    title: 'Manage 100+ Accounts at Once',
-    description: 'Connect brand channels and creator profiles from a single dashboard. No logging in and out, sharing passwords, or getting rate-limited.',
-    badge: '100+ Account Scale',
-  },
-  {
-    icon: Zap,
-    title: '30 Days Content in 30 Sec',
-    description: 'Paste your product URL or brief. EasyPost automatically generates 30 days of viral video hooks, captions, and 9:16 creative variations in seconds.',
-    badge: 'Instant Bulk AI Engine',
-  },
-  {
-    icon: BarChart3,
-    title: 'Full Campaign Analytics',
-    description: 'Monitor live total views, engagement, top-performing creators, and verified post URLs across Instagram, YouTube, and Facebook.',
-    badge: 'Real-Time ROI Tracking',
-  },
-];
-
-const workflowSteps = [
-  {
-    step: '01',
-    title: 'Create 30 Days of Content in 30 Sec',
-    text: 'Input product details, App Store links, or briefs. The engine instantly crafts 30 unique video angles, hooks, and 9:16 vertical creative drafts.',
-  },
-  {
-    step: '02',
-    title: 'Hire Creators & Deploy to 100+ Accounts',
-    text: 'Assign deliverables across your network of hired creators and brand channels. Paced queues schedule posts automatically across all platforms.',
-  },
-  {
-    step: '03',
-    title: 'Track Full Analytics & Verified Live Posts',
-    text: 'Watch views roll in in real time. Verify live post URLs, measure creator performance rankings, and scale winning creative angles.',
-  },
+  { id: 'instagram', label: 'Instagram Reels' },
+  { id: 'youtube', label: 'YouTube Shorts' },
+  { id: 'facebook', label: 'Facebook Pages & Reels' },
 ];
 
 export const Home = () => {
@@ -91,18 +36,12 @@ export const Home = () => {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <BrandMark />
 
-          <nav className="hidden items-center gap-6 md:flex">
-            <a href="#features" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
-              Features
-            </a>
-            <a href="#analytics" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
-              Analytics
-            </a>
-            <a href="#comparison" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
-              Why EasyPost
-            </a>
+          <nav className="hidden items-center gap-8 md:flex">
             <a href="#workflow" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
               How It Works
+            </a>
+            <a href="#roles" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
+              For Brands & Creators
             </a>
           </nav>
 
@@ -117,26 +56,26 @@ export const Home = () => {
               to="/login"
               className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#8a3ff2] to-[#6d24cf] px-4 py-2 text-xs font-semibold text-white shadow-[0_0_20px_rgba(138,63,242,0.35)] transition hover:opacity-95 hover:scale-[1.02] active:scale-[0.98]"
             >
-              Start Free Trial
+              Get Started
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="space-y-24 py-12 sm:space-y-32 sm:py-20">
+      <main className="space-y-20 py-12 sm:space-y-28 sm:py-16">
         {/* Hero Section */}
         <section className="relative px-4 text-center sm:px-6 lg:px-8">
           {/* Subtle Ambient Glow */}
-          <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[380px] w-[680px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#8a3ff2]/20 blur-[130px]" />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[340px] w-[620px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#8a3ff2]/20 blur-[120px]" />
 
-          <div className="mx-auto max-w-4xl space-y-6">
+          <div className="mx-auto max-w-3xl space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-1.5 text-xs font-semibold text-purple-300">
               <Megaphone className="h-3.5 w-3.5 text-purple-400" />
               <span>All-In-One UGC Campaign Management</span>
             </div>
 
-            <h1 className="m-0 text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl sm:leading-[1.08]">
+            <h1 className="m-0 text-4xl font-extrabold tracking-tight text-white sm:text-6xl sm:leading-[1.1]">
               Hire real creators.{' '}
               <span className="block mt-1 bg-gradient-to-r from-[#c084fc] via-[#a855f7] to-[#8a3ff2] bg-clip-text text-transparent">
                 Manage 100+ accounts. Get full analytics.
@@ -144,26 +83,10 @@ export const Home = () => {
             </h1>
 
             <p className="mx-auto m-0 max-w-2xl text-sm leading-relaxed text-zinc-300 sm:text-base">
-              The end-to-end UGC platform for brands and agencies. Generate 30 days of viral content in 30 seconds, coordinate real creator poster teams, orchestrate 100+ social accounts simultaneously, and track live campaign view analytics in real time.
+              The end-to-end platform for brands and agencies to generate 30 days of viral short-form video ads in 30 seconds, coordinate creator poster teams, and track live campaign view analytics in real time.
             </p>
 
-            {/* Fast Stats Pill Bar */}
-            <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-500/30 bg-purple-500/15 px-3 py-1.5 text-xs font-bold text-purple-200">
-                🤝 Hire Real Creators
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-200">
-                🌐 Manage 100+ Accounts at Once
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-200">
-                ⚡ 30 Days Content in 30 Sec
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-500/30 bg-purple-500/15 px-3 py-1.5 text-xs font-bold text-purple-200">
-                📊 Full Campaign Analytics
-              </span>
-            </div>
-
-            <div className="flex flex-col items-center justify-center gap-3 pt-3 sm:flex-row">
+            <div className="flex flex-col items-center justify-center gap-3 pt-2 sm:flex-row">
               <Link
                 to="/login"
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8a3ff2] to-[#6d24cf] px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-900/40 transition hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] sm:w-auto"
@@ -172,233 +95,406 @@ export const Home = () => {
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <a
-                href="#features"
+                href="#workflow"
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-7 py-3.5 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.08] hover:text-white sm:w-auto"
               >
-                Explore Features
+                See How It Works
               </a>
             </div>
 
             {/* Social Platform Badges */}
-            <div className="pt-6">
-              <p className="m-0 mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-                Publish and track UGC across Instagram, YouTube Shorts, and Facebook
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-2.5">
-                {platforms.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-1.5 transition hover:border-white/20"
-                  >
-                    <PlatformIcon platform={p.id} className="h-4 w-4 shrink-0" />
-                    <span className="text-xs font-medium text-zinc-200">{p.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-
-        {/* Core Features Grid */}
-        <section id="features" className="px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl space-y-12">
-            <div className="text-center space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-purple-400">
-                Complete UGC Campaign Stack
-              </span>
-              <h2 className="m-0 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                Hire, manage 100+ accounts, and measure ROI
-              </h2>
-              <p className="m-0 text-sm text-zinc-400 max-w-xl mx-auto">
-                Everything brands and agencies need to scale short-form video operations from one workspace.
-              </p>
-            </div>
-
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {features.map((feature) => {
-                const Icon = feature.icon;
-                return (
-                  <div
-                    key={feature.title}
-                    className="flex flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition duration-200 hover:-translate-y-1 hover:border-purple-500/40 hover:bg-white/[0.05]"
-                  >
-                    <div>
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-300 mb-5">
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
-                        {feature.badge}
-                      </span>
-                      <h3 className="m-0 mt-2 text-base font-bold text-white">
-                        {feature.title}
-                      </h3>
-                      <p className="m-0 mt-2 text-xs leading-relaxed text-zinc-400">
-                        {feature.description}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* Dedicated Analytics Section */}
-        <section id="analytics" className="px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-5xl rounded-3xl border border-purple-500/20 bg-gradient-to-b from-[#14121e] to-[#0c0a14] p-8 sm:p-12 space-y-8">
-            <div className="text-center space-y-3 max-w-2xl mx-auto">
-              <span className="text-xs font-bold uppercase tracking-wider text-purple-400">
-                Real-Time Campaign Intelligence
-              </span>
-              <h2 className="m-0 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                Full analytics on every creator, post, and view
-              </h2>
-              <p className="m-0 text-sm leading-relaxed text-zinc-400">
-                Stop wondering whether creators actually posted. EasyPost automatically pulls live performance metrics and verified post URLs across all platforms.
-              </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-5 space-y-2">
-                <div className="flex items-center gap-2 text-purple-400 font-bold text-xs">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                  Verified Post URLs
-                </div>
-                <h3 className="m-0 text-base font-bold text-white">Proof of Delivery</h3>
-                <p className="m-0 text-xs text-zinc-400 leading-relaxed">
-                  Automatic link verification confirms every video is live on Instagram, YouTube, or Facebook before creator payout.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-5 space-y-2">
-                <div className="flex items-center gap-2 text-purple-400 font-bold text-xs">
-                  <TrendingUp className="h-4 w-4 text-purple-400" />
-                  Daily View Velocity
-                </div>
-                <h3 className="m-0 text-base font-bold text-white">Views & Engagement</h3>
-                <p className="m-0 text-xs text-zinc-400 leading-relaxed">
-                  Real-time tracking of lifetime views, daily watch surges, like-to-view ratios, and comment velocity across 100+ accounts.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-5 space-y-2">
-                <div className="flex items-center gap-2 text-purple-400 font-bold text-xs">
-                  <BarChart3 className="h-4 w-4 text-purple-400" />
-                  Creator Leaderboards
-                </div>
-                <h3 className="m-0 text-base font-bold text-white">Performance Ranking</h3>
-                <p className="m-0 text-xs text-zinc-400 leading-relaxed">
-                  Identify top-performing creator posters instantly so you can double down on winning creative angles and high-ROI channels.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Comparison Section (Old Way vs EasyPost) */}
-        <section id="comparison" className="px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-5xl space-y-8">
-            <div className="text-center space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-purple-400">
-                The Scale Difference
-              </span>
-              <h2 className="m-0 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                Stop doing UGC manually. Run it on autopilot.
-              </h2>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Old Way */}
-              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/[0.03] p-7 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="m-0 text-lg font-bold text-rose-300">The Old Manual Way</h3>
-                  <span className="rounded-md bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300">Slow & Chaotic</span>
-                </div>
-                <ul className="m-0 p-0 space-y-3 list-none text-xs text-zinc-400">
-                  <li className="flex items-start gap-2.5">
-                    <X className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
-                    <span>Spend 20+ hours writing individual hooks and scripts each month</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <X className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
-                    <span>Constantly logging in and out of 10+ accounts or getting account banned</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <X className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
-                    <span>Messy Google Drive folders, missing files, and broken links</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <X className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
-                    <span>No analytics: manually messaging creators on WhatsApp asking for view screenshots</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* With EasyPost */}
-              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.04] p-7 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="m-0 text-lg font-bold text-emerald-300">With EasyPost</h3>
-                  <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">30 Sec Setup</span>
-                </div>
-                <ul className="m-0 p-0 space-y-3 list-none text-xs text-zinc-200">
-                  <li className="flex items-start gap-2.5">
-                    <Check className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Generate 30 days of unique video hooks and creative in 30 seconds</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Hire real creators and manage 100+ accounts at once from a single dashboard</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>In-browser 9:16 timeline studio with automatic subtitle overlays</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Full campaign analytics with live view counts and verified post links</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 3-Step Simple Workflow */}
-        <section id="workflow" className="px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl space-y-12">
-            <div className="text-center space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-purple-400">
-                The Scale Workflow
-              </span>
-              <h2 className="m-0 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                From brief to 100+ live accounts with full analytics
-              </h2>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-3">
-              {workflowSteps.map((s) => (
+            <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
+              {platforms.map((p) => (
                 <div
-                  key={s.step}
-                  className="relative rounded-2xl border border-white/10 bg-[#121216] p-6 space-y-4"
+                  key={p.id}
+                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-1.5 transition hover:border-white/20"
                 >
-                  <span className="text-3xl font-black text-purple-400/30">
-                    {s.step}
-                  </span>
-                  <h3 className="m-0 text-lg font-bold text-white">
-                    {s.title}
-                  </h3>
-                  <p className="m-0 text-xs leading-relaxed text-zinc-400">
-                    {s.text}
-                  </p>
+                  <PlatformIcon platform={p.id} className="h-4 w-4 shrink-0" />
+                  <span className="text-xs font-medium text-zinc-300">{p.label}</span>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
+
+        {/* Visual Wire Pipeline Diagram (How It Works) */}
+        <section id="workflow" className="px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl space-y-10">
+            <div className="text-center space-y-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-purple-300">
+                <Sparkles className="h-3.5 w-3.5" />
+                Live Circuit Architecture
+              </span>
+              <h2 className="m-0 text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl">
+                How Content Flows Through the Pipeline
+              </h2>
+              <p className="m-0 text-sm text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+                Follow the live wire from raw product URL to 30 bulk-rendered videos, paced distribution across 100+ accounts, and unified analytics.
+              </p>
+            </div>
+
+            {/* Circuit Canvas Box */}
+            <div className="relative rounded-3xl border border-white/10 bg-[#0a0914] p-5 sm:p-8 shadow-2xl overflow-hidden">
+              {/* Background ambient lighting & grid */}
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#8a3ff2_1px,transparent_1px)] [background-size:24px_24px] opacity-20" />
+              <div className="pointer-events-none absolute -top-20 left-1/2 -z-0 h-60 w-[500px] -translate-x-1/2 rounded-full bg-purple-600/15 blur-[120px]" />
+
+              {/* DESKTOP WIRE DIAGRAM (lg:block) */}
+              <div className="relative z-10 hidden lg:block">
+                <svg className="w-full h-auto" viewBox="0 0 1200 370" fill="none">
+                  <defs>
+                    {/* Glowing Cable Filters */}
+                    <filter id="glowFilter" x="-40%" y="-40%" width="180%" height="180%">
+                      <feGaussianBlur stdDeviation="3.5" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+
+                    {/* Gradients for Wires */}
+                    <linearGradient id="wireGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#c084fc" />
+                      <stop offset="100%" stopColor="#a855f7" />
+                    </linearGradient>
+
+                    <linearGradient id="wireGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#a855f7" />
+                      <stop offset="100%" stopColor="#38bdf8" />
+                    </linearGradient>
+
+                    <linearGradient id="wireGradTop" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#38bdf8" />
+                      <stop offset="100%" stopColor="#f59e0b" />
+                    </linearGradient>
+
+                    <linearGradient id="wireGradBottom" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#38bdf8" />
+                      <stop offset="100%" stopColor="#10b981" />
+                    </linearGradient>
+
+                    <linearGradient id="wireGradMergeTop" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#f59e0b" />
+                      <stop offset="100%" stopColor="#ec4899" />
+                    </linearGradient>
+
+                    <linearGradient id="wireGradMergeBottom" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#ec4899" />
+                    </linearGradient>
+                  </defs>
+
+                  {/* BASE WIRES (Inactive cables) */}
+                  <path d="M 190 185 H 240" stroke="#251c3d" strokeWidth="4" />
+                  <path d="M 430 185 H 480" stroke="#251c3d" strokeWidth="4" />
+                  <path d="M 670 185 C 700 185, 715 95, 735 95" stroke="#251c3d" strokeWidth="4" />
+                  <path d="M 670 185 C 700 185, 715 275, 735 275" stroke="#251c3d" strokeWidth="4" />
+                  <path d="M 945 95 C 965 95, 975 185, 995 185" stroke="#251c3d" strokeWidth="4" />
+                  <path d="M 945 275 C 965 275, 975 185, 995 185" stroke="#251c3d" strokeWidth="4" />
+
+                  {/* ACTIVE GLOWING WIRES */}
+                  {/* Wire 1: Admin -> Hire Creators */}
+                  <path d="M 190 185 H 240" stroke="url(#wireGrad1)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
+
+                  {/* Wire 2: Hire Creators -> AI Studio */}
+                  <path d="M 430 185 H 480" stroke="url(#wireGrad2)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
+
+                  {/* Wire 3A: Studio -> Route A */}
+                  <path d="M 670 185 C 700 185, 715 95, 735 95" stroke="url(#wireGradTop)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
+
+                  {/* Wire 3B: Studio -> Route B */}
+                  <path d="M 670 185 C 700 185, 715 275, 735 275" stroke="url(#wireGradBottom)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
+
+                  {/* Wire 4A: Route A -> Analytics */}
+                  <path d="M 945 95 C 965 95, 975 185, 995 185" stroke="url(#wireGradMergeTop)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
+
+                  {/* Wire 4B: Route B -> Analytics */}
+                  <path d="M 945 275 C 965 275, 975 185, 995 185" stroke="url(#wireGradMergeBottom)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
+
+                  {/* ANIMATED PULSING PHOTONS */}
+                  <circle r="4" fill="#c084fc" filter="url(#glowFilter)">
+                    <animateMotion path="M 190 185 H 240" dur="1.8s" repeatCount="indefinite" />
+                  </circle>
+                  <circle r="4" fill="#38bdf8" filter="url(#glowFilter)">
+                    <animateMotion path="M 430 185 H 480" dur="1.8s" repeatCount="indefinite" />
+                  </circle>
+                  <circle r="4" fill="#f59e0b" filter="url(#glowFilter)">
+                    <animateMotion path="M 670 185 C 700 185, 715 95, 735 95" dur="2.4s" repeatCount="indefinite" />
+                  </circle>
+                  <circle r="4" fill="#10b981" filter="url(#glowFilter)">
+                    <animateMotion path="M 670 185 C 700 185, 715 275, 735 275" dur="2.4s" repeatCount="indefinite" />
+                  </circle>
+                  <circle r="4" fill="#ec4899" filter="url(#glowFilter)">
+                    <animateMotion path="M 945 95 C 965 95, 975 185, 995 185" dur="2.2s" repeatCount="indefinite" />
+                  </circle>
+                  <circle r="4" fill="#ec4899" filter="url(#glowFilter)">
+                    <animateMotion path="M 945 275 C 965 275, 975 185, 995 185" dur="2.2s" repeatCount="indefinite" />
+                  </circle>
+
+                  {/* CONNECTION SOCKETS */}
+                  <circle cx="190" cy="185" r="5" fill="#a855f7" stroke="#120c24" strokeWidth="2" />
+                  <circle cx="240" cy="185" r="5" fill="#a855f7" stroke="#120c24" strokeWidth="2" />
+                  <circle cx="430" cy="185" r="5" fill="#38bdf8" stroke="#120c24" strokeWidth="2" />
+                  <circle cx="480" cy="185" r="5" fill="#38bdf8" stroke="#120c24" strokeWidth="2" />
+                  <circle cx="670" cy="185" r="5" fill="#38bdf8" stroke="#120c24" strokeWidth="2" />
+                  <circle cx="735" cy="95" r="5" fill="#f59e0b" stroke="#120c24" strokeWidth="2" />
+                  <circle cx="735" cy="275" r="5" fill="#10b981" stroke="#120c24" strokeWidth="2" />
+                  <circle cx="945" cy="95" r="5" fill="#f59e0b" stroke="#120c24" strokeWidth="2" />
+                  <circle cx="945" cy="275" r="5" fill="#10b981" stroke="#120c24" strokeWidth="2" />
+                  <circle cx="995" cy="185" r="5" fill="#ec4899" stroke="#120c24" strokeWidth="2" />
+
+                  {/* WIRE DATA LABELS */}
+                  <g transform="translate(195, 160)">
+                    <rect width="40" height="16" rx="8" fill="#1a142e" stroke="#8a3ff2" strokeWidth="0.8" />
+                    <text x="20" y="11" fill="#c084fc" fontSize="8" fontWeight="bold" textAnchor="middle">Brief</text>
+                  </g>
+                  <g transform="translate(435, 160)">
+                    <rect width="42" height="16" rx="8" fill="#141c2e" stroke="#38bdf8" strokeWidth="0.8" />
+                    <text x="21" y="11" fill="#7dd3fc" fontSize="8" fontWeight="bold" textAnchor="middle">Clips</text>
+                  </g>
+                  <g transform="translate(680, 125)">
+                    <rect width="50" height="16" rx="8" fill="#261b12" stroke="#f59e0b" strokeWidth="0.8" />
+                    <text x="25" y="11" fill="#fbbf24" fontSize="8" fontWeight="bold" textAnchor="middle">API Queue</text>
+                  </g>
+                  <g transform="translate(675, 230)">
+                    <rect width="55" height="16" rx="8" fill="#10261e" stroke="#10b981" strokeWidth="0.8" />
+                    <text x="27" y="11" fill="#34d399" fontSize="8" fontWeight="bold" textAnchor="middle">Creator App</text>
+                  </g>
+                  <g transform="translate(950, 172)">
+                    <rect width="42" height="16" rx="8" fill="#2b1226" stroke="#ec4899" strokeWidth="0.8" />
+                    <text x="21" y="11" fill="#f472b6" fontSize="8" fontWeight="bold" textAnchor="middle">Sync</text>
+                  </g>
+
+                  {/* HTML CARDS VIA FOREIGNOBJECT */}
+
+                  {/* Station 1: Admin Setup */}
+                  <foreignObject x="10" y="110" width="180" height="150">
+                    <div className="h-full rounded-2xl border border-purple-500/30 bg-[#120d22] p-3.5 flex flex-col justify-between shadow-xl">
+                      <div>
+                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                          <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wide">01 · Admin Setup</span>
+                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-purple-500/20 text-purple-300">
+                            <Megaphone className="h-2.5 w-2.5" />
+                          </div>
+                        </div>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Product URL Brief</h4>
+                        <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
+                          Paste store link to generate 30 viral hooks & angles.
+                        </p>
+                      </div>
+                      <div className="rounded-md bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 text-[9px] text-purple-300 font-semibold">
+                        Input Strategy
+                      </div>
+                    </div>
+                  </foreignObject>
+
+                  {/* Station 2: Hire Real Creators */}
+                  <foreignObject x="240" y="110" width="190" height="150">
+                    <div className="h-full rounded-2xl border border-fuchsia-500/30 bg-[#190d22] p-3.5 flex flex-col justify-between shadow-xl">
+                      <div>
+                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                          <span className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wide">02 · Creator Roster</span>
+                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-fuchsia-500/20 text-fuchsia-300">
+                            <Users className="h-2.5 w-2.5" />
+                          </div>
+                        </div>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Hire Real Creators</h4>
+                        <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
+                          Recruit vetted creators, assign handles & deliverables.
+                        </p>
+                      </div>
+                      <div className="rounded-md bg-fuchsia-500/10 border border-fuchsia-500/20 px-1.5 py-0.5 text-[9px] text-fuchsia-300 font-semibold">
+                        🤝 Creator Network
+                      </div>
+                    </div>
+                  </foreignObject>
+
+                  {/* Station 3: AI Bulk Studio */}
+                  <foreignObject x="480" y="110" width="190" height="150">
+                    <div className="h-full rounded-2xl border border-blue-500/30 bg-[#0d1627] p-3.5 flex flex-col justify-between shadow-xl">
+                      <div>
+                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                          <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wide">03 · Studio Engine</span>
+                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-blue-500/20 text-blue-300">
+                            <Film className="h-2.5 w-2.5" />
+                          </div>
+                        </div>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">AI Bulk Video Studio</h4>
+                        <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
+                          Pairs hook + demo splitscreen & burns subtitles.
+                        </p>
+                      </div>
+                      <div className="rounded-md bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 text-[9px] text-blue-300 font-semibold">
+                        ⚡ 30+ 9:16 Ads Rendered
+                      </div>
+                    </div>
+                  </foreignObject>
+
+                  {/* Station 4A: Route A (API Auto-Publish) */}
+                  <foreignObject x="735" y="35" width="210" height="120">
+                    <div className="h-full rounded-2xl border border-amber-500/30 bg-[#1f170f] p-3 flex flex-col justify-between shadow-xl">
+                      <div>
+                        <div className="flex items-center justify-between gap-1.5 mb-1">
+                          <span className="text-[9px] font-bold text-amber-300 uppercase tracking-wide">Route A · Direct API</span>
+                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-amber-500/20 text-amber-300">
+                            <Send className="h-2.5 w-2.5" />
+                          </div>
+                        </div>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Admin Auto-Publish</h4>
+                        <p className="m-0 mt-0.5 text-[10px] text-zinc-400 leading-tight">
+                          Admin posts directly to creator channels once joined.
+                        </p>
+                      </div>
+                      <span className="text-[9px] font-semibold text-amber-300">⚡ Hands-Free Queue</span>
+                    </div>
+                  </foreignObject>
+
+                  {/* Station 4B: Route B (Creator Mobile PWA) */}
+                  <foreignObject x="735" y="215" width="210" height="120">
+                    <div className="h-full rounded-2xl border border-emerald-500/30 bg-[#0d1e17] p-3 flex flex-col justify-between shadow-xl">
+                      <div>
+                        <div className="flex items-center justify-between gap-1.5 mb-1">
+                          <span className="text-[9px] font-bold text-emerald-300 uppercase tracking-wide">Route B · Creator Posting</span>
+                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300">
+                            <Smartphone className="h-2.5 w-2.5" />
+                          </div>
+                        </div>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Creator Manual Posting</h4>
+                        <p className="m-0 mt-0.5 text-[10px] text-zinc-400 leading-tight">
+                          Creator 1-tap downloads video & posts with 6h cooldown.
+                        </p>
+                      </div>
+                      <span className="text-[9px] font-semibold text-emerald-300">⏳ Anti-Spam Pacing</span>
+                    </div>
+                  </foreignObject>
+
+                  {/* Station 5: Unified Live Analytics */}
+                  <foreignObject x="995" y="110" width="195" height="150">
+                    <div className="h-full rounded-2xl border border-fuchsia-500/30 bg-[#210d1e] p-3.5 flex flex-col justify-between shadow-xl">
+                      <div>
+                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                          <span className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wide">05 · Live Hub</span>
+                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-fuchsia-500/20 text-fuchsia-300">
+                            <BarChart3 className="h-2.5 w-2.5" />
+                          </div>
+                        </div>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Live Analytics & Proof of Post</h4>
+                        <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
+                          FeedSync verifies live post URLs & tracks views in real time.
+                        </p>
+                      </div>
+                      <div className="rounded-md bg-fuchsia-500/10 border border-fuchsia-500/20 px-1.5 py-0.5 text-[9px] text-fuchsia-300 font-semibold">
+                        📊 Proof of Delivery
+                      </div>
+                    </div>
+                  </foreignObject>
+
+                </svg>
+              </div>
+
+              {/* MOBILE & TABLET CIRCUIT DIAGRAM (lg:hidden) */}
+              <div className="relative z-10 lg:hidden space-y-6">
+                {/* Vertical Cable Line */}
+                <div className="absolute left-6 top-8 bottom-8 w-0.5 bg-gradient-to-b from-purple-500 via-fuchsia-500 via-blue-500 to-emerald-500" />
+
+                {/* Mobile Step 1 */}
+                <div className="relative flex items-start gap-4 pl-12">
+                  <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-purple-400 ring-4 ring-purple-500/30 shadow-[0_0_10px_#a855f7]" />
+                  <div className="w-full rounded-2xl border border-purple-500/30 bg-[#120d22] p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wide">01 · Admin Setup</span>
+                      <Megaphone className="h-4 w-4 text-purple-300" />
+                    </div>
+                    <h4 className="m-0 text-sm font-bold text-white">Campaign Brief & AI Hooks</h4>
+                    <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
+                      Paste product URL to automatically generate 30 viral hooks and creative angles.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mobile Step 2 */}
+                <div className="relative flex items-start gap-4 pl-12">
+                  <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-fuchsia-400 ring-4 ring-fuchsia-500/30 shadow-[0_0_10px_#d946ef]" />
+                  <div className="w-full rounded-2xl border border-fuchsia-500/30 bg-[#190d22] p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-fuchsia-300 uppercase tracking-wide">02 · Creator Roster</span>
+                      <Users className="h-4 w-4 text-fuchsia-300" />
+                    </div>
+                    <h4 className="m-0 text-sm font-bold text-white">Hire Real Creators</h4>
+                    <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
+                      Recruit authentic UGC creators, assign target social channels, and set 30-day deliverables.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mobile Step 3 */}
+                <div className="relative flex items-start gap-4 pl-12">
+                  <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-blue-400 ring-4 ring-blue-500/30 shadow-[0_0_10px_#38bdf8]" />
+                  <div className="w-full rounded-2xl border border-blue-500/30 bg-[#0d1627] p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-blue-300 uppercase tracking-wide">03 · Studio Engine</span>
+                      <Film className="h-4 w-4 text-blue-300" />
+                    </div>
+                    <h4 className="m-0 text-sm font-bold text-white">AI Bulk Video Studio</h4>
+                    <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
+                      Pairs creator hook + app demo splitscreen, burns subtitles, and outputs 30 ready-to-post 9:16 videos.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mobile Step 4 (Fork) */}
+                <div className="relative flex items-start gap-4 pl-12">
+                  <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-amber-400 ring-4 ring-amber-500/30 shadow-[0_0_10px_#f59e0b]" />
+                  <div className="w-full space-y-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-zinc-300">
+                      04 · Paced Multi-Account Distribution
+                    </span>
+                    {/* 4A */}
+                    <div className="rounded-2xl border border-amber-500/30 bg-[#1f170f] p-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-amber-300">Route A · Admin Auto-Publish via API</span>
+                        <Send className="h-3.5 w-3.5 text-amber-300" />
+                      </div>
+                      <p className="m-0 text-xs text-zinc-300">
+                        Admin schedules and auto-posts directly to creator channels once they join & connect accounts.
+                      </p>
+                    </div>
+                    {/* 4B */}
+                    <div className="rounded-2xl border border-emerald-500/30 bg-[#0d1e17] p-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-emerald-300">Route B · Creator Manual Posting App</span>
+                        <Smartphone className="h-3.5 w-3.5 text-emerald-300" />
+                      </div>
+                      <p className="m-0 text-xs text-zinc-300">
+                        For manual distribution: creators 1-tap download & copy captions with 6-hour anti-spam pacing.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile Step 5 */}
+                <div className="relative flex items-start gap-4 pl-12">
+                  <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-fuchsia-400 ring-4 ring-fuchsia-500/30 shadow-[0_0_10px_#ec4899]" />
+                  <div className="w-full rounded-2xl border border-fuchsia-500/30 bg-[#210d1e] p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-fuchsia-300 uppercase tracking-wide">05 · Live Hub</span>
+                      <BarChart3 className="h-4 w-4 text-fuchsia-300" />
+                    </div>
+                    <h4 className="m-0 text-sm font-bold text-white">Live Analytics & Verified Proof of Post</h4>
+                    <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
+                      FeedSync automatically confirms live URLs and tracks view velocity across all 100+ accounts in real time.
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Dual Roles Section (Brands vs Creators) */}
-        <section className="px-4 sm:px-6 lg:px-8">
+        <section id="roles" className="px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-5xl grid gap-6 md:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 space-y-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 text-purple-300">
@@ -412,6 +508,10 @@ export const Home = () => {
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
                   Hire & assign vetted UGC creators
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-purple-400" />
+                  Auto-publish directly to creator channels once joined
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
@@ -436,6 +536,10 @@ export const Home = () => {
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
                   Direct access to paid brand campaigns
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-purple-400" />
+                  Connect accounts once—allow admin auto-post or post manually
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
@@ -472,7 +576,7 @@ export const Home = () => {
                   to="/login"
                   className="btn-white-solid inline-flex items-center gap-2 rounded-xl px-8 py-3.5 text-sm font-bold shadow-[0_10px_35px_rgba(255,255,255,0.2)] transition hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <span>Start with EasyPost</span>
+                  <span>Start with ThousandPost</span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -497,109 +601,43 @@ export const Home = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 bg-[#070709] pt-16 pb-12 text-zinc-400">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-10 pb-12 sm:grid-cols-2 lg:grid-cols-5">
-            {/* Brand Column */}
-            <div className="space-y-4 sm:col-span-2">
-              <BrandMark />
-              <p className="m-0 max-w-sm text-xs leading-relaxed text-zinc-400">
-                The all-in-one platform for high-volume UGC campaigns. Hire real creators, create 30 days of content in 30 seconds, and manage 100+ accounts with real-time analytics.
-              </p>
-              <div className="flex items-center gap-2 pt-1">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  All Systems Operational
-                </span>
-              </div>
-            </div>
-
-            {/* Product Column */}
-            <div className="space-y-3">
-              <p className="m-0 text-xs font-bold uppercase tracking-wider text-white">Product</p>
-              <ul className="m-0 p-0 space-y-2 list-none text-xs">
-                <li>
-                  <a href="#features" className="text-zinc-400 transition hover:text-white">
-                    UGC Features
-                  </a>
-                </li>
-                <li>
-                  <a href="#analytics" className="text-zinc-400 transition hover:text-white">
-                    Campaign Analytics
-                  </a>
-                </li>
-                <li>
-                  <a href="#comparison" className="text-zinc-400 transition hover:text-white">
-                    Why EasyPost
-                  </a>
-                </li>
-                <li>
-                  <a href="#workflow" className="text-zinc-400 transition hover:text-white">
-                    How It Works
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Supported Networks Column */}
-            <div className="space-y-3">
-              <p className="m-0 text-xs font-bold uppercase tracking-wider text-white">Platforms</p>
-              <ul className="m-0 p-0 space-y-2 list-none text-xs">
-                <li className="flex items-center gap-2 text-zinc-400">
-                  <PlatformIcon platform="instagram" className="h-3.5 w-3.5" />
-                  <span>Instagram Reels</span>
-                </li>
-                <li className="flex items-center gap-2 text-zinc-400">
-                  <PlatformIcon platform="youtube" className="h-3.5 w-3.5" />
-                  <span>YouTube Shorts</span>
-                </li>
-                <li className="flex items-center gap-2 text-zinc-400">
-                  <PlatformIcon platform="facebook" className="h-3.5 w-3.5" />
-                  <span>Facebook Pages</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Legal & Account Column */}
-            <div className="space-y-3">
-              <p className="m-0 text-xs font-bold uppercase tracking-wider text-white">Legal & Account</p>
-              <ul className="m-0 p-0 space-y-2 list-none text-xs">
-                <li>
-                  <Link to="/privacy-policy" className="text-zinc-400 transition hover:text-white">
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/terms-and-conditions" className="text-zinc-400 transition hover:text-white">
-                    Terms of Service
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/data-deletion" className="text-zinc-400 transition hover:text-white">
-                    Data Deletion
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/login" className="text-zinc-400 transition hover:text-white">
-                    Sign In
-                  </Link>
-                </li>
-              </ul>
-            </div>
+      <footer className="border-t border-white/10 bg-[#070709] py-10 text-zinc-400">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-4 sm:flex-row sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center gap-2 sm:items-start">
+            <BrandMark />
+            <p className="m-0 text-xs text-zinc-500">
+              © 2026 ThousandPost · Managed by{' '}
+              <a
+                href="https://thethousandways.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline text-zinc-400 hover:text-white transition"
+              >
+                Thousand Ways
+              </a>
+              . All rights reserved.
+            </p>
           </div>
 
-          {/* Bottom Bar */}
-          <div className="flex flex-col gap-4 border-t border-white/10 pt-8 text-xs text-zinc-400 sm:flex-row sm:items-center sm:justify-between">
-            <p className="m-0 text-zinc-400">
-              © 2026 EasyPost Technologies. All rights reserved.
-            </p>
-            <div className="flex items-center gap-3 text-xs text-zinc-400">
-              <span>Hire Creators</span>
-              <span>•</span>
-              <span>100+ Accounts</span>
-              <span>•</span>
-              <span>Full Analytics</span>
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-zinc-400">
+            <a href="#workflow" className="transition hover:text-white">
+              How It Works
+            </a>
+            <a href="#roles" className="transition hover:text-white">
+              For Brands & Creators
+            </a>
+            <Link to="/privacy-policy" className="transition hover:text-white">
+              Privacy Policy
+            </Link>
+            <Link to="/terms-and-conditions" className="transition hover:text-white">
+              Terms
+            </Link>
+            <Link to="/data-deletion" className="transition hover:text-white">
+              Data Deletion
+            </Link>
+            <a href="mailto:admin@thethousandways.com" className="transition hover:text-white">
+              Contact Us
+            </a>
           </div>
         </div>
       </footer>
