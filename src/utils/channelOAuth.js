@@ -4,6 +4,7 @@ import { withHandlerPreviewHeaders } from './handlerPreview';
 export const connectInstagramOAuth = async (targetCampaignId = null) => {
   const token = localStorage.getItem('tw_token');
   const returnUrl = `${window.location.origin}/auth/instagram/callback`;
+  sessionStorage.setItem('instagram_oauth_redirect_uri', returnUrl);
   if (targetCampaignId) {
     sessionStorage.setItem('connect_campaign_id', targetCampaignId);
   }

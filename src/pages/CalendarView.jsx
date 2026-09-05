@@ -2105,7 +2105,7 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                         }`}
                       >
                         {chan.avatarUrl ? (
-                          <img src={chan.avatarUrl} crossOrigin="anonymous" className="w-7 h-7 rounded-full object-cover border border-white/10" alt="" />
+                          <img src={chan.avatarUrl} className="w-7 h-7 rounded-full object-cover border border-white/10" alt="" />
                         ) : (
                           <div className="w-7 h-7 rounded-full bg-white/[0.06] flex items-center justify-center border border-white/[0.08] text-zinc-400">
                             <Users className="w-3.5 h-3.5" />

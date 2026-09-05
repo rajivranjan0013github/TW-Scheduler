@@ -83,7 +83,7 @@ export const PostDetails = () => {
 
         {channel && (
           <div className="flex items-center gap-2 text-[10px] text-gray-500 font-semibold bg-white border border-[#e5e5ea] px-3 py-1 rounded-full shadow-sm">
-            <img src={channel.avatarUrl} crossOrigin="anonymous" className="w-4 h-4 rounded-full object-cover" alt="" />
+            <img src={channel.avatarUrl} className="w-4 h-4 rounded-full object-cover" alt="" />
             <PlatformIcon platform={channel.platform} className="h-4 w-4" />
             <span>{channel.name}</span>
           </div>

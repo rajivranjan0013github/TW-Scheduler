@@ -26,6 +26,7 @@ export const InstagramCallback = () => {
     const returnPath = sessionStorage.getItem('connect_return_path') || '';
     sessionStorage.removeItem('connect_return_path');
     sessionStorage.removeItem('reauthorize_account_id');
+    sessionStorage.removeItem('instagram_oauth_redirect_uri');
 
     const navState = {
       ...(storedCampaignId ? { campaignId: storedCampaignId } : {}),
@@ -55,8 +56,8 @@ export const InstagramCallback = () => {
       const campaignId = sessionStorage.getItem('connect_campaign_id') || localStorage.getItem('active-campaign-id') || '';
       const reauthorizeAccountId = sessionStorage.getItem('reauthorize_account_id') || '';
       const redirectUri = sessionStorage.getItem('instagram_oauth_redirect_uri')
-        || import.meta.env.VITE_INSTAGRAM_REDIRECT_URI
-        || `${window.location.origin}/auth/instagram/callback`;
+        || `${window.location.origin}/auth/instagram/callback`
+        || import.meta.env.VITE_INSTAGRAM_REDIRECT_URI;
 
       const response = await fetch(`${apiBaseUrl}/api/accounts/instagram-callback`, {
         method: 'POST',

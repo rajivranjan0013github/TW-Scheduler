@@ -299,7 +299,6 @@ export const AccountAvatar = ({
     return (
       <img
         src={resolvedAvatar}
-        crossOrigin="anonymous"
         referrerPolicy="no-referrer"
         alt={`${account?.name || account?.displayName || 'Publishing channel'} avatar`}
         onError={() => setImageFailed(true)}
