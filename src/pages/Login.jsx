@@ -129,15 +129,11 @@ export const Login = () => {
               {!showReviewerLogin ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowReviewerLogin(true);
-                    if (!email) setEmail('reviewer@thousandpost.com');
-                    if (!password) setPassword('Reviewer2026!');
-                  }}
+                  onClick={() => setShowReviewerLogin(true)}
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-xs font-semibold text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
                 >
                   <ShieldCheck className="h-4 w-4 text-purple-400" />
-                  <span>Sign in with Reviewer / Test Credentials</span>
+                  <span>Sign in with Email / Reviewer Credentials</span>
                 </button>
               ) : (
                 <form onSubmit={handleEmailSubmit} className="space-y-3 pt-1">
@@ -155,7 +151,7 @@ export const Login = () => {
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="reviewer@thousandpost.com"
+                        placeholder="name@example.com"
                         className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-2.5 pl-10 pr-3 text-xs text-white placeholder-zinc-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
                         autoComplete="email"
                         required

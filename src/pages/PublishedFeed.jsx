@@ -2,13 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { API_BASE_URL } from '../config';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BarChart3, ExternalLink, RefreshCw } from 'lucide-react';
+import { BarChart3, ExternalLink, RefreshCw } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
 import { getMediaUrl } from '../utils/mediaUrls';
 import LoadingVideoPreview from '../components/LoadingVideoPreview';
 import { useAuth } from '../context/AuthContext';
 import { DailyViewsChart } from '../components/adminDashboard/DashboardPresentation';
+import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
 
 const getAssetUrl = (url) => getMediaUrl(url, { apiBaseUrl: API_BASE_URL });
 const cancellableStatuses = new Set(['scheduled', 'manual_ready', 'downloaded', 'paused']);
@@ -155,7 +156,7 @@ export const PublishedFeed = () => {
     queryKey: ['channel', id, campaignId],
     queryFn: async () => {
       const token = localStorage.getItem('tw_token');
-      const headers = { 'Authorization': `Bearer ${token}` };
+      const headers = withHandlerPreviewHeaders({ 'Authorization': `Bearer ${token}` });
       const chanRes = await fetch(`${API_BASE_URL}/api/accounts${withCampaignScope()}`, { headers });
       let channels = chanRes.ok ? await chanRes.json() : [];
       let targetChan = channels.find(c => c._id === id);
@@ -199,7 +200,7 @@ export const PublishedFeed = () => {
     queryFn: async () => {
       const token = localStorage.getItem('tw_token');
       const response = await fetch(`${API_BASE_URL}/api/accounts/${id}/posts`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: withHandlerPreviewHeaders({ 'Authorization': `Bearer ${token}` })
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -239,7 +240,7 @@ export const PublishedFeed = () => {
       const url = `${API_BASE_URL}/api/scheduler?${params.toString()}`;
 
       const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: withHandlerPreviewHeaders({ 'Authorization': `Bearer ${token}` })
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -271,9 +272,9 @@ export const PublishedFeed = () => {
       const campaignParam = effectiveCampaignId ? `?campaignId=${effectiveCampaignId}` : '';
       const response = await fetch(`${API_BASE_URL}/api/scheduler/${post._id}${campaignParam}`, {
         method: 'DELETE',
-        headers: {
+        headers: withHandlerPreviewHeaders({
           'Authorization': `Bearer ${localStorage.getItem('tw_token')}`,
-        },
+        }),
       });
       if (response.ok) {
         await queuedPostsQuery.refetch();
@@ -293,7 +294,7 @@ export const PublishedFeed = () => {
     setRefreshError('');
     try {
       const token = localStorage.getItem('tw_token');
-      const headers = { 'Authorization': `Bearer ${token}` };
+      const headers = withHandlerPreviewHeaders({ 'Authorization': `Bearer ${token}` });
       const startResponse = await fetch(`${API_BASE_URL}/api/accounts/${id}/sync`, {
         method: 'POST',
         headers,
@@ -489,20 +490,6 @@ export const PublishedFeed = () => {
     <div className="min-h-screen bg-[#09090b] p-4 text-zinc-100">
       {/* Header Container */}
       <div className="mb-3 w-full">
-        <button
-          onClick={() => {
-            if (window.history.length > 1) {
-              navigate(-1);
-            } else {
-              navigate(location.state?.fromAdmin ? '/dashboard' : '/channels');
-            }
-          }}
-          className="mb-2 flex items-center gap-1.5 text-xs text-zinc-400 transition-colors hover:text-white"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back</span>
-        </button>
-
         {loading ? (
           <div className="h-14 flex items-center justify-center">
             <div className="w-5 h-5 border-2 border-[#7831d6] border-t-transparent rounded-full animate-spin"></div>

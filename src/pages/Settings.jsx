@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { User, Mail, Save, Check, Trash2, LogOut, ChevronDown } from 'lucide-react';
+import { User, Mail, Save, Check, Trash2, LogOut, ChevronDown, ShieldCheck } from 'lucide-react';
 import { getHandlerPreviewContext } from '../utils/handlerPreview';
 
 export const Settings = () => {
@@ -202,6 +203,39 @@ export const Settings = () => {
             </button>
           </div>
         </form>
+
+        {/* Legal & Platform Policies */}
+        <div className="border-t border-white/10 pt-6">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            <h4 className="m-0 text-xs font-bold uppercase tracking-[0.16em] text-zinc-400">
+              Legal & Compliance
+            </h4>
+          </div>
+          <p className="m-0 text-xs text-zinc-400">
+            Review platform terms, user rights, data protection guidelines, and deletion procedures:
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Link
+              to="/privacy-policy"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/10 hover:text-white"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              to="/terms-and-conditions"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/10 hover:text-white"
+            >
+              Terms & Conditions
+            </Link>
+            <Link
+              to="/data-deletion"
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:bg-white/10 hover:text-white"
+            >
+              Data Deletion Instructions
+            </Link>
+          </div>
+        </div>
 
         {/* Danger Zone */}
         <div className="border-t border-white/10 pt-6">

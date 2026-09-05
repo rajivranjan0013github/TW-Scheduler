@@ -40,7 +40,7 @@ const sections = [
     title: 'Connected Social Platforms & Meta Platform Terms',
     body: (
       <span>
-        Publishing, insights, feed, and comment features depend on third-party platform APIs. By connecting Facebook or Instagram accounts, you agree to comply with all applicable{' '}
+        Publishing, insights, and feed features depend on third-party platform APIs. By connecting Facebook or Instagram accounts, you agree to comply with all applicable{' '}
         <a
           href="https://developers.facebook.com/terms"
           target="_blank"
@@ -54,10 +54,17 @@ const sections = [
     ),
   },
   {
-    title: 'Content Responsibility',
+    title: 'Content Responsibility & Rights Certification',
     body: (
       <span>
-        You are responsible for all captions, media, comments, scheduled posts, and other content submitted through ThousandPost. Do not upload or publish content that violates copyright, intellectual property, laws, or platform community guidelines.
+        You are solely responsible for all captions, media assets, scheduled posts, and other content submitted through ThousandPost. By uploading or scheduling content, you explicitly certify and warrant that:
+        <br /><br />
+        <ul className="list-disc list-inside space-y-1.5 pl-2 text-zinc-300">
+          <li>You own all intellectual property rights in the content or have secured all necessary licenses, releases, and permissions to distribute it.</li>
+          <li>The content does not infringe copyright, trademark, privacy, publicity, or other rights of any third party.</li>
+          <li>The content complies with Meta Community Standards and Instagram Community Guidelines.</li>
+          <li>For sponsored, paid partnership, gifted, or affiliate posts, you must comply with Meta's Branded Content Policies and applicable consumer disclosure laws (e.g. FTC guidelines) using native platform disclosure tools.</li>
+        </ul>
       </span>
     ),
   },

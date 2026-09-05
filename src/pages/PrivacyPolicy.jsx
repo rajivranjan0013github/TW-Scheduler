@@ -70,7 +70,40 @@ const sections = [
     title: 'Meta Platform Data (Facebook & Instagram)',
     body: (
       <span>
-        When you connect a Facebook Page or Instagram Professional account, ThousandPost uses authorized platform permissions (such as <code>pages_show_list</code>, <code>pages_manage_posts</code>, <code>instagram_basic</code>, and <code>instagram_content_publish</code>) solely to publish user-approved content, verify channel ownership, and display feed metrics. We never use Meta user data for surveillance, profiling, or unauthorized targeting. You can disconnect your accounts at any time from ThousandPost or directly within your Meta settings.
+        When you connect a Facebook Page or Instagram Professional account to ThousandPost, we request only the minimal permissions required to deliver scheduling, publishing, and analytics services:
+        <br /><br />
+        <strong>Facebook Page Permissions:</strong>
+        <ul className="list-disc list-inside mt-2 space-y-1.5 pl-2 text-zinc-300">
+          <li>
+            <code>pages_show_list</code>: Allows you to view and select which Facebook Pages you manage so you can connect them to your ThousandPost workspace.
+          </li>
+          <li>
+            <code>pages_read_engagement</code>: Enables ThousandPost to retrieve post-level engagement metrics (such as reactions, likes, comment counts, and views) so you can review content performance in your unified analytics dashboard.
+          </li>
+          <li>
+            <code>pages_manage_posts</code>: Grants ThousandPost the ability to publish, schedule, and update authorized posts (text, photos, and videos) to your selected Facebook Pages upon your explicit direction.
+          </li>
+        </ul>
+        <br />
+        <strong>Instagram Professional Account Permissions:</strong>
+        <ul className="list-disc list-inside mt-2 space-y-1.5 pl-2 text-zinc-300">
+          <li>
+            <code>instagram_business_basic</code>: Allows ThousandPost to read your Instagram Professional profile info (username, account ID, profile picture) and verify account ownership.
+          </li>
+          <li>
+            <code>instagram_business_content_publish</code>: Enables ThousandPost to upload, schedule, and publish media containers (single images, reels, and carousels) directly to your Instagram Professional account.
+          </li>
+          <li>
+            <code>instagram_business_manage_insights</code>: Allows ThousandPost to retrieve performance analytics (reach, impressions, views, likes, and comment counts) for media published through the platform.
+          </li>
+        </ul>
+        <br />
+        <strong>Data Protection & Platform Compliance:</strong>
+        <br />
+        We never use Meta user data for surveillance, profiling, ad retargeting, or data brokering. All access tokens are securely handled and never exposed to client-side code. You may disconnect your accounts at any time from ThousandPost settings, through your Meta Account Settings under <em>Apps and Websites</em>, or via our{' '}
+        <Link to="/data-deletion" className="text-blue-400 underline hover:text-blue-300 font-medium">
+          Data Deletion Instructions Page
+        </Link>.
       </span>
     ),
   },
