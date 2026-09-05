@@ -283,25 +283,41 @@ export const AccountAvatar = ({
     || account?.picture
     || '';
 
-  const resolvedAvatar = rawAvatarUrl && rawAvatarUrl.startsWith('/') && API_BASE_URL
-    ? `${API_BASE_URL}${rawAvatarUrl}`
-    : rawAvatarUrl;
+  const getProxiedAvatar = (url) => {
+    if (!url || typeof url !== 'string') return '';
+    const trimmed = url.trim();
+    if (trimmed.startsWith('/') && API_BASE_URL) {
+      return `${API_BASE_URL}${trimmed}`;
+    }
+    if (trimmed.includes('media.thousandpost.com') || trimmed.includes('.r2.dev') || trimmed.includes('.r2.cloudflarestorage.com')) {
+      return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(trimmed)}`;
+    }
+    return trimmed;
+  };
 
-  const [imageFailed, setImageFailed] = useState(!resolvedAvatar);
-  const [currentAvatar, setCurrentAvatar] = useState(resolvedAvatar);
+  const initialAvatar = getProxiedAvatar(rawAvatarUrl);
+  const [imageFailed, setImageFailed] = useState(!initialAvatar);
+  const [currentAvatar, setCurrentAvatar] = useState(initialAvatar);
 
-  if (currentAvatar !== resolvedAvatar) {
-    setCurrentAvatar(resolvedAvatar);
-    setImageFailed(!resolvedAvatar);
-  }
+  useEffect(() => {
+    const next = getProxiedAvatar(rawAvatarUrl);
+    setCurrentAvatar(next);
+    setImageFailed(!next);
+  }, [rawAvatarUrl]);
 
-  if (resolvedAvatar && !imageFailed) {
+  if (currentAvatar && !imageFailed) {
     return (
       <img
-        src={resolvedAvatar}
+        src={currentAvatar}
         referrerPolicy="no-referrer"
         alt={`${account?.name || account?.displayName || 'Publishing channel'} avatar`}
-        onError={() => setImageFailed(true)}
+        onError={() => {
+          if (rawAvatarUrl && !currentAvatar.includes('/api/media/proxy') && API_BASE_URL) {
+            setCurrentAvatar(`${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(rawAvatarUrl)}`);
+          } else {
+            setImageFailed(true);
+          }
+        }}
         className={className}
       />
     );
