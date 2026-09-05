@@ -49,6 +49,7 @@ const emptyMetrics = {
   last7DaysComments: 0,
   thisMonthLikes: 0,
   thisMonthComments: 0,
+  lastSyncedAt: null,
   last30DaysPostedViews: [],
   accountRows: [],
 };
@@ -98,6 +99,11 @@ export const CreatorAnalytics = () => {
         <h2 className="text-2xl font-bold tracking-tight text-white m-0">Analytics</h2>
         <p className="text-xs text-zinc-400 mt-1 m-0">
           Track views, published content, and engagement across your connected channels.
+        </p>
+        <p className="text-xs text-zinc-400 mt-1 m-0">
+          {metrics.lastSyncedAt
+            ? `Metrics synced ${new Date(metrics.lastSyncedAt).toLocaleString()}`
+            : 'Metrics have not synced yet'}
         </p>
       </div>
 

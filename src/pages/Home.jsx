@@ -11,6 +11,8 @@ import {
   BarChart3,
   Smartphone,
   Send,
+  Calendar,
+  Link2,
 } from 'lucide-react';
 import PlatformIcon from '../components/PlatformIcon';
 
@@ -41,7 +43,7 @@ export const Home = () => {
               How It Works
             </a>
             <a href="#roles" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
-              For Brands & Creators
+              Creators & Teams
             </a>
           </nav>
 
@@ -72,18 +74,18 @@ export const Home = () => {
           <div className="mx-auto max-w-3xl space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-1.5 text-xs font-semibold text-purple-300">
               <Megaphone className="h-3.5 w-3.5 text-purple-400" />
-              <span>All-In-One UGC Campaign Management</span>
+              <span>All-In-One Social Media Workspace</span>
             </div>
 
             <h1 className="m-0 text-4xl font-extrabold tracking-tight text-white sm:text-6xl sm:leading-[1.1]">
-              Hire real creators.{' '}
+              Manage all your social accounts{' '}
               <span className="block mt-1 bg-gradient-to-r from-[#c084fc] via-[#a855f7] to-[#8a3ff2] bg-clip-text text-transparent">
-                Manage 100+ accounts. Get full analytics.
+                in a single place.
               </span>
             </h1>
 
             <p className="mx-auto m-0 max-w-2xl text-sm leading-relaxed text-zinc-300 sm:text-base">
-              The end-to-end platform for brands and agencies to generate 30 days of viral short-form video ads in 30 seconds, coordinate creator poster teams, and track live campaign view analytics in real time.
+              The unified social media platform for creators, brands, and teams. Plan, schedule, and publish high-quality video content across Instagram, YouTube, and Facebook with real-time performance analytics.
             </p>
 
             <div className="flex flex-col items-center justify-center gap-3 pt-2 sm:flex-row">
@@ -91,7 +93,7 @@ export const Home = () => {
                 to="/login"
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8a3ff2] to-[#6d24cf] px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-900/40 transition hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] sm:w-auto"
               >
-                Launch UGC Campaign
+                Get Started Free
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <a
@@ -124,13 +126,13 @@ export const Home = () => {
             <div className="text-center space-y-3">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-purple-300">
                 <Sparkles className="h-3.5 w-3.5" />
-                Live Circuit Architecture
+                Live Workflow Architecture
               </span>
               <h2 className="m-0 text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl">
                 How Content Flows Through the Pipeline
               </h2>
               <p className="m-0 text-sm text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-                Follow the live wire from raw product URL to 30 bulk-rendered videos, paced distribution across 100+ accounts, and unified analytics.
+                Follow the live workflow from creative video generation to scheduled publishing across your channels and unified analytics.
               </p>
             </div>
 
@@ -194,22 +196,22 @@ export const Home = () => {
                   <path d="M 945 275 C 965 275, 975 185, 995 185" stroke="#251c3d" strokeWidth="4" />
 
                   {/* ACTIVE GLOWING WIRES */}
-                  {/* Wire 1: Admin -> Hire Creators */}
+                  {/* Wire 1: Channels -> Studio */}
                   <path d="M 190 185 H 240" stroke="url(#wireGrad1)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
 
-                  {/* Wire 2: Hire Creators -> AI Studio */}
+                  {/* Wire 2: Studio -> Queue */}
                   <path d="M 430 185 H 480" stroke="url(#wireGrad2)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
 
-                  {/* Wire 3A: Studio -> Route A */}
+                  {/* Wire 3A: Queue -> Meta Publishing */}
                   <path d="M 670 185 C 700 185, 715 95, 735 95" stroke="url(#wireGradTop)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
 
-                  {/* Wire 3B: Studio -> Route B */}
+                  {/* Wire 3B: Queue -> YouTube Publishing */}
                   <path d="M 670 185 C 700 185, 715 275, 735 275" stroke="url(#wireGradBottom)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
 
-                  {/* Wire 4A: Route A -> Analytics */}
+                  {/* Wire 4A: Meta Publishing -> Analytics */}
                   <path d="M 945 95 C 965 95, 975 185, 995 185" stroke="url(#wireGradMergeTop)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
 
-                  {/* Wire 4B: Route B -> Analytics */}
+                  {/* Wire 4B: YouTube Publishing -> Analytics */}
                   <path d="M 945 275 C 965 275, 975 185, 995 185" stroke="url(#wireGradMergeBottom)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
 
                   {/* ANIMATED PULSING PHOTONS */}
@@ -245,147 +247,147 @@ export const Home = () => {
                   <circle cx="995" cy="185" r="5" fill="#ec4899" stroke="#120c24" strokeWidth="2" />
 
                   {/* WIRE DATA LABELS */}
-                  <g transform="translate(195, 160)">
-                    <rect width="40" height="16" rx="8" fill="#1a142e" stroke="#8a3ff2" strokeWidth="0.8" />
-                    <text x="20" y="11" fill="#c084fc" fontSize="8" fontWeight="bold" textAnchor="middle">Brief</text>
+                  <g transform="translate(190, 160)">
+                    <rect width="50" height="16" rx="8" fill="#1a142e" stroke="#8a3ff2" strokeWidth="0.8" />
+                    <text x="25" y="11" fill="#c084fc" fontSize="8" fontWeight="bold" textAnchor="middle">Channels</text>
                   </g>
                   <g transform="translate(435, 160)">
                     <rect width="42" height="16" rx="8" fill="#141c2e" stroke="#38bdf8" strokeWidth="0.8" />
-                    <text x="21" y="11" fill="#7dd3fc" fontSize="8" fontWeight="bold" textAnchor="middle">Clips</text>
+                    <text x="21" y="11" fill="#7dd3fc" fontSize="8" fontWeight="bold" textAnchor="middle">Media</text>
                   </g>
                   <g transform="translate(680, 125)">
                     <rect width="50" height="16" rx="8" fill="#261b12" stroke="#f59e0b" strokeWidth="0.8" />
-                    <text x="25" y="11" fill="#fbbf24" fontSize="8" fontWeight="bold" textAnchor="middle">API Queue</text>
+                    <text x="25" y="11" fill="#fbbf24" fontSize="8" fontWeight="bold" textAnchor="middle">Meta API</text>
                   </g>
                   <g transform="translate(675, 230)">
                     <rect width="55" height="16" rx="8" fill="#10261e" stroke="#10b981" strokeWidth="0.8" />
-                    <text x="27" y="11" fill="#34d399" fontSize="8" fontWeight="bold" textAnchor="middle">Creator App</text>
+                    <text x="27" y="11" fill="#34d399" fontSize="8" fontWeight="bold" textAnchor="middle">YouTube</text>
                   </g>
-                  <g transform="translate(950, 172)">
-                    <rect width="42" height="16" rx="8" fill="#2b1226" stroke="#ec4899" strokeWidth="0.8" />
-                    <text x="21" y="11" fill="#f472b6" fontSize="8" fontWeight="bold" textAnchor="middle">Sync</text>
+                  <g transform="translate(946, 172)">
+                    <rect width="50" height="16" rx="8" fill="#2b1226" stroke="#ec4899" strokeWidth="0.8" />
+                    <text x="25" y="11" fill="#f472b6" fontSize="8" fontWeight="bold" textAnchor="middle">Analytics</text>
                   </g>
 
                   {/* HTML CARDS VIA FOREIGNOBJECT */}
 
-                  {/* Station 1: Admin Setup */}
+                  {/* Station 1: Connect Channels */}
                   <foreignObject x="10" y="110" width="180" height="150">
                     <div className="h-full rounded-2xl border border-purple-500/30 bg-[#120d22] p-3.5 flex flex-col justify-between shadow-xl">
                       <div>
                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                          <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wide">01 · Admin Setup</span>
+                          <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wide">01 · Connect</span>
                           <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-purple-500/20 text-purple-300">
-                            <Megaphone className="h-2.5 w-2.5" />
+                            <Link2 className="h-2.5 w-2.5" />
                           </div>
                         </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Product URL Brief</h4>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Link Your Channels</h4>
                         <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
-                          Paste store link to generate 30 viral hooks & angles.
+                          Connect Instagram, YouTube channel, & Facebook Page securely via OAuth.
                         </p>
                       </div>
                       <div className="rounded-md bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 text-[9px] text-purple-300 font-semibold">
-                        Input Strategy
+                        🔗 1-Click Connect
                       </div>
                     </div>
                   </foreignObject>
 
-                  {/* Station 2: Hire Real Creators */}
+                  {/* Station 2: Creator Studio */}
                   <foreignObject x="240" y="110" width="190" height="150">
                     <div className="h-full rounded-2xl border border-fuchsia-500/30 bg-[#190d22] p-3.5 flex flex-col justify-between shadow-xl">
                       <div>
                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                          <span className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wide">02 · Creator Roster</span>
+                          <span className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wide">02 · Creator Studio</span>
                           <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-fuchsia-500/20 text-fuchsia-300">
-                            <Users className="h-2.5 w-2.5" />
+                            <Film className="h-2.5 w-2.5" />
                           </div>
                         </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Hire Real Creators</h4>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Media & AI Captions</h4>
                         <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
-                          Recruit vetted creators, assign handles & deliverables.
+                          Upload video clips, edit hooks, & generate engaging captions with AI.
                         </p>
                       </div>
                       <div className="rounded-md bg-fuchsia-500/10 border border-fuchsia-500/20 px-1.5 py-0.5 text-[9px] text-fuchsia-300 font-semibold">
-                        🤝 Creator Network
+                        ✨ AI Video Tools
                       </div>
                     </div>
                   </foreignObject>
 
-                  {/* Station 3: AI Bulk Studio */}
+                  {/* Station 3: Schedule Queue */}
                   <foreignObject x="480" y="110" width="190" height="150">
                     <div className="h-full rounded-2xl border border-blue-500/30 bg-[#0d1627] p-3.5 flex flex-col justify-between shadow-xl">
                       <div>
                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                          <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wide">03 · Studio Engine</span>
+                          <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wide">03 · Schedule Queue</span>
                           <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-blue-500/20 text-blue-300">
-                            <Film className="h-2.5 w-2.5" />
+                            <Calendar className="h-2.5 w-2.5" />
                           </div>
                         </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">AI Bulk Video Studio</h4>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Content Calendar</h4>
                         <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
-                          Pairs hook + demo splitscreen & burns subtitles.
+                          Plan your multi-channel posting calendar with visual drag-and-drop ease.
                         </p>
                       </div>
                       <div className="rounded-md bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 text-[9px] text-blue-300 font-semibold">
-                        ⚡ 30+ 9:16 Ads Rendered
+                        📅 Smart Calendar
                       </div>
                     </div>
                   </foreignObject>
 
-                  {/* Station 4A: Route A (API Auto-Publish) */}
+                  {/* Station 4A: Route A (Meta Publishing) */}
                   <foreignObject x="735" y="35" width="210" height="120">
                     <div className="h-full rounded-2xl border border-amber-500/30 bg-[#1f170f] p-3 flex flex-col justify-between shadow-xl">
                       <div>
                         <div className="flex items-center justify-between gap-1.5 mb-1">
-                          <span className="text-[9px] font-bold text-amber-300 uppercase tracking-wide">Route A · Direct API</span>
+                          <span className="text-[9px] font-bold text-amber-300 uppercase tracking-wide">Meta Publishing</span>
                           <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-amber-500/20 text-amber-300">
                             <Send className="h-2.5 w-2.5" />
                           </div>
                         </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Admin Auto-Publish</h4>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Instagram Reels & FB</h4>
                         <p className="m-0 mt-0.5 text-[10px] text-zinc-400 leading-tight">
-                          Admin posts directly to creator channels once joined.
+                          Auto-publish video content directly to Instagram Reels & Facebook Pages.
                         </p>
                       </div>
-                      <span className="text-[9px] font-semibold text-amber-300">⚡ Hands-Free Queue</span>
+                      <span className="text-[9px] font-semibold text-amber-300">⚡ Meta Graph API</span>
                     </div>
                   </foreignObject>
 
-                  {/* Station 4B: Route B (Creator Mobile PWA) */}
+                  {/* Station 4B: Route B (YouTube Publishing) */}
                   <foreignObject x="735" y="215" width="210" height="120">
                     <div className="h-full rounded-2xl border border-emerald-500/30 bg-[#0d1e17] p-3 flex flex-col justify-between shadow-xl">
                       <div>
                         <div className="flex items-center justify-between gap-1.5 mb-1">
-                          <span className="text-[9px] font-bold text-emerald-300 uppercase tracking-wide">Route B · Creator Posting</span>
+                          <span className="text-[9px] font-bold text-emerald-300 uppercase tracking-wide">YouTube Publishing</span>
                           <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300">
                             <Smartphone className="h-2.5 w-2.5" />
                           </div>
                         </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Creator Manual Posting</h4>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">YouTube Shorts & Videos</h4>
                         <p className="m-0 mt-0.5 text-[10px] text-zinc-400 leading-tight">
-                          Creator 1-tap downloads video & posts with 6h cooldown.
+                          Upload Shorts directly with titles, tags, thumbnails, & audience controls.
                         </p>
                       </div>
-                      <span className="text-[9px] font-semibold text-emerald-300">⏳ Anti-Spam Pacing</span>
+                      <span className="text-[9px] font-semibold text-emerald-300">⚡ YouTube API</span>
                     </div>
                   </foreignObject>
 
-                  {/* Station 5: Unified Live Analytics */}
+                  {/* Station 5: Creator Analytics Hub */}
                   <foreignObject x="995" y="110" width="195" height="150">
                     <div className="h-full rounded-2xl border border-fuchsia-500/30 bg-[#210d1e] p-3.5 flex flex-col justify-between shadow-xl">
                       <div>
                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                          <span className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wide">05 · Live Hub</span>
+                          <span className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wide">05 · Creator Hub</span>
                           <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-fuchsia-500/20 text-fuchsia-300">
                             <BarChart3 className="h-2.5 w-2.5" />
                           </div>
                         </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Live Analytics & Proof of Post</h4>
+                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Unified Analytics</h4>
                         <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
-                          FeedSync verifies live post URLs & tracks views in real time.
+                          Track total views, reach, likes, & audience growth across all platforms.
                         </p>
                       </div>
                       <div className="rounded-md bg-fuchsia-500/10 border border-fuchsia-500/20 px-1.5 py-0.5 text-[9px] text-fuchsia-300 font-semibold">
-                        📊 Proof of Delivery
+                        📊 Cross-Platform Insights
                       </div>
                     </div>
                   </foreignObject>
@@ -403,12 +405,12 @@ export const Home = () => {
                   <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-purple-400 ring-4 ring-purple-500/30 shadow-[0_0_10px_#a855f7]" />
                   <div className="w-full rounded-2xl border border-purple-500/30 bg-[#120d22] p-5">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wide">01 · Admin Setup</span>
-                      <Megaphone className="h-4 w-4 text-purple-300" />
+                      <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wide">01 · Channels</span>
+                      <Link2 className="h-4 w-4 text-purple-300" />
                     </div>
-                    <h4 className="m-0 text-sm font-bold text-white">Campaign Brief & AI Hooks</h4>
+                    <h4 className="m-0 text-sm font-bold text-white">Connect Your Social Accounts</h4>
                     <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
-                      Paste product URL to automatically generate 30 viral hooks and creative angles.
+                      Link your Instagram, YouTube channel, and Facebook Page securely via official 1-click OAuth.
                     </p>
                   </div>
                 </div>
@@ -418,12 +420,12 @@ export const Home = () => {
                   <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-fuchsia-400 ring-4 ring-fuchsia-500/30 shadow-[0_0_10px_#d946ef]" />
                   <div className="w-full rounded-2xl border border-fuchsia-500/30 bg-[#190d22] p-5">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-fuchsia-300 uppercase tracking-wide">02 · Creator Roster</span>
-                      <Users className="h-4 w-4 text-fuchsia-300" />
+                      <span className="text-[11px] font-bold text-fuchsia-300 uppercase tracking-wide">02 · Creator Studio</span>
+                      <Film className="h-4 w-4 text-fuchsia-300" />
                     </div>
-                    <h4 className="m-0 text-sm font-bold text-white">Hire Real Creators</h4>
+                    <h4 className="m-0 text-sm font-bold text-white">Media & AI Captions</h4>
                     <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
-                      Recruit authentic UGC creators, assign target social channels, and set 30-day deliverables.
+                      Upload video clips, edit hooks, and generate engaging captions with AI.
                     </p>
                   </div>
                 </div>
@@ -433,12 +435,12 @@ export const Home = () => {
                   <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-blue-400 ring-4 ring-blue-500/30 shadow-[0_0_10px_#38bdf8]" />
                   <div className="w-full rounded-2xl border border-blue-500/30 bg-[#0d1627] p-5">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-blue-300 uppercase tracking-wide">03 · Studio Engine</span>
-                      <Film className="h-4 w-4 text-blue-300" />
+                      <span className="text-[11px] font-bold text-blue-300 uppercase tracking-wide">03 · Schedule Queue</span>
+                      <Calendar className="h-4 w-4 text-blue-300" />
                     </div>
-                    <h4 className="m-0 text-sm font-bold text-white">AI Bulk Video Studio</h4>
+                    <h4 className="m-0 text-sm font-bold text-white">Visual Content Calendar</h4>
                     <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
-                      Pairs creator hook + app demo splitscreen, burns subtitles, and outputs 30 ready-to-post 9:16 videos.
+                      Plan and organize your multi-platform posting schedule in one visual queue.
                     </p>
                   </div>
                 </div>
@@ -448,26 +450,26 @@ export const Home = () => {
                   <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-amber-400 ring-4 ring-amber-500/30 shadow-[0_0_10px_#f59e0b]" />
                   <div className="w-full space-y-3">
                     <span className="text-[11px] font-bold uppercase tracking-wide text-zinc-300">
-                      04 · Paced Multi-Account Distribution
+                      04 · Direct Multi-Platform Publishing
                     </span>
                     {/* 4A */}
                     <div className="rounded-2xl border border-amber-500/30 bg-[#1f170f] p-4">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-amber-300">Route A · Admin Auto-Publish via API</span>
+                        <span className="text-xs font-bold text-amber-300">Instagram Reels & Facebook (Meta API)</span>
                         <Send className="h-3.5 w-3.5 text-amber-300" />
                       </div>
                       <p className="m-0 text-xs text-zinc-300">
-                        Admin schedules and auto-posts directly to creator channels once they join & connect accounts.
+                        Auto-publish video content directly to Instagram Reels and Facebook Pages via official Meta APIs.
                       </p>
                     </div>
                     {/* 4B */}
                     <div className="rounded-2xl border border-emerald-500/30 bg-[#0d1e17] p-4">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-emerald-300">Route B · Creator Manual Posting App</span>
+                        <span className="text-xs font-bold text-emerald-300">YouTube Shorts & Videos (YouTube API)</span>
                         <Smartphone className="h-3.5 w-3.5 text-emerald-300" />
                       </div>
                       <p className="m-0 text-xs text-zinc-300">
-                        For manual distribution: creators 1-tap download & copy captions with 6-hour anti-spam pacing.
+                        Directly upload Shorts with titles, tags, thumbnails, and audience controls via YouTube API.
                       </p>
                     </div>
                   </div>
@@ -478,12 +480,12 @@ export const Home = () => {
                   <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-fuchsia-400 ring-4 ring-fuchsia-500/30 shadow-[0_0_10px_#ec4899]" />
                   <div className="w-full rounded-2xl border border-fuchsia-500/30 bg-[#210d1e] p-5">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-fuchsia-300 uppercase tracking-wide">05 · Live Hub</span>
+                      <span className="text-[11px] font-bold text-fuchsia-300 uppercase tracking-wide">05 · Creator Hub</span>
                       <BarChart3 className="h-4 w-4 text-fuchsia-300" />
                     </div>
-                    <h4 className="m-0 text-sm font-bold text-white">Live Analytics & Verified Proof of Post</h4>
+                    <h4 className="m-0 text-sm font-bold text-white">Unified Creator Analytics</h4>
                     <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
-                      FeedSync automatically confirms live URLs and tracks view velocity across all 100+ accounts in real time.
+                      Track total views, reach, likes, and audience growth across every connected channel in real time.
                     </p>
                   </div>
                 </div>
@@ -498,56 +500,56 @@ export const Home = () => {
           <div className="mx-auto max-w-5xl grid gap-6 md:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 space-y-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 text-purple-300">
-                <Megaphone className="h-5 w-5" />
+                <Users className="h-5 w-5" />
               </div>
-              <h3 className="m-0 text-xl font-bold text-white">For Brands & Agencies</h3>
+              <h3 className="m-0 text-xl font-bold text-white">For Solo Creators & Influencers</h3>
               <p className="m-0 text-xs leading-relaxed text-zinc-400">
-                Hire real creators, generate 30 days of UGC hooks in 30 seconds, manage 100+ accounts, and monitor full analytics without extra headcount.
+                Publish consistently to Instagram, YouTube, and Facebook without burning out. Plan videos, schedule posts, and view real-time audience growth in one place.
               </p>
               <ul className="m-0 p-0 space-y-2 list-none text-xs text-zinc-300">
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Hire & assign vetted UGC creators
+                  Connect Instagram, YouTube, and Facebook in 1 click
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Auto-publish directly to creator channels once joined
+                  Flexible publishing: Direct API auto-publish or 1-tap manual video download & caption copy
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Simultaneous 100+ account orchestration
+                  AI caption generator, hashtag suggestions, & video hooks
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Live analytics, view tracking, & proof of post
+                  Visual drag-and-drop calendar queue & real-time analytics
                 </li>
               </ul>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 space-y-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 text-purple-300">
-                <Users className="h-5 w-5" />
+                <Megaphone className="h-5 w-5" />
               </div>
-              <h3 className="m-0 text-xl font-bold text-white">For Creators & Posters</h3>
+              <h3 className="m-0 text-xl font-bold text-white">For Creator Teams & Managers</h3>
               <p className="m-0 text-xs leading-relaxed text-zinc-400">
-                Get hired by top brands. Connect your Instagram, YouTube, and Facebook accounts to receive pre-edited 9:16 videos and schedule deliverables.
+                Manage multiple creator channels, collaborate with brand partners, and orchestrate campaign deliverables seamlessly.
               </p>
               <ul className="m-0 p-0 space-y-2 list-none text-xs text-zinc-300">
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Direct access to paid brand campaigns
+                  Manage multiple handles & channels from one dashboard
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Connect accounts once—allow admin auto-post or post manually
+                  Organize media assets into tagged cloud folders
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Pre-edited, ready-to-publish 9:16 videos
+                  Schedule posts across channels with rolling limit protection
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Clear schedule calendars & delivery tracking
+                  Track cross-platform campaign analytics & delivery proof
                 </li>
               </ul>
             </div>
@@ -560,15 +562,15 @@ export const Home = () => {
             <div className="relative mx-auto max-w-2xl space-y-6">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/20 px-3 py-1 text-xs font-semibold text-purple-200">
                 <Sparkles className="h-3.5 w-3.5" />
-                Hire Creators · Manage 100+ Accounts · Full Analytics
+                Built for Creators · Video Scheduler · Real-Time Analytics
               </span>
 
               <h2 className="m-0 text-3xl font-extrabold tracking-tight text-white sm:text-5xl">
-                Ready to scale your UGC campaigns?
+                Ready to level up your creator channels?
               </h2>
 
               <p className="m-0 text-sm leading-relaxed text-purple-200/80">
-                Join brands, agencies, and creator networks running high-volume UGC distribution with complete analytics and proof of delivery.
+                Join creators and influencers publishing high-performing video content to Instagram, YouTube, and Facebook with automated scheduling and unified analytics.
               </p>
 
               <div className="pt-2">
@@ -588,11 +590,11 @@ export const Home = () => {
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Check className="h-3.5 w-3.5 text-emerald-400" />
-                  Manage 100+ accounts
+                  Connect all your social accounts
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Check className="h-3.5 w-3.5 text-emerald-400" />
-                  Live analytics & verified post URLs
+                  Live view velocity & reach insights
                 </span>
               </div>
             </div>
@@ -624,7 +626,7 @@ export const Home = () => {
               How It Works
             </a>
             <a href="#roles" className="transition hover:text-white">
-              For Brands & Creators
+              Creators & Teams
             </a>
             <Link to="/privacy-policy" className="transition hover:text-white">
               Privacy Policy

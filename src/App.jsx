@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { BarChart3, CalendarPlus, Clock, FolderHeart, Link2, Megaphone, Settings as SettingsIcon } from 'lucide-react';
+import { BarChart3, CalendarPlus, Clock, FolderHeart, Home as HomeIcon, Link2, Megaphone, Settings as SettingsIcon } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
 import Home from './pages/Home';
@@ -12,6 +12,8 @@ import CalendarView from './pages/CalendarView';
 import ScheduleQueue from './pages/ScheduleQueue';
 import QueueManagement from './pages/QueueManagement';
 import Channels from './pages/Channels';
+import CreatorChannels from './pages/CreatorChannels';
+import AdminChannels from './pages/AdminChannels';
 import PublishedFeed from './pages/PublishedFeed';
 import PostDetails from './pages/PostDetails';
 import Settings from './pages/Settings';
@@ -32,6 +34,7 @@ import { BulkVideoBuilder } from './pages/BulkVideoBuilder';
 import OnboardingScreen from './pages/OnboardingScreen';
 import CreatorCampaigns from './pages/CreatorCampaigns';
 import CreatorSchedulePost from './pages/CreatorSchedulePost';
+import CreatorMedia from './pages/CreatorMedia';
 
 const VideoEditorV2 = lazy(() => import('./pages/videoEditorV2/VideoEditorV2'));
 
@@ -48,7 +51,8 @@ function MobileNav({ isCreator, canViewAdmin }) {
   const location = useLocation();
   const items = isCreator
     ? [
-        { name: 'Campaigns', path: '/campaigns', icon: Megaphone },
+        { name: 'Home', path: '/campaigns', icon: HomeIcon },
+        { name: 'Media', path: '/media', icon: FolderHeart },
         { name: 'Schedule', path: '/schedule', icon: CalendarPlus },
         { name: 'Analytics', path: '/analytics', icon: BarChart3 },
         { name: 'Channels', path: '/channels', icon: Link2 },
@@ -151,13 +155,14 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
             <>
               <Route path="/" element={<CreatorCampaigns />} />
               <Route path="/campaigns" element={<CreatorCampaigns />} />
+              <Route path="/media" element={<CreatorMedia />} />
               <Route path="/schedule" element={<CreatorSchedulePost />} />
               <Route path="/scheduler" element={<CalendarView selectedAccounts={selectedAccounts} />} />
               <Route path="/scheduler/new" element={canEditQueue ? <ScheduleQueue selectedAccounts={selectedAccounts} /> : <Navigate to="/scheduler" replace />} />
               <Route path="/scheduler/queue" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
               <Route path="/scheduler/queue/:accountId" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
               <Route path="/analytics" element={<CreatorAnalytics />} />
-              <Route path="/channels" element={<Channels selectedAccounts={selectedAccounts} />} />
+              <Route path="/channels" element={<CreatorChannels selectedAccounts={selectedAccounts} />} />
               <Route path="/channels/:id/feed" element={<PublishedFeed />} />
               <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
               <Route path="/settings" element={<Settings />} />
@@ -176,7 +181,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
               <Route path="/media/editor" element={<Suspense fallback={<TimelineEditorFallback />}><VideoEditorV2 /></Suspense>} />
               <Route path="/media/editor-v2" element={<Navigate to={`/media/editor${location.search}`} replace />} />
               <Route path="/media/bulk-builder" element={<BulkVideoBuilder />} />
-              <Route path="/channels" element={<Channels selectedAccounts={selectedAccounts} />} />
+              <Route path="/channels" element={<AdminChannels selectedAccounts={selectedAccounts} />} />
               <Route path="/channels/:id/feed" element={<PublishedFeed />} />
               <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
               <Route path="/settings" element={<Settings />} />

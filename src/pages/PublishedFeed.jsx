@@ -87,7 +87,7 @@ const getChannelAvatarSrc = (account) => {
 
   try {
     const parsedUrl = new URL(avatarUrl);
-    if (parsedUrl.hostname === 'media.theeasypost.com') {
+    if (parsedUrl.hostname === 'media.thousandpost.com') {
       return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(avatarUrl)}`;
     }
   } catch {
@@ -388,13 +388,13 @@ export const PublishedFeed = () => {
   const viewsStats = useMemo(() => {
     const now = renderNow;
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+
     const yesterdayStart = new Date(todayStart);
     yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-    
+
     const sevenDaysAgo = new Date(todayStart);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    
+
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     let today = 0;
@@ -407,9 +407,9 @@ export const PublishedFeed = () => {
       const publishedAt = getPublishedDate(post);
       const pubDate = publishedAt ? new Date(publishedAt) : null;
       const views = Number(post.views) || 0;
-      
+
       allTime += views;
-      
+
       if (pubDate) {
         if (pubDate >= todayStart) {
           today += views;
@@ -593,21 +593,19 @@ export const PublishedFeed = () => {
         <div className="mb-3 flex border-b border-white/[0.08] gap-4">
           <button
             onClick={() => setActiveTab('published')}
-            className={`pb-2 text-xs font-bold border-b-2 transition-colors ${
-              activeTab === 'published'
+            className={`pb-2 text-xs font-bold border-b-2 transition-colors ${activeTab === 'published'
                 ? 'border-white text-white'
                 : 'border-transparent text-zinc-400 hover:text-white'
-            }`}
+              }`}
           >
             Published Feed ({selectedGraphDate ? `${displayedPublishedPosts.length} of ${publishedPosts.length}` : publishedPosts.length})
           </button>
           <button
             onClick={() => setActiveTab('queued')}
-            className={`pb-2 text-xs font-bold border-b-2 transition-colors ${
-              activeTab === 'queued'
+            className={`pb-2 text-xs font-bold border-b-2 transition-colors ${activeTab === 'queued'
                 ? 'border-white text-white'
                 : 'border-transparent text-zinc-400 hover:text-white'
-            }`}
+              }`}
           >
             Scheduled Queue ({upcomingQueuedCount})
           </button>
@@ -649,63 +647,63 @@ export const PublishedFeed = () => {
               )}
               <div className="w-full overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#141417]/95 shadow-xl">
                 <div className="min-w-[620px]">
-                <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] gap-3 border-b border-white/[0.08] bg-black/40 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
-                  <span>Published</span>
-                  <span>Views</span>
-                  <span>Likes</span>
-                  <span>Comments</span>
-                  <span>Actions</span>
-                </div>
-                <div>
-                  {displayedPublishedPosts.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-zinc-400">
-                      No posts found for {selectedGraphDate}.
-                    </div>
-                  ) : (
-                    displayedPublishedPosts.map((post) => {
-                      const publishedDate = getPublishedDate(post);
-                      const publishedDisplay = formatPublishedDate(publishedDate);
-                      return (
-                        <div key={post.id} className="border-b border-white/[0.06] last:border-b-0">
-                          <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] items-center gap-3 px-3 py-2 text-xs transition hover:bg-white/[0.04] text-white">
-                            <div className="min-w-0">
-                              <p className="m-0 truncate font-semibold text-zinc-100">{publishedDisplay.date}</p>
-                              {publishedDisplay.time && (
-                                <p className="m-0 mt-0.5 text-[10px] font-semibold text-zinc-400">{publishedDisplay.time}</p>
-                              )}
-                            </div>
-                            <span className="font-semibold text-zinc-300">
-                              {post.views === null || post.views === undefined ? '—' : compactNumber(post.views)}
-                            </span>
-                            <span className="font-semibold text-zinc-300">{compactNumber(post.likes)}</span>
-                            <span className="font-semibold text-zinc-300">{compactNumber(post.comments)}</span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => openLivePost(post)}
-                                disabled={!post.permalink}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                                title={post.permalink ? 'Open live post' : 'Live-post link unavailable'}
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openInsights(post)}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] bg-white text-black transition hover:bg-zinc-200 shadow-sm"
-                                title="View performance insights"
-                              >
-                                <BarChart3 className="h-3.5 w-3.5" />
-                              </button>
+                  <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] gap-3 border-b border-white/[0.08] bg-black/40 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider text-zinc-400">
+                    <span>Published</span>
+                    <span>Views</span>
+                    <span>Likes</span>
+                    <span>Comments</span>
+                    <span>Actions</span>
+                  </div>
+                  <div>
+                    {displayedPublishedPosts.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-zinc-400">
+                        No posts found for {selectedGraphDate}.
+                      </div>
+                    ) : (
+                      displayedPublishedPosts.map((post) => {
+                        const publishedDate = getPublishedDate(post);
+                        const publishedDisplay = formatPublishedDate(publishedDate);
+                        return (
+                          <div key={post.id} className="border-b border-white/[0.06] last:border-b-0">
+                            <div className="grid grid-cols-[1fr_0.6fr_0.6fr_0.6fr_0.7fr] items-center gap-3 px-3 py-2 text-xs transition hover:bg-white/[0.04] text-white">
+                              <div className="min-w-0">
+                                <p className="m-0 truncate font-semibold text-zinc-100">{publishedDisplay.date}</p>
+                                {publishedDisplay.time && (
+                                  <p className="m-0 mt-0.5 text-[10px] font-semibold text-zinc-400">{publishedDisplay.time}</p>
+                                )}
+                              </div>
+                              <span className="font-semibold text-zinc-300">
+                                {post.views === null || post.views === undefined ? '—' : compactNumber(post.views)}
+                              </span>
+                              <span className="font-semibold text-zinc-300">{compactNumber(post.likes)}</span>
+                              <span className="font-semibold text-zinc-300">{compactNumber(post.comments)}</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openLivePost(post)}
+                                  disabled={!post.permalink}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                                  title={post.permalink ? 'Open live post' : 'Live-post link unavailable'}
+                                >
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openInsights(post)}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-[6px] bg-white text-black transition hover:bg-zinc-200 shadow-sm"
+                                  title="View performance insights"
+                                >
+                                  <BarChart3 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })
-                  )}
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
             </div>
           )
         ) : (

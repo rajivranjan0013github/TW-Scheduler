@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
-import { Clock, FolderHeart, Film, Layers, Link2, Settings as SettingsIcon, X, Megaphone, Users, BarChart3, CalendarPlus } from 'lucide-react';
+import { Clock, FolderHeart, Film, Layers, Link2, Settings as SettingsIcon, X, Megaphone, Users, BarChart3, CalendarPlus, Home } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { withCampaignScope } from '../utils/campaignScope';
 import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
@@ -146,7 +146,8 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
   const isCreator = user?.userType === 'account_handler';
 
   const navItems = isCreator ? [
-    { name: 'My Campaigns', label: 'Campaigns', path: '/campaigns', icon: Megaphone },
+    { name: 'Home', label: 'Home', path: '/campaigns', icon: Home },
+    { name: 'My Media', label: 'Media', path: '/media', icon: FolderHeart },
     { name: 'Schedule Post', label: 'Schedule', path: '/schedule', icon: CalendarPlus },
     { name: 'Analytics', label: 'Analytics', path: '/analytics', icon: BarChart3 },
     { name: 'My Channels', label: 'Channels', path: '/channels', icon: Link2 },
@@ -176,26 +177,32 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
       
       {/* Navigation */}
       <nav className="flex-1 space-y-1.5 overflow-y-auto p-2 scrollbar-none">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.name}
-            to={item.path}
-            end
-            title={item.name}
-            className={({ isActive }) =>
-              `flex h-12 flex-col items-center justify-center gap-0.5 rounded-[12px] px-1 transition-all duration-200 ${
-                isActive
-                  ? 'bg-white text-black font-semibold shadow-sm scale-[1.02]'
-                  : 'text-zinc-400 hover:bg-white/[0.05] hover:text-white hover:scale-[1.02]'
-              }`
-            }
-          >
-            <item.icon className="h-5 w-5 flex-shrink-0 transition-transform" />
-            <span className="max-w-full truncate text-[10px] font-semibold leading-none">
-              {item.label}
-            </span>
-          </NavLink>
-        ))}
+        {navItems.map((item) => {
+          const isItemActive = item.path === '/campaigns'
+            ? (location.pathname === '/' || location.pathname === '/campaigns')
+            : (item.path === '/' ? location.pathname === '/' : (location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)));
+
+          return (
+            <NavLink
+              key={item.name}
+              to={item.path}
+              end
+              title={item.name}
+              className={() =>
+                `flex h-12 flex-col items-center justify-center gap-0.5 rounded-[12px] px-1 transition-all duration-200 ${
+                  isItemActive
+                    ? 'bg-white text-black font-semibold shadow-sm scale-[1.02]'
+                    : 'text-zinc-400 hover:bg-white/[0.05] hover:text-white hover:scale-[1.02]'
+                }`
+              }
+            >
+              <item.icon className="h-5 w-5 flex-shrink-0 transition-transform" />
+              <span className="max-w-full truncate text-[10px] font-semibold leading-none">
+                {item.label}
+              </span>
+            </NavLink>
+          );
+        })}
 
         {managerItems.length > 0 && (
           <div className="mt-2.5 pt-2 space-y-1.5">

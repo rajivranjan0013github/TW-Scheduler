@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import {
   UploadCloud,
   Calendar,
@@ -14,11 +15,16 @@ import {
   Zap,
   Smartphone,
   Check,
+  FolderHeart,
+  Play,
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
-import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
+import { getHandlerPreviewContext, withHandlerPreviewHeaders } from '../utils/handlerPreview';
+import { getMediaUrl } from '../utils/mediaUrls';
+import { useAuth } from '../context/AuthContext';
 import PlatformIcon from '../components/PlatformIcon';
 import { AccountAvatar } from '../components/adminDashboard/DashboardPresentation';
+import LoadingVideoPreview from '../components/LoadingVideoPreview';
 
 const formatHandle = (raw = '') => {
   const clean = String(raw || '').replace(/^@+/, '');
@@ -38,6 +44,14 @@ const getChannelKey = (channel = {}) => {
   return `${platform}:${handle}`;
 };
 
+const cancellablePostStatuses = new Set([
+  'scheduled',
+  'manual_ready',
+  'downloaded',
+  'paused',
+  'posted_manual',
+]);
+
 const formatScheduledDate = (dateStr) => {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -50,6 +64,64 @@ const formatScheduledDate = (dateStr) => {
     minute: '2-digit',
     hour12: true,
   });
+};
+
+const getPostStatusInfo = (post) => {
+  const status = post?.status || 'scheduled';
+  switch (status) {
+    case 'manual_ready':
+      return {
+        label: 'Ready to Post',
+        color: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+        icon: CheckCircle2,
+      };
+    case 'downloaded':
+      return {
+        label: 'Downloaded',
+        color: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+        icon: CheckCircle2,
+      };
+    case 'publishing':
+      return {
+        label: 'Publishing',
+        color: 'bg-purple-500/15 text-purple-300 border-purple-500/30 animate-pulse',
+        icon: Loader2,
+        spin: true,
+      };
+    case 'failed':
+      return {
+        label: 'Failed',
+        color: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+        icon: AlertCircle,
+      };
+    case 'paused':
+      return {
+        label: 'Paused',
+        color: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+        icon: Clock,
+      };
+    case 'published':
+    case 'published_auto':
+    case 'posted_manual':
+      return {
+        label: 'Published',
+        color: 'bg-teal-500/15 text-teal-300 border-teal-500/30',
+        icon: CheckCircle2,
+      };
+    case 'cancelled':
+      return {
+        label: 'Cancelled',
+        color: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
+        icon: AlertCircle,
+      };
+    case 'scheduled':
+    default:
+      return {
+        label: 'Scheduled',
+        color: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+        icon: Clock,
+      };
+  }
 };
 
 const getMinDateTimeString = () => {
@@ -75,19 +147,31 @@ const getDefaultDateTimeString = () => {
 
 export const CreatorSchedulePost = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const fileInputRef = useRef(null);
+  const handlerPreviewUserId = getHandlerPreviewContext()?.userId || '';
+
+  const location = useLocation();
+  const preselected = location.state?.preselectedMedia;
 
   // Form State
   const [selectedChannelIds, setSelectedChannelIds] = useState([]);
+  const [selectedMediaAsset, setSelectedMediaAsset] = useState(preselected || null);
   const [file, setFile] = useState(null);
-  const [filePreviewUrl, setFilePreviewUrl] = useState('');
-  const [caption, setCaption] = useState('');
+  const [filePreviewUrl, setFilePreviewUrl] = useState(
+    preselected ? getMediaUrl(preselected.url, { apiBaseUrl: API_BASE_URL }) : ''
+  );
+  const [caption, setCaption] = useState(preselected?.caption || '');
   const [scheduledAt, setScheduledAt] = useState(getDefaultDateTimeString());
   const [dateError, setDateError] = useState('');
-  const [postType, setPostType] = useState('reels');
+  const [postType, setPostType] = useState(preselected?.type === 'video' ? 'reels' : 'post');
   const [scheduleMode, setScheduleMode] = useState('auto');
   const [submittingStep, setSubmittingStep] = useState('');
   const [statusMessage, setStatusMessage] = useState(null);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
+  const [videoModalUrl, setVideoModalUrl] = useState('');
+  const [queueFilter, setQueueFilter] = useState('all');
+  const [previewPost, setPreviewPost] = useState(null);
 
   // 1. Fetch Creator Campaigns and Channels
   const creatorCampaignsQuery = useQuery({
@@ -123,10 +207,33 @@ export const CreatorSchedulePost = () => {
   const availableChannels = useMemo(() => {
     const rawAccounts = Array.isArray(accountsQuery.data) ? accountsQuery.data : [];
     const campaigns = Array.isArray(creatorCampaignsQuery.data) ? creatorCampaignsQuery.data : [];
+    const ownedAccounts = rawAccounts.filter((account) => (
+      String(account?.userId?._id || account?.userId || '') === String(user?._id || '')
+    ));
 
     const list = [];
-    const seenAccountIds = new Set();
-    const seenChannelKeys = new Set();
+    const seenTargets = new Set();
+
+    // Personal accounts come first so creators can publish independently by default.
+    ownedAccounts.forEach((acc) => {
+      const accountId = String(acc._id || '');
+      const targetKey = `personal:${accountId || getChannelKey(acc)}`;
+      if (!accountId || seenTargets.has(targetKey)) return;
+      seenTargets.add(targetKey);
+
+      list.push({
+        _id: targetKey,
+        campaignId: null,
+        campaignName: 'Personal',
+        campaignChannelId: null,
+        socialAccountId: acc._id,
+        platform: acc.platform,
+        name: acc.name || acc.displayName || acc.username || 'Channel',
+        username: acc.username || '',
+        avatarUrl: acc.avatarUrl || acc.profilePictureUrl || '',
+        isConnected: acc.isConnected !== false,
+      });
+    });
 
     campaigns.forEach((camp) => {
       (camp.channels || []).forEach((ch) => {
@@ -134,16 +241,12 @@ export const CreatorSchedulePost = () => {
         const channelKey = getChannelKey(ch);
         const socialId = ch.socialAccountId ? String(ch.socialAccountId) : null;
         const channelId = String(ch._id || '');
-
-        if (socialId && seenAccountIds.has(socialId)) return;
-        if (channelKey && seenChannelKeys.has(channelKey)) return;
-
-        if (socialId) seenAccountIds.add(socialId);
-        if (channelId) seenAccountIds.add(channelId);
-        if (channelKey) seenChannelKeys.add(channelKey);
+        const targetKey = `campaign:${camp._id}:${channelId || socialId || channelKey}`;
+        if (seenTargets.has(targetKey)) return;
+        seenTargets.add(targetKey);
 
         list.push({
-          _id: ch._id,
+          _id: targetKey,
           campaignId: camp._id,
           campaignName: camp.name,
           campaignChannelId: ch._id,
@@ -157,46 +260,33 @@ export const CreatorSchedulePost = () => {
       });
     });
 
-    rawAccounts.forEach((acc) => {
-      const accId = String(acc._id || '');
-      const channelKey = getChannelKey(acc);
-
-      if (accId && seenAccountIds.has(accId)) return;
-      if (channelKey && seenChannelKeys.has(channelKey)) return;
-
-      if (accId) seenAccountIds.add(accId);
-      if (channelKey) seenChannelKeys.add(channelKey);
-
-      list.push({
-        _id: acc._id,
-        campaignId: campaigns[0]?._id || null,
-        campaignName: campaigns[0]?.name || '',
-        campaignChannelId: null,
-        socialAccountId: acc._id,
-        platform: acc.platform,
-        name: acc.name || acc.displayName || acc.username || 'Channel',
-        username: acc.username || '',
-        avatarUrl: acc.avatarUrl || acc.profilePictureUrl || '',
-        isConnected: acc.isConnected !== false,
-      });
-    });
-
     return list;
-  }, [creatorCampaignsQuery.data, accountsQuery.data]);
+  }, [creatorCampaignsQuery.data, accountsQuery.data, user?._id]);
 
   // Effective selection logic (defaults to first channel if none explicitly selected)
   const effectiveSelectedIds = useMemo(() => {
     if (selectedChannelIds.length === 0 && availableChannels.length > 0) {
-      return [availableChannels[0]._id];
+      const preselectedCampaignId = String(preselected?.campaignId?._id || preselected?.campaignId || '');
+      const matchingChannel = availableChannels.find((channel) => (
+        preselected?.scope === 'personal'
+          ? !channel.campaignId
+          : preselectedCampaignId && String(channel.campaignId || '') === preselectedCampaignId
+      ));
+      return [matchingChannel?._id || availableChannels[0]._id];
     }
     return selectedChannelIds;
-  }, [selectedChannelIds, availableChannels]);
+  }, [selectedChannelIds, availableChannels, preselected]);
 
   const selectedChannels = useMemo(() => {
     return availableChannels.filter((c) => effectiveSelectedIds.includes(c._id));
   }, [availableChannels, effectiveSelectedIds]);
 
   const activeChannel = selectedChannels[0] || availableChannels[0] || null;
+  const selectableChannelCount = new Set(
+    availableChannels.map((channel) => (
+      channel.socialAccountId ? `account:${channel.socialAccountId}` : `target:${channel._id}`
+    ))
+  ).size;
 
   const toggleChannel = (channelId) => {
     setSelectedChannelIds((prev) => {
@@ -206,26 +296,66 @@ export const CreatorSchedulePost = () => {
       if (current.includes(channelId)) {
         return current.filter((id) => id !== channelId);
       } else {
-        return [...current, channelId];
+        const target = availableChannels.find((channel) => channel._id === channelId);
+        const withoutDuplicateAccount = target?.socialAccountId
+          ? current.filter((id) => {
+            const selected = availableChannels.find((channel) => channel._id === id);
+            return String(selected?.socialAccountId || '') !== String(target.socialAccountId);
+          })
+          : current;
+        return [...withoutDuplicateAccount, channelId];
       }
     });
   };
 
   const selectAllChannels = () => {
-    if (effectiveSelectedIds.length === availableChannels.length) {
+    const seenSocialAccountIds = new Set();
+    const selectableIds = availableChannels
+      .filter((channel) => {
+        const socialAccountId = String(channel.socialAccountId || '');
+        if (!socialAccountId) return true;
+        if (seenSocialAccountIds.has(socialAccountId)) return false;
+        seenSocialAccountIds.add(socialAccountId);
+        return true;
+      })
+      .map((channel) => channel._id);
+    if (selectableIds.every((id) => effectiveSelectedIds.includes(id))) {
       setSelectedChannelIds([]);
     } else {
-      setSelectedChannelIds(availableChannels.map((c) => c._id));
+      setSelectedChannelIds(selectableIds);
     }
   };
 
-  // 3. Fetch Upcoming Scheduled Posts for this creator
+  // 3. Fetch queue posts belonging to this creator/handler only.
   const scheduledPostsQuery = useQuery({
-    queryKey: ['creator', 'scheduled-posts'],
+    queryKey: ['creator', handlerPreviewUserId, 'scheduled-posts'],
     queryFn: async () => {
-      const campaignId = activeChannel?.campaignId || availableChannels[0]?.campaignId;
-      if (!campaignId) return [];
-      const res = await fetch(`${API_BASE_URL}/api/scheduler?campaignId=${campaignId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/scheduler/creator/posts`, {
+        headers: withHandlerPreviewHeaders({
+          Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
+        }),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.message || 'Failed to fetch your scheduled queue.');
+      }
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 30 * 1000,
+  });
+
+  // 4. Fetch Creator's Media Library for in-form picker
+  const targetCampaignIdForMedia = activeChannel?.campaignId || null;
+  const mediaScopeKey = targetCampaignIdForMedia || 'personal';
+  const creatorMediaQuery = useQuery({
+    queryKey: ['creator', 'schedule', 'media-library', mediaScopeKey],
+    queryFn: async () => {
+      if (!activeChannel) return [];
+      const mediaQuery = targetCampaignIdForMedia
+        ? `campaignId=${encodeURIComponent(targetCampaignIdForMedia)}&onlyMyUploads=true`
+        : 'scope=personal&onlyMyUploads=true';
+      const res = await fetch(`${API_BASE_URL}/api/media?${mediaQuery}`, {
         headers: withHandlerPreviewHeaders({
           Authorization: `Bearer ${localStorage.getItem('tw_token')}`,
         }),
@@ -234,7 +364,7 @@ export const CreatorSchedulePost = () => {
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     },
-    enabled: Boolean(activeChannel?.campaignId || availableChannels[0]?.campaignId),
+    enabled: Boolean(showMediaPicker && activeChannel),
     staleTime: 30 * 1000,
   });
 
@@ -248,16 +378,18 @@ export const CreatorSchedulePost = () => {
       return;
     }
 
-    if (filePreviewUrl) {
+    if (filePreviewUrl && filePreviewUrl.startsWith('blob:')) {
       URL.revokeObjectURL(filePreviewUrl);
     }
 
     const preview = URL.createObjectURL(selected);
+    setSelectedMediaAsset(null);
     setFile(selected);
     setFilePreviewUrl(preview);
     setStatusMessage(null);
 
-    if (selected.type.startsWith('video/')) {
+    const isVideoFile = selected.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|m4v)$/i.test(selected.name);
+    if (isVideoFile) {
       setPostType('reels');
     } else {
       setPostType('post');
@@ -265,14 +397,28 @@ export const CreatorSchedulePost = () => {
   };
 
   const handleClearFile = () => {
-    if (filePreviewUrl) {
+    if (filePreviewUrl && filePreviewUrl.startsWith('blob:')) {
       URL.revokeObjectURL(filePreviewUrl);
     }
     setFile(null);
+    setSelectedMediaAsset(null);
     setFilePreviewUrl('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleSelectFromLibrary = (item) => {
+    if (filePreviewUrl && filePreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(filePreviewUrl);
+    }
+    setFile(null);
+    setSelectedMediaAsset(item);
+    setFilePreviewUrl(getMediaUrl(item.url, { apiBaseUrl: API_BASE_URL }));
+    setPostType(item.type === 'video' ? 'reels' : 'post');
+    if (!caption && item.caption) setCaption(item.caption);
+    setShowMediaPicker(false);
+    setStatusMessage(null);
   };
 
   const applyQuickTime = (type) => {
@@ -337,8 +483,8 @@ export const CreatorSchedulePost = () => {
       return;
     }
 
-    if (!file) {
-      setStatusMessage({ type: 'error', text: 'Please upload a video or photo from your device.' });
+    if (!file && !selectedMediaAsset) {
+      setStatusMessage({ type: 'error', text: 'Please upload or select a video or photo.' });
       return;
     }
 
@@ -357,7 +503,7 @@ export const CreatorSchedulePost = () => {
       // Group selected channels by campaignId
       const campaignGroups = new Map();
       selectedChannels.forEach((ch) => {
-        const cId = ch.campaignId || availableChannels[0]?.campaignId;
+        const cId = ch.campaignId || null;
         if (!campaignGroups.has(cId)) {
           campaignGroups.set(cId, []);
         }
@@ -365,36 +511,47 @@ export const CreatorSchedulePost = () => {
       });
 
       for (const [targetCampaignId, channelsInCampaign] of campaignGroups.entries()) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('campaignId', targetCampaignId);
-        formData.append('sourceUsage', 'schedule');
-        formData.append('tags', 'schedule,generated');
-        if (caption) formData.append('caption', caption);
+        let mediaId = selectedMediaAsset?._id;
 
-        const uploadHeaders = withHandlerPreviewHeaders({
-          Authorization: `Bearer ${token}`,
-        });
+        if (!mediaId) {
+          const formData = new FormData();
+          formData.append('file', file);
+          if (targetCampaignId) {
+            formData.append('campaignId', targetCampaignId);
+          } else {
+            formData.append('scope', 'personal');
+          }
+          formData.append('sourceUsage', 'schedule');
+          formData.append('tags', 'creator,schedule,generated');
+          if (caption) formData.append('caption', caption);
 
-        const uploadRes = await fetch(`${API_BASE_URL}/api/media/upload?campaignId=${targetCampaignId}`, {
-          method: 'POST',
-          headers: uploadHeaders,
-          body: formData,
-        });
+          const uploadHeaders = withHandlerPreviewHeaders({
+            Authorization: `Bearer ${token}`,
+          });
 
-        if (!uploadRes.ok) {
-          const err = await uploadRes.json().catch(() => ({}));
-          throw new Error(err.message || 'Failed to upload media from device.');
+          const uploadQuery = targetCampaignId
+            ? `campaignId=${encodeURIComponent(targetCampaignId)}`
+            : 'scope=personal';
+          const uploadRes = await fetch(`${API_BASE_URL}/api/media/upload?${uploadQuery}`, {
+            method: 'POST',
+            headers: uploadHeaders,
+            body: formData,
+          });
+
+          if (!uploadRes.ok) {
+            const err = await uploadRes.json().catch(() => ({}));
+            throw new Error(err.message || 'Failed to upload media from device.');
+          }
+
+          const mediaData = await uploadRes.json();
+          mediaId = mediaData._id;
         }
-
-        const mediaData = await uploadRes.json();
-        const mediaId = mediaData._id;
 
         setSubmittingStep('scheduling');
 
         const channelTargets = channelsInCampaign.map((c) => ({
           socialAccountId: c.socialAccountId || null,
-          campaignChannelId: c.campaignChannelId || c._id,
+          campaignChannelId: targetCampaignId ? (c.campaignChannelId || c._id) : null,
         }));
 
         const scheduleRes = await fetch(`${API_BASE_URL}/api/scheduler`, {
@@ -404,9 +561,11 @@ export const CreatorSchedulePost = () => {
             Authorization: `Bearer ${token}`,
           }),
           body: JSON.stringify({
-            campaignId: targetCampaignId,
+            ...(targetCampaignId ? { campaignId: targetCampaignId } : {}),
             socialAccountIds: channelsInCampaign.map((c) => c.socialAccountId).filter(Boolean),
-            campaignChannelIds: channelsInCampaign.map((c) => c.campaignChannelId || c._id).filter(Boolean),
+            campaignChannelIds: targetCampaignId
+              ? channelsInCampaign.map((c) => c.campaignChannelId || c._id).filter(Boolean)
+              : [],
             channelTargets,
             mediaIds: [mediaId],
             caption: caption.trim(),
@@ -433,7 +592,7 @@ export const CreatorSchedulePost = () => {
       handleClearFile();
       setCaption('');
       setScheduledAt(getDefaultDateTimeString());
-      queryClient.invalidateQueries({ queryKey: ['creator', 'scheduled-posts'] });
+      queryClient.invalidateQueries({ queryKey: ['creator', handlerPreviewUserId, 'scheduled-posts'] });
     } catch (err) {
       console.error('Scheduling error:', err);
       setStatusMessage({ type: 'error', text: err.message || 'An error occurred while scheduling.' });
@@ -443,10 +602,10 @@ export const CreatorSchedulePost = () => {
   };
 
   const deleteMutation = useMutation({
-    mutationFn: async (postId) => {
+    mutationFn: async ({ postId, campaignId }) => {
       const token = localStorage.getItem('tw_token');
-      const targetCampaignId = activeChannel?.campaignId || availableChannels[0]?.campaignId;
-      const res = await fetch(`${API_BASE_URL}/api/scheduler/${postId}?campaignId=${targetCampaignId}`, {
+      const campaignQuery = campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : '';
+      const res = await fetch(`${API_BASE_URL}/api/scheduler/${postId}${campaignQuery}`, {
         method: 'DELETE',
         headers: withHandlerPreviewHeaders({
           Authorization: `Bearer ${token}`,
@@ -459,7 +618,7 @@ export const CreatorSchedulePost = () => {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['creator', 'scheduled-posts'] });
+      queryClient.invalidateQueries({ queryKey: ['creator', handlerPreviewUserId, 'scheduled-posts'] });
       setStatusMessage({ type: 'success', text: 'Scheduled post cancelled.' });
     },
     onError: (err) => {
@@ -468,10 +627,63 @@ export const CreatorSchedulePost = () => {
   });
 
   const scheduledPosts = scheduledPostsQuery.data;
-  const upcomingPosts = useMemo(() => {
+  const allQueuePosts = useMemo(() => {
     const list = Array.isArray(scheduledPosts) ? scheduledPosts : [];
-    return list.filter((p) => !['published', 'published_auto', 'posted_manual', 'cancelled'].includes(p.status));
-  }, [scheduledPosts]);
+    return list.filter((post) => {
+      // The creator endpoint scopes ownership/assignment. Keep only posts whose
+      // publishing target is currently connected. Older/manual queue records may
+      // carry the connected account through campaignChannelIds instead.
+      const hasConnectedAccount = (post.socialAccountIds || []).some((account) => {
+        if (account && typeof account === 'object') {
+          return account.isConnected !== false;
+        }
+
+        return availableChannels.some((channel) => (
+          channel.isConnected
+          && String(channel.socialAccountId || '') === String(account || '')
+        ));
+      });
+
+      if (hasConnectedAccount) return true;
+
+      return (post.campaignChannelIds || []).some((campaignChannel) => {
+        const linkedAccount = campaignChannel?.socialAccountId;
+        if (linkedAccount && typeof linkedAccount === 'object') {
+          return linkedAccount.isConnected !== false;
+        }
+
+        const linkedAccountId = String(linkedAccount || '');
+        return Boolean(linkedAccountId) && availableChannels.some((channel) => (
+          channel.isConnected
+          && String(channel.socialAccountId || '') === linkedAccountId
+        ));
+      });
+    });
+  }, [scheduledPosts, availableChannels]);
+
+  const selectedQueuePosts = useMemo(() => {
+    const selectedIds = new Set(
+      selectedChannels.map((c) => String(c.campaignChannelId || '')).filter(Boolean)
+    );
+    const selectedSocialIds = new Set(
+      selectedChannels.map((c) => String(c.socialAccountId || '')).filter(Boolean)
+    );
+
+    return allQueuePosts.filter((p) => {
+      if (selectedIds.size > 0 || selectedSocialIds.size > 0) {
+        const pChanIds = (p.campaignChannelIds || []).map((c) => String(c?._id || c));
+        const pAccIds = (p.socialAccountIds || []).map((a) => String(a?._id || a));
+
+        const matchesChannel = pChanIds.some((id) => selectedIds.has(id));
+        const matchesAccount = pAccIds.some((id) => selectedSocialIds.has(id));
+
+        return matchesChannel || matchesAccount;
+      }
+      return true;
+    });
+  }, [allQueuePosts, selectedChannels]);
+
+  const visibleQueuePosts = queueFilter === 'selected' ? selectedQueuePosts : allQueuePosts;
 
   return (
     <div className="min-h-screen bg-[#0c0c0e] text-zinc-100 p-4 sm:p-6 md:p-8 space-y-6 font-sans antialiased">
@@ -524,7 +736,7 @@ export const CreatorSchedulePost = () => {
                 onClick={selectAllChannels}
                 className="text-[11px] font-medium text-purple-400 hover:text-purple-300 transition"
               >
-                {effectiveSelectedIds.length === availableChannels.length ? 'Deselect all' : 'Select all'}
+                {effectiveSelectedIds.length === selectableChannelCount ? 'Deselect all' : 'Select all'}
               </button>
             )}
           </div>
@@ -564,7 +776,7 @@ export const CreatorSchedulePost = () => {
                       <div className="min-w-0">
                         <p className="m-0 text-xs font-semibold leading-tight truncate">{channel.name}</p>
                         <p className="m-0 text-[10px] text-zinc-500 font-normal leading-tight truncate">
-                          {formatHandle(channel.username || channel.name)}
+                          {formatHandle(channel.username || channel.name)} · {channel.campaignName || 'Personal'}
                         </p>
                       </div>
                       {isSelected && (
@@ -580,13 +792,13 @@ export const CreatorSchedulePost = () => {
           )}
         </div>
 
-        {/* Device Media Upload */}
+        {/* Device Media Upload or Choose from Library */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
               Media
             </label>
-            {file && (
+            {(file || selectedMediaAsset) && (
               <button
                 type="button"
                 onClick={handleClearFile}
@@ -608,40 +820,139 @@ export const CreatorSchedulePost = () => {
           />
 
           {!filePreviewUrl ? (
-            <label
-              htmlFor="creator-file-input"
-              className="flex flex-col items-center justify-center border border-dashed border-white/15 hover:border-white/30 bg-white/[0.02] hover:bg-white/[0.04] rounded-xl p-8 cursor-pointer transition text-center"
-            >
-              <UploadCloud className="h-6 w-6 text-zinc-400 mb-2" />
-              <p className="text-xs font-semibold text-white m-0">
-                Choose video or photo from this device
-              </p>
-              <p className="text-[11px] text-zinc-500 mt-1 m-0">
-                MP4, MOV, WEBM, JPG, PNG (up to 500MB)
-              </p>
-            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label
+                htmlFor="creator-file-input"
+                className="flex flex-col items-center justify-center border border-dashed border-white/15 hover:border-white/30 bg-white/[0.02] hover:bg-white/[0.04] rounded-xl p-6 cursor-pointer transition text-center"
+              >
+                <UploadCloud className="h-6 w-6 text-zinc-400 mb-2" />
+                <p className="text-xs font-semibold text-white m-0">
+                  Upload from this device
+                </p>
+                <p className="text-[10px] text-zinc-500 mt-1 m-0">
+                  MP4, MOV, WEBM, JPG, PNG (up to 500MB)
+                </p>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setShowMediaPicker(true)}
+                className="flex flex-col items-center justify-center border border-dashed border-white/15 hover:border-purple-500/40 bg-white/[0.02] hover:bg-purple-500/[0.04] rounded-xl p-6 transition text-center group cursor-pointer"
+              >
+                <FolderHeart className="h-6 w-6 text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
+                <p className="text-xs font-semibold text-white m-0">
+                  Choose from My Media
+                </p>
+                <p className="text-[10px] text-zinc-500 mt-1 m-0">
+                  Select previously uploaded media
+                </p>
+              </button>
+            </div>
           ) : (
             <div className="space-y-2">
-              <div className="rounded-xl overflow-hidden bg-black/60 border border-white/10 flex items-center justify-center max-h-72">
-                {file?.type.startsWith('video/') ? (
-                  <video
-                    src={filePreviewUrl}
-                    controls
-                    playsInline
-                    className="max-h-72 w-auto object-contain rounded-lg"
-                  />
+              <div className="rounded-2xl overflow-hidden bg-black/60 border border-white/10 flex items-center justify-center p-3 min-h-[240px]">
+                {postType === 'reels' || Boolean(file?.type?.startsWith('video/')) || /\.(mp4|mov|webm|mkv|m4v)$/i.test(file?.name || '') || selectedMediaAsset?.type === 'video' ? (
+                  <div
+                    className={`group relative ${
+                      postType === 'reels' ? 'h-72 aspect-[9/16]' : 'h-64 aspect-video'
+                    } max-w-full rounded-xl overflow-hidden bg-black border border-white/15 shadow-2xl cursor-pointer flex items-center justify-center`}
+                    onClick={() => setVideoModalUrl(filePreviewUrl)}
+                    onMouseEnter={(e) => {
+                      const video = e.currentTarget.querySelector('video');
+                      if (video) {
+                        video.muted = false;
+                        video.play().catch(() => {
+                          video.muted = true;
+                          video.play().catch(() => {});
+                        });
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      const video = e.currentTarget.querySelector('video');
+                      if (video) {
+                        video.pause();
+                        video.currentTime = 0;
+                      }
+                    }}
+                    title="Hover to preview with sound • Click to expand"
+                  >
+                    <LoadingVideoPreview
+                      src={filePreviewUrl}
+                      crossOrigin={filePreviewUrl?.startsWith('blob:') || filePreviewUrl?.startsWith('data:') ? undefined : 'anonymous'}
+                      className="h-full w-full"
+                      videoClassName="h-full w-full object-cover"
+                      playsInline
+                      preload="metadata"
+                      poster={
+                        selectedMediaAsset?.thumbnailUrl
+                          ? getMediaUrl(selectedMediaAsset.thumbnailUrl, { apiBaseUrl: API_BASE_URL })
+                          : undefined
+                      }
+                    />
+
+                    {/* Centered Play Indicator (fades out while hovering/playing) */}
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/25 group-hover:opacity-0 transition-opacity z-10">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/70 border border-white/25 text-white shadow-xl shadow-black/50 backdrop-blur-sm group-hover:scale-110 transition-transform">
+                        <Play className="h-5 w-5 fill-white text-white ml-0.5" />
+                      </div>
+                    </div>
+
+                    {/* Video / Reel Tag */}
+                    <div className="pointer-events-none absolute top-2.5 right-2.5 z-10">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-black/80 border border-white/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-purple-300 backdrop-blur-md shadow-sm">
+                        <Video className="h-2.5 w-2.5 text-purple-400" />
+                        {postType === 'reels' ? 'Reel' : 'Video'}
+                      </span>
+                    </div>
+
+                    {/* From My Media Badge */}
+                    {selectedMediaAsset && (
+                      <div className="pointer-events-none absolute top-2.5 left-2.5 z-10">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-purple-600/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white backdrop-blur-md shadow-sm">
+                          <FolderHeart className="h-2.5 w-2.5" />
+                          From My Media
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Hover/Click Hint */}
+                    <div className="pointer-events-none absolute bottom-2.5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">
+                      <span className="rounded-full bg-black/85 border border-white/15 px-2.5 py-1 text-[10px] text-zinc-300 backdrop-blur-md shadow-md">
+                        Hover to preview • Click to expand
+                      </span>
+                    </div>
+                  </div>
                 ) : (
-                  <img
-                    src={filePreviewUrl}
-                    alt="Preview"
-                    className="max-h-72 w-auto object-contain rounded-lg"
-                  />
+                  <div className="relative h-72 max-w-full flex items-center justify-center overflow-hidden rounded-xl">
+                    <img
+                      src={filePreviewUrl}
+                      alt="Preview"
+                      className="h-full w-auto object-contain rounded-xl"
+                    />
+                    {selectedMediaAsset && (
+                      <div className="pointer-events-none absolute top-2.5 left-2.5 z-10">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-purple-600/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white backdrop-blur-md shadow-sm">
+                          <FolderHeart className="h-2.5 w-2.5" />
+                          From My Media
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
               <div className="flex items-center justify-between px-1 text-xs text-zinc-400">
-                <span className="truncate">{file?.name}</span>
-                <span className="shrink-0 ml-2">({(file?.size / (1024 * 1024)).toFixed(1)} MB)</span>
+                <div className="flex items-center gap-2 truncate">
+                  <span className="truncate">{file?.name || selectedMediaAsset?.name}</span>
+                  {(file?.type?.startsWith('video/') || selectedMediaAsset?.type === 'video') && (
+                    <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 font-medium">
+                      Video Preview
+                    </span>
+                  )}
+                </div>
+                {file?.size ? (
+                  <span className="shrink-0 ml-2">({(file.size / (1024 * 1024)).toFixed(1)} MB)</span>
+                ) : null}
               </div>
             </div>
           )}
@@ -653,7 +964,7 @@ export const CreatorSchedulePost = () => {
             <label htmlFor="caption-input" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
               Caption
             </label>
-            {file?.type.startsWith('video/') && (
+            {(file?.type?.startsWith('video/') || selectedMediaAsset?.type === 'video') && (
               <div className="flex items-center gap-1.5 text-xs">
                 <button
                   type="button"
@@ -815,91 +1126,545 @@ export const CreatorSchedulePost = () => {
         </div>
       </form>
 
-      {/* Upcoming Scheduled Posts (Clean borderless list, only if posts exist) */}
-      {upcomingPosts.length > 0 && (
-        <div className="pt-8 border-t border-white/10 space-y-4">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
-            <Clock className="h-3.5 w-3.5" />
-            <span>Upcoming Scheduled ({upcomingPosts.length})</span>
+      {/* Complete creator/handler queue for connected accounts */}
+      <div className="pt-8 border-t border-white/10 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
+              <Clock className="h-3.5 w-3.5" />
+              <span>Post Queue ({visibleQueuePosts.length})</span>
+            </div>
+
+            {/* Filter Toggle: All vs Selected Channel */}
+            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 text-xs">
+              <button
+                type="button"
+                onClick={() => setQueueFilter('all')}
+                className={`px-3 py-1 rounded-lg font-medium transition ${
+                  queueFilter === 'all'
+                    ? 'bg-[#7831d6] text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                All Connected Accounts ({allQueuePosts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueueFilter('selected')}
+                className={`px-3 py-1 rounded-lg font-medium transition ${
+                  queueFilter === 'selected'
+                    ? 'bg-[#7831d6] text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Selected Channel ({selectedQueuePosts.length})
+              </button>
+            </div>
           </div>
 
-          <div className="divide-y divide-white/10">
-            {upcomingPosts.map((post) => {
-              const targetChannel = availableChannels.find((c) => (
-                (post.campaignChannelIds || []).includes(c._id) ||
-                (post.socialAccountIds || []).includes(c.socialAccountId)
-              )) || availableChannels[0];
-
-              const mediaItem = post.mediaIds?.[0];
-              const mediaUrl = typeof mediaItem === 'object' ? mediaItem?.url : '';
-              const isVideo = mediaItem?.type === 'video';
-
-              return (
-                <div
-                  key={post._id}
-                  className="py-3 flex items-center justify-between gap-3"
+          {scheduledPostsQuery.isLoading ? (
+            <div className="flex items-center justify-center gap-2 p-6 text-xs text-zinc-400">
+              <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+              <span>Loading your post queue...</span>
+            </div>
+          ) : scheduledPostsQuery.isError ? (
+            <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-xs text-rose-300">
+              {scheduledPostsQuery.error?.message || 'Failed to load your scheduled queue.'}
+            </div>
+          ) : visibleQueuePosts.length === 0 ? (
+            <div className="p-6 rounded-xl border border-white/10 bg-white/[0.02] text-center space-y-2">
+              <p className="text-xs text-zinc-400 m-0">
+                No queue posts found for the currently selected connected account.
+              </p>
+              {allQueuePosts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setQueueFilter('all')}
+                  className="text-xs text-purple-400 hover:text-purple-300 font-semibold"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-lg bg-white/5 overflow-hidden shrink-0 flex items-center justify-center">
-                      {mediaUrl ? (
-                        isVideo ? (
-                          <Video className="h-4 w-4 text-zinc-400" />
+                  View all {allQueuePosts.length} connected-account queue posts →
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="divide-y divide-white/10">
+              {visibleQueuePosts.map((post) => {
+                const postChannelIds = (post.campaignChannelIds || []).map((c) => String(c?._id || c));
+                const postAccountIds = (post.socialAccountIds || []).map((a) => String(a?._id || a));
+
+                const targetChannel = availableChannels.find((c) => (
+                  postChannelIds.includes(String(c._id)) ||
+                  postAccountIds.includes(String(c.socialAccountId))
+                )) || null;
+
+                const fallbackAccount = typeof post.socialAccountIds?.[0] === 'object' ? post.socialAccountIds[0] : null;
+                const fallbackChannel = typeof post.campaignChannelIds?.[0] === 'object' ? post.campaignChannelIds[0] : null;
+                const displayAccount = targetChannel || (fallbackAccount ? {
+                  ...fallbackAccount,
+                  name: fallbackAccount.name || fallbackAccount.displayName || fallbackAccount.username,
+                } : null);
+                const displayName = displayAccount?.name || displayAccount?.username || fallbackChannel?.displayName || fallbackChannel?.requestedHandle || 'Channel';
+                const displayPlatform = displayAccount?.platform || fallbackChannel?.platform || 'facebook';
+
+                const mediaItem = post.mediaIds?.[0];
+                const mediaUrl = typeof mediaItem === 'object' ? mediaItem?.url : '';
+                const isVideo = mediaItem?.type === 'video' || (typeof mediaItem === 'object' && /\.(mp4|mov|webm|mkv|m4v)$/i.test(mediaItem?.name || mediaUrl));
+                const thumbUrl = mediaItem?.thumbnailUrl
+                  ? getMediaUrl(mediaItem.thumbnailUrl, { apiBaseUrl: API_BASE_URL, proxy: true })
+                  : '';
+                const resolvedMediaUrl = mediaUrl
+                  ? getMediaUrl(mediaUrl, { apiBaseUrl: API_BASE_URL, proxy: true })
+                  : '';
+
+                const statusInfo = getPostStatusInfo(post);
+                const StatusIcon = statusInfo.icon;
+
+                return (
+                  <div
+                    key={post._id}
+                    className="py-3.5 flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      {/* Clickable Video / Image Thumbnail */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (resolvedMediaUrl) {
+                            setPreviewPost({
+                              ...post,
+                              resolvedMediaUrl,
+                              thumbUrl,
+                              isVideo,
+                              displayName,
+                              displayPlatform,
+                              displayAccount,
+                            });
+                          }
+                        }}
+                        className="group/thumb relative h-14 w-14 sm:h-16 sm:w-16 rounded-xl bg-black/60 overflow-hidden shrink-0 flex items-center justify-center border border-white/10 hover:border-purple-500/50 transition shadow-sm cursor-pointer text-left"
+                        title={resolvedMediaUrl ? 'Click to preview video' : 'Media preview'}
+                      >
+                        {isVideo ? (
+                          thumbUrl ? (
+                            <div className="relative h-full w-full">
+                              <img
+                                src={thumbUrl}
+                                alt=""
+                                className="h-full w-full object-cover transition duration-200 group-hover/thumb:scale-105"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallbackVideo = e.currentTarget.parentElement?.querySelector('video');
+                                  if (fallbackVideo) fallbackVideo.classList.remove('hidden');
+                                }}
+                              />
+                              {resolvedMediaUrl && (
+                                <video
+                                  src={`${resolvedMediaUrl}#t=0.001`}
+                                  preload="metadata"
+                                  muted
+                                  playsInline
+                                  className="hidden h-full w-full object-cover"
+                                />
+                              )}
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 group-hover/thumb:bg-black/15 transition">
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#7831d6]/90 text-white shadow-md group-hover/thumb:scale-110 transition">
+                                  <Play className="h-3 w-3 fill-white ml-0.5" />
+                                </div>
+                              </div>
+                            </div>
+                          ) : resolvedMediaUrl ? (
+                            <div className="relative h-full w-full bg-black flex items-center justify-center overflow-hidden">
+                              <video
+                                src={`${resolvedMediaUrl}#t=0.001`}
+                                preload="metadata"
+                                muted
+                                playsInline
+                                className="h-full w-full object-cover"
+                              />
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 group-hover/thumb:bg-black/15 transition">
+                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#7831d6]/90 text-white shadow-md group-hover/thumb:scale-110 transition">
+                                  <Play className="h-3 w-3 fill-white ml-0.5" />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-purple-500/10 text-purple-400">
+                              <Video className="h-5 w-5" />
+                            </div>
+                          )
+                        ) : resolvedMediaUrl ? (
+                          <img
+                            src={resolvedMediaUrl}
+                            alt=""
+                            className="h-full w-full object-cover transition duration-200 group-hover/thumb:scale-105"
+                          />
                         ) : (
-                          <img src={mediaUrl} alt="" className="h-full w-full object-cover" />
-                        )
-                      ) : (
-                        <ImageIcon className="h-4 w-4 text-zinc-500" />
-                      )}
+                          <ImageIcon className="h-5 w-5 text-zinc-500" />
+                        )}
+                      </button>
+
+                      {/* Account details & Caption */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          {displayAccount ? (
+                            <div className="relative shrink-0">
+                              <AccountAvatar account={displayAccount} className="h-5 w-5 rounded-full object-cover" />
+                              <div className="absolute -bottom-0.5 -right-0.5">
+                                <PlatformIcon platform={displayPlatform} className="h-2 w-2" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="h-5 w-5 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
+                              <PlatformIcon platform={displayPlatform} className="h-2 w-2" />
+                            </div>
+                          )}
+                          <span className="text-xs font-semibold text-white truncate">
+                            {displayName}
+                          </span>
+                        </div>
+                        <p className="m-0 text-[11px] text-zinc-400 truncate mt-1">
+                          {post.caption || 'No caption'}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        {targetChannel && (
-                          <div className="relative shrink-0">
-                            <AccountAvatar account={targetChannel} className="h-5 w-5 rounded-full object-cover" />
-                            <div className="absolute -bottom-0.5 -right-0.5">
-                              <PlatformIcon platform={targetChannel.platform} className="h-2 w-2" />
+                    {/* Status, Mode, Date & Actions */}
+                    <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap justify-end">
+                      {/* Post Status Badge */}
+                      <span
+                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusInfo.color}`}
+                        title={post.publishError || statusInfo.label}
+                      >
+                        <StatusIcon className={`h-2.5 w-2.5 ${statusInfo.spin ? 'animate-spin' : ''}`} />
+                        <span>{statusInfo.label}</span>
+                      </span>
+
+                      {/* Schedule Mode Badge */}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        post.scheduleMode === 'auto'
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                          : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                      }`}>
+                        {post.scheduleMode === 'auto' ? 'Auto' : 'Manual'}
+                      </span>
+
+                      {/* Scheduled Time */}
+                      <span className="text-[11px] text-zinc-400 font-medium whitespace-nowrap">
+                        {formatScheduledDate(post.scheduledAt)}
+                      </span>
+
+                      {/* Watch Video Button */}
+                      {resolvedMediaUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPost({
+                            ...post,
+                            resolvedMediaUrl,
+                            thumbUrl,
+                            isVideo,
+                            displayName,
+                            displayPlatform,
+                            displayAccount,
+                          })}
+                          className="text-xs text-purple-400 hover:text-purple-300 font-medium p-1 rounded hover:bg-white/5 transition flex items-center gap-1"
+                          title="Watch video"
+                        >
+                          <Play className="h-3 w-3 fill-current" />
+                          <span className="hidden sm:inline">Watch</span>
+                        </button>
+                      )}
+
+                      {/* Cancel / Delete Button */}
+                      {cancellablePostStatuses.has(post.status) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm('Cancel this scheduled post?')) {
+                              deleteMutation.mutate({
+                                postId: post._id,
+                                campaignId: String(post.campaignId?._id || post.campaignId || ''),
+                              });
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                          className="text-zinc-500 hover:text-rose-400 p-1 rounded hover:bg-white/5 transition"
+                          title="Cancel post"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+      </div>
+
+      {/* Choose from My Media Modal */}
+      {showMediaPicker && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setShowMediaPicker(false)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl border border-white/15 bg-[#121216] p-6 shadow-2xl flex flex-col space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <FolderHeart className="h-5 w-5 text-purple-400" />
+                <h3 className="m-0 text-base font-bold text-white">Select from My Media</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMediaPicker(false)}
+                className="rounded-lg p-1 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {creatorMediaQuery.isLoading ? (
+                <div className="flex h-40 items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-[#7831d6]" />
+                </div>
+              ) : (creatorMediaQuery.data || []).length === 0 ? (
+                <div className="py-12 text-center text-zinc-400 text-xs">
+                  No uploads found in your media folder for this campaign.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {(creatorMediaQuery.data || []).map((item) => {
+                    const isVideo = item.type === 'video';
+                    const mediaUrl = getMediaUrl(item.url, { apiBaseUrl: API_BASE_URL });
+                    const thumbUrl = item.thumbnailUrl ? getMediaUrl(item.thumbnailUrl, { apiBaseUrl: API_BASE_URL }) : undefined;
+
+                    return (
+                      <div
+                        key={item._id}
+                        onClick={() => handleSelectFromLibrary(item)}
+                        onMouseEnter={(e) => {
+                          if (!isVideo) return;
+                          const video = e.currentTarget.querySelector('video');
+                          if (!video) return;
+                          video.muted = false;
+                          video.play().catch(() => {
+                            video.muted = true;
+                            video.play().catch(() => {});
+                          });
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isVideo) return;
+                          const video = e.currentTarget.querySelector('video');
+                          if (!video) return;
+                          video.pause();
+                          video.currentTime = 0;
+                        }}
+                        className={`group relative cursor-pointer rounded-xl overflow-hidden border border-white/10 hover:border-purple-500 bg-black transition ${
+                          isVideo ? 'aspect-[9/16]' : 'aspect-square'
+                        }`}
+                      >
+                        {isVideo ? (
+                          <LoadingVideoPreview
+                            src={mediaUrl}
+                            crossOrigin="anonymous"
+                            className="h-full w-full"
+                            videoClassName="h-full w-full object-cover"
+                            playsInline
+                            preload="metadata"
+                            poster={thumbUrl}
+                          />
+                        ) : (
+                          <img src={mediaUrl} crossOrigin="anonymous" alt="" className="h-full w-full object-cover group-hover:scale-105 transition" />
+                        )}
+
+                        {isVideo && (
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center group-hover:opacity-0 transition-opacity z-10">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 border border-white/20 text-white backdrop-blur-sm shadow-md">
+                              <Play className="h-3.5 w-3.5 fill-white text-white ml-0.5" />
                             </div>
                           </div>
                         )}
-                        <span className="text-xs font-semibold text-white truncate">
-                          {targetChannel ? targetChannel.name : 'Channel'}
-                        </span>
+
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-2 z-10">
+                          <p className="m-0 truncate text-[11px] font-semibold text-white">{item.name}</p>
+                          <span className="text-[9px] text-zinc-400 uppercase">{item.type}</span>
+                        </div>
                       </div>
-                      <p className="m-0 text-[11px] text-zinc-400 truncate mt-0.5">
-                        {post.caption || 'No caption'}
-                      </p>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full Video Preview Modal */}
+      {videoModalUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setVideoModalUrl('')}
+        >
+          <div
+            className="relative max-h-[90vh] max-w-2xl w-full overflow-hidden rounded-2xl border border-white/15 bg-[#121216] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 p-3.5">
+              <div className="flex items-center gap-2">
+                <Video className="h-4 w-4 text-purple-400" />
+                <h4 className="text-xs font-bold text-white m-0">Video Preview</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVideoModalUrl('')}
+                className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex items-center justify-center bg-black p-2 max-h-[65vh] overflow-hidden">
+              <video
+                src={videoModalUrl}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[60vh] w-auto rounded-lg object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Scheduled Post Full Preview Modal */}
+      {previewPost && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-150"
+          onClick={() => setPreviewPost(null)}
+        >
+          <div
+            className="relative max-h-[92vh] max-w-2xl w-full overflow-hidden rounded-2xl border border-white/15 bg-[#121216] shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-white/10 p-4">
+              <div className="flex items-center gap-3 min-w-0">
+                {previewPost.displayAccount ? (
+                  <div className="relative shrink-0">
+                    <AccountAvatar account={previewPost.displayAccount} className="h-8 w-8 rounded-full object-cover" />
+                    <div className="absolute -bottom-0.5 -right-0.5">
+                      <PlatformIcon platform={previewPost.displayPlatform} className="h-3 w-3" />
                     </div>
                   </div>
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400">
+                    <PlatformIcon platform={previewPost.displayPlatform} className="h-3 w-3" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h4 className="text-sm font-bold text-white m-0 truncate">
+                    {previewPost.displayName}
+                  </h4>
+                  <p className="text-[11px] text-zinc-400 m-0 mt-0.5">
+                    Scheduled for {formatScheduledDate(previewPost.scheduledAt)}
+                  </p>
+                </div>
+              </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      post.scheduleMode === 'auto'
-                        ? 'bg-amber-500/15 text-amber-300'
-                        : 'bg-purple-500/15 text-purple-300'
-                    }`}>
-                      {post.scheduleMode === 'auto' ? 'Auto' : 'Manual'}
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const sInfo = getPostStatusInfo(previewPost);
+                  const SIcon = sInfo.icon;
+                  return (
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border ${sInfo.color}`}>
+                      <SIcon className={`h-3 w-3 ${sInfo.spin ? 'animate-spin' : ''}`} />
+                      <span>{sInfo.label}</span>
                     </span>
-                    <span className="text-[11px] text-zinc-400 font-medium">
-                      {formatScheduledDate(post.scheduledAt)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm('Cancel this scheduled post?')) {
-                          deleteMutation.mutate(post._id);
-                        }
-                      }}
-                      disabled={deleteMutation.isPending}
-                      className="text-zinc-500 hover:text-rose-400 p-1 rounded transition"
-                      title="Cancel post"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  );
+                })()}
+                <button
+                  type="button"
+                  onClick={() => setPreviewPost(null)}
+                  className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white transition ml-2"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Video / Media Content */}
+            <div className="flex items-center justify-center bg-black p-4 max-h-[55vh] overflow-hidden">
+              {previewPost.isVideo ? (
+                <video
+                  src={previewPost.resolvedMediaUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="max-h-[50vh] w-auto rounded-xl object-contain shadow-lg"
+                />
+              ) : (
+                <img
+                  src={previewPost.resolvedMediaUrl}
+                  alt=""
+                  className="max-h-[50vh] w-auto rounded-xl object-contain"
+                />
+              )}
+            </div>
+
+            {/* Modal Footer / Details */}
+            <div className="border-t border-white/10 p-4 space-y-3 bg-white/[0.02]">
+              {previewPost.publishError && (
+                <div className="p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold m-0">Publishing Error</p>
+                    <p className="m-0 text-[11px] mt-0.5">{previewPost.publishError}</p>
                   </div>
                 </div>
-              );
-            })}
+              )}
+
+              {previewPost.caption && (
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">
+                    Caption
+                  </span>
+                  <p className="text-xs text-zinc-200 m-0 max-h-20 overflow-y-auto whitespace-pre-wrap bg-white/5 p-2.5 rounded-lg border border-white/10">
+                    {previewPost.caption}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px]">
+                    Mode: <strong className="text-zinc-200 uppercase">{previewPost.scheduleMode}</strong>
+                  </span>
+                </div>
+                {cancellablePostStatuses.has(previewPost.status) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Cancel this scheduled post?')) {
+                        deleteMutation.mutate({
+                          postId: previewPost._id,
+                          campaignId: String(previewPost.campaignId?._id || previewPost.campaignId || ''),
+                        });
+                        setPreviewPost(null);
+                      }
+                    }}
+                    className="text-rose-400 hover:text-rose-300 text-xs font-semibold inline-flex items-center gap-1.5 transition"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Cancel Post</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

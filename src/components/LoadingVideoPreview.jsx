@@ -11,6 +11,7 @@ const LoadingVideoPreview = forwardRef(({
   onLoadedMetadata,
   onLoadedData,
   onError,
+  crossOrigin,
   ...videoProps
 }, ref) => {
   const [loaded, setLoaded] = useState(false);
@@ -22,6 +23,9 @@ const LoadingVideoPreview = forwardRef(({
     setFailed(false);
     setUseProxyFallback(false);
   }, [src]);
+
+  const isBlobOrData = typeof src === 'string' && (src.startsWith('blob:') || src.startsWith('data:'));
+  const effectiveCrossOrigin = isBlobOrData ? undefined : crossOrigin;
 
   const effectiveSrc = useProxyFallback && src && !src.startsWith('blob:') && !src.startsWith('data:') && !src.includes('/api/media/proxy')
     ? `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(src)}`
@@ -48,6 +52,7 @@ const LoadingVideoPreview = forwardRef(({
       <video
         ref={ref}
         {...videoProps}
+        crossOrigin={effectiveCrossOrigin}
         src={effectiveSrc}
         className={videoClassName}
         onLoadedMetadata={(event) => {
@@ -55,6 +60,7 @@ const LoadingVideoPreview = forwardRef(({
           if (!waitForLoadedData) handleLoaded(event);
         }}
         onLoadedData={(event) => handleLoaded(event, onLoadedData)}
+        onCanPlay={(event) => handleLoaded(event)}
         onError={handleError}
       />
       {!loaded && (

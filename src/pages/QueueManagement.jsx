@@ -42,7 +42,7 @@ const getChannelAvatarSrc = (account) => {
 
   try {
     const parsedUrl = new URL(avatarUrl);
-    if (parsedUrl.hostname === 'media.theeasypost.com') {
+    if (parsedUrl.hostname === 'media.thousandpost.com') {
       return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(avatarUrl)}`;
     }
   } catch {
@@ -475,11 +475,10 @@ const QueueManagement = () => {
               setChannelPickerOpen((open) => !open);
               setChannelSearch('');
             }}
-            className={`flex h-8 min-w-60 items-center justify-between gap-3 rounded-[10px] border px-3 text-left outline-none transition ${
-              channelPickerOpen
+            className={`flex h-8 min-w-60 items-center justify-between gap-3 rounded-[10px] border px-3 text-left outline-none transition ${channelPickerOpen
                 ? 'border-white/30 bg-white/[0.08] ring-1 ring-white/20 text-white'
                 : 'border-white/[0.08] bg-white/[0.03] text-white hover:bg-white/[0.06] hover:border-white/[0.12]'
-            }`}
+              }`}
             aria-haspopup="listbox"
             aria-expanded={channelPickerOpen}
           >
@@ -524,9 +523,8 @@ const QueueManagement = () => {
                       setChannelPickerOpen(false);
                       navigateToWindow(pageOffset, '');
                     }}
-                    className={`flex w-full items-center justify-between gap-3 rounded-[8px] px-2.5 py-2 text-left transition ${
-                      !selectedAccount ? 'bg-white text-black font-semibold' : 'text-white hover:bg-white/[0.04]'
-                    }`}
+                    className={`flex w-full items-center justify-between gap-3 rounded-[8px] px-2.5 py-2 text-left transition ${!selectedAccount ? 'bg-white text-black font-semibold' : 'text-white hover:bg-white/[0.04]'
+                      }`}
                   >
                     <span className="text-xs font-semibold">All channels</span>
                     {!selectedAccount && <Check className="h-3.5 w-3.5 text-black" />}
@@ -544,9 +542,8 @@ const QueueManagement = () => {
                         setChannelPickerOpen(false);
                         navigateToWindow(pageOffset, candidate._id);
                       }}
-                      className={`flex w-full items-center justify-between gap-3 rounded-[8px] px-2.5 py-2 text-left transition ${
-                        selected ? 'bg-white text-black font-semibold' : 'hover:bg-white/[0.04] text-white'
-                      }`}
+                      className={`flex w-full items-center justify-between gap-3 rounded-[8px] px-2.5 py-2 text-left transition ${selected ? 'bg-white text-black font-semibold' : 'hover:bg-white/[0.04] text-white'
+                        }`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         <ChannelAvatar account={candidate} className="h-6 w-6" />
@@ -581,11 +578,10 @@ const QueueManagement = () => {
           <button
             type="button"
             onClick={() => navigateToWindow(0)}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-3 text-[11px] font-semibold transition ${
-              pageOffset === 0
+            className={`inline-flex h-8 items-center gap-1.5 rounded-[8px] border px-3 text-[11px] font-semibold transition ${pageOffset === 0
                 ? 'border-white/20 bg-white/[0.08] text-white'
                 : 'border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-white'
-            }`}
+              }`}
             title="Show seven days before and after today"
           >
             <CalendarDays className="h-3.5 w-3.5" />

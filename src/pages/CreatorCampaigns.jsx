@@ -846,13 +846,14 @@ export const CreatorCampaigns = () => {
 
         {loading ? (
           <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-8 text-center text-sm text-zinc-400">
-            Syncing campaigns and calendar...
+            Syncing posts and calendar...
           </div>
         ) : (
           <div className="space-y-3 md:space-y-4">
             <section className="space-y-5 md:space-y-6">
               <div className="px-1">
-                <h2 className="m-0 text-2xl font-semibold text-white">My Campaigns</h2>
+                <h2 className="m-0 text-2xl font-bold tracking-tight text-white">Home</h2>
+                <p className="m-0 mt-1 text-xs text-zinc-400">Scheduled posts & content queue across your channels</p>
               </div>
               {campaignConnectionIssues.length > 0 && (
                 <section className="overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0a] shadow-sm">
@@ -1090,10 +1091,26 @@ export const CreatorCampaigns = () => {
                   })}
                 </div>
               ) : (
-                <div className="p-5 text-center text-sm text-zinc-400 md:p-6">
-                  <Calendar className="mx-auto h-7 w-7 text-zinc-600" />
-                  <p className="m-0 mt-2 font-semibold text-white">No campaigns yet</p>
-                  <p className="m-0 mt-1 text-xs">Assigned campaigns will appear here.</p>
+                <div className="p-8 text-center text-sm text-zinc-400 md:p-10 rounded-2xl border border-white/10 bg-[#0a0a0a]">
+                  <Calendar className="mx-auto h-8 w-8 text-zinc-600" />
+                  <p className="m-0 mt-3 text-base font-semibold text-white">No scheduled posts yet</p>
+                  <p className="m-0 mt-1 text-xs text-zinc-400">Connect your social accounts or schedule your first post to see it here.</p>
+                  <div className="mt-5 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/channels')}
+                      className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-black transition hover:bg-zinc-200 shadow-sm"
+                    >
+                      Connect Channels
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/schedule')}
+                      className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/10"
+                    >
+                      Schedule Post
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
