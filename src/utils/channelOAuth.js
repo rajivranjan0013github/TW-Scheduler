@@ -1,6 +1,22 @@
 import { API_BASE_URL } from '../config';
 import { withHandlerPreviewHeaders } from './handlerPreview';
 
+const requestOAuthRedirect = async (url, token, provider) => {
+  try {
+    const response = await fetch(url, {
+      headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.url) {
+      throw new Error(data.message || `Unable to start ${provider} authorization.`);
+    }
+    window.location.assign(data.url);
+  } catch (error) {
+    console.error(`${provider} authorization failed:`, error);
+    window.alert(error.message || `Unable to start ${provider} authorization.`);
+  }
+};
+
 export const connectInstagramOAuth = async (targetCampaignId = null) => {
   const token = localStorage.getItem('tw_token');
   const returnUrl = `${window.location.origin}/auth/instagram/callback`;
@@ -8,20 +24,11 @@ export const connectInstagramOAuth = async (targetCampaignId = null) => {
   if (targetCampaignId) {
     sessionStorage.setItem('connect_campaign_id', targetCampaignId);
   }
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/accounts/instagram/auth-url?redirectUri=${encodeURIComponent(returnUrl)}&campaignId=${encodeURIComponent(targetCampaignId || '')}`,
-      { headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }) }
-    );
-    const data = await response.json();
-    if (data?.url) {
-      window.location.href = data.url;
-      return;
-    }
-  } catch (err) {
-    console.warn('Failed to fetch Instagram auth URL from backend:', err);
-  }
-  window.location.assign(`${API_BASE_URL}/api/accounts/connect/instagram?campaignId=${encodeURIComponent(targetCampaignId || '')}`);
+  return requestOAuthRedirect(
+    `${API_BASE_URL}/api/accounts/instagram/auth-url?redirectUri=${encodeURIComponent(returnUrl)}&campaignId=${encodeURIComponent(targetCampaignId || '')}`,
+    token,
+    'Instagram',
+  );
 };
 
 export const connectYoutubeOAuth = async (targetCampaignId = null) => {
@@ -30,20 +37,11 @@ export const connectYoutubeOAuth = async (targetCampaignId = null) => {
   if (targetCampaignId) {
     sessionStorage.setItem('connect_campaign_id', targetCampaignId);
   }
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/accounts/youtube/auth-url?redirectUri=${encodeURIComponent(returnUrl)}&campaignId=${encodeURIComponent(targetCampaignId || '')}`,
-      { headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }) }
-    );
-    const data = await response.json();
-    if (data?.url) {
-      window.location.href = data.url;
-      return;
-    }
-  } catch (err) {
-    console.warn('Failed to fetch YouTube auth URL from backend:', err);
-  }
-  window.location.assign(`${API_BASE_URL}/api/accounts/connect/youtube?campaignId=${encodeURIComponent(targetCampaignId || '')}`);
+  return requestOAuthRedirect(
+    `${API_BASE_URL}/api/accounts/youtube/auth-url?redirectUri=${encodeURIComponent(returnUrl)}&campaignId=${encodeURIComponent(targetCampaignId || '')}`,
+    token,
+    'YouTube',
+  );
 };
 
 export const connectMetaOAuth = async (targetCampaignId = null, targetSocialAccountId = null) => {
@@ -55,20 +53,11 @@ export const connectMetaOAuth = async (targetCampaignId = null, targetSocialAcco
   if (targetSocialAccountId) {
     sessionStorage.setItem('reauthorize_account_id', targetSocialAccountId);
   }
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/accounts/facebook/auth-url?redirectUri=${encodeURIComponent(returnUrl)}&campaignId=${encodeURIComponent(targetCampaignId || '')}&reauthorizeAccountId=${encodeURIComponent(targetSocialAccountId || '')}`,
-      { headers: withHandlerPreviewHeaders({ Authorization: `Bearer ${token}` }) }
-    );
-    const data = await response.json();
-    if (data?.url) {
-      window.location.href = data.url;
-      return;
-    }
-  } catch (err) {
-    console.warn('Failed to fetch Facebook auth URL from backend:', err);
-  }
-  window.location.assign(`${API_BASE_URL}/api/accounts/connect/facebook?campaignId=${encodeURIComponent(targetCampaignId || '')}&socialAccountId=${encodeURIComponent(targetSocialAccountId || '')}`);
+  return requestOAuthRedirect(
+    `${API_BASE_URL}/api/accounts/facebook/auth-url?redirectUri=${encodeURIComponent(returnUrl)}&campaignId=${encodeURIComponent(targetCampaignId || '')}&reauthorizeAccountId=${encodeURIComponent(targetSocialAccountId || '')}`,
+    token,
+    'Facebook',
+  );
 };
 
 export const formatHandle = (handle) => {

@@ -1,10 +1,29 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Sparkles, Trash2, ShieldCheck, Mail, ExternalLink, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export const DataDeletion = () => {
   const [searchParams] = useSearchParams();
   const confirmationCode = searchParams.get('code');
+  const [deletionStatus, setDeletionStatus] = useState(confirmationCode ? 'checking' : 'none');
+
+  useEffect(() => {
+    if (!confirmationCode) return undefined;
+    const controller = new AbortController();
+    fetch(`${API_BASE_URL}/api/auth/meta-data-deletion/status/${encodeURIComponent(confirmationCode)}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.status !== 'completed') throw new Error('Deletion request could not be verified.');
+        setDeletionStatus('completed');
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') setDeletionStatus('invalid');
+      });
+    return () => controller.abort();
+  }, [confirmationCode]);
 
   return (
     <div className="h-screen overflow-y-auto bg-[#0c0c0e] text-white font-sans selection:bg-white selection:text-black">
@@ -24,9 +43,9 @@ export const DataDeletion = () => {
       <main className="mx-auto max-w-4xl px-5 py-12">
         <p className="m-0 text-xs font-bold uppercase tracking-wider text-zinc-400">User Rights & Compliance</p>
         <h1 className="m-0 mt-3 text-4xl font-black tracking-tight text-white">User Data Deletion Instructions</h1>
-        <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: June 16, 2026</p>
+        <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: September 6, 2026</p>
 
-        {confirmationCode && (
+        {confirmationCode && deletionStatus === 'completed' && (
           <div className="mt-8 rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-6 text-white shadow-xl">
             <div className="flex items-start gap-4">
               <div className="rounded-lg bg-emerald-500/20 p-2.5 text-emerald-400 border border-emerald-500/30">
@@ -38,10 +57,22 @@ export const DataDeletion = () => {
                   Confirmation Code: <span className="font-mono font-semibold text-emerald-200 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded">{confirmationCode}</span>
                 </p>
                 <p className="m-0 pt-2 text-xs text-zinc-400 leading-relaxed">
-                  Your request has been successfully processed in accordance with the Meta Platform Terms and global privacy regulations. All personal data, social tokens, and cached analytics associated with your user identity have been permanently purged or scheduled for complete erasure.
+                  This confirmation code was verified by ThousandPost. The associated local profile data, social tokens, stored media, scheduled posts, and cached analytics were erased.
                 </p>
               </div>
             </div>
+          </div>
+        )}
+
+        {confirmationCode && deletionStatus === 'checking' && (
+          <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.03] p-5 text-sm text-zinc-300">
+            Verifying this deletion confirmation…
+          </div>
+        )}
+
+        {confirmationCode && deletionStatus === 'invalid' && (
+          <div className="mt-8 rounded-xl border border-rose-500/30 bg-rose-950/20 p-5 text-sm text-rose-200">
+            This deletion confirmation could not be verified. Check the complete URL or contact support.
           </div>
         )}
 
@@ -73,7 +104,7 @@ export const DataDeletion = () => {
             <li>Click <strong>Delete Account</strong> and confirm the prompt.</li>
           </ol>
           <p className="text-xs text-zinc-400 bg-white/[0.03] p-3 rounded-lg border border-white/5">
-            <strong>What gets deleted:</strong> Your profile record, access and refresh tokens for all connected channels, uploaded media assets, scheduled posts, published feed records, metric snapshots, and comment records are permanently purged from our databases.
+            <strong>What gets deleted:</strong> Your profile record, access and refresh tokens for all connected channels, uploaded media and thumbnails from object storage, folders, saved captions, scheduled posts, published feed records, metric snapshots, comment-count records, AI workflow records, and channel assignments are permanently purged.
           </p>
         </section>
 

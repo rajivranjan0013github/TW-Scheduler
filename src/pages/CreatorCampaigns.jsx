@@ -930,7 +930,7 @@ export const CreatorCampaigns = () => {
                         <button
                           type="button"
                           onClick={() => navigate('/channels', { state: { campaignId: camp._id } })}
-                          className="shrink-0 rounded-lg bg-white hover:bg-zinc-200 px-3.5 py-1.5 text-xs font-semibold text-black transition-colors shadow-sm"
+                          className="btn-white-solid shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors shadow-sm"
                         >
                           Reconnect
                         </button>
@@ -975,13 +975,6 @@ export const CreatorCampaigns = () => {
 
                       return (
                         <div key={`${camp._id}-${queue.accountId}`} className="rounded-lg border border-white/10 bg-[#0a0a0a] px-4 py-3 shadow-lg">
-                          <div className="mb-2 flex items-center justify-between gap-3 border-b border-white/10 pb-2">
-                            <span className="truncate text-xs font-semibold text-zinc-400">{camp.name}</span>
-                            <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] font-bold capitalize text-zinc-300">
-                              {camp.status || 'active'}
-                            </span>
-                          </div>
-
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <div className="flex min-w-0 items-center gap-3">
                               <div className="flex items-center gap-2 shrink-0">
@@ -1055,29 +1048,27 @@ export const CreatorCampaigns = () => {
                           </div>
 
                           {postedToday.length > 0 && (
-                            <div className="mb-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-2">
-                              <div className="flex flex-wrap gap-1.5">
-                                {postedToday.slice(0, 6).map((post) => (
-                                  <span
-                                    key={post.id}
-                                    className="animate-in fade-in zoom-in-95 inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300 transition-all duration-300 ease-out"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked
-                                      readOnly
-                                      aria-label={`Posted at ${formatPostTime(getPostDisplayPublishedAt(post))}`}
-                                      className="h-3 w-3 accent-white"
-                                    />
-                                    {formatPostTime(getPostDisplayPublishedAt(post))}
-                                  </span>
-                                ))}
-                                {postedToday.length > 6 && (
-                                  <span className="rounded-md bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300">
-                                    +{postedToday.length - 6}
-                                  </span>
-                                )}
-                              </div>
+                            <div className="mb-2 flex flex-wrap gap-1.5">
+                              {postedToday.slice(0, 6).map((post) => (
+                                <span
+                                  key={post.id}
+                                  className="animate-in fade-in zoom-in-95 inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300 transition-all duration-300 ease-out"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked
+                                    readOnly
+                                    aria-label={`Posted at ${formatPostTime(getPostDisplayPublishedAt(post))}`}
+                                    className="h-3 w-3 accent-white"
+                                  />
+                                  {formatPostTime(getPostDisplayPublishedAt(post))}
+                                </span>
+                              ))}
+                              {postedToday.length > 6 && (
+                                <span className="rounded-md bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300">
+                                  +{postedToday.length - 6}
+                                </span>
+                              )}
                             </div>
                           )}
 
@@ -1112,7 +1103,7 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleMarkManualPosted(queuePost)}
                                   disabled={markingPostId === queuePost._id}
-                                  className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg bg-white hover:bg-zinc-200 px-3 py-1.5 text-xs font-semibold text-black transition-colors disabled:opacity-60 shadow-sm"
+                                  className="btn-white-solid inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-60 shadow-sm"
                                 >
                                   <CheckCircle className="h-3.5 w-3.5" />
                                   {markingPostId === queuePost._id ? 'Checking...' : 'Mark as Posted'}
@@ -1124,10 +1115,10 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleSharePost(queuePost, postingCooldown)}
                                   disabled={sharingPostId === queuePost._id || postingCooldown.isLocked}
-                                  className={`inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-lg bg-white text-black text-xs font-semibold shadow-sm transition-all ${
+                                  className={`inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-lg text-xs font-bold shadow-md transition-all ${
                                     postingCooldown.isLocked
-                                      ? 'opacity-60 cursor-not-allowed'
-                                      : 'hover:bg-zinc-200 active:scale-[0.99]'
+                                      ? 'border border-white/15 bg-white/5 text-zinc-400 cursor-not-allowed'
+                                      : 'bg-[#7831d6] hover:bg-[#6825bc] text-white shadow-[#7831d6]/25 active:scale-[0.99]'
                                   } ${sharingPostId === queuePost._id ? 'opacity-70 cursor-wait' : ''}`}
                                 >
                                   <Share2 className="h-4 w-4 shrink-0" />
@@ -1159,7 +1150,7 @@ export const CreatorCampaigns = () => {
                     <button
                       type="button"
                       onClick={() => navigate('/channels')}
-                      className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-black transition hover:bg-zinc-200 shadow-sm"
+                      className="btn-white-solid rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm"
                     >
                       Connect Channels
                     </button>

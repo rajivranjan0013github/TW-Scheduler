@@ -16,6 +16,10 @@ node_modules
 .env.*.local
 *.local
 
+# Never commit production database or object-storage exports
+db-inventory/
+r2-audit/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

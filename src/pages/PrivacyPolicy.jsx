@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 
@@ -7,7 +6,7 @@ const sections = [
     title: 'Information We Collect',
     body: (
       <span>
-        ThousandPost collects account details you provide (name, email), Google sign-in profile information, connected social channel identifiers, media assets you upload, post captions, scheduled publication timestamps, and performance metrics (views, likes, comments) fetched from authorized platform APIs.
+        ThousandPost collects account details you provide (name and email), Google sign-in profile information, connected social channel identifiers and profile details, OAuth authorization credentials, media assets you upload, post titles and captions, publication settings and timestamps, and performance metrics (views, likes, and comment counts) fetched from authorized platform APIs. We also process basic security and diagnostic information such as IP address, browser type, request time, and error logs. The web app stores your signed-in session and interface preferences in browser storage.
       </span>
     ),
   },
@@ -62,7 +61,7 @@ const sections = [
           Google API Services User Data Policy
         </a>
         , including the Limited Use requirements.<br /><br />
-        <strong>Data Retention:</strong> In compliance with YouTube Developer Policies, numeric YouTube API metric snapshots are retained for no longer than 30 calendar days before being refreshed or purged.
+        <strong>Data Retention:</strong> YouTube channel profile data, video records, and metrics obtained from YouTube API Services are refreshed from YouTube or deleted within 30 calendar days. Completed scheduled-post records have YouTube video identifiers removed after 30 days. OAuth credentials are retained only while your channel remains connected. Disconnecting the channel or deleting your ThousandPost account removes locally stored YouTube Authorized Data and initiates revocation of the applicable provider authorization.
       </span>
     ),
   },
@@ -81,7 +80,7 @@ const sections = [
             <code>pages_read_engagement</code>: Enables ThousandPost to retrieve post-level engagement metrics (such as reactions, likes, comment counts, and views) so you can review content performance in your unified analytics dashboard.
           </li>
           <li>
-            <code>pages_manage_posts</code>: Grants ThousandPost the ability to publish, schedule, and update authorized posts (text, photos, and videos) to your selected Facebook Pages upon your explicit direction.
+            <code>pages_manage_posts</code>: Grants ThousandPost the ability to publish text, photos, and videos to your selected Facebook Pages upon your explicit direction.
           </li>
         </ul>
         <br />
@@ -111,7 +110,7 @@ const sections = [
     title: 'Data Storage and Security',
     body: (
       <span>
-        We implement administrative, technical, and physical safeguards to protect stored data. Access tokens are treated as sensitive credentials, transmission is encrypted via HTTPS/TLS, and access to internal databases is restricted.
+        We implement administrative and technical safeguards to protect stored data. OAuth access and refresh tokens are encrypted at rest using authenticated encryption, transmission is encrypted via HTTPS/TLS, tokens are excluded from API responses and client-side code, and access to internal databases is restricted by role and operational need. No internet service can guarantee absolute security.
       </span>
     ),
   },
@@ -119,7 +118,23 @@ const sections = [
     title: 'Data Sharing',
     body: (
       <span>
-        We do not sell, rent, or trade your personal information or social platform data. We share data with third-party service providers only when necessary to operate core features (e.g. Cloudflare R2 / AWS S3 for media storage, cloud hosting, and official platform APIs).
+        We do not sell, rent, trade, advertise with, or broker your personal information or platform data. We disclose data only as needed to provide user-requested features: Cloudflare R2-compatible storage processes uploaded media; our database and hosting providers process application records and operational logs; Meta and Google/YouTube receive content and settings when you direct us to publish or retrieve analytics; and Google Gemini processes media or prompts only when you choose an AI analysis or generation feature. Service providers are contractually or technically limited to providing these functions.
+      </span>
+    ),
+  },
+  {
+    title: 'AI-Assisted Features',
+    body: (
+      <span>
+        If you choose an AI-assisted media analysis, caption, or creative feature, the selected media, file name, prompt, and related instructions may be sent to Google Gemini solely to produce the requested result. Temporary provider files are deleted after processing where the provider API supports deletion. We do not use Google or Meta platform data to train general-purpose AI models or for advertising.
+      </span>
+    ),
+  },
+  {
+    title: 'Retention, Transfers, and Your Rights',
+    body: (
+      <span>
+        Account records, uploaded media, and scheduled-post data are kept while your account is active or until you delete them. Connected-platform credentials are kept only while the connection is active. Cached YouTube Authorized Data follows the 30-day refresh-or-delete cycle described above. Deletion requests remove applicable database records and stored media objects; limited security records may be retained only where required by law or necessary to investigate abuse. Our providers may process data in countries outside your own using their applicable transfer safeguards. Depending on your location, you may request access, correction, export, restriction, objection, or deletion by contacting us.
       </span>
     ),
   },
@@ -171,7 +186,7 @@ export const PrivacyPolicy = () => (
     <main className="mx-auto max-w-4xl px-5 py-12">
       <p className="m-0 text-xs font-bold uppercase tracking-wider text-zinc-400">Legal</p>
       <h1 className="m-0 mt-3 text-4xl font-black tracking-tight text-white">Privacy Policy</h1>
-      <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: June 16, 2026</p>
+      <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: September 6, 2026</p>
 
       <div className="mt-8 rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-xl">
         <p className="m-0 text-base leading-7 text-zinc-300">

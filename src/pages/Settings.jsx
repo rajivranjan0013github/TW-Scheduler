@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { User, Mail, Save, Check, Trash2, LogOut, ChevronDown, ShieldCheck } from 'lucide-react';
+import { User, Mail, Save, Check, Trash2, LogOut, ShieldCheck } from 'lucide-react';
 import { getHandlerPreviewContext } from '../utils/handlerPreview';
 
 export const Settings = () => {
   const { user, updateProfile, deleteAccount, logout } = useAuth();
   const [name, setName] = useState(user?.name || '');
-  const [userType, setUserType] = useState(user?.userType || 'account_handler');
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -51,8 +50,7 @@ export const Settings = () => {
     setSuccessMessage('');
     setErrorMessage('');
 
-    const payload = isCreator ? { name } : { name, userType };
-    const success = await updateProfile(payload);
+    const success = await updateProfile({ name });
     setSaving(false);
     if (success) {
       setSuccessMessage('Workspace settings updated successfully.');
@@ -170,25 +168,6 @@ export const Settings = () => {
               />
             </div>
 
-            {!isCreator && (
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-medium text-zinc-300">Account Perspective / Role</label>
-                <div className="relative">
-                  <select
-                    value={userType}
-                    onChange={(e) => setUserType(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-white/20 bg-zinc-700/85 px-4 py-3 pr-10 text-xs capitalize text-white outline-none transition hover:border-white/35 hover:bg-zinc-700 focus:border-[#7831d6] focus:bg-zinc-700 focus:ring-2 focus:ring-[#7831d6]/40 shadow-sm cursor-pointer"
-                  >
-                    <option value="campaign_maker" className="bg-[#27272a] text-white">Campaign Maker (Admins / Agencies)</option>
-                    <option value="account_handler" className="bg-[#27272a] text-white">Account Handler (Creators / Influencers)</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                </div>
-                <p className="m-0 mt-1 text-[10px] text-zinc-400">
-                  Switching roles updates your navigation and dashboard view.
-                </p>
-              </div>
-            )}
           </div>
 
           {/* Save Button with Primary Brand Color */}

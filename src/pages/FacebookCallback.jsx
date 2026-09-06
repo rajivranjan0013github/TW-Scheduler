@@ -63,7 +63,7 @@ export const FacebookCallback = () => {
         const account = (Array.isArray(data.accounts) && data.accounts.length > 0)
           ? data.accounts[0]
           : (data.account || null);
-        const successMsg = data.message || 'Your Facebook Pages and Instagram accounts are linked successfully.';
+        const successMsg = data.message || 'Your Facebook Pages are linked successfully.';
         setConnectedAccount(account);
         setStatus('success');
         setStatusMessage(successMsg);

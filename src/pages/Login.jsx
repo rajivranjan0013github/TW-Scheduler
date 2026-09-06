@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -125,15 +125,15 @@ export const Login = () => {
                 <div className="flex-grow border-t border-white/10" />
               </div>
 
-              {/* Reviewer / Email Credentials Form */}
+              {/* Email credentials form */}
               {!showReviewerLogin ? (
                 <button
                   type="button"
                   onClick={() => setShowReviewerLogin(true)}
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-xs font-semibold text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
                 >
-                  <ShieldCheck className="h-4 w-4 text-purple-400" />
-                  <span>Sign in with Email / Reviewer Credentials</span>
+                  <Mail className="h-4 w-4 text-purple-400" />
+                  <span>Sign in with email</span>
                 </button>
               ) : (
                 <form onSubmit={handleEmailSubmit} className="space-y-3 pt-1">
@@ -187,7 +187,7 @@ export const Login = () => {
                       </>
                     ) : (
                       <>
-                        <span>Sign In with Credentials</span>
+                        <span>Sign In</span>
                         <ArrowRight className="h-3.5 w-3.5" />
                       </>
                     )}
@@ -199,7 +199,7 @@ export const Login = () => {
                       onClick={() => setShowReviewerLogin(false)}
                       className="text-[11px] text-zinc-400 hover:text-white transition underline"
                     >
-                      Hide reviewer credentials
+                      Use another sign-in method
                     </button>
                   </div>
                 </form>

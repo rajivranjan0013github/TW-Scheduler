@@ -44,6 +44,8 @@ const getChannelKey = (channel = {}) => {
   return `${platform}:${handle}`;
 };
 
+const getUtf8ByteLength = (value = '') => new TextEncoder().encode(value).length;
+
 const cancellablePostStatuses = new Set([
   'scheduled',
   'manual_ready',
@@ -162,6 +164,12 @@ export const CreatorSchedulePost = () => {
     preselected ? getMediaUrl(preselected.url, { apiBaseUrl: API_BASE_URL }) : ''
   );
   const [caption, setCaption] = useState(preselected?.caption || '');
+  const [youtubeTitle, setYoutubeTitle] = useState('');
+  const [youtubeDescription, setYoutubeDescription] = useState('');
+  const [youtubePrivacyStatus, setYoutubePrivacyStatus] = useState('private');
+  const [youtubeMadeForKids, setYoutubeMadeForKids] = useState('');
+  const [youtubeContainsSyntheticMedia, setYoutubeContainsSyntheticMedia] = useState(false);
+  const [youtubeGuidelinesCertified, setYoutubeGuidelinesCertified] = useState(false);
   const [scheduledAt, setScheduledAt] = useState(getDefaultDateTimeString());
   const [dateError, setDateError] = useState('');
   const [postType, setPostType] = useState(preselected?.type === 'video' ? 'reels' : 'post');
@@ -280,6 +288,8 @@ export const CreatorSchedulePost = () => {
   const selectedChannels = useMemo(() => {
     return availableChannels.filter((c) => effectiveSelectedIds.includes(c._id));
   }, [availableChannels, effectiveSelectedIds]);
+  const hasYoutubeApiTarget = scheduleMode !== 'manual'
+    && selectedChannels.some((channel) => channel.platform === 'youtube');
 
   const activeChannel = selectedChannels[0] || availableChannels[0] || null;
   const selectableChannelCount = new Set(
@@ -488,6 +498,34 @@ export const CreatorSchedulePost = () => {
       return;
     }
 
+    if (hasYoutubeApiTarget) {
+      const isVideo = file?.type?.startsWith('video/') || selectedMediaAsset?.type === 'video';
+      if (!isVideo) {
+        setStatusMessage({ type: 'error', text: 'YouTube API publishing requires a video file.' });
+        return;
+      }
+      if (!youtubeTitle.trim()) {
+        setStatusMessage({ type: 'error', text: 'Enter a YouTube video title.' });
+        return;
+      }
+      if (Array.from(youtubeTitle.trim()).length > 100) {
+        setStatusMessage({ type: 'error', text: 'YouTube title must be 100 characters or fewer.' });
+        return;
+      }
+      if (getUtf8ByteLength(youtubeDescription) > 5000) {
+        setStatusMessage({ type: 'error', text: 'YouTube description must be 5,000 bytes or fewer.' });
+        return;
+      }
+      if (!youtubeMadeForKids) {
+        setStatusMessage({ type: 'error', text: 'Choose whether the YouTube video is made for kids.' });
+        return;
+      }
+      if (!youtubeGuidelinesCertified) {
+        setStatusMessage({ type: 'error', text: 'Confirm YouTube Community Guidelines compliance.' });
+        return;
+      }
+    }
+
     const scheduledDate = new Date(scheduledAt);
     const nowThreshold = new Date(Date.now() - 2 * 60 * 1000);
     if (Number.isNaN(scheduledDate.getTime()) || scheduledDate < nowThreshold) {
@@ -574,6 +612,16 @@ export const CreatorSchedulePost = () => {
             platformSpecifics: {
               type: postType,
               postCaption: caption.trim(),
+              ...(hasYoutubeApiTarget ? {
+                youtube: {
+                  title: youtubeTitle.trim(),
+                  description: youtubeDescription,
+                  privacyStatus: youtubePrivacyStatus,
+                  selfDeclaredMadeForKids: youtubeMadeForKids === 'yes',
+                  containsSyntheticMedia: youtubeContainsSyntheticMedia,
+                  communityGuidelinesCertified: youtubeGuidelinesCertified,
+                },
+              } : {}),
             },
           }),
         });
@@ -591,6 +639,12 @@ export const CreatorSchedulePost = () => {
 
       handleClearFile();
       setCaption('');
+      setYoutubeTitle('');
+      setYoutubeDescription('');
+      setYoutubePrivacyStatus('private');
+      setYoutubeMadeForKids('');
+      setYoutubeContainsSyntheticMedia(false);
+      setYoutubeGuidelinesCertified(false);
       setScheduledAt(getDefaultDateTimeString());
       queryClient.invalidateQueries({ queryKey: ['creator', handlerPreviewUserId, 'scheduled-posts'] });
     } catch (err) {
@@ -867,7 +921,7 @@ export const CreatorSchedulePost = () => {
                   Upload from this device
                 </p>
                 <p className="text-[10px] text-zinc-500 mt-1 m-0">
-                  MP4, MOV, WEBM, JPG, PNG (up to 500MB)
+                  MP4, MOV, WEBM, JPG, PNG (up to 100MB)
                 </p>
               </label>
 
@@ -1033,6 +1087,121 @@ export const CreatorSchedulePost = () => {
             className="w-full rounded-xl bg-white/[0.03] border border-white/10 p-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-white/25 transition resize-none"
           />
         </div>
+
+        {hasYoutubeApiTarget && (
+          <section className="space-y-4 rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-4">
+            <div>
+              <h3 className="m-0 text-sm font-bold text-white">YouTube upload details</h3>
+              <p className="m-0 mt-1 text-[11px] leading-5 text-zinc-400">
+                These values are sent to YouTube exactly as entered and apply only to selected YouTube channels.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="youtube-title-input" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Video title <span className="text-red-400">*</span>
+                </label>
+                <span className="text-[10px] text-zinc-500">{Array.from(youtubeTitle).length}/100</span>
+              </div>
+              <input
+                id="youtube-title-input"
+                type="text"
+                value={youtubeTitle}
+                maxLength={100}
+                onChange={(event) => setYoutubeTitle(event.target.value)}
+                placeholder="Enter the YouTube video title"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:border-red-500/50 focus:outline-none"
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="youtube-description-input" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Description
+                </label>
+                <span className={`text-[10px] ${getUtf8ByteLength(youtubeDescription) > 5000 ? 'text-rose-400' : 'text-zinc-500'}`}>
+                  {getUtf8ByteLength(youtubeDescription)}/5,000 bytes
+                </span>
+              </div>
+              <textarea
+                id="youtube-description-input"
+                rows={4}
+                value={youtubeDescription}
+                onChange={(event) => setYoutubeDescription(event.target.value)}
+                placeholder="Describe this video for YouTube viewers"
+                className="w-full resize-y rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-white placeholder-zinc-500 focus:border-red-500/50 focus:outline-none"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="youtube-privacy-input" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Visibility <span className="text-red-400">*</span>
+                </label>
+                <select
+                  id="youtube-privacy-input"
+                  value={youtubePrivacyStatus}
+                  onChange={(event) => setYoutubePrivacyStatus(event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#151519] px-3 py-2.5 text-xs text-white focus:border-red-500/50 focus:outline-none"
+                >
+                  <option value="private">Private</option>
+                  <option value="unlisted">Unlisted</option>
+                  <option value="public">Public</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="youtube-kids-input" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Made for kids? <span className="text-red-400">*</span>
+                </label>
+                <select
+                  id="youtube-kids-input"
+                  value={youtubeMadeForKids}
+                  onChange={(event) => setYoutubeMadeForKids(event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#151519] px-3 py-2.5 text-xs text-white focus:border-red-500/50 focus:outline-none"
+                  required
+                >
+                  <option value="">Choose an option</option>
+                  <option value="no">No, it is not made for kids</option>
+                  <option value="yes">Yes, it is made for kids</option>
+                </select>
+              </div>
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-5 text-zinc-300">
+              <input
+                type="checkbox"
+                checked={youtubeContainsSyntheticMedia}
+                onChange={(event) => setYoutubeContainsSyntheticMedia(event.target.checked)}
+                className="mt-1 h-3.5 w-3.5 accent-red-500"
+              />
+              <span>This video contains realistic altered or synthetic content that should be disclosed to viewers.</span>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-white/10 bg-black/20 p-3 text-xs leading-5 text-zinc-300">
+              <input
+                type="checkbox"
+                checked={youtubeGuidelinesCertified}
+                onChange={(event) => setYoutubeGuidelinesCertified(event.target.checked)}
+                className="mt-1 h-3.5 w-3.5 accent-red-500"
+                required
+              />
+              <span>
+                I certify that this upload complies with the{' '}
+                <a
+                  href="https://www.youtube.com/howyoutubeworks/policies/community-guidelines/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-red-300 underline hover:text-red-200"
+                >
+                  YouTube Community Guidelines
+                </a>.
+              </span>
+            </label>
+          </section>
+        )}
 
           {/* Schedule Date & Time */}
         <div className="space-y-2">

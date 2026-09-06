@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, AlertTriangle, CheckCircle2, Trash2, Unlink } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, Unlink } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import PlatformIcon from '../components/PlatformIcon';
 import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
@@ -345,7 +345,10 @@ export const CreatorChannels = () => {
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {normalizedChannels.map((chan) => (
+            {normalizedChannels.map((chan) => {
+              const channelOwnerId = String(chan.userId?._id || chan.userId || '');
+              const canDisconnect = channelOwnerId === String(user?._id || '');
+              return (
               <div
                 key={chan._id}
                 className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3.5 hover:bg-white/[0.04] transition shadow-sm"
@@ -373,6 +376,7 @@ export const CreatorChannels = () => {
                 </div>
 
                 <div className="shrink-0">
+                  {canDisconnect ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -385,9 +389,15 @@ export const CreatorChannels = () => {
                     <Unlink className="h-3.5 w-3.5" />
                     <span>Disconnect</span>
                   </button>
+                  ) : (
+                    <span className="rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] font-semibold text-zinc-500">
+                      Assigned access
+                    </span>
+                  )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

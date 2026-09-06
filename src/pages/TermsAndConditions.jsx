@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 
@@ -7,7 +6,7 @@ const sections = [
     title: 'Use of ThousandPost',
     body: (
       <span>
-        You may use ThousandPost to connect supported publishing channels, manage media assets, schedule content, view insights, and moderate comments. You are responsible for ensuring your use complies with applicable laws and third-party platform policies.
+        You may use ThousandPost to connect supported publishing channels, manage media assets, schedule and publish content, and view performance insights. You are responsible for ensuring your use complies with applicable laws and third-party platform policies.
       </span>
     ),
   },
@@ -63,6 +62,12 @@ const sections = [
           <li>You own all intellectual property rights in the content or have secured all necessary licenses, releases, and permissions to distribute it.</li>
           <li>The content does not infringe copyright, trademark, privacy, publicity, or other rights of any third party.</li>
           <li>The content complies with Meta Community Standards and Instagram Community Guidelines.</li>
+          <li>
+            Content uploaded to YouTube complies with the{' '}
+            <a href="https://www.youtube.com/howyoutubeworks/policies/community-guidelines/" target="_blank" rel="noopener noreferrer" className="text-red-400 underline hover:text-red-300 font-medium">
+              YouTube Community Guidelines
+            </a>. You must select the video title, description, visibility, audience designation, and applicable altered-content disclosure before an API upload.
+          </li>
           <li>For sponsored, paid partnership, gifted, or affiliate posts, you must comply with Meta's Branded Content Policies and applicable consumer disclosure laws (e.g. FTC guidelines) using native platform disclosure tools.</li>
         </ul>
       </span>
@@ -104,7 +109,7 @@ export const TermsAndConditions = () => (
     <main className="mx-auto max-w-4xl px-5 py-12">
       <p className="m-0 text-xs font-bold uppercase tracking-wider text-zinc-400">Legal</p>
       <h1 className="m-0 mt-3 text-4xl font-black tracking-tight text-white">Terms and Conditions</h1>
-      <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: June 16, 2026</p>
+      <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: September 6, 2026</p>
 
       <div className="mt-8 rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-xl">
         <p className="m-0 text-base leading-7 text-zinc-300">

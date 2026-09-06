@@ -11,7 +11,6 @@ import MediaLibrary from './pages/MediaLibrary';
 import CalendarView from './pages/CalendarView';
 import ScheduleQueue from './pages/ScheduleQueue';
 import QueueManagement from './pages/QueueManagement';
-import Channels from './pages/Channels';
 import CreatorChannels from './pages/CreatorChannels';
 import AdminChannels from './pages/AdminChannels';
 import PublishedFeed from './pages/PublishedFeed';
@@ -109,7 +108,6 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   const location = useLocation();
   const [campaignVersion, setCampaignVersion] = useState(0);
   const canViewAdmin = user?.role === 'owner' || user?.role === 'admin';
-  const canEditQueue = ['owner', 'admin', 'editor'].includes(user?.role) || isCreator;
   const handlerPreviewContext = (() => {
     try {
       return JSON.parse(sessionStorage.getItem('admin_view_context') || 'null');
@@ -119,6 +117,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   })();
   const isHandlerPreview = handlerPreviewContext?.viewAs === 'account_handler' || Boolean(location.state?.previewAsHandler);
   const isCreator = user?.userType === 'account_handler' || isHandlerPreview;
+  const canEditQueue = ['owner', 'admin', 'editor'].includes(user?.role) || isCreator;
 
   useEffect(() => {
     const refreshCampaignScopedRoutes = () => {
