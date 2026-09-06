@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { AlertCircle, Calendar, CheckCircle, MoreVertical, Share2, SkipForward, TimerOff, RefreshCw } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle, MoreVertical, Share2, SkipForward, TimerOff, RefreshCw, Zap } from 'lucide-react';
 import { getMediaUrl } from '../utils/mediaUrls';
 import PlatformIcon from '../components/PlatformIcon';
 import { AccountAvatar } from '../components/adminDashboard/DashboardPresentation';
@@ -44,6 +44,7 @@ export const CreatorCampaigns = () => {
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [todayTracking, setTodayTracking] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -65,8 +66,7 @@ export const CreatorCampaigns = () => {
   const isReadyToPullRef = useRef(false);
 
   const isCreatorActionable = (post) => (
-    ['manual', 'hybrid'].includes(post.scheduleMode)
-    && !['posted_manual', 'published', 'published_auto', 'failed', 'cancelled'].includes(post.status)
+    !['posted_manual', 'published', 'published_auto', 'failed', 'cancelled'].includes(post.status)
   );
   const isAwaitingPostedDecision = (post) => (
     Boolean(post?.manualDownloadedAt) || post?.status === 'downloaded'
@@ -467,7 +467,7 @@ export const CreatorCampaigns = () => {
         await queryClient.invalidateQueries({ queryKey: ['creator'] });
       }
 
-      const [campData, postData, trackingData] = await Promise.all([
+      const [campData, postData, trackingData, accountsData] = await Promise.all([
         queryClient.fetchQuery({
           queryKey: ['creator', handlerPreviewUserId, 'campaigns'],
           queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts/creator/campaigns`),
@@ -479,10 +479,16 @@ export const CreatorCampaigns = () => {
           staleTime: opts.force ? 0 : 20 * 1000,
         }),
         fetchTodayTracking(headers, { force: opts.force }),
+        queryClient.fetchQuery({
+          queryKey: ['creator', handlerPreviewUserId, 'accounts'],
+          queryFn: () => fetchJson(`${API_BASE_URL}/api/accounts`),
+          staleTime: opts.force ? 0 : 60 * 1000,
+        }).catch(() => []),
       ]);
 
-      setCampaigns(campData);
-      setPosts(postData);
+      setCampaigns(Array.isArray(campData) ? campData : []);
+      setPosts(Array.isArray(postData) ? postData : []);
+      setAccounts(Array.isArray(accountsData) ? accountsData : []);
       setTodayTracking(trackingData.accounts || {});
       lastDataRefreshAtRef.current = Date.now();
     } catch (err) {
@@ -599,26 +605,7 @@ export const CreatorCampaigns = () => {
     return () => window.clearTimeout(timer);
   }, [postedToast]);
 
-  const assignedCampaigns = campaigns.filter((camp) => (camp.channels || []).length > 0);
-  const creatorQueuePosts = posts.filter((post) => (
-    ['manual', 'hybrid'].includes(post.scheduleMode)
-    && !['failed', 'cancelled'].includes(post.status)
-  ));
-  const actionablePosts = posts
-    .filter(isCreatorActionable)
-    .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
-  const nextQueuedPost = actionablePosts[0] || null;
   const getIdValue = (value) => (typeof value === 'object' && value !== null ? value._id : value);
-  const getCampaignCreatorPosts = (campaignId) => (
-    creatorQueuePosts.filter((post) => String(getIdValue(post.campaignId)) === String(campaignId))
-  );
-
-  const getPrimaryMedia = (post) => post.mediaIds?.[0] || null;
-  const getPostAccounts = (post) => (
-    (post.socialAccountIds || []).length > 0
-      ? post.socialAccountIds
-      : post.campaignChannelIds || []
-  );
   const getAccountId = (account) => String(getIdValue(account) || '');
   const getChannelAccountIds = (channel) => (
     [
@@ -626,6 +613,62 @@ export const CreatorCampaigns = () => {
       channel?.matchedAccountId,
       channel?._id,
     ].map(getAccountId).filter(Boolean)
+  );
+
+  const allCampaigns = useMemo(() => {
+    const list = [...campaigns];
+    const coveredAccountIds = new Set(
+      campaigns.flatMap((c) => (c.channels || []).flatMap(getChannelAccountIds))
+    );
+    const personalChannels = accounts
+      .filter((acc) => !coveredAccountIds.has(String(acc._id)) && acc.isConnected !== false)
+      .map((acc) => ({
+        _id: `personal-${acc._id}`,
+        socialAccountId: acc._id,
+        platform: acc.platform,
+        username: acc.username,
+        name: acc.name || acc.displayName || acc.username || 'Personal Channel',
+        avatarUrl: acc.avatarUrl || acc.profilePictureUrl,
+        isConnected: acc.isConnected !== false,
+        status: acc.status || 'connected',
+        tokenStatus: acc.tokenStatus,
+        isVerified: acc.isVerified,
+      }));
+
+    if (personalChannels.length > 0) {
+      list.push({
+        _id: 'personal',
+        name: 'Personal Channels',
+        status: 'active',
+        channels: personalChannels,
+      });
+    }
+    return list;
+  }, [campaigns, accounts]);
+
+  const assignedCampaigns = allCampaigns.filter((camp) => (camp.channels || []).length > 0);
+  const creatorQueuePosts = posts.filter((post) => (
+    !['failed', 'cancelled'].includes(post.status)
+  ));
+  const actionableManualPosts = posts
+    .filter((p) => ['manual', 'hybrid'].includes(p.scheduleMode) && isCreatorActionable(p))
+    .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
+  const nextQueuedPost = actionableManualPosts[0] || null;
+  const getCampaignCreatorPosts = (campaignId) => {
+    if (campaignId === 'personal') {
+      return creatorQueuePosts.filter((post) => {
+        const campId = getIdValue(post.campaignId);
+        return !campId || campId === 'personal';
+      });
+    }
+    return creatorQueuePosts.filter((post) => String(getIdValue(post.campaignId)) === String(campaignId));
+  };
+
+  const getPrimaryMedia = (post) => post.mediaIds?.[0] || null;
+  const getPostAccounts = (post) => (
+    (post.socialAccountIds || []).length > 0
+      ? post.socialAccountIds
+      : post.campaignChannelIds || []
   );
   const getAccountLabel = (account) => account?.username || account?.name || account?.handle || account?.requestedHandle || 'Account';
   const shouldShowManualPostedTimes = (account) => (
@@ -1039,7 +1082,24 @@ export const CreatorCampaigns = () => {
                           )}
 
                           {queuePost ? (
-                            awaitingPostedDecision ? (
+                            queuePost.scheduleMode === 'auto' ? (
+                              <div className="space-y-1.5">
+                                <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 flex items-center justify-between">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Zap className="h-4 w-4 text-amber-400 shrink-0" />
+                                    <div className="min-w-0">
+                                      <p className="m-0 text-xs font-semibold text-white">Auto Post Scheduled</p>
+                                      <p className="m-0 text-[10px] text-zinc-400 truncate">
+                                        {formatPostTime(queuePost.scheduledAt)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <span className="shrink-0 text-[10px] font-bold uppercase text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                                    Auto
+                                  </span>
+                                </div>
+                              </div>
+                            ) : awaitingPostedDecision ? (
                               <div className="grid w-full grid-cols-2 gap-2">
                                 <button
                                   type="button"

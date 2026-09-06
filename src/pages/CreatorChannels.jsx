@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, AlertTriangle, CheckCircle2, Trash2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, Trash2, Unlink } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import PlatformIcon from '../components/PlatformIcon';
 import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
@@ -379,10 +379,11 @@ export const CreatorChannels = () => {
                       setRemoveError('');
                       setChannelToRemove(chan);
                     }}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition shadow-sm"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-zinc-300 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition shadow-sm"
                     title="Disconnect Account"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Unlink className="h-3.5 w-3.5" />
+                    <span>Disconnect</span>
                   </button>
                 </div>
               </div>
@@ -397,7 +398,7 @@ export const CreatorChannels = () => {
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#121215] p-6 shadow-2xl space-y-4">
             <div className="flex items-start gap-3.5">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/15 text-rose-400">
-                <Trash2 className="h-5 w-5" />
+                <Unlink className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-semibold text-white m-0">Disconnect Social Account</h3>
@@ -473,7 +474,7 @@ export const CreatorChannels = () => {
                 disabled={removing}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/20 px-4 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/30 hover:text-white shadow-sm disabled:opacity-50"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Unlink className="h-3.5 w-3.5" />
                 <span>{removing ? 'Disconnecting...' : 'Disconnect Account'}</span>
               </button>
             </div>

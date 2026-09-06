@@ -792,6 +792,43 @@ export const CreatorSchedulePost = () => {
           )}
         </div>
 
+        {/* Publishing Mode: Auto vs Manual */}
+        <div className="space-y-2">
+          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+            Publishing Mode
+          </label>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setScheduleMode('auto')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+                scheduleMode === 'auto'
+                  ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/30'
+                  : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Zap className={`h-3.5 w-3.5 ${scheduleMode === 'auto' ? 'text-amber-400' : 'text-zinc-500'}`} />
+              <span>Auto Post</span>
+              <span className="text-[10px] text-zinc-500 font-normal">Direct via API</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setScheduleMode('manual')}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+                scheduleMode === 'manual'
+                  ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/30'
+                  : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              <Smartphone className={`h-3.5 w-3.5 ${scheduleMode === 'manual' ? 'text-purple-400' : 'text-zinc-500'}`} />
+              <span>Manual Post</span>
+              <span className="text-[10px] text-zinc-500 font-normal">Share from device</span>
+            </button>
+          </div>
+        </div>
+
         {/* Device Media Upload or Choose from Library */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -997,44 +1034,7 @@ export const CreatorSchedulePost = () => {
           />
         </div>
 
-        {/* Publishing Mode: Auto vs Manual */}
-        <div className="space-y-2">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
-            Publishing Mode
-          </label>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setScheduleMode('auto')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
-                scheduleMode === 'auto'
-                  ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/30'
-                  : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Zap className={`h-3.5 w-3.5 ${scheduleMode === 'auto' ? 'text-amber-400' : 'text-zinc-500'}`} />
-              <span>Auto Post</span>
-              <span className="text-[10px] text-zinc-500 font-normal">Direct via API</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setScheduleMode('manual')}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
-                scheduleMode === 'manual'
-                  ? 'bg-white/15 text-white shadow-sm ring-1 ring-white/30'
-                  : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <Smartphone className={`h-3.5 w-3.5 ${scheduleMode === 'manual' ? 'text-purple-400' : 'text-zinc-500'}`} />
-              <span>Manual Post</span>
-              <span className="text-[10px] text-zinc-500 font-normal">Share from device</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Schedule Date & Time */}
+          {/* Schedule Date & Time */}
         <div className="space-y-2">
           <label htmlFor="scheduled-at-input" className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
             Publish Date & Time
