@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import {
@@ -138,7 +138,7 @@ const getMinDateTimeString = () => {
 
 const getDefaultDateTimeString = () => {
   const d = new Date();
-  d.setHours(d.getHours() + 1, 0, 0, 0);
+  d.setSeconds(0, 0);
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -232,7 +232,7 @@ export const CreatorSchedulePost = () => {
       list.push({
         _id: targetKey,
         campaignId: null,
-        campaignName: 'Personal',
+        campaignName: null,
         campaignChannelId: null,
         socialAccountId: acc._id,
         platform: acc.platform,
@@ -271,19 +271,8 @@ export const CreatorSchedulePost = () => {
     return list;
   }, [creatorCampaignsQuery.data, accountsQuery.data, user?._id]);
 
-  // Effective selection logic (defaults to first channel if none explicitly selected)
-  const effectiveSelectedIds = useMemo(() => {
-    if (selectedChannelIds.length === 0 && availableChannels.length > 0) {
-      const preselectedCampaignId = String(preselected?.campaignId?._id || preselected?.campaignId || '');
-      const matchingChannel = availableChannels.find((channel) => (
-        preselected?.scope === 'personal'
-          ? !channel.campaignId
-          : preselectedCampaignId && String(channel.campaignId || '') === preselectedCampaignId
-      ));
-      return [matchingChannel?._id || availableChannels[0]._id];
-    }
-    return selectedChannelIds;
-  }, [selectedChannelIds, availableChannels, preselected]);
+  // Channel selection: no channel selected by default
+  const effectiveSelectedIds = selectedChannelIds;
 
   const selectedChannels = useMemo(() => {
     return availableChannels.filter((c) => effectiveSelectedIds.includes(c._id));
@@ -300,19 +289,16 @@ export const CreatorSchedulePost = () => {
 
   const toggleChannel = (channelId) => {
     setSelectedChannelIds((prev) => {
-      const current = prev.length === 0 && availableChannels.length > 0
-        ? [availableChannels[0]._id]
-        : prev;
-      if (current.includes(channelId)) {
-        return current.filter((id) => id !== channelId);
+      if (prev.includes(channelId)) {
+        return prev.filter((id) => id !== channelId);
       } else {
         const target = availableChannels.find((channel) => channel._id === channelId);
         const withoutDuplicateAccount = target?.socialAccountId
-          ? current.filter((id) => {
+          ? prev.filter((id) => {
             const selected = availableChannels.find((channel) => channel._id === id);
             return String(selected?.socialAccountId || '') !== String(target.socialAccountId);
           })
-          : current;
+          : prev;
         return [...withoutDuplicateAccount, channelId];
       }
     });
@@ -329,7 +315,7 @@ export const CreatorSchedulePost = () => {
         return true;
       })
       .map((channel) => channel._id);
-    if (selectableIds.every((id) => effectiveSelectedIds.includes(id))) {
+    if (selectableIds.length > 0 && selectableIds.every((id) => effectiveSelectedIds.includes(id))) {
       setSelectedChannelIds([]);
     } else {
       setSelectedChannelIds(selectableIds);
@@ -378,13 +364,52 @@ export const CreatorSchedulePost = () => {
     staleTime: 30 * 1000,
   });
 
+  // Cleanup active blob preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (filePreviewUrl && filePreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(filePreviewUrl);
+      }
+    };
+  }, [filePreviewUrl]);
+
+  // Handle Modal Escape key and body scroll lock
+  useEffect(() => {
+    const isAnyModalOpen = Boolean(showMediaPicker || videoModalUrl || previewPost);
+    if (!isAnyModalOpen) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowMediaPicker(false);
+        setVideoModalUrl('');
+        setPreviewPost(null);
+      }
+    };
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showMediaPicker, videoModalUrl, previewPost]);
+
+  // Auto-dismiss toast notification after 5 seconds
+  useEffect(() => {
+    if (!statusMessage) return undefined;
+    const timer = window.setTimeout(() => setStatusMessage(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [statusMessage]);
+
   // Handle file selection from device
   const handleFileChange = (e) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
 
-    if (selected.size > 500 * 1024 * 1024) {
-      setStatusMessage({ type: 'error', text: 'File size exceeds 500MB limit.' });
+    if (selected.size > 100 * 1024 * 1024) {
+      setStatusMessage({ type: 'error', text: 'File size exceeds 100MB limit.' });
       return;
     }
 
@@ -434,9 +459,10 @@ export const CreatorSchedulePost = () => {
   const applyQuickTime = (type) => {
     const d = new Date();
     if (type === 'now') {
-      // Set to right now
+      d.setSeconds(0, 0);
     } else if (type === '1h') {
-      d.setHours(d.getHours() + 1, 0, 0, 0);
+      d.setTime(d.getTime() + 60 * 60 * 1000);
+      d.setSeconds(0, 0);
     } else if (type === 'tonight') {
       d.setHours(20, 0, 0, 0);
       if (d <= new Date()) d.setDate(d.getDate() + 1);
@@ -499,7 +525,9 @@ export const CreatorSchedulePost = () => {
     }
 
     if (hasYoutubeApiTarget) {
-      const isVideo = file?.type?.startsWith('video/') || selectedMediaAsset?.type === 'video';
+      const isVideo = file?.type?.startsWith('video/')
+        || /\.(mp4|mov|webm|mkv|m4v)$/i.test(file?.name || '')
+        || selectedMediaAsset?.type === 'video';
       if (!isVideo) {
         setStatusMessage({ type: 'error', text: 'YouTube API publishing requires a video file.' });
         return;
@@ -526,11 +554,39 @@ export const CreatorSchedulePost = () => {
       }
     }
 
-    const scheduledDate = new Date(scheduledAt);
+    if (selectedMediaAsset) {
+      const assetCampaignId = String(selectedMediaAsset.campaignId?._id || selectedMediaAsset.campaignId || '');
+      const assetIsPersonal = selectedMediaAsset.scope === 'personal' || !assetCampaignId;
+      const hasMismatchedCampaign = selectedChannels.some((channel) => {
+        if (assetIsPersonal) {
+          return Boolean(channel.campaignId);
+        }
+        return String(channel.campaignId || '') !== assetCampaignId;
+      });
+
+      if (hasMismatchedCampaign) {
+        setStatusMessage({
+          type: 'error',
+          text: `The selected media from My Media belongs to ${assetIsPersonal ? 'Personal' : 'a specific campaign'} and cannot be scheduled to channels across other campaigns. Please choose channels within the same campaign or upload the file from this device.`,
+        });
+        return;
+      }
+    }
+
+    let scheduledDate = new Date(scheduledAt);
     const nowThreshold = new Date(Date.now() - 2 * 60 * 1000);
-    if (Number.isNaN(scheduledDate.getTime()) || scheduledDate < nowThreshold) {
-      setStatusMessage({ type: 'error', text: 'Scheduled date and time cannot be in the past. Please choose a future time.' });
-      setDateError('Scheduled date and time cannot be in the past.');
+    if (!Number.isNaN(scheduledDate.getTime()) && scheduledDate < nowThreshold) {
+      const minutesAgo = (Date.now() - scheduledDate.getTime()) / (60 * 1000);
+      if (minutesAgo <= 15) {
+        scheduledDate = new Date();
+      } else {
+        setStatusMessage({ type: 'error', text: 'Scheduled date and time cannot be in the past. Please choose a future time.' });
+        setDateError('Scheduled date and time cannot be in the past.');
+        return;
+      }
+    } else if (Number.isNaN(scheduledDate.getTime())) {
+      setStatusMessage({ type: 'error', text: 'Please select a valid date and time.' });
+      setDateError('Please select a valid date and time.');
       return;
     }
 
@@ -548,105 +604,132 @@ export const CreatorSchedulePost = () => {
         campaignGroups.get(cId).push(ch);
       });
 
+      const successfulCampaigns = [];
+      const failedCampaigns = [];
+
       for (const [targetCampaignId, channelsInCampaign] of campaignGroups.entries()) {
-        let mediaId = selectedMediaAsset?._id;
+        try {
+          let mediaId = selectedMediaAsset?._id;
 
-        if (!mediaId) {
-          const formData = new FormData();
-          formData.append('file', file);
-          if (targetCampaignId) {
-            formData.append('campaignId', targetCampaignId);
-          } else {
-            formData.append('scope', 'personal');
+          if (!mediaId) {
+            const formData = new FormData();
+            formData.append('file', file);
+            if (targetCampaignId) {
+              formData.append('campaignId', targetCampaignId);
+            } else {
+              formData.append('scope', 'personal');
+            }
+            formData.append('sourceUsage', 'schedule');
+            formData.append('tags', 'creator,schedule,generated');
+            if (caption) formData.append('caption', caption);
+
+            const uploadHeaders = withHandlerPreviewHeaders({
+              Authorization: `Bearer ${token}`,
+            });
+
+            const uploadQuery = targetCampaignId
+              ? `campaignId=${encodeURIComponent(targetCampaignId)}`
+              : 'scope=personal';
+            const uploadRes = await fetch(`${API_BASE_URL}/api/media/upload?${uploadQuery}`, {
+              method: 'POST',
+              headers: uploadHeaders,
+              body: formData,
+            });
+
+            if (!uploadRes.ok) {
+              const err = await uploadRes.json().catch(() => ({}));
+              throw new Error(err.message || 'Failed to upload media from device.');
+            }
+
+            const mediaData = await uploadRes.json();
+            mediaId = mediaData._id;
           }
-          formData.append('sourceUsage', 'schedule');
-          formData.append('tags', 'creator,schedule,generated');
-          if (caption) formData.append('caption', caption);
 
-          const uploadHeaders = withHandlerPreviewHeaders({
-            Authorization: `Bearer ${token}`,
-          });
+          setSubmittingStep('scheduling');
 
-          const uploadQuery = targetCampaignId
-            ? `campaignId=${encodeURIComponent(targetCampaignId)}`
-            : 'scope=personal';
-          const uploadRes = await fetch(`${API_BASE_URL}/api/media/upload?${uploadQuery}`, {
+          const channelTargets = channelsInCampaign.map((c) => ({
+            socialAccountId: c.socialAccountId || null,
+            campaignChannelId: targetCampaignId ? (c.campaignChannelId || c._id) : null,
+          }));
+
+          const scheduleRes = await fetch(`${API_BASE_URL}/api/scheduler`, {
             method: 'POST',
-            headers: uploadHeaders,
-            body: formData,
+            headers: withHandlerPreviewHeaders({
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            }),
+            body: JSON.stringify({
+              ...(targetCampaignId ? { campaignId: targetCampaignId } : {}),
+              socialAccountIds: channelsInCampaign.map((c) => c.socialAccountId).filter(Boolean),
+              campaignChannelIds: targetCampaignId
+                ? channelsInCampaign.map((c) => c.campaignChannelId || c._id).filter(Boolean)
+                : [],
+              channelTargets,
+              mediaIds: [mediaId],
+              caption: caption.trim(),
+              scheduledAt: scheduledDate.toISOString(),
+              scheduleMode,
+              platformSpecifics: {
+                type: postType,
+                postCaption: caption.trim(),
+                ...(hasYoutubeApiTarget ? {
+                  youtube: {
+                    title: youtubeTitle.trim(),
+                    description: youtubeDescription,
+                    privacyStatus: youtubePrivacyStatus,
+                    selfDeclaredMadeForKids: youtubeMadeForKids === 'yes',
+                    containsSyntheticMedia: youtubeContainsSyntheticMedia,
+                    communityGuidelinesCertified: youtubeGuidelinesCertified,
+                  },
+                } : {}),
+              },
+            }),
           });
 
-          if (!uploadRes.ok) {
-            const err = await uploadRes.json().catch(() => ({}));
-            throw new Error(err.message || 'Failed to upload media from device.');
+          if (!scheduleRes.ok) {
+            const err = await scheduleRes.json().catch(() => ({}));
+            throw new Error(err.message || 'Failed to schedule post.');
           }
 
-          const mediaData = await uploadRes.json();
-          mediaId = mediaData._id;
-        }
-
-        setSubmittingStep('scheduling');
-
-        const channelTargets = channelsInCampaign.map((c) => ({
-          socialAccountId: c.socialAccountId || null,
-          campaignChannelId: targetCampaignId ? (c.campaignChannelId || c._id) : null,
-        }));
-
-        const scheduleRes = await fetch(`${API_BASE_URL}/api/scheduler`, {
-          method: 'POST',
-          headers: withHandlerPreviewHeaders({
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          }),
-          body: JSON.stringify({
-            ...(targetCampaignId ? { campaignId: targetCampaignId } : {}),
-            socialAccountIds: channelsInCampaign.map((c) => c.socialAccountId).filter(Boolean),
-            campaignChannelIds: targetCampaignId
-              ? channelsInCampaign.map((c) => c.campaignChannelId || c._id).filter(Boolean)
-              : [],
-            channelTargets,
-            mediaIds: [mediaId],
-            caption: caption.trim(),
-            scheduledAt: scheduledDate.toISOString(),
-            scheduleMode,
-            platformSpecifics: {
-              type: postType,
-              postCaption: caption.trim(),
-              ...(hasYoutubeApiTarget ? {
-                youtube: {
-                  title: youtubeTitle.trim(),
-                  description: youtubeDescription,
-                  privacyStatus: youtubePrivacyStatus,
-                  selfDeclaredMadeForKids: youtubeMadeForKids === 'yes',
-                  containsSyntheticMedia: youtubeContainsSyntheticMedia,
-                  communityGuidelinesCertified: youtubeGuidelinesCertified,
-                },
-              } : {}),
-            },
-          }),
-        });
-
-        if (!scheduleRes.ok) {
-          const err = await scheduleRes.json().catch(() => ({}));
-          throw new Error(err.message || 'Failed to schedule post.');
+          successfulCampaigns.push(targetCampaignId);
+        } catch (groupErr) {
+          failedCampaigns.push({
+            campaignId: targetCampaignId,
+            error: groupErr.message || 'An unexpected error occurred.',
+          });
         }
       }
 
-      setStatusMessage({
-        type: 'success',
-        text: `Post scheduled across ${selectedChannels.length} channel${selectedChannels.length > 1 ? 's' : ''} for ${formatScheduledDate(scheduledDate.toISOString())}!`,
-      });
+      if (successfulCampaigns.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ['creator', handlerPreviewUserId, 'scheduled-posts'] });
+      }
 
-      handleClearFile();
-      setCaption('');
-      setYoutubeTitle('');
-      setYoutubeDescription('');
-      setYoutubePrivacyStatus('private');
-      setYoutubeMadeForKids('');
-      setYoutubeContainsSyntheticMedia(false);
-      setYoutubeGuidelinesCertified(false);
-      setScheduledAt(getDefaultDateTimeString());
-      queryClient.invalidateQueries({ queryKey: ['creator', handlerPreviewUserId, 'scheduled-posts'] });
+      if (failedCampaigns.length === 0) {
+        setStatusMessage({
+          type: 'success',
+          text: `Post scheduled across ${selectedChannels.length} channel${selectedChannels.length > 1 ? 's' : ''} for ${formatScheduledDate(scheduledDate.toISOString())}!`,
+        });
+
+        handleClearFile();
+        setCaption('');
+        setYoutubeTitle('');
+        setYoutubeDescription('');
+        setYoutubePrivacyStatus('private');
+        setYoutubeMadeForKids('');
+        setYoutubeContainsSyntheticMedia(false);
+        setYoutubeGuidelinesCertified(false);
+        setScheduledAt(getDefaultDateTimeString());
+      } else if (successfulCampaigns.length > 0) {
+        setStatusMessage({
+          type: 'error',
+          text: `Partially scheduled. Succeeded for some channels, but failed for others: ${failedCampaigns.map((f) => f.error).join('; ')}`,
+        });
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: failedCampaigns[0]?.error || 'Failed to schedule post.',
+        });
+      }
     } catch (err) {
       console.error('Scheduling error:', err);
       setStatusMessage({ type: 'error', text: err.message || 'An error occurred while scheduling.' });
@@ -715,29 +798,30 @@ export const CreatorSchedulePost = () => {
     });
   }, [scheduledPosts, availableChannels]);
 
-  const selectedQueuePosts = useMemo(() => {
-    const selectedIds = new Set(
-      selectedChannels.map((c) => String(c.campaignChannelId || '')).filter(Boolean)
-    );
-    const selectedSocialIds = new Set(
-      selectedChannels.map((c) => String(c.socialAccountId || '')).filter(Boolean)
-    );
-
-    return allQueuePosts.filter((p) => {
-      if (selectedIds.size > 0 || selectedSocialIds.size > 0) {
-        const pChanIds = (p.campaignChannelIds || []).map((c) => String(c?._id || c));
-        const pAccIds = (p.socialAccountIds || []).map((a) => String(a?._id || a));
-
-        const matchesChannel = pChanIds.some((id) => selectedIds.has(id));
-        const matchesAccount = pAccIds.some((id) => selectedSocialIds.has(id));
-
-        return matchesChannel || matchesAccount;
-      }
-      return true;
+  const upcomingPosts = useMemo(() => {
+    const nowThreshold = new Date(Date.now() - 60 * 1000);
+    return allQueuePosts.filter((post) => {
+      const isPastOrPublished = ['published', 'published_auto', 'posted_manual', 'cancelled'].includes(post.status);
+      return !isPastOrPublished && new Date(post.scheduledAt) >= nowThreshold;
     });
-  }, [allQueuePosts, selectedChannels]);
+  }, [allQueuePosts]);
 
-  const visibleQueuePosts = queueFilter === 'selected' ? selectedQueuePosts : allQueuePosts;
+  const scheduledOnlyPosts = useMemo(() => {
+    return allQueuePosts.filter((post) => (post.status || 'scheduled') === 'scheduled');
+  }, [allQueuePosts]);
+
+  const publishedPosts = useMemo(() => {
+    return allQueuePosts.filter((post) => {
+      return ['published', 'published_auto', 'posted_manual'].includes(post.status) || Boolean(post.manualPostedAt);
+    });
+  }, [allQueuePosts]);
+
+  const filteredQueuePosts = useMemo(() => {
+    if (queueFilter === 'upcoming') return upcomingPosts;
+    if (queueFilter === 'scheduled') return scheduledOnlyPosts;
+    if (queueFilter === 'published') return publishedPosts;
+    return allQueuePosts;
+  }, [queueFilter, upcomingPosts, scheduledOnlyPosts, publishedPosts, allQueuePosts]);
 
   return (
     <div className="min-h-screen bg-[#0c0c0e] text-zinc-100 p-4 sm:p-6 md:p-8 space-y-6 font-sans antialiased">
@@ -749,30 +833,33 @@ export const CreatorSchedulePost = () => {
         </p>
       </div>
 
-      {/* Status Banner */}
+      {/* Toast Notification */}
       {statusMessage && (
-        <div
-          className={`p-3 rounded-xl text-xs font-semibold flex items-center justify-between gap-3 ${
-            statusMessage.type === 'success'
-              ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300'
-              : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {statusMessage.type === 'success' ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-            ) : (
-              <AlertCircle className="h-4 w-4 shrink-0" />
-            )}
-            <span>{statusMessage.text}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setStatusMessage(null)}
-            className="text-xs opacity-70 hover:opacity-100"
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300 max-w-md w-full px-4 pointer-events-none">
+          <div
+            className={`pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border text-xs font-semibold shadow-2xl backdrop-blur-xl ${
+              statusMessage.type === 'success'
+                ? 'border-emerald-500/30 bg-[#0d1f17]/95 text-emerald-300 shadow-emerald-950/40'
+                : 'border-rose-500/30 bg-[#240e11]/95 text-rose-300 shadow-rose-950/40'
+            }`}
           >
-            ✕
-          </button>
+            <div className="flex items-center gap-2.5 min-w-0">
+              {statusMessage.type === 'success' ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+              )}
+              <span className="leading-snug">{statusMessage.text}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStatusMessage(null)}
+              className="rounded-lg p-1 text-zinc-400 hover:text-white hover:bg-white/10 transition shrink-0 ml-1"
+              title="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -808,7 +895,7 @@ export const CreatorSchedulePost = () => {
                     key={channel._id}
                     type="button"
                     onClick={() => toggleChannel(channel._id)}
-                    className={`relative p-[1.5px] rounded-xl text-left transition-all ${
+                    className={`relative p-[1.5px] rounded-xl text-left transition ${
                       isSelected
                         ? 'bg-gradient-to-r from-[#7831d6] via-[#9333ea] to-[#ec4899] shadow-[0_0_14px_rgba(120,49,214,0.35)]'
                         : 'bg-white/10 hover:bg-white/20'
@@ -830,14 +917,18 @@ export const CreatorSchedulePost = () => {
                       <div className="min-w-0">
                         <p className="m-0 text-xs font-semibold leading-tight truncate">{channel.name}</p>
                         <p className="m-0 text-[10px] text-zinc-500 font-normal leading-tight truncate">
-                          {formatHandle(channel.username || channel.name)} · {channel.campaignName || 'Personal'}
+                          {[formatHandle(channel.username || channel.name), channel.campaignName && channel.campaignName !== 'Personal' ? channel.campaignName : null].filter(Boolean).join(' · ')}
                         </p>
                       </div>
-                      {isSelected && (
-                        <span className="h-4 w-4 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0 ml-1">
-                          <Check className="h-2.5 w-2.5 stroke-[3]" />
-                        </span>
-                      )}
+                      <span
+                        className={`h-4 w-4 rounded-full flex items-center justify-center shrink-0 ml-1 transition-all duration-150 ${
+                          isSelected
+                            ? 'bg-purple-500/20 text-purple-300 opacity-100 scale-100'
+                            : 'opacity-0 scale-75 pointer-events-none'
+                        }`}
+                      >
+                        <Check className="h-2.5 w-2.5 stroke-[3]" />
+                      </span>
                     </div>
                   </button>
                 );
@@ -1297,66 +1388,60 @@ export const CreatorSchedulePost = () => {
 
       {/* Complete creator/handler queue for connected accounts */}
       <div className="pt-8 border-t border-white/10 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
-              <Clock className="h-3.5 w-3.5" />
-              <span>Post Queue ({visibleQueuePosts.length})</span>
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
+            <Clock className="h-3.5 w-3.5" />
+            <span>Post Queue ({filteredQueuePosts.length})</span>
+          </div>
 
-            {/* Filter Toggle: All vs Selected Channel */}
-            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 text-xs">
+          {/* Filter Dropdown */}
+          <div className="flex items-center gap-2">
+            <select
+              value={queueFilter}
+              onChange={(e) => setQueueFilter(e.target.value)}
+              className="rounded-xl border border-white/10 bg-[#151519] px-3 py-1.5 text-xs font-medium text-white focus:border-purple-500/50 focus:outline-none transition cursor-pointer [color-scheme:dark]"
+            >
+              <option value="all">All ({allQueuePosts.length})</option>
+              <option value="upcoming">Upcoming ({upcomingPosts.length})</option>
+              <option value="scheduled">Scheduled ({scheduledOnlyPosts.length})</option>
+              <option value="published">Published ({publishedPosts.length})</option>
+            </select>
+          </div>
+        </div>
+
+        {scheduledPostsQuery.isLoading ? (
+          <div className="flex items-center justify-center gap-2 p-6 text-xs text-zinc-400">
+            <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+            <span>Loading your post queue...</span>
+          </div>
+        ) : scheduledPostsQuery.isError ? (
+          <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-xs text-rose-300">
+            {scheduledPostsQuery.error?.message || 'Failed to load your scheduled queue.'}
+          </div>
+        ) : filteredQueuePosts.length === 0 ? (
+          <div className="p-6 rounded-xl border border-white/10 bg-white/[0.02] text-center space-y-2">
+            <p className="text-xs text-zinc-400 m-0">
+              {queueFilter === 'upcoming'
+                ? 'No upcoming scheduled posts found.'
+                : queueFilter === 'scheduled'
+                ? 'No posts with scheduled status found.'
+                : queueFilter === 'published'
+                ? 'No published posts found in your queue.'
+                : 'No scheduled posts found in your queue.'}
+            </p>
+            {queueFilter !== 'all' && allQueuePosts.length > 0 && (
               <button
                 type="button"
                 onClick={() => setQueueFilter('all')}
-                className={`px-3 py-1 rounded-lg font-medium transition ${
-                  queueFilter === 'all'
-                    ? 'bg-[#7831d6] text-white shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
+                className="text-xs text-purple-400 hover:text-purple-300 font-semibold"
               >
-                All Connected Accounts ({allQueuePosts.length})
+                View all {allQueuePosts.length} queue posts →
               </button>
-              <button
-                type="button"
-                onClick={() => setQueueFilter('selected')}
-                className={`px-3 py-1 rounded-lg font-medium transition ${
-                  queueFilter === 'selected'
-                    ? 'bg-[#7831d6] text-white shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                Selected Channel ({selectedQueuePosts.length})
-              </button>
-            </div>
+            )}
           </div>
-
-          {scheduledPostsQuery.isLoading ? (
-            <div className="flex items-center justify-center gap-2 p-6 text-xs text-zinc-400">
-              <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
-              <span>Loading your post queue...</span>
-            </div>
-          ) : scheduledPostsQuery.isError ? (
-            <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-xs text-rose-300">
-              {scheduledPostsQuery.error?.message || 'Failed to load your scheduled queue.'}
-            </div>
-          ) : visibleQueuePosts.length === 0 ? (
-            <div className="p-6 rounded-xl border border-white/10 bg-white/[0.02] text-center space-y-2">
-              <p className="text-xs text-zinc-400 m-0">
-                No queue posts found for the currently selected connected account.
-              </p>
-              {allQueuePosts.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setQueueFilter('all')}
-                  className="text-xs text-purple-400 hover:text-purple-300 font-semibold"
-                >
-                  View all {allQueuePosts.length} connected-account queue posts →
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="divide-y divide-white/10">
-              {visibleQueuePosts.map((post) => {
+        ) : (
+          <div className="divide-y divide-white/10">
+            {filteredQueuePosts.map((post) => {
                 const postChannelIds = (post.campaignChannelIds || []).map((c) => String(c?._id || c));
                 const postAccountIds = (post.socialAccountIds || []).map((a) => String(a?._id || a));
 
@@ -1675,6 +1760,8 @@ export const CreatorSchedulePost = () => {
       {/* Full Video Preview Modal */}
       {videoModalUrl && (
         <div
+          role="dialog"
+          aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
           onClick={() => setVideoModalUrl('')}
         >
