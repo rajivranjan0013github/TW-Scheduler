@@ -17,6 +17,8 @@ import {
   Check,
   FolderHeart,
   Play,
+  Send,
+  ExternalLink,
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { getHandlerPreviewContext, withHandlerPreviewHeaders } from '../utils/handlerPreview';
@@ -53,6 +55,37 @@ const cancellablePostStatuses = new Set([
   'paused',
   'posted_manual',
 ]);
+
+const isPublishNowSelected = (scheduledAtStr) => {
+  if (!scheduledAtStr) return false;
+  const time = new Date(scheduledAtStr).getTime();
+  if (Number.isNaN(time)) return false;
+  return time <= Date.now() + 2 * 60 * 1000;
+};
+
+const getLivePostUrl = (post) => {
+  if (!post) return null;
+  if (post.manualPostUrl) return post.manualPostUrl;
+  if (post.permalink) return post.permalink;
+  if (post.publishResponseId) {
+    try {
+      const parsed = typeof post.publishResponseId === 'string'
+        ? JSON.parse(post.publishResponseId)
+        : post.publishResponseId;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const item = parsed[0];
+        if (item?.platform === 'youtube' && item?.publishId) {
+          return `https://www.youtube.com/watch?v=${item.publishId}`;
+        }
+        if (item?.permalink) return item.permalink;
+        if (item?.url) return item.url;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+};
 
 const formatScheduledDate = (dateStr) => {
   if (!dateStr) return '';
@@ -287,6 +320,8 @@ export const CreatorSchedulePost = () => {
     ))
   ).size;
 
+  const isPublishNow = isPublishNowSelected(scheduledAt);
+
   const toggleChannel = (channelId) => {
     setSelectedChannelIds((prev) => {
       if (prev.includes(channelId)) {
@@ -338,7 +373,20 @@ export const CreatorSchedulePost = () => {
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     },
-    staleTime: 30 * 1000,
+    staleTime: 10 * 1000,
+    refetchInterval: (query) => {
+      const posts = Array.isArray(query.state.data) ? query.state.data : [];
+      const now = Date.now();
+      const hasActivePublishing = posts.some((post) => {
+        if (post.status === 'publishing') return true;
+        if (post.status === 'scheduled') {
+          const postTime = new Date(post.scheduledAt).getTime();
+          return Number.isFinite(postTime) && postTime <= now + 5000;
+        }
+        return false;
+      });
+      return hasActivePublishing ? 3000 : false;
+    },
   });
 
   // 4. Fetch Creator's Media Library for in-form picker
@@ -705,10 +753,25 @@ export const CreatorSchedulePost = () => {
       }
 
       if (failedCampaigns.length === 0) {
-        setStatusMessage({
-          type: 'success',
-          text: `Post scheduled across ${selectedChannels.length} channel${selectedChannels.length > 1 ? 's' : ''} for ${formatScheduledDate(scheduledDate.toISOString())}!`,
-        });
+        const isNow = isPublishNowSelected(scheduledDate.toISOString());
+        if (isNow) {
+          if (scheduleMode === 'manual') {
+            setStatusMessage({
+              type: 'success',
+              text: `Post prepared for ${selectedChannels.length} channel${selectedChannels.length > 1 ? 's' : ''}! Ready to share from your device.`,
+            });
+          } else {
+            setStatusMessage({
+              type: 'success',
+              text: `Publishing now across ${selectedChannels.length} channel${selectedChannels.length > 1 ? 's' : ''}! It will appear live on your profile${selectedChannels.length > 1 ? 's' : ''} shortly.`,
+            });
+          }
+        } else {
+          setStatusMessage({
+            type: 'success',
+            text: `Post scheduled across ${selectedChannels.length} channel${selectedChannels.length > 1 ? 's' : ''} for ${formatScheduledDate(scheduledDate.toISOString())}!`,
+          });
+        }
 
         handleClearFile();
         setCaption('');
@@ -1370,7 +1433,24 @@ export const CreatorSchedulePost = () => {
             ) : submittingStep === 'scheduling' ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Scheduling...</span>
+                <span>{isPublishNow ? 'Publishing now...' : 'Scheduling...'}</span>
+              </>
+            ) : isPublishNow ? (
+              <>
+                {scheduleMode === 'manual' ? (
+                  <Smartphone className="h-4 w-4 text-purple-200" />
+                ) : (
+                  <Send className="h-4 w-4 text-purple-200" />
+                )}
+                <span>
+                  {scheduleMode === 'manual'
+                    ? (effectiveSelectedIds.length > 1
+                        ? `Prepare for ${effectiveSelectedIds.length} Channels`
+                        : 'Prepare to Post Now')
+                    : (effectiveSelectedIds.length > 1
+                        ? `Publish Now to ${effectiveSelectedIds.length} Channels`
+                        : 'Publish Now')}
+                </span>
               </>
             ) : (
               <>
@@ -1471,6 +1551,7 @@ export const CreatorSchedulePost = () => {
 
                 const statusInfo = getPostStatusInfo(post);
                 const StatusIcon = statusInfo.icon;
+                const livePostUrl = getLivePostUrl(post);
 
                 return (
                   <div
@@ -1491,6 +1572,7 @@ export const CreatorSchedulePost = () => {
                               displayName,
                               displayPlatform,
                               displayAccount,
+                              livePostUrl,
                             });
                           }
                         }}
@@ -1618,6 +1700,7 @@ export const CreatorSchedulePost = () => {
                             displayName,
                             displayPlatform,
                             displayAccount,
+                            livePostUrl,
                           })}
                           className="text-xs text-purple-400 hover:text-purple-300 font-medium p-1 rounded hover:bg-white/5 transition flex items-center gap-1"
                           title="Watch video"
@@ -1625,6 +1708,20 @@ export const CreatorSchedulePost = () => {
                           <Play className="h-3 w-3 fill-current" />
                           <span className="hidden sm:inline">Watch</span>
                         </button>
+                      )}
+
+                      {/* Live Post Link (if published) */}
+                      {livePostUrl && (
+                        <a
+                          href={livePostUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-teal-400 hover:text-teal-300 font-medium p-1 rounded hover:bg-white/5 transition flex items-center gap-1"
+                          title="Open live post in new tab"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          <span className="hidden sm:inline">Live</span>
+                        </a>
                       )}
 
                       {/* Cancel / Delete Button */}
@@ -1896,10 +1993,22 @@ export const CreatorSchedulePost = () => {
               )}
 
               <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <span className="text-[11px]">
                     Mode: <strong className="text-zinc-200 uppercase">{previewPost.scheduleMode}</strong>
                   </span>
+                  {getLivePostUrl(previewPost) && (
+                    <a
+                      href={getLivePostUrl(previewPost)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-teal-400 hover:text-teal-300 font-semibold inline-flex items-center gap-1 transition ml-2"
+                      title="Open live post in new tab"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span>View Live Post</span>
+                    </a>
+                  )}
                 </div>
                 {cancellablePostStatuses.has(previewPost.status) && (
                   <button
