@@ -42,8 +42,8 @@ export const Home = () => {
             <a href="#workflow" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
               How It Works
             </a>
-            <a href="#roles" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
-              Creators & Teams
+            <a href="#features" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
+              Features
             </a>
           </nav>
 
@@ -85,7 +85,7 @@ export const Home = () => {
             </h1>
 
             <p className="mx-auto m-0 max-w-2xl text-sm leading-relaxed text-zinc-300 sm:text-base">
-              The unified social media platform for creators, brands, and teams. Plan, schedule, and publish high-quality video content across Instagram, YouTube, and Facebook with real-time performance analytics.
+              The unified social media platform for content creators and digital publishers. Plan, schedule, and publish high-quality video content across Instagram, YouTube, and Facebook with real-time performance analytics.
             </p>
 
             <div className="flex flex-col items-center justify-center gap-3 pt-2 sm:flex-row">
@@ -495,61 +495,61 @@ export const Home = () => {
           </div>
         </section>
 
-        {/* Dual Roles Section (Brands vs Creators) */}
-        <section id="roles" className="px-4 sm:px-6 lg:px-8">
+        {/* Features Section */}
+        <section id="features" className="px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-5xl grid gap-6 md:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 space-y-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 text-purple-300">
-                <Users className="h-5 w-5" />
+                <Send className="h-5 w-5" />
               </div>
-              <h3 className="m-0 text-xl font-bold text-white">For Solo Creators & Influencers</h3>
+              <h3 className="m-0 text-xl font-bold text-white">Direct Multi-Channel Publishing</h3>
               <p className="m-0 text-xs leading-relaxed text-zinc-400">
-                Publish consistently to Instagram, YouTube, and Facebook without burning out. Plan videos, schedule posts, and view real-time audience growth in one place.
+                Publish high-quality video content consistently to Instagram, YouTube, and Facebook without burning out.
               </p>
               <ul className="m-0 p-0 space-y-2 list-none text-xs text-zinc-300">
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Connect Instagram, YouTube, and Facebook in 1 click
+                  Connect Instagram, YouTube, and Facebook in 1 click via official OAuth
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Flexible publishing: Direct API auto-publish or 1-tap manual video download & caption copy
+                  Direct API auto-publishing or 1-tap manual video download & caption copy
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  AI caption generator, hashtag suggestions, & video hooks
+                  AI-powered caption ideas, hashtag suggestions, and video hooks
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Visual drag-and-drop calendar queue & real-time analytics
+                  Built-in media library with cloud storage for high-res assets
                 </li>
               </ul>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 space-y-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 text-purple-300">
-                <Megaphone className="h-5 w-5" />
+                <BarChart3 className="h-5 w-5" />
               </div>
-              <h3 className="m-0 text-xl font-bold text-white">For Creator Teams & Managers</h3>
+              <h3 className="m-0 text-xl font-bold text-white">Visual Scheduling & Real-Time Analytics</h3>
               <p className="m-0 text-xs leading-relaxed text-zinc-400">
-                Manage multiple creator channels, collaborate with brand partners, and orchestrate campaign deliverables seamlessly.
+                Organize your upcoming releases in a visual calendar and track engagement metrics across all your channels.
               </p>
               <ul className="m-0 p-0 space-y-2 list-none text-xs text-zinc-300">
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Manage multiple handles & channels from one dashboard
+                  Interactive visual content calendar and automated publishing queue
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Organize media assets into tagged cloud folders
+                  Real-time views, reactions, likes, and comment counts
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Schedule posts across channels with rolling limit protection
+                  Platform-separated performance insights and audience engagement trends
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-purple-400" />
-                  Track cross-platform campaign analytics & delivery proof
+                  Full privacy compliance with instant self-service account and data deletion
                 </li>
               </ul>
             </div>
@@ -625,8 +625,8 @@ export const Home = () => {
             <a href="#workflow" className="transition hover:text-white">
               How It Works
             </a>
-            <a href="#roles" className="transition hover:text-white">
-              Creators & Teams
+            <a href="#features" className="transition hover:text-white">
+              Features
             </a>
             <Link to="/privacy-policy" className="transition hover:text-white">
               Privacy Policy

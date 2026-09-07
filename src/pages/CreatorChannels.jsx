@@ -249,7 +249,7 @@ export const CreatorChannels = () => {
             </h3>
           </div>
           <p className="text-xs text-amber-200/80 m-0">
-            A brand has assigned the following channels to you. Click verify to link your social account.
+            Click verify to link and authenticate your social account.
           </p>
           <div className="grid gap-2.5 sm:grid-cols-2">
             {pendingVerificationChannels.map((channel) => (
