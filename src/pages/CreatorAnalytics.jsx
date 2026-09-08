@@ -98,16 +98,58 @@ export const CreatorAnalytics = () => {
   const byPlatform = metrics.byPlatform || {};
   const currentRange = timeRanges[selectedTimeRange] || timeRanges.today;
 
-  const currentViews = metrics[currentRange.viewsKey] ?? 0;
-  const currentPosts = metrics[currentRange.postsKey] ?? 0;
-  const currentLikes = metrics[currentRange.likesKey] ?? 0;
-  const currentComments = metrics[currentRange.commentsKey] ?? 0;
+  const filteredMetrics = useMemo(() => {
+    if (filterPlatform === 'all') {
+      return {
+        views: metrics[currentRange.viewsKey] ?? 0,
+        posts: metrics[currentRange.postsKey] ?? 0,
+        likes: metrics[currentRange.likesKey] ?? 0,
+        comments: metrics[currentRange.commentsKey] ?? 0,
+        chartData: Array.isArray(metrics.last30DaysPostedViews) ? metrics.last30DaysPostedViews : [],
+      };
+    }
+
+    const platformAccounts = (metrics.accountRows || []).filter(
+      (channel) => (channel.platform || '').toLowerCase() === filterPlatform.toLowerCase()
+    );
+
+    const views = platformAccounts.reduce((sum, acc) => sum + (acc[currentRange.viewsKey] ?? 0), 0);
+    const posts = platformAccounts.reduce((sum, acc) => sum + (acc[currentRange.postsKey] ?? 0), 0);
+    const likes = platformAccounts.reduce((sum, acc) => sum + (acc[currentRange.likesKey] ?? 0), 0);
+    const comments = platformAccounts.reduce((sum, acc) => sum + (acc[currentRange.commentsKey] ?? 0), 0);
+
+    const dailyMap = new Map();
+    platformAccounts.forEach((acc) => {
+      (acc.last30DaysActivity || []).forEach((day) => {
+        if (!dailyMap.has(day.dateStr)) {
+          dailyMap.set(day.dateStr, { dateStr: day.dateStr, views: 0, posts: 0 });
+        }
+        const bucket = dailyMap.get(day.dateStr);
+        bucket.views += day.views || 0;
+        bucket.posts += day.posts || 0;
+      });
+    });
+
+    return {
+      views,
+      posts,
+      likes,
+      comments,
+      chartData: Array.from(dailyMap.values()),
+    };
+  }, [filterPlatform, metrics, currentRange]);
+
+  const currentViews = filteredMetrics.views;
+  const currentPosts = filteredMetrics.posts;
+  const currentLikes = filteredMetrics.likes;
+  const currentComments = filteredMetrics.comments;
+  const activeChartData = filteredMetrics.chartData;
 
   // Selected date statistics from chart data
   const selectedDateStats = useMemo(() => {
-    if (!selectedGraphDate || !Array.isArray(metrics.last30DaysPostedViews)) return null;
-    return metrics.last30DaysPostedViews.find((day) => day.dateStr === selectedGraphDate) || null;
-  }, [selectedGraphDate, metrics.last30DaysPostedViews]);
+    if (!selectedGraphDate || !Array.isArray(activeChartData)) return null;
+    return activeChartData.find((day) => day.dateStr === selectedGraphDate) || null;
+  }, [selectedGraphDate, activeChartData]);
 
   // Filtered & sorted account rows
   const displayAccountRows = useMemo(() => {
@@ -363,7 +405,7 @@ export const CreatorAnalytics = () => {
 
           {/* 30-Day Views Chart */}
           <DailyViewsChart
-            data={metrics.last30DaysPostedViews}
+            data={activeChartData}
             selectedDate={selectedGraphDate}
             onSelectDate={setSelectedGraphDate}
           />

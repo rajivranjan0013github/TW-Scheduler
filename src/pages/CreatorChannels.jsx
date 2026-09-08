@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, AlertTriangle, CheckCircle2, Unlink } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, ExternalLink, Unlink } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import PlatformIcon from '../components/PlatformIcon';
 import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
@@ -51,6 +51,8 @@ export const CreatorChannels = () => {
   const [connectedDialogAccount, setConnectedDialogAccount] = useState(
     () => location.state?.connectedAccount || null
   );
+  const [showYoutubeConsentModal, setShowYoutubeConsentModal] = useState(false);
+  const [pendingYoutubeCampaignId, setPendingYoutubeCampaignId] = useState(null);
 
   useEffect(() => {
     if (location.state?.channelToast) {
@@ -138,7 +140,8 @@ export const CreatorChannels = () => {
     if (channel.platform === 'instagram') {
       connectInstagramOAuth(channel.campaignId);
     } else if (channel.platform === 'youtube') {
-      connectYoutubeOAuth(channel.campaignId);
+      setPendingYoutubeCampaignId(channel.campaignId);
+      setShowYoutubeConsentModal(true);
     } else {
       connectMetaOAuth(channel.campaignId, channel.socialAccountId);
     }
@@ -222,7 +225,10 @@ export const CreatorChannels = () => {
           </button>
           <button
             type="button"
-            onClick={() => connectYoutubeOAuth(activeConnectCampaignId)}
+            onClick={() => {
+              setPendingYoutubeCampaignId(activeConnectCampaignId);
+              setShowYoutubeConsentModal(true);
+            }}
             className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-white/15 active:scale-95 shadow-sm"
           >
             <PlatformIcon platform="youtube" className="h-4 w-4 shrink-0" />
@@ -533,6 +539,85 @@ export const CreatorChannels = () => {
             >
               <span>Done</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* YouTube Terms of Service & Privacy Consent Modal */}
+      {showYoutubeConsentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#121215] p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-600/20 border border-red-500/30 text-red-400">
+                <PlatformIcon platform="youtube" className="h-6 w-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-bold text-white m-0">Connect YouTube Channel</h3>
+                <p className="mt-1 text-xs text-zinc-400 m-0">
+                  Publish video content and view video performance insights via official YouTube API Services.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-2.5 text-xs text-zinc-300 leading-relaxed">
+              <p className="m-0">
+                By connecting your YouTube channel, you agree to be bound by the{' '}
+                <a
+                  href="https://www.youtube.com/t/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-red-400 underline hover:text-red-300"
+                >
+                  YouTube Terms of Service
+                </a>{' '}
+                and acknowledge that your use is subject to the{' '}
+                <a
+                  href="https://policies.google.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-red-400 underline hover:text-red-300"
+                >
+                  Google Privacy Policy
+                </a>.
+              </p>
+              <p className="m-0 text-[11px] text-zinc-400 pt-1 border-t border-white/5">
+                You can disconnect your channel at any time from ThousandPost or revoke permissions via{' '}
+                <a
+                  href="https://security.google.com/settings/security/permissions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-zinc-300 underline hover:text-white"
+                >
+                  Google Security Settings
+                </a>.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowYoutubeConsentModal(false);
+                  setPendingYoutubeCampaignId(null);
+                }}
+                className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold text-zinc-300 transition hover:bg-white/15 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const campaignId = pendingYoutubeCampaignId;
+                  setShowYoutubeConsentModal(false);
+                  setPendingYoutubeCampaignId(null);
+                  connectYoutubeOAuth(campaignId);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-red-500 active:scale-95 shadow-lg shadow-red-600/25"
+              >
+                <span>Continue to Google</span>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       )}

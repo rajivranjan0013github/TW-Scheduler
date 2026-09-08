@@ -19,7 +19,7 @@ const sections = [
     ),
   },
   {
-    title: 'YouTube Terms of Service',
+    title: 'YouTube Terms of Service & Google Policies',
     body: (
       <span>
         ThousandPost integrates with YouTube API Services. By connecting a YouTube channel or using ThousandPost features that interact with YouTube, you agree to be bound by the{' '}
@@ -30,8 +30,26 @@ const sections = [
           className="text-red-400 underline hover:text-red-300 font-medium"
         >
           YouTube Terms of Service (https://www.youtube.com/t/terms)
+        </a>{' '}
+        and acknowledge that your use is subject to the{' '}
+        <a
+          href="https://policies.google.com/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-red-400 underline hover:text-red-300 font-medium"
+        >
+          Google Privacy Policy (https://policies.google.com/privacy)
         </a>
-        . Please review the YouTube Terms of Service carefully before connecting your channel.
+        . You may revoke ThousandPost's access to your Google and YouTube data at any time via the{' '}
+        <a
+          href="https://security.google.com/settings/security/permissions"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-red-400 underline hover:text-red-300 font-medium"
+        >
+          Google Security Settings page
+        </a>
+        . Please review these policies carefully before connecting your channel.
       </span>
     ),
   },

@@ -201,7 +201,6 @@ export const CreatorSchedulePost = () => {
   const [youtubeDescription, setYoutubeDescription] = useState('');
   const [youtubePrivacyStatus, setYoutubePrivacyStatus] = useState('private');
   const [youtubeMadeForKids, setYoutubeMadeForKids] = useState('');
-  const [youtubeContainsSyntheticMedia, setYoutubeContainsSyntheticMedia] = useState(false);
   const [youtubeGuidelinesCertified, setYoutubeGuidelinesCertified] = useState(false);
   const [scheduledAt, setScheduledAt] = useState(getDefaultDateTimeString());
   const [dateError, setDateError] = useState('');
@@ -312,6 +311,9 @@ export const CreatorSchedulePost = () => {
   }, [availableChannels, effectiveSelectedIds]);
   const hasYoutubeApiTarget = scheduleMode !== 'manual'
     && selectedChannels.some((channel) => channel.platform === 'youtube');
+  const isOnlyYoutubeTarget = scheduleMode !== 'manual'
+    && selectedChannels.length > 0
+    && selectedChannels.every((channel) => channel.platform === 'youtube');
 
   const activeChannel = selectedChannels[0] || availableChannels[0] || null;
   const selectableChannelCount = new Set(
@@ -500,6 +502,7 @@ export const CreatorSchedulePost = () => {
     setFilePreviewUrl(getMediaUrl(item.url, { apiBaseUrl: API_BASE_URL }));
     setPostType(item.type === 'video' ? 'reels' : 'post');
     if (!caption && item.caption) setCaption(item.caption);
+    if (!youtubeDescription && item.caption) setYoutubeDescription(item.caption);
     setShowMediaPicker(false);
     setStatusMessage(null);
   };
@@ -655,6 +658,8 @@ export const CreatorSchedulePost = () => {
       const successfulCampaigns = [];
       const failedCampaigns = [];
 
+      const effectiveCaption = (isOnlyYoutubeTarget ? (youtubeDescription || youtubeTitle || caption) : caption).trim();
+
       for (const [targetCampaignId, channelsInCampaign] of campaignGroups.entries()) {
         try {
           let mediaId = selectedMediaAsset?._id;
@@ -669,7 +674,7 @@ export const CreatorSchedulePost = () => {
             }
             formData.append('sourceUsage', 'schedule');
             formData.append('tags', 'creator,schedule,generated');
-            if (caption) formData.append('caption', caption);
+            if (effectiveCaption) formData.append('caption', effectiveCaption);
 
             const uploadHeaders = withHandlerPreviewHeaders({
               Authorization: `Bearer ${token}`,
@@ -714,19 +719,19 @@ export const CreatorSchedulePost = () => {
                 : [],
               channelTargets,
               mediaIds: [mediaId],
-              caption: caption.trim(),
+              caption: effectiveCaption,
               scheduledAt: scheduledDate.toISOString(),
               scheduleMode,
               platformSpecifics: {
                 type: postType,
-                postCaption: caption.trim(),
+                postCaption: effectiveCaption,
                 ...(hasYoutubeApiTarget ? {
                   youtube: {
                     title: youtubeTitle.trim(),
                     description: youtubeDescription,
                     privacyStatus: youtubePrivacyStatus,
                     selfDeclaredMadeForKids: youtubeMadeForKids === 'yes',
-                    containsSyntheticMedia: youtubeContainsSyntheticMedia,
+                    containsSyntheticMedia: false,
                     communityGuidelinesCertified: youtubeGuidelinesCertified,
                   },
                 } : {}),
@@ -779,7 +784,6 @@ export const CreatorSchedulePost = () => {
         setYoutubeDescription('');
         setYoutubePrivacyStatus('private');
         setYoutubeMadeForKids('');
-        setYoutubeContainsSyntheticMedia(false);
         setYoutubeGuidelinesCertified(false);
         setScheduledAt(getDefaultDateTimeString());
       } else if (successfulCampaigns.length > 0) {
@@ -1146,7 +1150,7 @@ export const CreatorSchedulePost = () => {
                     <div className="pointer-events-none absolute top-2.5 right-2.5 z-10">
                       <span className="inline-flex items-center gap-1 rounded-md bg-black/80 border border-white/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-purple-300 backdrop-blur-md shadow-sm">
                         <Video className="h-2.5 w-2.5 text-purple-400" />
-                        {postType === 'reels' ? 'Reel' : 'Video'}
+                        {postType === 'reels' ? (isOnlyYoutubeTarget ? 'Short' : 'Reel') : 'Video'}
                       </span>
                     </div>
 
@@ -1203,52 +1207,78 @@ export const CreatorSchedulePost = () => {
           )}
         </div>
 
-        {/* Caption */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label htmlFor="caption-input" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-              Caption
-            </label>
-            {(file?.type?.startsWith('video/') || selectedMediaAsset?.type === 'video') && (
-              <div className="flex items-center gap-1.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setPostType('reels')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-                    postType === 'reels' ? 'bg-white/20 text-white' : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  Reel / Short
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPostType('post')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
-                    postType === 'post' ? 'bg-white/20 text-white' : 'text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  Post
-                </button>
-              </div>
-            )}
+        {/* Caption - shown for Meta or mixed destinations */}
+        {!isOnlyYoutubeTarget && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label htmlFor="caption-input" className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                Caption
+              </label>
+              {(file?.type?.startsWith('video/') || selectedMediaAsset?.type === 'video') && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPostType('reels')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
+                      postType === 'reels' ? 'bg-white/20 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    Reel / Short
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPostType('post')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
+                      postType === 'post' ? 'bg-white/20 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    Post
+                  </button>
+                </div>
+              )}
+            </div>
+            <textarea
+              id="caption-input"
+              rows={3}
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="Write caption, hashtags..."
+              className="w-full rounded-xl bg-white/[0.03] border border-white/10 p-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-white/25 transition resize-none"
+            />
           </div>
-          <textarea
-            id="caption-input"
-            rows={3}
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder="Write caption, hashtags..."
-            className="w-full rounded-xl bg-white/[0.03] border border-white/10 p-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-white/25 transition resize-none"
-          />
-        </div>
+        )}
 
         {hasYoutubeApiTarget && (
           <section className="space-y-4 rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-4">
-            <div>
-              <h3 className="m-0 text-sm font-bold text-white">YouTube upload details</h3>
-              <p className="m-0 mt-1 text-[11px] leading-5 text-zinc-400">
-                These values are sent to YouTube exactly as entered and apply only to selected YouTube channels.
-              </p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="m-0 text-sm font-bold text-white">YouTube upload details</h3>
+                <p className="m-0 mt-1 text-[11px] leading-5 text-zinc-400">
+                  These values are sent to YouTube exactly as entered and apply only to selected YouTube channels.
+                </p>
+              </div>
+              {isOnlyYoutubeTarget && (file?.type?.startsWith('video/') || selectedMediaAsset?.type === 'video') && (
+                <div className="flex items-center gap-1.5 text-xs shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPostType('reels')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
+                      postType === 'reels' ? 'bg-white/20 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    Short
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPostType('post')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-semibold transition ${
+                      postType === 'post' ? 'bg-white/20 text-white' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    Video
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -1324,15 +1354,6 @@ export const CreatorSchedulePost = () => {
               </div>
             </div>
 
-            <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-5 text-zinc-300">
-              <input
-                type="checkbox"
-                checked={youtubeContainsSyntheticMedia}
-                onChange={(event) => setYoutubeContainsSyntheticMedia(event.target.checked)}
-                className="mt-1 h-3.5 w-3.5 accent-red-500"
-              />
-              <span>This video contains realistic altered or synthetic content that should be disclosed to viewers.</span>
-            </label>
 
             <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-white/10 bg-black/20 p-3 text-xs leading-5 text-zinc-300">
               <input
@@ -1658,7 +1679,7 @@ export const CreatorSchedulePost = () => {
                           </span>
                         </div>
                         <p className="m-0 text-[11px] text-zinc-400 truncate mt-1">
-                          {post.caption || 'No caption'}
+                          {post.platformSpecifics?.youtube?.title || post.caption || 'No caption'}
                         </p>
                       </div>
                     </div>
@@ -1981,7 +2002,28 @@ export const CreatorSchedulePost = () => {
                 </div>
               )}
 
-              {previewPost.caption && (
+              {previewPost.platformSpecifics?.youtube?.title ? (
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">
+                      YouTube Video Title
+                    </span>
+                    <p className="text-xs text-white font-medium m-0 bg-white/5 p-2.5 rounded-lg border border-white/10">
+                      {previewPost.platformSpecifics.youtube.title}
+                    </p>
+                  </div>
+                  {(previewPost.platformSpecifics?.youtube?.description || previewPost.caption) && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">
+                        YouTube Description
+                      </span>
+                      <p className="text-xs text-zinc-200 m-0 max-h-20 overflow-y-auto whitespace-pre-wrap bg-white/5 p-2.5 rounded-lg border border-white/10">
+                        {previewPost.platformSpecifics?.youtube?.description || previewPost.caption}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : previewPost.caption ? (
                 <div>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block mb-1">
                     Caption
@@ -1990,7 +2032,7 @@ export const CreatorSchedulePost = () => {
                     {previewPost.caption}
                   </p>
                 </div>
-              )}
+              ) : null}
 
               <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
                 <div className="flex items-center gap-3">
