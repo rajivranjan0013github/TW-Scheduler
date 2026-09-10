@@ -107,7 +107,6 @@ export const Settings = () => {
               {user?.avatar ? (
                 <img
                   src={user.avatar}
-                  crossOrigin="anonymous"
                   className="h-16 w-16 rounded-full border border-white/15 object-cover shadow-sm"
                   alt="Avatar"
                   onError={(e) => {

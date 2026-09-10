@@ -246,7 +246,6 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
             {displayedAvatar ? (
               <img
                 src={displayedAvatar}
-                crossOrigin="anonymous"
                 className="h-6 w-6 rounded-full object-cover border border-white/20 shadow-sm"
                 alt=""
                 onError={(e) => {

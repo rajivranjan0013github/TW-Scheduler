@@ -136,7 +136,6 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
                       {acc.avatarUrl ? (
                         <img
                           src={acc.avatarUrl}
-                          crossOrigin="anonymous"
                           className="w-6 h-6 rounded-full object-cover border border-white/10"
                           alt=""
                           onError={(e) => {
@@ -184,7 +183,6 @@ export const Header = ({ selectedAccounts, setSelectedAccounts }) => {
               {displayedAvatar ? (
                 <img
                   src={displayedAvatar}
-                  crossOrigin="anonymous"
                   className="w-7 h-7 rounded-full object-cover border border-white/15"
                   alt="Avatar"
                   onError={(e) => {
