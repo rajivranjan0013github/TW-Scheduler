@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search, Trash2, Loader2, ExternalLink } from 'lucide-react';
+import { Plus, Clock, AlertCircle, Folder, Images, Users, ChevronLeft, X, Search, Trash2, Loader2, ExternalLink, Settings } from 'lucide-react';
 import { getActiveCampaignId, withCampaignScope, clearActiveCampaign } from '../utils/campaignScope';
 import {
   MEDIA_LIBRARY_STALE_TIME,
@@ -312,9 +312,11 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
   const [contentSelectionSource, setContentSelectionSource] = useState('library');
   const [postType, setPostType] = useState('reels');
   const [youtubeTitle, setYoutubeTitle] = useState('');
-  const [youtubePrivacy, setYoutubePrivacy] = useState('private');
+  const [youtubePrivacy, setYoutubePrivacy] = useState('public');
   const [youtubeTags, setYoutubeTags] = useState('');
   const [youtubeMadeForKids, setYoutubeMadeForKids] = useState(false);
+  const [youtubeGuidelinesCertified, setYoutubeGuidelinesCertified] = useState(true);
+  const [showYoutubeOptionsModal, setShowYoutubeOptionsModal] = useState(false);
   const [captionDrafts, setCaptionDrafts] = useState({});
   const [, setSavingCaptionId] = useState(null);
   const [deselectedPlanRows, setDeselectedPlanRows] = useState([]);
@@ -551,14 +553,16 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
   const AccountAvatar = ({ account, sizeClass = 'h-5 w-5', textClass = 'text-[9px]' }) => {
     const label = getAccountLabel(account);
     const avatarUrl = getAccountAvatarUrl(account);
+    const [imgFailed, setImgFailed] = useState(false);
     return (
       <span className={`${sizeClass} inline-flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-black/10 bg-[#eef2ff] ${textClass} font-black uppercase text-[#4f46e5]`}>
-        {avatarUrl ? (
+        {avatarUrl && !imgFailed ? (
           <img
             src={avatarUrl}
-            crossOrigin="anonymous"
+            referrerPolicy="no-referrer"
             alt=""
             className="h-full w-full object-cover"
+            onError={() => setImgFailed(true)}
           />
         ) : (
           label.charAt(0)
@@ -1350,13 +1354,22 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
       return;
     }
     if (shouldUseYoutubePublishing) {
-      const hasVideo = selectedMedia.some(medId => mediaList.find(item => item._id === medId)?.type === 'video');
+      const hasVideo = selectedMedia.some(medId => mediaList.find(item => item._id === medId)?.type === 'video')
+        || (activeSchedulePlan && activeSchedulePlan.some(row => row.mediaItem?.type === 'video'));
       if (!hasVideo) {
         alert('YouTube uploads require a video media asset');
         return;
       }
       if (!youtubeTitle.trim()) {
         alert('Add a YouTube title before scheduling');
+        return;
+      }
+      if (Array.from(youtubeTitle.trim()).length > 100) {
+        alert('YouTube title must be 100 characters or fewer');
+        return;
+      }
+      if (!youtubeGuidelinesCertified) {
+        alert('Confirm compliance with the YouTube Community Guidelines before scheduling (see YouTube Options)');
         return;
       }
     }
@@ -1376,10 +1389,12 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
           youtube: {
             title: youtubeTitle.trim(),
             description: caption.trim(),
-            privacyStatus: youtubePrivacy,
+            privacyStatus: youtubePrivacy || 'public',
             tags: youtubeTags,
             categoryId: '22',
-            selfDeclaredMadeForKids: youtubeMadeForKids,
+            selfDeclaredMadeForKids: Boolean(youtubeMadeForKids),
+            containsSyntheticMedia: false,
+            communityGuidelinesCertified: Boolean(youtubeGuidelinesCertified),
           }
         } : {}),
       };
@@ -1486,9 +1501,11 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
         setScheduleMode('manual');
         setScheduleContentMode('assets');
         setYoutubeTitle('');
-        setYoutubePrivacy('private');
+        setYoutubePrivacy('public');
         setYoutubeTags('');
         setYoutubeMadeForKids(false);
+        setYoutubeGuidelinesCertified(true);
+        setShowYoutubeOptionsModal(false);
         await fetchPosts({ force: true });
         navigate('/scheduler');
       } else {
@@ -2445,7 +2462,18 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
                   {/* Youtube specific options */}
                   {shouldUseYoutubePublishing && (
                     <div className="border border-red-500/30 bg-red-500/10 rounded-lg p-2.5 space-y-2">
-                      <span className="block text-[9px] font-bold uppercase tracking-wider text-red-400">YouTube Specifics</span>
+                      <div className="flex items-center justify-between">
+                        <span className="block text-[9px] font-bold uppercase tracking-wider text-red-400">YouTube Specifics</span>
+                        <button
+                          type="button"
+                          onClick={() => setShowYoutubeOptionsModal(true)}
+                          className="inline-flex items-center gap-1 rounded border border-red-500/30 bg-red-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-red-300 hover:bg-red-500/30 hover:text-white transition"
+                          title="Configure YouTube privacy, audience & guidelines"
+                        >
+                          <Settings className="h-2.5 w-2.5" />
+                          <span>Options ({youtubePrivacy})</span>
+                        </button>
+                      </div>
                       <div className="group relative rounded-[8px] p-[1px] bg-gradient-to-r from-red-500/30 via-red-500/10 to-red-500/30 hover:from-red-500/50 hover:via-orange-500/40 hover:to-red-500/50 focus-within:from-red-500 focus-within:via-orange-500 focus-within:to-red-500 focus-within:shadow-[0_0_10px_rgba(239,68,68,0.3)] transition-all duration-200">
                         <input
                           value={youtubeTitle}
@@ -3366,6 +3394,107 @@ const CalendarView = ({ selectedAccounts, composerOnly = false }) => {
       )}
 
 
+      {/* YouTube Options Modal */}
+      {showYoutubeOptionsModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-xs px-4 py-6"
+          onClick={() => setShowYoutubeOptionsModal(false)}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-sm flex-col rounded-2xl border border-white/10 bg-[#141417] text-white shadow-2xl overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 bg-white/[0.02]">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500/20 text-red-400 font-bold text-xs">YT</span>
+                <div>
+                  <h4 className="m-0 text-sm font-bold text-white">YouTube Options</h4>
+                  <p className="m-0 text-[10px] text-zinc-400">Visibility, audience & guidelines</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowYoutubeOptionsModal(false)}
+                className="rounded-lg p-1 text-zinc-400 hover:bg-white/10 hover:text-white transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="space-y-4 p-4 text-xs">
+              {/* Visibility / Privacy */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Visibility / Privacy
+                </label>
+                <select
+                  value={youtubePrivacy}
+                  onChange={(e) => setYoutubePrivacy(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#101013] px-3 py-2 text-xs text-white outline-none focus:border-red-500/50"
+                >
+                  <option value="public">Public (Default)</option>
+                  <option value="unlisted">Unlisted</option>
+                  <option value="private">Private</option>
+                </select>
+                <p className="m-0 text-[10px] text-zinc-500">Public videos can be viewed by anyone on YouTube.</p>
+              </div>
+
+              {/* Made for Kids */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Audience (Made for Kids)
+                </label>
+                <select
+                  value={youtubeMadeForKids ? 'yes' : 'no'}
+                  onChange={(e) => setYoutubeMadeForKids(e.target.value === 'yes')}
+                  className="w-full rounded-xl border border-white/10 bg-[#101013] px-3 py-2 text-xs text-white outline-none focus:border-red-500/50"
+                >
+                  <option value="no">No, it's not made for kids (Default)</option>
+                  <option value="yes">Yes, it's made for kids</option>
+                </select>
+                <p className="m-0 text-[10px] text-zinc-500">Required by YouTube COPPA policy.</p>
+              </div>
+
+              {/* Guidelines Compliance */}
+              <div className="pt-2 border-t border-white/10">
+                <label className="flex items-start gap-2.5 cursor-pointer text-[11px] leading-4 text-zinc-300">
+                  <input
+                    type="checkbox"
+                    checked={youtubeGuidelinesCertified}
+                    onChange={(e) => setYoutubeGuidelinesCertified(e.target.checked)}
+                    className="mt-0.5 rounded border-white/20 bg-black text-red-600 focus:ring-red-500"
+                  />
+                  <span>
+                    I confirm compliance with{' '}
+                    <a
+                      href="https://www.youtube.com/howyoutubeworks/policies/community-guidelines/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-red-400 underline hover:text-red-300"
+                    >
+                      Community Guidelines
+                    </a>{' '}
+                    (Required)
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end border-t border-white/10 bg-white/[0.02] px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setShowYoutubeOptionsModal(false)}
+                className="rounded-xl bg-white px-4 py-1.5 text-xs font-bold text-black transition hover:bg-zinc-200"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

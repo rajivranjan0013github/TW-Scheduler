@@ -283,24 +283,21 @@ export const AccountAvatar = ({
     || account?.picture
     || '';
 
-  const getProxiedAvatar = (url) => {
+  const getDirectAvatarUrl = (url) => {
     if (!url || typeof url !== 'string') return '';
     const trimmed = url.trim();
     if (trimmed.startsWith('/') && API_BASE_URL) {
       return `${API_BASE_URL}${trimmed}`;
     }
-    if (trimmed.includes('media.thousandpost.com') || trimmed.includes('.r2.dev') || trimmed.includes('.r2.cloudflarestorage.com')) {
-      return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(trimmed)}`;
-    }
     return trimmed;
   };
 
-  const initialAvatar = getProxiedAvatar(rawAvatarUrl);
+  const initialAvatar = getDirectAvatarUrl(rawAvatarUrl);
   const [imageFailed, setImageFailed] = useState(!initialAvatar);
   const [currentAvatar, setCurrentAvatar] = useState(initialAvatar);
 
   useEffect(() => {
-    const next = getProxiedAvatar(rawAvatarUrl);
+    const next = getDirectAvatarUrl(rawAvatarUrl);
     setCurrentAvatar(next);
     setImageFailed(!next);
   }, [rawAvatarUrl]);

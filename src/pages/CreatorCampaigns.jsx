@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { AlertCircle, Calendar, CheckCircle, MoreVertical, Share2, SkipForward, TimerOff, RefreshCw, Zap } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle, MoreVertical, Share2, SkipForward, TimerOff, RefreshCw, Zap, X } from 'lucide-react';
 import { getMediaUrl } from '../utils/mediaUrls';
 import PlatformIcon from '../components/PlatformIcon';
 import { AccountAvatar } from '../components/adminDashboard/DashboardPresentation';
@@ -688,28 +688,7 @@ export const CreatorCampaigns = () => {
     }
     return null;
   };
-  const renderConnectionBadge = (account, camp) => {
-    const notice = getChannelConnectionNotice(account);
-    if (!notice) {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          Ready
-        </span>
-      );
-    }
-    return (
-      <button
-        type="button"
-        onClick={() => navigate('/channels', { state: { campaignId: camp?._id } })}
-        className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold text-amber-300 transition hover:bg-amber-500/25"
-        title={notice.detail}
-      >
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-        {notice.label}
-      </button>
-    );
-  };
+
   const campaignConnectionIssues = assignedCampaigns.flatMap((camp) => (
     (camp.channels || []).map((channel) => ({
       camp,
@@ -843,15 +822,28 @@ export const CreatorCampaigns = () => {
       onTouchCancel={handleTouchEnd}
     >
       {postedToast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className={`px-4 py-2.5 rounded-xl border text-xs font-semibold shadow-lg backdrop-blur-md ${
-            postedToast.type === 'verified'
-              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300 max-w-[90vw] sm:max-w-md">
+          <div className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl border text-xs sm:text-sm font-semibold shadow-2xl backdrop-blur-xl ${
+            postedToast.type === 'verified' || postedToast.type === 'marked'
+              ? 'border-emerald-500/35 bg-[#0a1710]/95 text-emerald-200 shadow-emerald-950/40'
               : postedToast.type === 'pending'
-              ? 'border-white/10 bg-[#141417] text-white'
-              : 'border-amber-200 bg-amber-50 text-amber-700'
+              ? 'border-amber-500/35 bg-[#17130a]/95 text-amber-200 shadow-amber-950/40'
+              : 'border-white/15 bg-[#121215]/95 text-white shadow-black/60'
           }`}>
-            {postedToast.message}
+            {postedToast.type === 'verified' || postedToast.type === 'marked' ? (
+              <CheckCircle className="h-4.5 w-4.5 text-emerald-400 shrink-0" />
+            ) : postedToast.type === 'pending' ? (
+              <AlertCircle className="h-4.5 w-4.5 text-amber-400 shrink-0" />
+            ) : null}
+            <span className="min-w-0 flex-1 leading-snug">{postedToast.message}</span>
+            <button
+              type="button"
+              onClick={() => setPostedToast(null)}
+              className="ml-1 rounded-lg p-1 text-zinc-400 transition hover:bg-white/10 hover:text-white shrink-0"
+              aria-label="Dismiss notification"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
       )}
@@ -955,6 +947,7 @@ export const CreatorCampaigns = () => {
 
                     return accountQueues.map((queue) => {
                       const queuePost = queue.nextPost;
+                      const postsLeft = queue.actionableQueue?.length || 0;
                       const tracking = todayTracking[queue.accountId] || { count: 0, posts: [] };
                       const manualPostedToday = shouldShowManualPostedTimes(queue.account)
                         ? getManualPostedToday(queue.posts)
@@ -967,46 +960,45 @@ export const CreatorCampaigns = () => {
                       const latestManualPostedAt = getLatestManualPostedAt(queue.posts);
                       const postingCooldown = getPostingCooldown(tracking, latestManualPostedAt, queuePost);
                       const awaitingPostedDecision = isAwaitingPostedDecision(queuePost);
-                      const canConfirmAndContinue = queuePost && (
-                        postingCooldown.isLocked ||
-                        queuePost.status === 'awaiting_confirmation'
-                      );
+                      const canConfirmAndContinue = Boolean(queuePost);
                       const canBypassCooldown = queuePost && postingCooldown.isLocked;
 
                       return (
-                        <div key={`${camp._id}-${queue.accountId}`} className="rounded-lg border border-white/10 bg-[#0a0a0a] px-4 py-3 shadow-lg">
-                          <div className="mb-2 flex items-center justify-between gap-2">
+                        <div key={`${camp._id}-${queue.accountId}`} className="rounded-xl sm:rounded-2xl border border-white/10 bg-[#0a0a0a] p-4 sm:p-5 shadow-xl transition-all">
+                          <div className="mb-3 sm:mb-3.5 flex items-center justify-between gap-3">
                             <div className="flex min-w-0 items-center gap-3">
-                              <div className="flex items-center gap-2 shrink-0">
-                                <PlatformIcon platform={queue.account?.platform} className="h-8 w-8" />
+                              <div className="flex items-center gap-2.5 shrink-0">
+                                <PlatformIcon platform={queue.account?.platform} className="h-9 w-9 sm:h-10 sm:w-10" />
                                 <AccountAvatar
                                   account={queue.account}
-                                  className="h-8 w-8 rounded-full border border-white/10 object-cover shadow-xs"
+                                  className="h-9 w-9 sm:h-10 sm:w-10 rounded-full border border-white/15 object-cover shadow-sm"
                                 />
                               </div>
                               <div className="min-w-0">
-                                <p className="m-0 truncate text-sm font-semibold text-white">
+                                <p className="m-0 truncate text-sm sm:text-base font-bold text-white leading-snug">
                                   {getAccountLabel(queue.account).startsWith('@')
                                     ? getAccountLabel(queue.account)
                                     : `@${getAccountLabel(queue.account)}`}
                                 </p>
-                                <p className="m-0 truncate text-xs text-zinc-400">
+                                <p className="m-0 truncate text-xs sm:text-sm text-zinc-400">
                                   {queue.account?.displayName || queue.account?.name || 'Assigned Channel'}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-1.5">
-                              {renderConnectionBadge(queue.account, camp)}
-                              {(canConfirmAndContinue || canBypassCooldown) && (
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-zinc-300">
+                                {postsLeft} left
+                              </span>
+                              {Boolean(queuePost) && (
                                 <div className="relative">
                                   <button
                                     type="button"
                                     onClick={() => setOpenQueueMenuId((current) => current === queue.accountId ? null : queue.accountId)}
-                                    className="flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+                                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-400 transition hover:bg-white/10 hover:text-white"
                                     aria-label="Queue actions"
                                   >
-                                    <MoreVertical className="h-4 w-4" />
+                                    <MoreVertical className="h-4.5 w-4.5" />
                                   </button>
                                   {openQueueMenuId === queue.accountId && (
                                     <>
@@ -1016,16 +1008,16 @@ export const CreatorCampaigns = () => {
                                         aria-label="Close queue actions"
                                         onClick={() => setOpenQueueMenuId(null)}
                                       />
-                                      <div className="absolute right-0 top-9 z-30 w-56 overflow-hidden rounded-lg border border-white/10 bg-[#0a0a0a] p-1.5 shadow-2xl">
+                                      <div className="absolute right-0 top-10 z-30 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0a] p-1.5 shadow-2xl">
                                         {canConfirmAndContinue && (
                                           <button
                                             type="button"
                                             onClick={() => handleConfirmPostedOverride(queuePost)}
                                             disabled={markingPostId === queuePost._id}
-                                            className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition hover:bg-white/10 disabled:opacity-60"
+                                            className="flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition hover:bg-white/10 disabled:opacity-60"
                                           >
                                             <SkipForward className="mt-0.5 h-4 w-4 shrink-0 text-zinc-300" />
-                                            <span className="text-[11px] font-bold text-white">Confirm posted & move next</span>
+                                            <span className="text-xs font-bold text-white">Confirm posted & move next</span>
                                           </button>
                                         )}
                                         {canBypassCooldown && (
@@ -1033,10 +1025,10 @@ export const CreatorCampaigns = () => {
                                             type="button"
                                             onClick={() => handleCooldownBypass(queuePost)}
                                             disabled={bypassingPostId === queuePost._id}
-                                            className="flex w-full items-start gap-2.5 rounded-md px-2.5 py-2 text-left transition hover:bg-white/10 disabled:opacity-60"
+                                            className="flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition hover:bg-white/10 disabled:opacity-60"
                                           >
                                             <TimerOff className="mt-0.5 h-4 w-4 shrink-0 text-zinc-300" />
-                                            <span className="text-[11px] font-bold text-white">Allow next post now</span>
+                                            <span className="text-xs font-bold text-white">Allow next post now</span>
                                           </button>
                                         )}
                                       </div>
@@ -1048,24 +1040,24 @@ export const CreatorCampaigns = () => {
                           </div>
 
                           {postedToday.length > 0 && (
-                            <div className="mb-2 flex flex-wrap gap-1.5">
+                            <div className="mb-3.5 flex flex-wrap gap-2.5">
                               {postedToday.slice(0, 6).map((post) => (
                                 <span
                                   key={post.id}
-                                  className="animate-in fade-in zoom-in-95 inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300 transition-all duration-300 ease-out"
+                                  className="animate-in fade-in zoom-in-95 inline-flex items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-3.5 py-1.5 text-sm sm:text-[15px] font-bold text-emerald-300 shadow-sm transition-all duration-300 ease-out"
                                 >
                                   <input
                                     type="checkbox"
                                     checked
                                     readOnly
                                     aria-label={`Posted at ${formatPostTime(getPostDisplayPublishedAt(post))}`}
-                                    className="h-3 w-3 accent-white"
+                                    className="h-4 w-4 accent-emerald-500"
                                   />
                                   {formatPostTime(getPostDisplayPublishedAt(post))}
                                 </span>
                               ))}
                               {postedToday.length > 6 && (
-                                <span className="rounded-md bg-white/10 px-2 py-1 text-[10px] font-bold text-zinc-300">
+                                <span className="rounded-xl bg-white/10 px-3 py-1.5 text-sm font-bold text-zinc-300 flex items-center">
                                   +{postedToday.length - 6}
                                 </span>
                               )}
@@ -1074,28 +1066,28 @@ export const CreatorCampaigns = () => {
 
                           {queuePost ? (
                             queuePost.scheduleMode === 'auto' ? (
-                              <div className="space-y-1.5">
-                                <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 flex items-center justify-between">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <Zap className="h-4 w-4 text-amber-400 shrink-0" />
+                              <div className="space-y-2">
+                                <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 flex items-center justify-between">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <Zap className="h-4.5 w-4.5 text-amber-400 shrink-0" />
                                     <div className="min-w-0">
-                                      <p className="m-0 text-xs font-semibold text-white">Auto Post Scheduled</p>
-                                      <p className="m-0 text-[10px] text-zinc-400 truncate">
+                                      <p className="m-0 text-xs sm:text-sm font-semibold text-white">Auto Post Scheduled</p>
+                                      <p className="m-0 text-sm font-bold text-amber-200 truncate">
                                         {formatPostTime(queuePost.scheduledAt)}
                                       </p>
                                     </div>
                                   </div>
-                                  <span className="shrink-0 text-[10px] font-bold uppercase text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                                  <span className="shrink-0 text-[10px] font-bold uppercase text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
                                     Auto
                                   </span>
                                 </div>
                               </div>
                             ) : awaitingPostedDecision ? (
-                              <div className="grid w-full grid-cols-2 gap-2">
+                              <div className="grid w-full grid-cols-2 gap-2.5">
                                 <button
                                   type="button"
                                   onClick={() => handleNotPosted(queuePost)}
-                                  className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-rose-500/30 bg-rose-500/15 px-3 py-1.5 text-xs font-semibold text-rose-300 transition-colors hover:bg-rose-500/25"
+                                  className="inline-flex min-h-[42px] sm:min-h-[44px] items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/15 px-3.5 py-2 text-xs sm:text-sm font-semibold text-rose-300 transition-colors hover:bg-rose-500/25"
                                 >
                                   Not Posted
                                 </button>
@@ -1103,25 +1095,25 @@ export const CreatorCampaigns = () => {
                                   type="button"
                                   onClick={() => handleMarkManualPosted(queuePost)}
                                   disabled={markingPostId === queuePost._id}
-                                  className="btn-white-solid inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-60 shadow-sm"
+                                  className="btn-white-solid inline-flex min-h-[42px] sm:min-h-[44px] items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition-all disabled:opacity-60 shadow-sm"
                                 >
-                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  <CheckCircle className="h-4 w-4" />
                                   {markingPostId === queuePost._id ? 'Checking...' : 'Mark as Posted'}
                                 </button>
                               </div>
                             ) : (
-                              <div className="space-y-1.5">
+                              <div className="space-y-2">
                                 <button
                                   type="button"
                                   onClick={() => handleSharePost(queuePost, postingCooldown)}
                                   disabled={sharingPostId === queuePost._id || postingCooldown.isLocked}
-                                  className={`inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-lg text-xs font-bold shadow-md transition-all ${
+                                  className={`inline-flex min-h-[44px] sm:min-h-[48px] w-full items-center justify-center gap-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all ${
                                     postingCooldown.isLocked
                                       ? 'border border-white/15 bg-white/5 text-zinc-400 cursor-not-allowed'
                                       : 'bg-[#7831d6] hover:bg-[#6825bc] text-white shadow-[#7831d6]/25 active:scale-[0.99]'
                                   } ${sharingPostId === queuePost._id ? 'opacity-70 cursor-wait' : ''}`}
                                 >
-                                  <Share2 className="h-4 w-4 shrink-0" />
+                                  <Share2 className="h-4.5 w-4.5 shrink-0" />
                                   {sharingPostId === queuePost._id
                                     ? 'Opening...'
                                     : postingCooldown.isLocked
@@ -1131,9 +1123,9 @@ export const CreatorCampaigns = () => {
                               </div>
                             )
                           ) : (
-                            <div className="py-2 text-center">
-                              <p className="m-0 text-[10px] font-bold uppercase text-zinc-400">Videos</p>
-                              <p className="m-0 mt-0.5 text-xs font-semibold text-white">No videos yet</p>
+                            <div className="py-3 text-center">
+                              <p className="m-0 text-xs font-bold uppercase text-zinc-400">Videos</p>
+                              <p className="m-0 mt-1 text-sm font-semibold text-white">No videos yet</p>
                             </div>
                           )}
                         </div>

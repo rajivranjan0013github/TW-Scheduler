@@ -85,33 +85,36 @@ const getChannelAvatarSrc = (account) => {
   const avatarUrl = getAccountAvatarUrl(account).trim();
   if (!avatarUrl) return '';
   if (avatarUrl.startsWith('/')) return `${API_BASE_URL}${avatarUrl}`;
-
-  try {
-    const parsedUrl = new URL(avatarUrl);
-    if (parsedUrl.hostname === 'media.thousandpost.com') {
-      return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(avatarUrl)}`;
-    }
-  } catch {
-    return `${API_BASE_URL}/${avatarUrl.replace(/^\/+/, '')}`;
-  }
   return avatarUrl;
 };
 
 const AccountAvatar = ({ account, sizeClass = 'h-10 w-10', textClass = 'text-xs' }) => {
   const label = getAccountLabel(account);
-  const avatarUrl = getChannelAvatarSrc(account);
+  const rawAvatarUrl = getChannelAvatarSrc(account);
+  const [imgSrc, setImgSrc] = useState(rawAvatarUrl);
+  const [hasError, setHasError] = useState(!rawAvatarUrl);
+
+  useEffect(() => {
+    const next = getChannelAvatarSrc(account);
+    setImgSrc(next);
+    setHasError(!next);
+  }, [account]);
+
   return (
     <span className={`${sizeClass} relative inline-flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#7831d6]/20 ${textClass} font-bold uppercase text-[#c4b5fd]`}>
       <span>{label.charAt(0) || 'C'}</span>
-      {avatarUrl && (
+      {imgSrc && !hasError && (
         <img
-          src={avatarUrl}
+          src={imgSrc}
           alt={`${label} channel`}
-          crossOrigin="anonymous"
           referrerPolicy="no-referrer"
           className="absolute inset-0 h-full w-full object-cover"
-          onError={(event) => {
-            event.currentTarget.style.display = 'none';
+          onError={() => {
+            if (rawAvatarUrl && !imgSrc.includes('/api/media/proxy') && API_BASE_URL) {
+              setImgSrc(`${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(rawAvatarUrl)}`);
+            } else {
+              setHasError(true);
+            }
           }}
         />
       )}

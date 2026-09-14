@@ -39,33 +39,36 @@ const getChannelAvatarSrc = (account) => {
   const avatarUrl = getAccountAvatarUrl(account).trim();
   if (!avatarUrl) return '';
   if (avatarUrl.startsWith('/')) return `${API_BASE_URL}${avatarUrl}`;
-
-  try {
-    const parsedUrl = new URL(avatarUrl);
-    if (parsedUrl.hostname === 'media.thousandpost.com') {
-      return `${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(avatarUrl)}`;
-    }
-  } catch {
-    return `${API_BASE_URL}/${avatarUrl.replace(/^\/+/, '')}`;
-  }
   return avatarUrl;
 };
 
 const ChannelAvatar = ({ account, className = 'h-8 w-8' }) => {
   const label = getAccountLabel(account);
-  const avatarUrl = getChannelAvatarSrc(account);
+  const rawAvatarUrl = getChannelAvatarSrc(account);
+  const [imgSrc, setImgSrc] = useState(rawAvatarUrl);
+  const [hasError, setHasError] = useState(!rawAvatarUrl);
+
+  useEffect(() => {
+    const next = getChannelAvatarSrc(account);
+    setImgSrc(next);
+    setHasError(!next);
+  }, [account]);
+
   return (
     <span className={`${className} relative inline-flex flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-black/10 bg-[#eef2ff] text-[10px] font-bold uppercase text-[#4f46e5]`}>
       <span>{label.charAt(0) || 'C'}</span>
-      {avatarUrl && (
+      {imgSrc && !hasError && (
         <img
-          src={avatarUrl}
+          src={imgSrc}
           alt={`${label} channel`}
-          crossOrigin="anonymous"
           referrerPolicy="no-referrer"
           className="absolute inset-0 h-full w-full object-cover"
-          onError={(event) => {
-            event.currentTarget.style.display = 'none';
+          onError={() => {
+            if (rawAvatarUrl && !imgSrc.includes('/api/media/proxy') && API_BASE_URL) {
+              setImgSrc(`${API_BASE_URL}/api/media/proxy?url=${encodeURIComponent(rawAvatarUrl)}`);
+            } else {
+              setHasError(true);
+            }
           }}
         />
       )}
@@ -422,7 +425,15 @@ const QueueManagement = () => {
             caption: post.caption || '',
             scheduledAt: nextScheduledAt,
             scheduleMode: post.scheduleMode || 'auto',
-            platformSpecifics: post.platformSpecifics || {},
+            platformSpecifics: {
+              ...(post.platformSpecifics || {}),
+              ...(post.platformSpecifics?.youtube ? {
+                youtube: {
+                  ...post.platformSpecifics.youtube,
+                  communityGuidelinesCertified: true,
+                },
+              } : {}),
+            },
           }),
         });
         const data = await response.json().catch(() => null);
