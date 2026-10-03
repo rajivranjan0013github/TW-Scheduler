@@ -102,7 +102,18 @@ export const resolveClipMedia = async ({
     if (!bytes && typeof Response !== 'undefined' && source instanceof Response) {
       bytes = new Uint8Array(await source.arrayBuffer());
     }
-    if (!bytes) bytes = await fetchFile(source);
+    if (!bytes) {
+      try {
+        bytes = await fetchFile(source);
+      } catch (directError) {
+        if (typeof source === 'string' && /^https?:\/\//i.test(source) && !source.includes('/api/media/proxy')) {
+          const proxiedUrl = `/api/media/proxy?url=${encodeURIComponent(source)}`;
+          bytes = await fetchFile(proxiedUrl);
+        } else {
+          throw directError;
+        }
+      }
+    }
 
     if (!bytes.byteLength) {
       throw new Error('The resolved media file is empty.');
