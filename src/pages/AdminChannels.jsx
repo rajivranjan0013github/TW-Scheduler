@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -296,6 +296,15 @@ export const AdminChannels = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to={activeConnectCampaignId
+              ? `/channels/unassigned?${new URLSearchParams({ campaignId: activeConnectCampaignId })}`
+              : '/channels/unassigned'}
+            className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-white/15 active:scale-95 shadow-sm"
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <span>Unassigned Channels</span>
+          </Link>
           <button
             type="button"
             onClick={() => connectInstagramOAuth(activeConnectCampaignId)}

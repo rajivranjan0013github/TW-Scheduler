@@ -13,6 +13,7 @@ import ScheduleQueue from './pages/ScheduleQueue';
 import QueueManagement from './pages/QueueManagement';
 import CreatorChannels from './pages/CreatorChannels';
 import AdminChannels from './pages/AdminChannels';
+import UnassignedChannels from './pages/UnassignedChannels';
 import PublishedFeed from './pages/PublishedFeed';
 import PostDetails from './pages/PostDetails';
 import Settings from './pages/Settings';
@@ -181,6 +182,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
               <Route path="/media/editor-v2" element={<Navigate to={`/media/editor${location.search}`} replace />} />
               <Route path="/media/bulk-builder" element={<BulkVideoBuilder />} />
               <Route path="/channels" element={<AdminChannels selectedAccounts={selectedAccounts} />} />
+              <Route path="/channels/unassigned" element={<UnassignedChannels />} />
               <Route path="/channels/:id/feed" element={<PublishedFeed />} />
               <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
               <Route path="/settings" element={<Settings />} />

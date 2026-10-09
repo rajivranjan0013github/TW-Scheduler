@@ -151,7 +151,12 @@ export const AdminDashboard = () => {
   const selectedPosts = activeMetrics[selectedRange.postsKey] || 0;
   const selectedLikes = activeMetrics[selectedRange.likesKey] || 0;
   const selectedComments = activeMetrics[selectedRange.commentsKey] || 0;
-  const upcomingPosts = activeMetrics.upcomingPosts || 0;
+  const upcomingPosts = useMemo(() => {
+    if (Array.isArray(activeMetrics.accountRows) && activeMetrics.accountRows.length > 0) {
+      return activeMetrics.accountRows.reduce((sum, account) => sum + (account.upcomingPosts || 0), 0);
+    }
+    return activeMetrics.upcomingPosts || 0;
+  }, [activeMetrics]);
 
   const filteredAccountRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
