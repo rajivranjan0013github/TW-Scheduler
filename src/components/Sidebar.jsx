@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
-import { Clock, FolderHeart, Film, Layers, Link2, Settings as SettingsIcon, X, Megaphone, Users, BarChart3, CalendarPlus, Home } from 'lucide-react';
+import { Clock, FolderHeart, Film, Layers, Link2, Settings as SettingsIcon, X, Megaphone, Users, BarChart3, CalendarPlus, Home, Bot } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { withCampaignScope } from '../utils/campaignScope';
 import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
@@ -150,6 +150,7 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     { name: 'My Media', label: 'Media', path: '/media', icon: FolderHeart },
     { name: 'Schedule Post', label: 'Schedule', path: '/schedule', icon: CalendarPlus },
     { name: 'Analytics', label: 'Analytics', path: '/analytics', icon: BarChart3 },
+    { name: 'Automations', label: 'Auto', path: '/automations', icon: Bot },
     { name: 'My Channels', label: 'Channels', path: '/channels', icon: Link2 },
     { name: 'Settings', label: 'Settings', path: '/settings', icon: SettingsIcon },
   ] : [

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { BarChart3, CalendarPlus, Clock, FolderHeart, Home as HomeIcon, Link2, Megaphone, Settings as SettingsIcon } from 'lucide-react';
+import { BarChart3, Bot, CalendarPlus, Clock, FolderHeart, Home as HomeIcon, Link2, Megaphone, Settings as SettingsIcon } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
 import Home from './pages/Home';
@@ -35,6 +35,7 @@ import OnboardingScreen from './pages/OnboardingScreen';
 import CreatorCampaigns from './pages/CreatorCampaigns';
 import CreatorSchedulePost from './pages/CreatorSchedulePost';
 import CreatorMedia from './pages/CreatorMedia';
+import CreatorAutomations from './pages/CreatorAutomations';
 
 const VideoEditorV2 = lazy(() => import('./pages/videoEditorV2/VideoEditorV2'));
 
@@ -55,6 +56,7 @@ function MobileNav({ isCreator, canViewAdmin }) {
         { name: 'Media', path: '/media', icon: FolderHeart },
         { name: 'Schedule', path: '/schedule', icon: CalendarPlus },
         { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+        { name: 'Auto', path: '/automations', icon: Bot },
         { name: 'Channels', path: '/channels', icon: Link2 },
         { name: 'Settings', path: '/settings', icon: SettingsIcon },
       ]
@@ -82,7 +84,7 @@ function MobileNav({ isCreator, canViewAdmin }) {
             <NavLink
               key={item.name}
               to={item.path}
-              className="flex flex-col items-center justify-center gap-1 transition-all py-1 px-3 rounded-xl active:scale-95"
+              className="flex flex-col items-center justify-center gap-1 transition-all py-1 px-1.5 rounded-xl active:scale-95"
             >
               <div
                 className={`flex items-center justify-center rounded-xl transition-all ${
@@ -162,6 +164,7 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
               <Route path="/scheduler/queue" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
               <Route path="/scheduler/queue/:accountId" element={canEditQueue ? <QueueManagement /> : <Navigate to="/scheduler" replace />} />
               <Route path="/analytics" element={<CreatorAnalytics />} />
+              <Route path="/automations" element={<CreatorAutomations />} />
               <Route path="/channels" element={<CreatorChannels selectedAccounts={selectedAccounts} />} />
               <Route path="/channels/:id/feed" element={<PublishedFeed />} />
               <Route path="/channels/:id/posts/:metaPostId" element={<PostDetails />} />
