@@ -69,7 +69,7 @@ const sections = [
     title: 'Meta Platform Data (Facebook & Instagram)',
     body: (
       <span>
-        When you connect a Facebook Page or Instagram Professional account to ThousandPost, we request only the minimal permissions required to deliver scheduling, publishing, and analytics services:
+        When you connect a Facebook Page or Instagram Professional account to ThousandPost, we request only the minimal permissions required to deliver scheduling, publishing, analytics, and comment and message automation services:
         <br /><br />
         <strong>Facebook Page Permissions:</strong>
         <ul className="list-disc list-inside mt-2 space-y-1.5 pl-2 text-zinc-300">
@@ -81,6 +81,18 @@ const sections = [
           </li>
           <li>
             <code>pages_manage_posts</code>: Grants ThousandPost the ability to publish text, photos, and videos to your selected Facebook Pages upon your explicit direction.
+          </li>
+          <li>
+            <code>pages_manage_metadata</code>: Allows ThousandPost to subscribe your connected Facebook Page to comment and message webhooks so new comments and messages reach your Automations page.
+          </li>
+          <li>
+            <code>pages_manage_engagement</code>: Enables ThousandPost to post public replies to comments on your Page's posts, either when you reply manually or when an automation you created matches a comment.
+          </li>
+          <li>
+            <code>pages_read_user_content</code>: Allows ThousandPost to read comments and commenter names on your Page's posts so you can see and answer them, and so your keyword automations can respond.
+          </li>
+          <li>
+            <code>pages_messaging</code>: Enables ThousandPost to send private replies to people who comment on your Page's posts and to read and send Messenger replies from your Page in the Inbox, within Meta's 24-hour messaging window.
           </li>
         </ul>
         <br />
@@ -95,8 +107,18 @@ const sections = [
           <li>
             <code>instagram_business_manage_insights</code>: Allows ThousandPost to retrieve performance analytics (reach, impressions, views, likes, and comment counts) for media published through the platform.
           </li>
+          <li>
+            <code>instagram_business_manage_comments</code>: Allows ThousandPost to read comments on your Instagram posts, post public replies to them, and power the keyword auto-replies you set up.
+          </li>
+          <li>
+            <code>instagram_business_manage_messages</code>: Enables ThousandPost to send private replies to people who comment on your posts and to read and send direct messages in the Inbox, within Meta's 24-hour messaging window.
+          </li>
         </ul>
         <br />
+        <strong>Comment and Message Data:</strong>
+        <br />
+        When you use comment automation, the comment feed, or the Inbox, ThousandPost stores the comments on your connected Pages and Instagram posts, the names and usernames of the people who wrote them, your direct-message conversations and messages, and a log of automation activity (which rule matched, what reply was sent, and whether it succeeded). We keep this data so you can see and answer comments and messages in the Automations page, and only act on it as you direct or as the automations you create specify. It is never used to message people who have not first commented on your posts or messaged your account. Disconnecting the account or deleting your ThousandPost account removes it.
+        <br /><br />
         <strong>Data Protection & Platform Compliance:</strong>
         <br />
         We never use Meta user data for surveillance, profiling, ad retargeting, or data brokering. All access tokens are securely handled and never exposed to client-side code. You may disconnect your accounts at any time from ThousandPost settings, through your Meta Account Settings under <em>Apps and Websites</em>, or via our{' '}
