@@ -1234,7 +1234,8 @@ const StatusTag = ({ icon: Icon, children }) => (
 const RecentComments = ({ accounts, onSent, onDmSent, onError }) => {
   const queryClient = useQueryClient();
   const [accountId, setAccountId] = useState(accounts[0]?._id || '');
-  const accountSupportsDm = accounts.find((account) => account._id === accountId)?.supportsDm !== false;
+  const selectedAccount = accounts.find((account) => account._id === accountId);
+  const accountSupportsDm = selectedAccount?.supportsDm !== false;
   // { commentId, mode: 'reply' | 'dm' } for the one open composer
   const [composer, setComposer] = useState(null);
 
@@ -1344,6 +1345,23 @@ const RecentComments = ({ accounts, onSent, onDmSent, onError }) => {
                   </span>
                 </p>
                 <p className="m-0 mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-200">{comment.text}</p>
+
+                {comment.replies?.length > 0 && (
+                  <div className="mt-2.5 space-y-2 border-l-2 border-[#7831d6]/40 pl-3">
+                    {comment.replies.map((reply) => (
+                      <div key={reply.id} className="flex gap-2">
+                        <AccountAvatar account={selectedAccount} className="mt-0.5 h-5 w-5 shrink-0 rounded-full object-cover" />
+                        <div className="min-w-0">
+                          <p className="m-0 flex items-baseline gap-2">
+                            <span className="text-xs font-semibold text-white">You</span>
+                            <span className="text-[11px] text-zinc-500">{formatRelative(reply.timestamp)}</span>
+                          </p>
+                          <p className="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-300">{reply.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {isOpen && composer.mode === 'reply' && (
                   <CommentReplyForm
