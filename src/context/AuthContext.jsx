@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { queryClient } from '../lib/queryClient';
 import { clearActiveCampaign } from '../utils/campaignScope';
+import { hasCurrentPolicyConsent, LEGAL_POLICY_VERSION } from '../utils/legalPolicy';
 
 const AuthContext = createContext(null);
 
@@ -214,8 +215,20 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const acceptPolicies = async () => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/policy-consent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ version: LEGAL_POLICY_VERSION, accepted: true }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || 'Could not save your acceptance. Please try again.');
+    queryClient.clear();
+    setUser(data);
+  };
+
   return (
-    <AuthContext.Provider value={{ user: effectiveUser, token, loading, login, loginWithEmail, logout, updateProfile, deleteAccount, previewContextVersion }}>
+    <AuthContext.Provider value={{ user: effectiveUser, token, loading, login, loginWithEmail, logout, updateProfile, deleteAccount, previewContextVersion, acceptPolicies, policyConsentRequired: Boolean(user && !hasCurrentPolicyConsent(user)) }}>
       {children}
     </AuthContext.Provider>
   );

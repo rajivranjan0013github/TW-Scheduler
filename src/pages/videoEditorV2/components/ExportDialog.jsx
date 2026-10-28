@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
@@ -76,7 +76,36 @@ const FolderCoverPreview = ({ folder }) => {
   );
 };
 
-const BulkExportCard = ({ item, index, savingDisabled, onSave }) => {
+// Keeps a local draft and commits on blur, so bulk rows (stored in
+// localStorage) are not rewritten on every keystroke.
+const CaptionEditor = ({ value = '', onCommit, disabled = false, compact = false }) => {
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const commit = () => {
+    if (draft !== value) onCommit?.(draft);
+  };
+
+  return (
+    <textarea
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      disabled={disabled}
+      rows={compact ? 3 : 4}
+      placeholder="Write a caption or generate one…"
+      aria-label="Caption"
+      className={`block w-full resize-y rounded-lg border border-white/10 bg-black/30 font-medium leading-relaxed text-[#d4d7dd] outline-none placeholder:text-[#666d78] focus:border-[#ff7043]/60 disabled:cursor-not-allowed disabled:opacity-60 ${
+        compact ? 'px-2 py-1.5 text-[9px]' : 'px-2.5 py-2 text-[10px]'
+      }`}
+    />
+  );
+};
+
+const BulkExportCard = ({ item, index, savingDisabled, onSave, onCaptionChange }) => {
   const status = getItemStatus(item);
   const meta = STATUS_META[status] || STATUS_META.ready;
   const StatusIcon = meta.Icon;
@@ -156,7 +185,16 @@ const BulkExportCard = ({ item, index, savingDisabled, onSave }) => {
               </>
             )}
         </div>
-        {item.generatedCaption && (
+        {rendered && status !== 'done' ? (
+          <div className="border-t border-white/[0.08] pt-1.5">
+            <CaptionEditor
+              compact
+              value={item.generatedCaption || ''}
+              disabled={savingDisabled || status === 'saving'}
+              onCommit={(caption) => onCaptionChange?.(String(item.id), caption)}
+            />
+          </div>
+        ) : item.generatedCaption && (
           <p className="line-clamp-3 whitespace-pre-line border-t border-white/[0.08] pt-1.5 text-[8px] font-medium leading-relaxed text-[#9ba1ab]">
             📝 {item.generatedCaption}
           </p>
@@ -193,6 +231,7 @@ export const ExportDialog = ({
   onFolderChange,
   onSaveToLibrary,
   onGenerateCaptions,
+  onCaptionChange,
 }) => {
   const [folderPickerOpen, setFolderPickerOpen] = useState(false);
   const [folderPickerTargetId, setFolderPickerTargetId] = useState('');
@@ -380,7 +419,7 @@ export const ExportDialog = ({
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                 {items.map((item, index) => (
-                  <BulkExportCard key={item.id || index} item={item} index={index} savingDisabled={exporting || generatingCaptions || saving} onSave={openFolderPicker} />
+                  <BulkExportCard key={item.id || index} item={item} index={index} savingDisabled={exporting || generatingCaptions || saving} onSave={openFolderPicker} onCaptionChange={onCaptionChange} />
                 ))}
               </div>
             </>
@@ -446,10 +485,14 @@ export const ExportDialog = ({
                       </button>
                     </div>
                   </div>
-                  {singleGeneratedCaption && (
-                    <p className="whitespace-pre-line border-t border-white/[0.08] px-3 py-2.5 text-[9px] font-medium leading-relaxed text-[#9ba1ab]">
-                      📝 {singleGeneratedCaption}
-                    </p>
+                  {!isAudio && (
+                    <div className="border-t border-white/[0.08] px-3 py-2.5">
+                      <CaptionEditor
+                        value={singleGeneratedCaption}
+                        disabled={saving || generatingCaptions}
+                        onCommit={(caption) => onCaptionChange?.(items[0]?.id, caption)}
+                      />
+                    </div>
                   )}
                 </div>
               )}

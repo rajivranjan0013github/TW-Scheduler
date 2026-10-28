@@ -1,28 +1,31 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Sparkles,
   ArrowRight,
-  Film,
-  Users,
-  Zap,
-  Check,
-  Megaphone,
-  CheckCircle2,
   BarChart3,
-  Smartphone,
-  Send,
+  Bot,
   Calendar,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Inbox,
   Link2,
+  Menu,
+  MessageCircle,
+  Reply,
+  Send,
+  X,
 } from 'lucide-react';
 import PlatformIcon from '../components/PlatformIcon';
 
-const BrandMark = () => (
-  <Link to="/" className="inline-flex items-center">
-    <span className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-      ThousandPost
-    </span>
-  </Link>
-);
+const headingFont = { fontFamily: "'Outfit', sans-serif" };
+
+const navLinks = [
+  { href: '#automations', label: 'Automations' },
+  { href: '#features', label: 'Features' },
+  { href: '#workflow', label: 'How It Works' },
+  { href: '#faq', label: 'FAQ' },
+];
 
 const platforms = [
   { id: 'instagram', label: 'Instagram Reels' },
@@ -30,590 +33,631 @@ const platforms = [
   { id: 'facebook', label: 'Facebook Pages & Reels' },
 ];
 
-export const Home = () => {
+const steps = [
+  {
+    icon: Link2,
+    title: 'Connect & upload',
+    description: 'Link your Instagram, Facebook, and YouTube accounts, then add your media and captions.',
+  },
+  {
+    icon: Bot,
+    title: 'Schedule & automate',
+    description: 'Pick a publishing time and set comment rules that reply publicly and send DMs.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Engage & measure',
+    description: 'Answer messages from one Inbox and see how your content performs.',
+  },
+];
+
+const faqs = [
+  {
+    q: 'Which platforms does ThousandPost support?',
+    a: 'You can publish to Instagram, YouTube, and Facebook. Comment auto-replies work on all three. DMs and the Inbox support Instagram and Facebook.',
+  },
+  {
+    q: 'How does comment-to-DM automation work?',
+    a: 'Choose a keyword (or every new comment), write your public reply and DM, and pick the posts it applies to. When an eligible comment matches, your enabled rule sends both.',
+  },
+  {
+    q: 'Are there limits on automated DMs?',
+    a: 'Yes. DMs are sent only for eligible Instagram and Facebook comments and are subject to each platform’s messaging limits.',
+  },
+  {
+    q: 'Can I pause a rule or delete my data?',
+    a: 'You can pause any rule at any time, disconnect accounts, and delete your ThousandPost data from your settings.',
+  },
+];
+
+const BrandMark = ({ onClick }) => (
+  <Link to="/" onClick={onClick} className="inline-flex items-center">
+    <span style={headingFont} className="text-2xl font-black tracking-tight text-white">
+      ThousandPost
+    </span>
+  </Link>
+);
+
+const PrimaryCta = ({ children = 'Get started', className = '' }) => (
+  <Link
+    to="/login"
+    className={`inline-flex items-center justify-center gap-2 rounded-xl bg-[#8a3ff2] px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_30px_rgba(138,63,242,0.35)] transition hover:-translate-y-0.5 hover:bg-[#7c33e0] active:translate-y-0 ${className}`}
+  >
+    {children}
+    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+  </Link>
+);
+
+const Eyebrow = ({ children }) => (
+  <p className="m-0 text-xs font-semibold uppercase tracking-[0.18em] text-purple-300">{children}</p>
+);
+
+// Reveals children when they scroll into view; skipped for reduced-motion users.
+const Reveal = ({ children, className = '', delay = 0 }) => {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return undefined;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
+      setVisible(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="h-screen overflow-y-auto overflow-x-hidden scroll-smooth bg-[#09090b] text-[#f4f4f5] font-sans antialiased selection:bg-[#8a3ff2] selection:text-white">
-      {/* Top Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#09090b]/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <BrandMark />
+    <div
+      ref={ref}
+      style={{ transitionDelay: `${delay}ms` }}
+      className={`transition-all duration-700 ease-out motion-reduce:transition-none ${visible ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'} ${className}`}
+    >
+      {children}
+    </div>
+  );
+};
 
-          <nav className="hidden items-center gap-8 md:flex">
-            <a href="#workflow" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
-              How It Works
-            </a>
-            <a href="#features" className="text-xs font-semibold text-zinc-400 transition hover:text-white">
-              Features
-            </a>
-          </nav>
+const SentBadge = ({ children }) => (
+  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400">
+    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+    {children}
+  </span>
+);
 
-          <div className="flex items-center gap-3">
-            <Link
-              to="/login"
-              className="rounded-xl px-3.5 py-2 text-xs font-semibold text-zinc-300 transition hover:bg-white/[0.06] hover:text-white"
-            >
-              Sign In
-            </Link>
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#8a3ff2] to-[#6d24cf] px-4 py-2 text-xs font-semibold text-white shadow-[0_0_20px_rgba(138,63,242,0.35)] transition hover:opacity-95 hover:scale-[1.02] active:scale-[0.98]"
-            >
-              Get Started
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+const HeroMockup = () => (
+  <div className="relative mx-auto w-full max-w-md" aria-hidden="true">
+    <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-[#8a3ff2]/20 blur-3xl" />
+    <div className="space-y-3 rounded-3xl border border-white/10 bg-[#121216]/90 p-4 shadow-2xl backdrop-blur">
+      {/* Scheduled post */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
+            <Calendar className="h-4 w-4 text-purple-300" />
+            Scheduled · Today, 6:30 PM
+          </div>
+          <div className="flex -space-x-1.5">
+            {platforms.map((p) => (
+              <PlatformIcon key={p.id} platform={p.id} className="h-5 w-5 rounded-full ring-2 ring-[#121216]" />
+            ))}
           </div>
         </div>
-      </header>
+        <div className="mt-3 flex gap-3">
+          <div className="h-20 w-14 shrink-0 rounded-lg bg-gradient-to-br from-[#c084fc] via-[#8a3ff2] to-[#3b0f7a]" />
+          <div className="min-w-0 flex-1 space-y-2 pt-1">
+            <div className="h-2.5 w-11/12 rounded bg-white/15" />
+            <div className="h-2.5 w-3/4 rounded bg-white/10" />
+            <div className="h-2.5 w-1/2 rounded bg-white/10" />
+            <p className="m-0 pt-1 text-[11px] text-zinc-500">Comment “link” to get the guide 👇</p>
+          </div>
+        </div>
+      </div>
 
-      <main className="space-y-20 py-12 sm:space-y-28 sm:py-16">
-        {/* Hero Section */}
-        <section className="relative px-4 text-center sm:px-6 lg:px-8">
-          {/* Subtle Ambient Glow */}
-          <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[340px] w-[620px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#8a3ff2]/20 blur-[120px]" />
+      {/* Automation thread */}
+      <div className="space-y-2.5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
+          <Bot className="h-4 w-4 text-purple-300" />
+          Rule: keyword “link”
+        </div>
+        <div className="flex items-start gap-2">
+          <div className="h-6 w-6 shrink-0 rounded-full bg-zinc-700" />
+          <p className="m-0 rounded-2xl rounded-tl-sm bg-white/[0.08] px-3 py-2 text-xs text-white">
+            Can you send me the <strong className="text-purple-200">link</strong>?
+          </p>
+        </div>
+        <div className="flex items-center justify-between gap-2 rounded-xl bg-purple-500/10 px-3 py-2">
+          <span className="flex items-center gap-1.5 text-xs text-zinc-200">
+            <Reply className="h-3.5 w-3.5 text-purple-300" /> Public reply
+          </span>
+          <SentBadge>Sent</SentBadge>
+        </div>
+        <div className="flex items-center justify-between gap-2 rounded-xl bg-purple-500/10 px-3 py-2">
+          <span className="flex items-center gap-1.5 text-xs text-zinc-200">
+            <Send className="h-3.5 w-3.5 text-purple-300" /> DM with your link
+          </span>
+          <SentBadge>Sent</SentBadge>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
-          <div className="mx-auto max-w-3xl space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-1.5 text-xs font-semibold text-purple-300">
-              <Megaphone className="h-3.5 w-3.5 text-purple-400" />
-              <span>All-In-One Social Media Workspace</span>
-            </div>
+const FeatureTile = ({ icon: Icon, title, description, children, className = '' }) => (
+  <article className={`flex min-w-0 flex-col rounded-3xl border border-white/10 bg-white/[0.03] p-6 sm:p-7 ${className}`}>
+    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 text-purple-300">
+      <Icon className="h-5 w-5" aria-hidden="true" />
+    </div>
+    <h3 style={headingFont} className="m-0 mt-5 text-xl font-semibold text-white">
+      {title}
+    </h3>
+    <p className="m-0 mt-2 text-sm leading-relaxed text-zinc-400">{description}</p>
+    {children && <div className="mt-6 flex-1">{children}</div>}
+  </article>
+);
 
-            <h1 className="m-0 text-4xl font-extrabold tracking-tight text-white sm:text-6xl sm:leading-[1.1]">
-              Manage all your social accounts{' '}
-              <span className="block mt-1 bg-gradient-to-r from-[#c084fc] via-[#a855f7] to-[#8a3ff2] bg-clip-text text-transparent">
-                in a single place.
-              </span>
-            </h1>
+const CheckList = ({ items }) => (
+  <ul className="m-0 list-none space-y-2.5 p-0 text-sm text-zinc-300">
+    {items.map((item) => (
+      <li key={item} className="flex items-start gap-2.5">
+        <Check className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" aria-hidden="true" />
+        {item}
+      </li>
+    ))}
+  </ul>
+);
 
-            <p className="mx-auto m-0 max-w-2xl text-sm leading-relaxed text-zinc-300 sm:text-base">
-              The unified social media platform for content creators and digital publishers. Plan, schedule, and publish high-quality video content across Instagram, YouTube, and Facebook with real-time performance analytics.
-            </p>
+const chartBars = [40, 65, 50, 85, 60, 95, 75];
 
-            <div className="flex flex-col items-center justify-center gap-3 pt-2 sm:flex-row">
+export const Home = () => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showStickyCta, setShowStickyCta] = useState(false);
+  const scrollRef = useRef(null);
+  const heroRef = useRef(null);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    const hero = heroRef.current;
+    if (!root || !hero || !('IntersectionObserver' in window)) return undefined;
+    const observer = new IntersectionObserver(([entry]) => setShowStickyCta(!entry.isIntersecting), {
+      root,
+      threshold: 0,
+    });
+    observer.observe(hero);
+    return () => observer.disconnect();
+  }, []);
+
+  const closeMenu = () => setMenuOpen(false);
+
+  return (
+    <div
+      ref={scrollRef}
+      className="h-screen overflow-y-auto overflow-x-hidden scroll-smooth bg-[#09090b] text-[#f4f4f5] font-sans antialiased selection:bg-[#8a3ff2] selection:text-white"
+    >
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#09090b]/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <BrandMark onClick={closeMenu} />
+
+          <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
+            {navLinks.map((l) => (
+              <a key={l.href} href={l.href} className="text-sm font-medium text-zinc-400 transition hover:text-white">
+                {l.label}
+              </a>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <Link
+              to="/login"
+              className="hidden rounded-xl px-3.5 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/[0.06] hover:text-white sm:inline-flex"
+            >
+              Sign in
+            </Link>
+            <Link
+              to="/login"
+              className="hidden items-center gap-1.5 rounded-xl bg-[#8a3ff2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#7c33e0] sm:inline-flex"
+            >
+              Get started
+            </Link>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-zinc-300 transition hover:bg-white/[0.06] md:hidden"
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+
+        {menuOpen && (
+          <div id="mobile-menu" className="border-t border-white/10 bg-[#09090b] px-4 pb-6 pt-2 md:hidden">
+            <nav className="flex flex-col" aria-label="Mobile">
+              {navLinks.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  onClick={closeMenu}
+                  className="border-b border-white/5 py-3.5 text-base font-medium text-zinc-200"
+                >
+                  {l.label}
+                </a>
+              ))}
+            </nav>
+            <div className="mt-5 grid gap-3">
+              <PrimaryCta className="w-full" />
               <Link
                 to="/login"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8a3ff2] to-[#6d24cf] px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-900/40 transition hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] sm:w-auto"
+                className="rounded-xl border border-white/10 py-3 text-center text-sm font-medium text-zinc-200"
               >
-                Get Started Free
-                <ArrowRight className="h-4 w-4" />
+                Sign in
               </Link>
-              <a
-                href="#workflow"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-7 py-3.5 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.08] hover:text-white sm:w-auto"
+            </div>
+          </div>
+        )}
+      </header>
+
+      <main>
+        {/* Hero */}
+        <section ref={heroRef} className="relative isolate overflow-hidden px-4 pb-20 pt-14 sm:px-6 sm:pt-20 lg:px-8 lg:pb-28">
+          <div className="pointer-events-none absolute left-1/4 top-0 -z-10 h-[420px] w-[620px] -translate-x-1/2 rounded-full bg-[#8a3ff2]/15 blur-[120px]" />
+
+          <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[1.05fr_1fr]">
+            <div className="text-center lg:text-left">
+              <div className="inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.03] py-1.5 pl-2 pr-3.5">
+                <span className="flex -space-x-1">
+                  {platforms.map((p) => (
+                    <PlatformIcon key={p.id} platform={p.id} className="h-5 w-5 rounded-full" />
+                  ))}
+                </span>
+                <span className="text-xs font-medium text-zinc-300">Instagram · YouTube · Facebook</span>
+              </div>
+
+              <h1
+                style={headingFont}
+                className="m-0 mt-6 text-[2.75rem] font-bold leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-[4.25rem]"
               >
-                See How It Works
-              </a>
+                Post everywhere.
+                <span className="block text-purple-300">Reply automatically.</span>
+              </h1>
+
+              <p className="m-0 mx-auto mt-6 max-w-xl text-base leading-relaxed text-zinc-400 sm:text-lg lg:mx-0">
+                Schedule Reels and Shorts, auto-reply to comments, and send DMs to your audience, all from one creator
+                workspace.
+              </p>
+
+              <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center lg:justify-start">
+                <PrimaryCta className="w-full sm:w-auto" />
+                <a
+                  href="#automations"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-300 transition hover:text-white"
+                >
+                  See how automation works
+                  <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                </a>
+              </div>
             </div>
 
-            {/* Social Platform Badges */}
-            <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
-              {platforms.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-1.5 transition hover:border-white/20"
+            <HeroMockup />
+          </div>
+        </section>
+
+        {/* Comment-to-DM */}
+        <section
+          id="automations"
+          aria-labelledby="automations-title"
+          className="scroll-mt-16 border-y border-white/5 bg-white/[0.015] px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
+        >
+          <div className="mx-auto max-w-6xl">
+            <Reveal className="mx-auto max-w-2xl text-center">
+              <Eyebrow>Instagram & Facebook automation</Eyebrow>
+              <h2
+                id="automations-title"
+                style={headingFont}
+                className="m-0 mt-3 text-3xl font-bold tracking-tight text-white sm:text-5xl"
+              >
+                They comment “link”.
+                <br className="hidden sm:block" /> Your rule does the rest.
+              </h2>
+              <p className="m-0 mt-4 text-base leading-relaxed text-zinc-400">
+                Pick a keyword, write your public reply and DM. When an eligible comment matches, your enabled rule sends
+                both.
+              </p>
+            </Reveal>
+
+            <ol aria-label="Example comment-to-DM automation" className="m-0 mt-14 grid list-none gap-4 p-0 md:grid-cols-3">
+              {[
+                {
+                  icon: MessageCircle,
+                  step: 'Someone comments',
+                  meta: 'On your selected post',
+                  body: (
+                    <p className="m-0 inline-block rounded-2xl rounded-tl-sm bg-white/[0.08] px-4 py-3 text-sm text-white">
+                      Can you send me the <strong className="font-semibold text-purple-200">link</strong>?
+                    </p>
+                  ),
+                },
+                {
+                  icon: Reply,
+                  step: 'Your rule replies',
+                  meta: 'Public comment reply',
+                  body: (
+                    <>
+                      <p className="m-0 rounded-2xl rounded-tl-sm bg-purple-500/15 px-4 py-3 text-sm leading-relaxed text-white">
+                        Sent you the link by DM. Check your inbox!
+                      </p>
+                      <div className="mt-3">
+                        <SentBadge>Reply posted</SentBadge>
+                      </div>
+                    </>
+                  ),
+                },
+                {
+                  icon: Send,
+                  step: 'A DM follows',
+                  meta: 'Private reply to the commenter',
+                  body: (
+                    <>
+                      <div className="rounded-2xl rounded-tl-sm bg-purple-500/15 px-4 py-3">
+                        <p className="m-0 text-sm leading-relaxed text-white">Here’s the link you asked for.</p>
+                        <span className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-purple-200">
+                          <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          Your saved link
+                        </span>
+                      </div>
+                      <div className="mt-3">
+                        <SentBadge>DM delivered</SentBadge>
+                      </div>
+                    </>
+                  ),
+                },
+              ].map(({ icon: Icon, step, meta, body }, index) => (
+                <li key={step} className="min-w-0">
+                  <Reveal delay={index * 150} className="h-full">
+                    <div className="h-full rounded-3xl border border-white/10 bg-[#0e0e12] p-6">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500/15 text-sm font-semibold text-purple-200">
+                          {index + 1}
+                        </span>
+                        <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                          <Icon className="h-4 w-4 text-purple-300" aria-hidden="true" />
+                          {step}
+                        </span>
+                      </div>
+                      <p className="m-0 mb-2 mt-5 text-xs font-medium text-zinc-500">{meta}</p>
+                      {body}
+                    </div>
+                  </Reveal>
+                </li>
+              ))}
+            </ol>
+
+            <p className="m-0 mx-auto mt-8 max-w-3xl text-center text-xs leading-relaxed text-zinc-500">
+              Example messages. You choose the wording and link. DMs and the Inbox support Instagram and Facebook, subject
+              to platform messaging limits. Public comment replies also work on YouTube.
+            </p>
+          </div>
+        </section>
+
+        {/* Features bento */}
+        <section id="features" aria-labelledby="features-title" className="scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <Reveal className="max-w-2xl">
+              <Eyebrow>Everything in one workspace</Eyebrow>
+              <h2 id="features-title" style={headingFont} className="m-0 mt-3 text-3xl font-bold tracking-tight text-white sm:text-5xl">
+                Less tab-switching.
+                <br /> More creating.
+              </h2>
+            </Reveal>
+
+            <div className="mt-12 grid gap-4 md:grid-cols-6">
+              <Reveal className="md:col-span-4">
+                <FeatureTile
+                  icon={Bot}
+                  title="Automatic comment replies & DMs"
+                  description="Reply to comments on Instagram, Facebook, and YouTube. Send links or details by DM on Instagram and Facebook when a comment matches your rule."
+                  className="h-full border-purple-500/25 bg-gradient-to-br from-purple-500/[0.10] to-transparent"
                 >
-                  <PlatformIcon platform={p.id} className="h-4 w-4 shrink-0" />
-                  <span className="text-xs font-medium text-zinc-300">{p.label}</span>
-                </div>
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <CheckList
+                      items={[
+                        'Trigger on keywords or every new comment',
+                        'Target specific posts or all your posts',
+                        'Start from templates and pause anytime',
+                      ]}
+                    />
+                    <div className="space-y-2 rounded-2xl border border-white/10 bg-black/30 p-4" aria-hidden="true">
+                      {['“price?”', '“link”', '“info”'].map((kw) => (
+                        <div key={kw} className="flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2">
+                          <span className="text-xs text-zinc-300">{kw}</span>
+                          <SentBadge>Auto-reply</SentBadge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="m-0 mt-5 text-xs text-zinc-500">
+                    DMs are available for eligible Instagram and Facebook comments, subject to platform messaging limits.
+                  </p>
+                </FeatureTile>
+              </Reveal>
+
+              <Reveal className="md:col-span-2" delay={100}>
+                <FeatureTile
+                  icon={Inbox}
+                  title="One Inbox"
+                  description="Read and reply to Instagram and Facebook DMs, and browse comments by post."
+                  className="h-full"
+                >
+                  <div className="space-y-2" aria-hidden="true">
+                    {[
+                      { id: 'instagram', w: 'w-3/4', unread: 2 },
+                      { id: 'facebook', w: 'w-2/3', unread: 1 },
+                      { id: 'instagram', w: 'w-1/2', unread: 0 },
+                    ].map((row, i) => (
+                      <div key={i} className="flex items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5">
+                        <PlatformIcon platform={row.id} className="h-5 w-5 shrink-0" />
+                        <div className={`h-2 rounded bg-white/15 ${row.w}`} />
+                        {row.unread > 0 && (
+                          <span className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#8a3ff2] text-[10px] font-bold text-white">
+                            {row.unread}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </FeatureTile>
+              </Reveal>
+
+              <Reveal className="md:col-span-3">
+                <FeatureTile
+                  icon={Send}
+                  title="Schedule & publish"
+                  description="Upload once, choose your channels, write a caption, and set the time. Publish automatically or download media and copy the caption."
+                  className="h-full"
+                >
+                  <div className="grid grid-cols-7 gap-1.5" aria-hidden="true">
+                    {Array.from({ length: 14 }, (_, i) => (
+                      <div
+                        key={i}
+                        className={`aspect-square rounded-lg ${[2, 5, 8, 11].includes(i) ? 'bg-[#8a3ff2]/70' : 'bg-white/[0.05]'}`}
+                      />
+                    ))}
+                  </div>
+                  <p className="m-0 mt-4 text-xs text-zinc-500">Your uploads stay organized in My Media.</p>
+                </FeatureTile>
+              </Reveal>
+
+              <Reveal className="md:col-span-3" delay={100}>
+                <FeatureTile
+                  icon={BarChart3}
+                  title="Performance insights"
+                  description="Track available views, likes, and comment counts, and review results by platform and connected account."
+                  className="h-full"
+                >
+                  <div className="flex h-24 items-end gap-2" aria-hidden="true">
+                    {chartBars.map((h, i) => (
+                      <div
+                        key={i}
+                        style={{ height: `${h}%` }}
+                        className={`flex-1 rounded-t-md ${i === chartBars.length - 2 ? 'bg-[#8a3ff2]' : 'bg-white/10'}`}
+                      />
+                    ))}
+                  </div>
+                </FeatureTile>
+              </Reveal>
+            </div>
+          </div>
+        </section>
+
+        {/* How it works */}
+        <section
+          id="workflow"
+          aria-labelledby="workflow-title"
+          className="scroll-mt-16 border-y border-white/5 bg-white/[0.015] px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
+        >
+          <div className="mx-auto max-w-6xl">
+            <Reveal className="mx-auto max-w-2xl text-center">
+              <Eyebrow>How it works</Eyebrow>
+              <h2 id="workflow-title" style={headingFont} className="m-0 mt-3 text-3xl font-bold tracking-tight text-white sm:text-5xl">
+                Up and running in three steps
+              </h2>
+            </Reveal>
+
+            <ol className="m-0 mt-14 grid list-none gap-10 p-0 md:grid-cols-3 md:gap-6">
+              {steps.map(({ icon: Icon, title, description }, index) => (
+                <li key={title} className="relative min-w-0 text-center md:text-left">
+                  <Reveal delay={index * 120}>
+                    <div className="flex items-center justify-center gap-4 md:justify-start">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-purple-500/30 bg-purple-500/10 text-purple-200">
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      {index < steps.length - 1 && (
+                        <span className="hidden h-px flex-1 bg-gradient-to-r from-purple-500/40 to-transparent md:block" />
+                      )}
+                    </div>
+                    <p className="m-0 mt-5 text-xs font-semibold tracking-wider text-purple-300">STEP {index + 1}</p>
+                    <h3 style={headingFont} className="m-0 mt-1 text-xl font-semibold text-white">
+                      {title}
+                    </h3>
+                    <p className="m-0 mt-2 text-sm leading-relaxed text-zinc-400">{description}</p>
+                  </Reveal>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section id="faq" aria-labelledby="faq-title" className="scroll-mt-16 px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+          <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1fr_1.6fr]">
+            <div>
+              <Eyebrow>FAQ</Eyebrow>
+              <h2 id="faq-title" style={headingFont} className="m-0 mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Questions, answered
+              </h2>
+              <p className="m-0 mt-4 text-sm text-zinc-400">
+                Something else?{' '}
+                <a href="mailto:admin@thethousandways.com" className="text-purple-300 underline-offset-4 hover:underline">
+                  Email us
+                </a>
+                .
+              </p>
+            </div>
+            <div className="divide-y divide-white/10 border-y border-white/10">
+              {faqs.map(({ q, a }) => (
+                <details key={q} className="group py-5">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-medium text-white [&::-webkit-details-marker]:hidden">
+                    {q}
+                    <ChevronDown className="h-5 w-5 shrink-0 text-zinc-500 transition group-open:rotate-180" aria-hidden="true" />
+                  </summary>
+                  <p className="m-0 mt-3 pr-8 text-sm leading-relaxed text-zinc-400">{a}</p>
+                </details>
               ))}
             </div>
           </div>
         </section>
 
-
-        {/* Visual Wire Pipeline Diagram (How It Works) */}
-        <section id="workflow" className="px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl space-y-10">
-            <div className="text-center space-y-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-purple-300">
-                <Sparkles className="h-3.5 w-3.5" />
-                Live Workflow Architecture
-              </span>
-              <h2 className="m-0 text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl">
-                How Content Flows Through the Pipeline
+        {/* Final CTA */}
+        <section className="px-4 pb-24 sm:px-6 lg:px-8">
+          <Reveal className="mx-auto max-w-6xl">
+            <div className="relative isolate overflow-hidden rounded-[2rem] border border-purple-500/30 bg-gradient-to-br from-[#2a1450] via-[#170c2c] to-[#0e0917] px-6 py-16 text-center sm:px-12 sm:py-20">
+              <div className="pointer-events-none absolute -top-24 left-1/2 -z-10 h-64 w-[36rem] -translate-x-1/2 rounded-full bg-[#8a3ff2]/30 blur-[100px]" />
+              <h2 style={headingFont} className="m-0 text-3xl font-bold tracking-tight text-white sm:text-5xl">
+                Stop copy-pasting the same reply.
               </h2>
-              <p className="m-0 text-sm text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-                Follow the live workflow from creative video generation to scheduled publishing across your channels and unified analytics.
+              <p className="m-0 mx-auto mt-4 max-w-xl text-base text-zinc-300">
+                Schedule your next post and let your rules handle the comments.
               </p>
+              <PrimaryCta className="mt-8">Get started with ThousandPost</PrimaryCta>
             </div>
-
-            {/* Circuit Canvas Box */}
-            <div className="relative rounded-3xl border border-white/10 bg-[#0a0914] p-5 sm:p-8 shadow-2xl overflow-hidden">
-              {/* Background ambient lighting & grid */}
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#8a3ff2_1px,transparent_1px)] [background-size:24px_24px] opacity-20" />
-              <div className="pointer-events-none absolute -top-20 left-1/2 -z-0 h-60 w-[500px] -translate-x-1/2 rounded-full bg-purple-600/15 blur-[120px]" />
-
-              {/* DESKTOP WIRE DIAGRAM (lg:block) */}
-              <div className="relative z-10 hidden lg:block">
-                <svg className="w-full h-auto" viewBox="0 0 1200 370" fill="none">
-                  <defs>
-                    {/* Glowing Cable Filters */}
-                    <filter id="glowFilter" x="-40%" y="-40%" width="180%" height="180%">
-                      <feGaussianBlur stdDeviation="3.5" result="blur" />
-                      <feMerge>
-                        <feMergeNode in="blur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-
-                    {/* Gradients for Wires */}
-                    <linearGradient id="wireGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#c084fc" />
-                      <stop offset="100%" stopColor="#a855f7" />
-                    </linearGradient>
-
-                    <linearGradient id="wireGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#a855f7" />
-                      <stop offset="100%" stopColor="#38bdf8" />
-                    </linearGradient>
-
-                    <linearGradient id="wireGradTop" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#38bdf8" />
-                      <stop offset="100%" stopColor="#f59e0b" />
-                    </linearGradient>
-
-                    <linearGradient id="wireGradBottom" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#38bdf8" />
-                      <stop offset="100%" stopColor="#10b981" />
-                    </linearGradient>
-
-                    <linearGradient id="wireGradMergeTop" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#f59e0b" />
-                      <stop offset="100%" stopColor="#ec4899" />
-                    </linearGradient>
-
-                    <linearGradient id="wireGradMergeBottom" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#10b981" />
-                      <stop offset="100%" stopColor="#ec4899" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* BASE WIRES (Inactive cables) */}
-                  <path d="M 190 185 H 240" stroke="#251c3d" strokeWidth="4" />
-                  <path d="M 430 185 H 480" stroke="#251c3d" strokeWidth="4" />
-                  <path d="M 670 185 C 700 185, 715 95, 735 95" stroke="#251c3d" strokeWidth="4" />
-                  <path d="M 670 185 C 700 185, 715 275, 735 275" stroke="#251c3d" strokeWidth="4" />
-                  <path d="M 945 95 C 965 95, 975 185, 995 185" stroke="#251c3d" strokeWidth="4" />
-                  <path d="M 945 275 C 965 275, 975 185, 995 185" stroke="#251c3d" strokeWidth="4" />
-
-                  {/* ACTIVE GLOWING WIRES */}
-                  {/* Wire 1: Channels -> Studio */}
-                  <path d="M 190 185 H 240" stroke="url(#wireGrad1)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
-
-                  {/* Wire 2: Studio -> Queue */}
-                  <path d="M 430 185 H 480" stroke="url(#wireGrad2)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
-
-                  {/* Wire 3A: Queue -> Meta Publishing */}
-                  <path d="M 670 185 C 700 185, 715 95, 735 95" stroke="url(#wireGradTop)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
-
-                  {/* Wire 3B: Queue -> YouTube Publishing */}
-                  <path d="M 670 185 C 700 185, 715 275, 735 275" stroke="url(#wireGradBottom)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
-
-                  {/* Wire 4A: Meta Publishing -> Analytics */}
-                  <path d="M 945 95 C 965 95, 975 185, 995 185" stroke="url(#wireGradMergeTop)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
-
-                  {/* Wire 4B: YouTube Publishing -> Analytics */}
-                  <path d="M 945 275 C 965 275, 975 185, 995 185" stroke="url(#wireGradMergeBottom)" strokeWidth="2.5" strokeDasharray="6 4" filter="url(#glowFilter)" />
-
-                  {/* ANIMATED PULSING PHOTONS */}
-                  <circle r="4" fill="#c084fc" filter="url(#glowFilter)">
-                    <animateMotion path="M 190 185 H 240" dur="1.8s" repeatCount="indefinite" />
-                  </circle>
-                  <circle r="4" fill="#38bdf8" filter="url(#glowFilter)">
-                    <animateMotion path="M 430 185 H 480" dur="1.8s" repeatCount="indefinite" />
-                  </circle>
-                  <circle r="4" fill="#f59e0b" filter="url(#glowFilter)">
-                    <animateMotion path="M 670 185 C 700 185, 715 95, 735 95" dur="2.4s" repeatCount="indefinite" />
-                  </circle>
-                  <circle r="4" fill="#10b981" filter="url(#glowFilter)">
-                    <animateMotion path="M 670 185 C 700 185, 715 275, 735 275" dur="2.4s" repeatCount="indefinite" />
-                  </circle>
-                  <circle r="4" fill="#ec4899" filter="url(#glowFilter)">
-                    <animateMotion path="M 945 95 C 965 95, 975 185, 995 185" dur="2.2s" repeatCount="indefinite" />
-                  </circle>
-                  <circle r="4" fill="#ec4899" filter="url(#glowFilter)">
-                    <animateMotion path="M 945 275 C 965 275, 975 185, 995 185" dur="2.2s" repeatCount="indefinite" />
-                  </circle>
-
-                  {/* CONNECTION SOCKETS */}
-                  <circle cx="190" cy="185" r="5" fill="#a855f7" stroke="#120c24" strokeWidth="2" />
-                  <circle cx="240" cy="185" r="5" fill="#a855f7" stroke="#120c24" strokeWidth="2" />
-                  <circle cx="430" cy="185" r="5" fill="#38bdf8" stroke="#120c24" strokeWidth="2" />
-                  <circle cx="480" cy="185" r="5" fill="#38bdf8" stroke="#120c24" strokeWidth="2" />
-                  <circle cx="670" cy="185" r="5" fill="#38bdf8" stroke="#120c24" strokeWidth="2" />
-                  <circle cx="735" cy="95" r="5" fill="#f59e0b" stroke="#120c24" strokeWidth="2" />
-                  <circle cx="735" cy="275" r="5" fill="#10b981" stroke="#120c24" strokeWidth="2" />
-                  <circle cx="945" cy="95" r="5" fill="#f59e0b" stroke="#120c24" strokeWidth="2" />
-                  <circle cx="945" cy="275" r="5" fill="#10b981" stroke="#120c24" strokeWidth="2" />
-                  <circle cx="995" cy="185" r="5" fill="#ec4899" stroke="#120c24" strokeWidth="2" />
-
-                  {/* WIRE DATA LABELS */}
-                  <g transform="translate(190, 160)">
-                    <rect width="50" height="16" rx="8" fill="#1a142e" stroke="#8a3ff2" strokeWidth="0.8" />
-                    <text x="25" y="11" fill="#c084fc" fontSize="8" fontWeight="bold" textAnchor="middle">Channels</text>
-                  </g>
-                  <g transform="translate(435, 160)">
-                    <rect width="42" height="16" rx="8" fill="#141c2e" stroke="#38bdf8" strokeWidth="0.8" />
-                    <text x="21" y="11" fill="#7dd3fc" fontSize="8" fontWeight="bold" textAnchor="middle">Media</text>
-                  </g>
-                  <g transform="translate(680, 125)">
-                    <rect width="50" height="16" rx="8" fill="#261b12" stroke="#f59e0b" strokeWidth="0.8" />
-                    <text x="25" y="11" fill="#fbbf24" fontSize="8" fontWeight="bold" textAnchor="middle">Meta API</text>
-                  </g>
-                  <g transform="translate(675, 230)">
-                    <rect width="55" height="16" rx="8" fill="#10261e" stroke="#10b981" strokeWidth="0.8" />
-                    <text x="27" y="11" fill="#34d399" fontSize="8" fontWeight="bold" textAnchor="middle">YouTube</text>
-                  </g>
-                  <g transform="translate(946, 172)">
-                    <rect width="50" height="16" rx="8" fill="#2b1226" stroke="#ec4899" strokeWidth="0.8" />
-                    <text x="25" y="11" fill="#f472b6" fontSize="8" fontWeight="bold" textAnchor="middle">Analytics</text>
-                  </g>
-
-                  {/* HTML CARDS VIA FOREIGNOBJECT */}
-
-                  {/* Station 1: Connect Channels */}
-                  <foreignObject x="10" y="110" width="180" height="150">
-                    <div className="h-full rounded-2xl border border-purple-500/30 bg-[#120d22] p-3.5 flex flex-col justify-between shadow-xl">
-                      <div>
-                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                          <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wide">01 · Connect</span>
-                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-purple-500/20 text-purple-300">
-                            <Link2 className="h-2.5 w-2.5" />
-                          </div>
-                        </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Link Your Channels</h4>
-                        <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
-                          Connect Instagram, YouTube channel, & Facebook Page securely via OAuth.
-                        </p>
-                      </div>
-                      <div className="rounded-md bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 text-[9px] text-purple-300 font-semibold">
-                        🔗 1-Click Connect
-                      </div>
-                    </div>
-                  </foreignObject>
-
-                  {/* Station 2: Creator Studio */}
-                  <foreignObject x="240" y="110" width="190" height="150">
-                    <div className="h-full rounded-2xl border border-fuchsia-500/30 bg-[#190d22] p-3.5 flex flex-col justify-between shadow-xl">
-                      <div>
-                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                          <span className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wide">02 · Creator Studio</span>
-                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-fuchsia-500/20 text-fuchsia-300">
-                            <Film className="h-2.5 w-2.5" />
-                          </div>
-                        </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Media & AI Captions</h4>
-                        <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
-                          Upload video clips, edit hooks, & generate engaging captions with AI.
-                        </p>
-                      </div>
-                      <div className="rounded-md bg-fuchsia-500/10 border border-fuchsia-500/20 px-1.5 py-0.5 text-[9px] text-fuchsia-300 font-semibold">
-                        ✨ AI Video Tools
-                      </div>
-                    </div>
-                  </foreignObject>
-
-                  {/* Station 3: Schedule Queue */}
-                  <foreignObject x="480" y="110" width="190" height="150">
-                    <div className="h-full rounded-2xl border border-blue-500/30 bg-[#0d1627] p-3.5 flex flex-col justify-between shadow-xl">
-                      <div>
-                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                          <span className="text-[10px] font-bold text-blue-300 uppercase tracking-wide">03 · Schedule Queue</span>
-                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-blue-500/20 text-blue-300">
-                            <Calendar className="h-2.5 w-2.5" />
-                          </div>
-                        </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Content Calendar</h4>
-                        <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
-                          Plan your multi-channel posting calendar with visual drag-and-drop ease.
-                        </p>
-                      </div>
-                      <div className="rounded-md bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 text-[9px] text-blue-300 font-semibold">
-                        📅 Smart Calendar
-                      </div>
-                    </div>
-                  </foreignObject>
-
-                  {/* Station 4A: Route A (Meta Publishing) */}
-                  <foreignObject x="735" y="35" width="210" height="120">
-                    <div className="h-full rounded-2xl border border-amber-500/30 bg-[#1f170f] p-3 flex flex-col justify-between shadow-xl">
-                      <div>
-                        <div className="flex items-center justify-between gap-1.5 mb-1">
-                          <span className="text-[9px] font-bold text-amber-300 uppercase tracking-wide">Meta Publishing</span>
-                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-amber-500/20 text-amber-300">
-                            <Send className="h-2.5 w-2.5" />
-                          </div>
-                        </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Instagram Reels & FB</h4>
-                        <p className="m-0 mt-0.5 text-[10px] text-zinc-400 leading-tight">
-                          Auto-publish video content directly to Instagram Reels & Facebook Pages.
-                        </p>
-                      </div>
-                      <span className="text-[9px] font-semibold text-amber-300">⚡ Meta Graph API</span>
-                    </div>
-                  </foreignObject>
-
-                  {/* Station 4B: Route B (YouTube Publishing) */}
-                  <foreignObject x="735" y="215" width="210" height="120">
-                    <div className="h-full rounded-2xl border border-emerald-500/30 bg-[#0d1e17] p-3 flex flex-col justify-between shadow-xl">
-                      <div>
-                        <div className="flex items-center justify-between gap-1.5 mb-1">
-                          <span className="text-[9px] font-bold text-emerald-300 uppercase tracking-wide">YouTube Publishing</span>
-                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300">
-                            <Smartphone className="h-2.5 w-2.5" />
-                          </div>
-                        </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">YouTube Shorts & Videos</h4>
-                        <p className="m-0 mt-0.5 text-[10px] text-zinc-400 leading-tight">
-                          Upload Shorts directly with titles, tags, thumbnails, & audience controls.
-                        </p>
-                      </div>
-                      <span className="text-[9px] font-semibold text-emerald-300">⚡ YouTube API</span>
-                    </div>
-                  </foreignObject>
-
-                  {/* Station 5: Creator Analytics Hub */}
-                  <foreignObject x="995" y="110" width="195" height="150">
-                    <div className="h-full rounded-2xl border border-fuchsia-500/30 bg-[#210d1e] p-3.5 flex flex-col justify-between shadow-xl">
-                      <div>
-                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                          <span className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wide">05 · Creator Hub</span>
-                          <div className="flex h-5 w-5 items-center justify-center rounded-lg bg-fuchsia-500/20 text-fuchsia-300">
-                            <BarChart3 className="h-2.5 w-2.5" />
-                          </div>
-                        </div>
-                        <h4 className="m-0 text-xs font-bold text-white leading-tight">Unified Analytics</h4>
-                        <p className="m-0 mt-1 text-[10px] text-zinc-400 leading-tight">
-                          Track total views, reach, likes, & audience growth across all platforms.
-                        </p>
-                      </div>
-                      <div className="rounded-md bg-fuchsia-500/10 border border-fuchsia-500/20 px-1.5 py-0.5 text-[9px] text-fuchsia-300 font-semibold">
-                        📊 Cross-Platform Insights
-                      </div>
-                    </div>
-                  </foreignObject>
-
-                </svg>
-              </div>
-
-              {/* MOBILE & TABLET CIRCUIT DIAGRAM (lg:hidden) */}
-              <div className="relative z-10 lg:hidden space-y-6">
-                {/* Vertical Cable Line */}
-                <div className="absolute left-6 top-8 bottom-8 w-0.5 bg-gradient-to-b from-purple-500 via-fuchsia-500 via-blue-500 to-emerald-500" />
-
-                {/* Mobile Step 1 */}
-                <div className="relative flex items-start gap-4 pl-12">
-                  <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-purple-400 ring-4 ring-purple-500/30 shadow-[0_0_10px_#a855f7]" />
-                  <div className="w-full rounded-2xl border border-purple-500/30 bg-[#120d22] p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-purple-300 uppercase tracking-wide">01 · Channels</span>
-                      <Link2 className="h-4 w-4 text-purple-300" />
-                    </div>
-                    <h4 className="m-0 text-sm font-bold text-white">Connect Your Social Accounts</h4>
-                    <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
-                      Link your Instagram, YouTube channel, and Facebook Page securely via official 1-click OAuth.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Mobile Step 2 */}
-                <div className="relative flex items-start gap-4 pl-12">
-                  <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-fuchsia-400 ring-4 ring-fuchsia-500/30 shadow-[0_0_10px_#d946ef]" />
-                  <div className="w-full rounded-2xl border border-fuchsia-500/30 bg-[#190d22] p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-fuchsia-300 uppercase tracking-wide">02 · Creator Studio</span>
-                      <Film className="h-4 w-4 text-fuchsia-300" />
-                    </div>
-                    <h4 className="m-0 text-sm font-bold text-white">Media & AI Captions</h4>
-                    <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
-                      Upload video clips, edit hooks, and generate engaging captions with AI.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Mobile Step 3 */}
-                <div className="relative flex items-start gap-4 pl-12">
-                  <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-blue-400 ring-4 ring-blue-500/30 shadow-[0_0_10px_#38bdf8]" />
-                  <div className="w-full rounded-2xl border border-blue-500/30 bg-[#0d1627] p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-blue-300 uppercase tracking-wide">03 · Schedule Queue</span>
-                      <Calendar className="h-4 w-4 text-blue-300" />
-                    </div>
-                    <h4 className="m-0 text-sm font-bold text-white">Visual Content Calendar</h4>
-                    <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
-                      Plan and organize your multi-platform posting schedule in one visual queue.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Mobile Step 4 (Fork) */}
-                <div className="relative flex items-start gap-4 pl-12">
-                  <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-amber-400 ring-4 ring-amber-500/30 shadow-[0_0_10px_#f59e0b]" />
-                  <div className="w-full space-y-3">
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-zinc-300">
-                      04 · Direct Multi-Platform Publishing
-                    </span>
-                    {/* 4A */}
-                    <div className="rounded-2xl border border-amber-500/30 bg-[#1f170f] p-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-amber-300">Instagram Reels & Facebook (Meta API)</span>
-                        <Send className="h-3.5 w-3.5 text-amber-300" />
-                      </div>
-                      <p className="m-0 text-xs text-zinc-300">
-                        Auto-publish video content directly to Instagram Reels and Facebook Pages via official Meta APIs.
-                      </p>
-                    </div>
-                    {/* 4B */}
-                    <div className="rounded-2xl border border-emerald-500/30 bg-[#0d1e17] p-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-emerald-300">YouTube Shorts & Videos (YouTube API)</span>
-                        <Smartphone className="h-3.5 w-3.5 text-emerald-300" />
-                      </div>
-                      <p className="m-0 text-xs text-zinc-300">
-                        Directly upload Shorts with titles, tags, thumbnails, and audience controls via YouTube API.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mobile Step 5 */}
-                <div className="relative flex items-start gap-4 pl-12">
-                  <div className="absolute left-[19px] top-4 h-3 w-3 rounded-full bg-fuchsia-400 ring-4 ring-fuchsia-500/30 shadow-[0_0_10px_#ec4899]" />
-                  <div className="w-full rounded-2xl border border-fuchsia-500/30 bg-[#210d1e] p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-fuchsia-300 uppercase tracking-wide">05 · Creator Hub</span>
-                      <BarChart3 className="h-4 w-4 text-fuchsia-300" />
-                    </div>
-                    <h4 className="m-0 text-sm font-bold text-white">Unified Creator Analytics</h4>
-                    <p className="m-0 mt-1 text-xs text-zinc-300 leading-relaxed">
-                      Track total views, reach, likes, and audience growth across every connected channel in real time.
-                    </p>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section id="features" className="px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-5xl grid gap-6 md:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 space-y-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 text-purple-300">
-                <Send className="h-5 w-5" />
-              </div>
-              <h3 className="m-0 text-xl font-bold text-white">Direct Multi-Channel Publishing</h3>
-              <p className="m-0 text-xs leading-relaxed text-zinc-400">
-                Publish high-quality video content consistently to Instagram, YouTube, and Facebook without burning out.
-              </p>
-              <ul className="m-0 p-0 space-y-2 list-none text-xs text-zinc-300">
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400" />
-                  Connect Instagram, YouTube, and Facebook in 1 click via official OAuth
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400" />
-                  Direct API auto-publishing or 1-tap manual video download & caption copy
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400" />
-                  AI-powered caption ideas, hashtag suggestions, and video hooks
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400" />
-                  Built-in media library with cloud storage for high-res assets
-                </li>
-              </ul>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 space-y-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/15 text-purple-300">
-                <BarChart3 className="h-5 w-5" />
-              </div>
-              <h3 className="m-0 text-xl font-bold text-white">Visual Scheduling & Real-Time Analytics</h3>
-              <p className="m-0 text-xs leading-relaxed text-zinc-400">
-                Organize your upcoming releases in a visual calendar and track engagement metrics across all your channels.
-              </p>
-              <ul className="m-0 p-0 space-y-2 list-none text-xs text-zinc-300">
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400" />
-                  Interactive visual content calendar and automated publishing queue
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400" />
-                  Real-time views, reactions, likes, and comment counts
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400" />
-                  Platform-separated performance insights and audience engagement trends
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400" />
-                  Full privacy compliance with instant self-service account and data deletion
-                </li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* Final Call to Action Card */}
-        <section className="px-4 sm:px-6 lg:px-8">
-          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-purple-500/30 bg-gradient-to-b from-[#1c122c] to-[#0e0917] p-8 text-center sm:p-14 shadow-2xl shadow-purple-950/40">
-            <div className="relative mx-auto max-w-2xl space-y-6">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/30 bg-purple-500/20 px-3 py-1 text-xs font-semibold text-purple-200">
-                <Sparkles className="h-3.5 w-3.5" />
-                Built for Creators · Video Scheduler · Real-Time Analytics
-              </span>
-
-              <h2 className="m-0 text-3xl font-extrabold tracking-tight text-white sm:text-5xl">
-                Ready to level up your creator channels?
-              </h2>
-
-              <p className="m-0 text-sm leading-relaxed text-purple-200/80">
-                Join creators and influencers publishing high-performing video content to Instagram, YouTube, and Facebook with automated scheduling and unified analytics.
-              </p>
-
-              <div className="pt-2">
-                <Link
-                  to="/login"
-                  className="btn-white-solid inline-flex items-center gap-2 rounded-xl px-8 py-3.5 text-sm font-bold shadow-[0_10px_35px_rgba(255,255,255,0.2)] transition hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  <span>Start with ThousandPost</span>
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-4 pt-2 text-[11px] text-purple-300/70">
-                <span className="flex items-center gap-1.5">
-                  <Check className="h-3.5 w-3.5 text-emerald-400" />
-                  No credit card required
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Check className="h-3.5 w-3.5 text-emerald-400" />
-                  Connect all your social accounts
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Check className="h-3.5 w-3.5 text-emerald-400" />
-                  Live view velocity & reach insights
-                </span>
-              </div>
-            </div>
-          </div>
+          </Reveal>
         </section>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 bg-[#070709] py-10 text-zinc-400">
+      <footer className="border-t border-white/10 bg-[#070709] py-10 pb-28 text-zinc-400 sm:pb-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-4 sm:flex-row sm:px-6 lg:px-8">
           <div className="flex flex-col items-center gap-2 sm:items-start">
             <BrandMark />
             <p className="m-0 text-xs text-zinc-500">
-              © 2026 ThousandPost · Managed by{' '}
+              © {new Date().getFullYear()} ThousandPost · Managed by{' '}
               <a
                 href="https://thethousandways.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline text-zinc-400 hover:text-white transition"
+                className="text-zinc-400 underline transition hover:text-white"
               >
                 Thousand Ways
               </a>
@@ -621,13 +665,12 @@ export const Home = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-zinc-400">
-            <a href="#workflow" className="transition hover:text-white">
-              How It Works
-            </a>
-            <a href="#features" className="transition hover:text-white">
-              Features
-            </a>
+          <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-xs text-zinc-400" aria-label="Footer">
+            {navLinks.map((l) => (
+              <a key={l.href} href={l.href} className="transition hover:text-white">
+                {l.label}
+              </a>
+            ))}
             <Link to="/privacy-policy" className="transition hover:text-white">
               Privacy Policy
             </Link>
@@ -640,9 +683,17 @@ export const Home = () => {
             <a href="mailto:admin@thethousandways.com" className="transition hover:text-white">
               Contact Us
             </a>
-          </div>
+          </nav>
         </div>
       </footer>
+
+      {/* Mobile sticky CTA */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#09090b]/90 p-3 backdrop-blur-xl transition-transform duration-300 sm:hidden ${showStickyCta && !menuOpen ? 'translate-y-0' : 'translate-y-full'}`}
+        inert={!showStickyCta || menuOpen}
+      >
+        <PrimaryCta className="w-full" />
+      </div>
     </div>
   );
 };

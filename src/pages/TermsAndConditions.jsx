@@ -1,3 +1,4 @@
+import { LEGAL_POLICY_UPDATED_LABEL } from '../utils/legalPolicy';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 
@@ -5,23 +6,31 @@ const sections = [
   {
     title: 'Use of ThousandPost',
     body: (
-      <span>
-        You may use ThousandPost to connect supported publishing channels, manage media assets, schedule and publish content, and view performance insights. You are responsible for ensuring your use complies with applicable laws and third-party platform policies.
-      </span>
+      <div>
+        You may use ThousandPost to connect supported social channels, manage media assets, schedule and publish content, view performance insights, manage comments and conversations, and configure automatic comment replies and DMs. Instagram and Facebook support eligible comment-to-DM and Inbox features; YouTube supports public comment replies only. You are responsible for ensuring your use complies with applicable laws and third-party platform policies.
+      </div>
+    ),
+  },
+  {
+    title: 'Acceptance and Updates',
+    body: (
+      <div>
+        To continue into the app and connect channels or use comment and messaging features, you must expressly accept the current Terms and Conditions and Privacy Policy. We record the accepted version and time. We will present material changes for renewed acceptance before enabling newly disclosed data uses. You can decline by signing out; account settings, channel disconnection, and deletion remain available without acceptance. Accepting these policies does not enable an automation: you must separately create and enable each rule you want to run.
+      </div>
     ),
   },
   {
     title: 'Account Access',
     body: (
-      <span>
-        You are responsible for maintaining access to your Google account and connected publishing channels. Do not share credentials, tokens, or workspace access with unauthorized users.
-      </span>
+      <div>
+        You are responsible for maintaining access to your Google account and connected social channels. Do not share your login, credentials, or tokens with anyone. Only connect social channels that you own or are authorized to manage, and disconnect any channel you no longer manage.
+      </div>
     ),
   },
   {
     title: 'YouTube Terms of Service & Google Policies',
     body: (
-      <span>
+      <div>
         ThousandPost integrates with YouTube API Services. By connecting a YouTube channel or using ThousandPost features that interact with YouTube, you agree to be bound by the{' '}
         <a
           href="https://www.youtube.com/t/terms"
@@ -50,14 +59,14 @@ const sections = [
           Google Security Settings page
         </a>
         . Please review these policies carefully before connecting your channel.
-      </span>
+      </div>
     ),
   },
   {
     title: 'Connected Social Platforms & Meta Platform Terms',
     body: (
-      <span>
-        Publishing, insights, and feed features depend on third-party platform APIs. By connecting Facebook or Instagram accounts, you agree to comply with all applicable{' '}
+      <div>
+        Publishing, insights, comments, automation, and messaging features depend on third-party platform APIs. By connecting Facebook or Instagram accounts, you agree to comply with all applicable{' '}
         <a
           href="https://developers.facebook.com/terms"
           target="_blank"
@@ -67,14 +76,27 @@ const sections = [
           Meta Platform Terms
         </a>{' '}
         and Developer Policies. Meta, Instagram, Facebook, Google, and other providers may change permissions, limits, review requirements, or API availability at any time.
-      </span>
+      </div>
+    ),
+  },
+  {
+    title: 'Comment Replies, DMs, and Automation Authorization',
+    body: (
+      <div>
+        When you save an enabled automation, you authorize ThousandPost to monitor comments on the selected connected account and send the public replies and, where supported, private replies specified by that rule when its triggers match. Review the selected account, posts, keywords, reply variants, personalization, and DM text before enabling the rule. Enabled rules may run while you are offline. When multiple rules match, only the first matching enabled rule for the account is applied.
+        <br /><br />
+        You can edit, pause, or delete rules from the Automations page, or disconnect the channel to stop future work. An action already in progress may finish. Pausing or deleting a rule does not retract content already sent. You remain responsible for your configured messages, links, offers, and any necessary notices, permissions, or marketing consent. A person's comment is not blanket permission for ongoing promotional messages. Do not use automations or the Inbox for spam, harassment, impersonation, deceptive offers, unlawful content, or attempts to bypass platform limits or a person's request to stop receiving messages. We may restrict abusive use.
+        <br /><br />
+        Comment-specific private replies and ordinary Inbox messages have separate eligibility and time limits. A private reply does not itself authorize follow-up messages. You must respect the recipient's choices and the platform rules described in our{' '}
+        <Link to="/privacy-policy" className="text-blue-400 underline hover:text-blue-300 font-medium">Privacy Policy</Link>.
+      </div>
     ),
   },
   {
     title: 'Content Responsibility & Rights Certification',
     body: (
-      <span>
-        You are solely responsible for all captions, media assets, scheduled posts, and other content submitted through ThousandPost. By uploading or scheduling content, you explicitly certify and warrant that:
+      <div>
+        You are responsible for all captions, media assets, scheduled posts, public replies, private messages, automation templates, and other content you submit or authorize through ThousandPost. By uploading, scheduling, sending, or enabling rules for content, you certify and warrant that:
         <br /><br />
         <ul className="list-disc list-inside space-y-1.5 pl-2 text-zinc-300">
           <li>You own all intellectual property rights in the content or have secured all necessary licenses, releases, and permissions to distribute it.</li>
@@ -88,23 +110,35 @@ const sections = [
           </li>
           <li>For sponsored, paid partnership, gifted, or affiliate posts, you must comply with Meta's Branded Content Policies and applicable consumer disclosure laws (e.g. FTC guidelines) using native platform disclosure tools.</li>
         </ul>
-      </span>
+      </div>
     ),
   },
   {
     title: 'Service Availability',
     body: (
-      <span>
-        ThousandPost is provided on an as-available basis. Scheduled publishing may be affected by internet connectivity, token expiry, platform API errors, invalid media formats, rate limits, or service outages.
-      </span>
+      <div>
+        ThousandPost is provided on an as-available basis. Publishing, comment synchronization, automated replies, DMs, and Inbox delivery may be delayed or fail because of connectivity, token expiry, missing permissions, platform review status, API errors, recipient settings, messaging windows, rate limits, or outages. We do not guarantee that every comment will be detected or that every reply or message will be delivered. Review activity and delivery errors, and use the social platform directly when timely communication is essential.
+      </div>
+    ),
+  },
+  {
+    title: 'Privacy and Deleting Connected Data',
+    body: (
+      <div>
+        Our{' '}
+        <Link to="/privacy-policy" className="text-blue-400 underline hover:text-blue-300 font-medium">Privacy Policy</Link>{' '}
+        explains how we process comments, messages, participant information, and automation records. Disconnecting a channel or deleting your ThousandPost account removes applicable locally stored interaction records and queued automation work. It does not delete comments, replies, messages, or copies already held by social platforms or recipients. Use the social platform's own controls for content held there. Follow our{' '}
+        <Link to="/data-deletion" className="text-blue-400 underline hover:text-blue-300 font-medium">Data Deletion Instructions</Link>{' '}
+        to request deletion of data held by ThousandPost.
+      </div>
     ),
   },
   {
     title: 'Limitation of Liability',
     body: (
-      <span>
+      <div>
         To the maximum extent allowed by law, ThousandPost is not liable for indirect losses, missed publishing times, platform restrictions, account suspensions, or business losses caused by use of the service.
-      </span>
+      </div>
     ),
   },
 ];
@@ -127,7 +161,7 @@ export const TermsAndConditions = () => (
     <main className="mx-auto max-w-4xl px-5 py-12">
       <p className="m-0 text-xs font-bold uppercase tracking-wider text-zinc-400">Legal</p>
       <h1 className="m-0 mt-3 text-4xl font-black tracking-tight text-white">Terms and Conditions</h1>
-      <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: September 6, 2026</p>
+      <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: {LEGAL_POLICY_UPDATED_LABEL}</p>
 
       <div className="mt-8 rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-xl">
         <p className="m-0 text-base leading-7 text-zinc-300">
@@ -139,7 +173,7 @@ export const TermsAndConditions = () => (
         {sections.map((section) => (
           <section key={section.title} className="rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-md">
             <h2 className="m-0 text-lg font-bold text-white">{section.title}</h2>
-            <p className="m-0 mt-3 text-sm leading-7 text-zinc-400">{section.body}</p>
+            <div className="m-0 mt-3 text-sm leading-7 text-zinc-400">{section.body}</div>
           </section>
         ))}
       </div>

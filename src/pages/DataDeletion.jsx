@@ -1,3 +1,4 @@
+import { LEGAL_POLICY_UPDATED_LABEL } from '../utils/legalPolicy';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Sparkles, Trash2, ShieldCheck, Mail, ExternalLink, RefreshCw, CheckCircle2 } from 'lucide-react';
@@ -43,7 +44,7 @@ export const DataDeletion = () => {
       <main className="mx-auto max-w-4xl px-5 py-12">
         <p className="m-0 text-xs font-bold uppercase tracking-wider text-zinc-400">User Rights & Compliance</p>
         <h1 className="m-0 mt-3 text-4xl font-black tracking-tight text-white">User Data Deletion Instructions</h1>
-        <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: September 6, 2026</p>
+        <p className="m-0 mt-3 text-sm text-zinc-400">Last updated: {LEGAL_POLICY_UPDATED_LABEL}</p>
 
         {confirmationCode && deletionStatus === 'completed' && (
           <div className="mt-8 rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-6 text-white shadow-xl">
@@ -57,7 +58,7 @@ export const DataDeletion = () => {
                   Confirmation Code: <span className="font-mono font-semibold text-emerald-200 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded">{confirmationCode}</span>
                 </p>
                 <p className="m-0 pt-2 text-xs text-zinc-400 leading-relaxed">
-                  This confirmation code was verified by ThousandPost. The associated local profile data, social tokens, stored media, scheduled posts, and cached analytics were erased.
+                  This confirmation code was verified by ThousandPost. The associated local profile data, social tokens, stored media, scheduled posts, cached analytics, stored comments, DM conversations and messages, automation rules and activity logs, and queued automation work were erased.
                 </p>
               </div>
             </div>
@@ -90,21 +91,21 @@ export const DataDeletion = () => {
               <Trash2 className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="m-0 text-lg font-bold text-white">1. Self-Service Account & Data Deletion (Instant)</h2>
+              <h2 className="m-0 text-lg font-bold text-white">1. Self-Service Account & Data Deletion</h2>
               <p className="m-0 text-xs text-zinc-400">Deletes your ThousandPost account and cascades deletion across all stored data</p>
             </div>
           </div>
           <p className="text-sm leading-6 text-zinc-300">
-            You can delete your entire ThousandPost workspace directly from inside the application:
+            You can delete your ThousandPost account directly from inside the app:
           </p>
           <ol className="list-decimal list-inside space-y-2 text-sm text-zinc-400 pl-2">
-            <li>Log in to your ThousandPost dashboard.</li>
+            <li>Log in to ThousandPost.</li>
             <li>Navigate to <strong>Settings</strong> from the main menu.</li>
             <li>Scroll down to the <strong>Danger Zone</strong>.</li>
             <li>Click <strong>Delete Account</strong> and confirm the prompt.</li>
           </ol>
           <p className="text-xs text-zinc-400 bg-white/[0.03] p-3 rounded-lg border border-white/5">
-            <strong>What gets deleted:</strong> Your profile record, access and refresh tokens for all connected channels, uploaded media and thumbnails from object storage, folders, saved captions, scheduled posts, published feed records, metric snapshots, comment-count records, AI workflow records, and channel assignments are permanently purged.
+            <strong>What gets deleted:</strong> Your profile record, access and refresh tokens for all connected channels, uploaded media and thumbnails from object storage, folders, saved captions, scheduled posts, published feed records, metric snapshots, stored comments and commenter details, DM conversations and messages (including locally stored attachment URLs), automation rules and activity logs, queued automation work, AI workflow records, and campaign channel links. Connections are disabled first; work already in progress may need to finish before deletion completes. If deletion fails, retry it or contact support.
           </p>
         </section>
 
@@ -120,10 +121,11 @@ export const DataDeletion = () => {
             </div>
           </div>
           <ol className="list-decimal list-inside space-y-2 text-sm text-zinc-400 pl-2">
-            <li>Go to the <strong>Publishing Channels</strong> page in your dashboard.</li>
+            <li>Open the <strong>Channels</strong> page (My Channels).</li>
             <li>Locate the channel you want to disconnect.</li>
-            <li>Click the channel options and select <strong>Disconnect / Remove</strong>.</li>
-            <li>All access tokens and cached metrics specific to that channel will be immediately invalidated and deleted.</li>
+            <li>Click <strong>Disconnect</strong> and confirm.</li>
+            <li>The connection is disabled, queued automation work is cleared, and locally stored tokens, metrics, comments, conversations, messages, automation rules, and activity logs for that channel are deleted.</li>
+            <li>ThousandPost also attempts to revoke provider authorization. If that attempt fails, revoke access in the platform settings using the instructions below.</li>
           </ol>
         </section>
 
@@ -206,7 +208,14 @@ export const DataDeletion = () => {
             </a>
           </div>
           <p className="text-xs leading-5 text-zinc-400">
-            Please include the email address associated with your ThousandPost account and the handles of any connected channels. Our privacy team will process and confirm your deletion request within <strong>48 hours</strong>.
+            Please include your ThousandPost account email and connected channel handles. If you commented on or messaged a connected account without having a ThousandPost account, identify that social account and your own handle so we can locate the relevant records. We may request information to verify your request. We aim to acknowledge requests within <strong>48 hours</strong>; applicable YouTube user data is deleted as soon as possible and within <strong>seven calendar days</strong> of your deletion request.
+          </p>
+        </section>
+
+        <section className="rounded-xl border border-white/10 bg-[#0a0a0a] p-6 shadow-md space-y-4">
+          <h2 className="m-0 text-lg font-bold text-white">Content Already Sent to Social Platforms</h2>
+          <p className="m-0 text-sm leading-6 text-zinc-400">
+            Deletion from ThousandPost removes our local records. It does not remove posts, comments, public replies, DMs, or copies held by YouTube, Facebook, Instagram, or message recipients. Use the social platform's own controls to manage content held there. Limited security records may be retained as described in our Privacy Policy.
           </p>
         </section>
       </div>

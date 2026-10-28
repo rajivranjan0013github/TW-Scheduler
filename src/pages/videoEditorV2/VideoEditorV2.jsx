@@ -2058,6 +2058,25 @@ export const VideoEditorV2 = () => {
     }
   }, [bulkRowId, exportState.format, exportState.generatedCaption, exportState.resultFileName, exportState.resultMimeType, isBulkProject, project, token]);
 
+  useEffect(() => {
+    if (status?.type !== 'success') return undefined;
+    const timeoutId = setTimeout(() => setStatus(null), 4000);
+    return () => clearTimeout(timeoutId);
+  }, [status]);
+
+  const handleExportCaptionChange = useCallback((itemId, caption) => {
+    if (exportState.mode !== 'bulk') {
+      setExportState((current) => ({ ...current, generatedCaption: caption }));
+      return;
+    }
+    updateStoredBulkRowById(itemId, (current) => ({
+      ...current,
+      generatedCaption: caption,
+    }), { source: 'editor-v2-bulk-captions' }).catch((error) => {
+      setStatus({ type: 'error', text: error.message || 'Failed to update the caption.' });
+    });
+  }, [exportState.mode]);
+
   const handleSaveExportToLibrary = useCallback(async (targetItemId = null, options = {}) => {
     const folderId = options.folderId || exportState.folderId || 'root';
     if (exportState.mode === 'bulk') {
@@ -2277,15 +2296,23 @@ export const VideoEditorV2 = () => {
         </div>
       </div>
 
-      {status?.type === 'error' && (
+      {status?.text && (
         <button
           type="button"
+          role={status.type === 'error' ? 'alert' : 'status'}
           onClick={() => setStatus(null)}
           style={{
             left: 'calc((100vw - clamp(340px, 26vw, 420px)) / 2)',
             bottom: timelineHeight + 12,
           }}
-          className="fixed z-50 max-w-md -translate-x-1/2 rounded-xl border border-red-400/30 bg-[#2a1519] px-4 py-2.5 text-[11px] font-bold text-red-200 shadow-lg"
+          // Above the full-screen ExportDialog (z-[100]) so save results stay visible.
+          className={`fixed z-[110] max-w-md -translate-x-1/2 rounded-xl border px-4 py-2.5 text-[11px] font-bold shadow-lg ${
+            status.type === 'success'
+              ? 'border-emerald-400/30 bg-[#12251c] text-emerald-200'
+              : status.type === 'warning'
+                ? 'border-amber-400/30 bg-[#2a2213] text-amber-200'
+                : 'border-red-400/30 bg-[#2a1519] text-red-200'
+          }`}
         >
           {status.text}
         </button>
@@ -2354,6 +2381,7 @@ export const VideoEditorV2 = () => {
         onClose={handleCloseExportDialog}
         onSaveToLibrary={handleSaveExportToLibrary}
         onGenerateCaptions={() => generateExportCaptions()}
+        onCaptionChange={handleExportCaptionChange}
       />
 
       {/* Exit Confirmation Dialog Modal for Standalone Editor */}

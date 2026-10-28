@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, AlertTriangle, CheckCircle2, ExternalLink, Unlink } from 'lucide-react';
@@ -554,7 +554,7 @@ export const CreatorChannels = () => {
               <div className="min-w-0 flex-1">
                 <h3 className="text-base font-bold text-white m-0">Connect YouTube Channel</h3>
                 <p className="mt-1 text-xs text-zinc-400 m-0">
-                  Publish video content and view video performance insights via official YouTube API Services.
+                  Publish videos, view performance, and read and reply to comments through YouTube API Services.
                 </p>
               </div>
             </div>
@@ -579,6 +579,11 @@ export const CreatorChannels = () => {
                 >
                   Google Privacy Policy
                 </a>.
+              </p>
+              <p className="m-0">
+                We also read and store comments and commenter details for the Comments feed and post the public replies you submit or authorize in enabled rules. YouTube does not support DMs. Our{' '}
+                <Link to="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-zinc-200 underline">Privacy Policy</Link>{' '}
+                explains these uses, retention, and deletion.
               </p>
               <p className="m-0 text-[11px] text-zinc-400 pt-1 border-t border-white/5">
                 You can disconnect your channel at any time from ThousandPost or revoke permissions via{' '}

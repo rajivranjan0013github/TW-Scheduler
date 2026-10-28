@@ -31,6 +31,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
+import { useAuth } from '../context/AuthContext';
 import { withHandlerPreviewHeaders } from '../utils/handlerPreview';
 import { connectInstagramOAuth, connectMetaOAuth, formatHandle } from '../utils/channelOAuth';
 import { AccountAvatar } from '../components/adminDashboard/DashboardPresentation';
@@ -47,7 +48,11 @@ const apiRequest = async (path, { method = 'GET', body } = {}) => {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || `Request failed (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(data.message || `Request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
   return data;
 };
 
@@ -814,7 +819,7 @@ const Pill = ({ children, tone = 'neutral' }) => (
   </span>
 );
 
-const RuleCard = ({ rule, account, onToggle, onEdit, onDelete }) => (
+const RuleCard = ({ rule, account, toggling, onToggle, onEdit, onDelete }) => (
   <article className={`group rounded-2xl border bg-white/[0.02] p-5 transition hover:border-white/15 ${
     rule.enabled ? 'border-white/10' : 'border-white/[0.06] opacity-70'
   }`}>
@@ -829,7 +834,7 @@ const RuleCard = ({ rule, account, onToggle, onEdit, onDelete }) => (
           <p className="m-0 mt-0.5 truncate text-xs text-zinc-500">{accountLabel(account)}</p>
         </div>
       </div>
-      <Switch checked={rule.enabled} onChange={onToggle} label={`${rule.enabled ? 'Pause' : 'Resume'} ${rule.name}`} />
+      <Switch checked={rule.enabled} onChange={onToggle} disabled={toggling} label={`${rule.enabled ? 'Pause' : 'Resume'} ${rule.name}`} />
     </div>
 
     <div className="mt-4 space-y-2.5 rounded-xl bg-black/30 p-3.5">
@@ -1944,6 +1949,17 @@ const Tabs = ({ value, onChange, tabs }) => (
   </div>
 );
 
+const LoadError = ({ error, onRetry }) => (
+  <div className="rounded-3xl border border-rose-500/20 bg-rose-500/[0.04] p-10 text-center">
+    <AlertTriangle className="mx-auto h-8 w-8 text-rose-400" />
+    <p className="m-0 mt-3 text-base font-semibold text-white">Couldn't load your automations</p>
+    <p className="m-0 mt-1 text-sm text-zinc-400">{error.message}</p>
+    <button type="button" onClick={onRetry} className={`${secondaryButton} mt-5`}>
+      <RefreshCw className="h-4 w-4" /> Try again
+    </button>
+  </div>
+);
+
 const Stat = ({ label, value }) => (
   <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3.5">
     <p className="m-0 text-xs text-zinc-500">{label}</p>
@@ -1953,6 +1969,7 @@ const Stat = ({ label, value }) => (
 
 export const CreatorAutomations = () => {
   const queryClient = useQueryClient();
+  const { logout } = useAuth();
   const [editor, setEditor] = useState(null);
   const [ruleToDelete, setRuleToDelete] = useState(null);
   const [toast, setToast] = useState(null);
@@ -1984,6 +2001,12 @@ export const CreatorAutomations = () => {
     queryFn: () => apiRequest('/events?limit=50'),
     refetchInterval: 30 * 1000,
   });
+
+  // A 401 here means the login itself expired, so send them back to sign in
+  const sessionExpired = accountsQuery.error?.status === 401 || rulesQuery.error?.status === 401;
+  useEffect(() => {
+    if (sessionExpired) logout();
+  }, [sessionExpired, logout]);
 
   const accounts = accountsQuery.data || [];
   const rules = rulesQuery.data || [];
@@ -2064,7 +2087,11 @@ export const CreatorAutomations = () => {
         <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-zinc-500" /></div>
       )}
 
-      {!isLoading && accounts.length === 0 && (
+      {!isLoading && accountsQuery.error && (
+        <LoadError error={accountsQuery.error} onRetry={() => accountsQuery.refetch()} />
+      )}
+
+      {!isLoading && !accountsQuery.error && accounts.length === 0 && (
         <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-10 text-center">
           <span className="mx-auto flex h-12 w-fit items-center justify-center gap-2.5 rounded-2xl bg-white/[0.04] px-3.5">
             <PlatformIcon platform="instagram" className="h-6 w-6" />
@@ -2094,12 +2121,14 @@ export const CreatorAutomations = () => {
               { value: 'automations', label: 'Automations', count: rules.length },
               { value: 'inbox', label: 'Inbox', count: unreadConversations },
               { value: 'comments', label: 'Comments', count: newComments },
-              { value: 'activity', label: 'Activity', count: events.length },
+              { value: 'activity', label: 'Activity' },
             ]}
           />
 
           {activeTab === 'automations' && (
-            rules.length === 0 ? (
+            rulesQuery.error ? (
+              <LoadError error={rulesQuery.error} onRetry={() => rulesQuery.refetch()} />
+            ) : rules.length === 0 ? (
               <EmptyRules onPick={openNewRule} />
             ) : (
               <div className="space-y-6">
@@ -2114,6 +2143,7 @@ export const CreatorAutomations = () => {
                       key={rule._id}
                       rule={rule}
                       account={accountsById.get(String(rule.socialAccountId))}
+                      toggling={toggleMutation.isPending && toggleMutation.variables?.ruleId === rule._id}
                       onToggle={(enabled) => toggleMutation.mutate({ ruleId: rule._id, enabled })}
                       onEdit={() => setEditor({ ruleId: rule._id, showTemplates: false, draft: ruleToDraft(rule) })}
                       onDelete={() => setRuleToDelete(rule)}

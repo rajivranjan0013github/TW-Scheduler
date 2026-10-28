@@ -39,7 +39,7 @@ export const Settings = () => {
     setErrorMessage('');
     const success = await deleteAccount();
     if (!success) {
-      setErrorMessage('Could not delete this workspace account. Please try again.');
+      setErrorMessage('Could not delete your account. Please try again.');
       setShowDeleteConfirm(false);
     }
   };
@@ -127,9 +127,11 @@ export const Settings = () => {
             <div className="space-y-1.5 text-center sm:text-left">
               <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                 <h3 className="m-0 text-base font-bold text-white">{user?.name}</h3>
-                <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${getRoleBadgeColor(user?.role)}`}>
-                  {user?.role || 'editor'}
-                </span>
+                {!isCreator && (
+                  <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${getRoleBadgeColor(user?.role)}`}>
+                    {user?.role || 'editor'}
+                  </span>
+                )}
                 <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-bold uppercase text-zinc-300">
                   {isCreator ? 'Creator' : 'Campaign Maker'}
                 </span>
@@ -285,7 +287,7 @@ export const Settings = () => {
             </div>
 
             <p className="mb-6 text-xs text-zinc-400 leading-relaxed">
-              You will need to sign back in to access your workspace campaigns and channels.
+              You will need to sign back in to access your campaigns and channels.
             </p>
 
             <div className="flex items-center justify-end gap-2.5">

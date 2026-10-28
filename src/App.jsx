@@ -36,6 +36,7 @@ import CreatorCampaigns from './pages/CreatorCampaigns';
 import CreatorSchedulePost from './pages/CreatorSchedulePost';
 import CreatorMedia from './pages/CreatorMedia';
 import CreatorAutomations from './pages/CreatorAutomations';
+import PolicyConsent from './pages/PolicyConsent';
 
 const VideoEditorV2 = lazy(() => import('./pages/videoEditorV2/VideoEditorV2'));
 
@@ -205,8 +206,21 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
   );
 }
 
+function PolicyAccountAccess({ children }) {
+  return (
+    <div className="h-[100dvh] overflow-y-auto bg-[#0c0c0e] text-white">
+      <nav aria-label="Account access before policy acceptance" className="flex flex-wrap gap-5 border-b border-white/10 px-5 py-4 text-sm text-zinc-300">
+        <NavLink to="/" className="underline">Review updated policies</NavLink>
+        <NavLink to="/channels" className="underline">My Channels</NavLink>
+        <NavLink to="/settings" className="underline">Account settings</NavLink>
+      </nav>
+      <div className="px-5 py-6">{children}</div>
+    </div>
+  );
+}
+
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, policyConsentRequired } = useAuth();
   const location = useLocation();
   const [selectedAccounts, setSelectedAccounts] = useState([]);
 
@@ -240,6 +254,12 @@ function AppContent() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="*" element={<Navigate to="/" replace />} />
+        </>
+      ) : policyConsentRequired ? (
+        <>
+          <Route path="/settings" element={<PolicyAccountAccess><Settings /></PolicyAccountAccess>} />
+          <Route path="/channels" element={<PolicyAccountAccess><CreatorChannels selectedAccounts={selectedAccounts} /></PolicyAccountAccess>} />
+          <Route path="*" element={<PolicyConsent />} />
         </>
       ) : !user.userType ? (
         <>

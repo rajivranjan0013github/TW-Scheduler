@@ -2,7 +2,6 @@ import { useState } from 'react';
 import {
   ArrowRight,
   Check,
-  Layers3,
   LogOut,
   UsersRound,
 } from 'lucide-react';
@@ -10,22 +9,16 @@ import { useAuth } from '../context/AuthContext';
 
 const workspaceTypes = [
   {
-    value: 'campaign_maker',
-    title: 'Run campaigns',
-    description: 'Create content, manage schedules, and coordinate posters.',
-    icon: Layers3,
-  },
-  {
     value: 'account_handler',
-    title: 'Post content',
-    description: 'Connect social channels and publish assigned posts.',
+    title: 'Creator',
+    description: 'Connect your channels, schedule posts, and automate comment replies and DMs.',
     icon: UsersRound,
   },
 ];
 
 export const OnboardingScreen = () => {
   const { user, updateProfile, logout } = useAuth();
-  const [selectedRole, setSelectedRole] = useState('campaign_maker');
+  const [selectedRole, setSelectedRole] = useState('account_handler');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,7 +29,7 @@ export const OnboardingScreen = () => {
     try {
       const success = await updateProfile({ userType: selectedRole });
       if (!success) {
-        throw new Error('Could not set role. Please try again.');
+        throw new Error('Could not finish setup. Please try again.');
       }
     } catch (err) {
       setError(err.message);
@@ -94,10 +87,10 @@ export const OnboardingScreen = () => {
             {/* Header */}
             <div className="text-center">
               <h1 className="m-0 text-xl sm:text-2xl md:text-3xl font-black tracking-[-0.04em] text-[#f5f0e8]">
-                Select your role
+                Welcome to ThousandPost
               </h1>
               <p className="m-0 mt-1 text-xs sm:text-sm text-[#89837c]">
-                Choose how you want to use ThousandPost.
+                Set up your creator account to get started.
               </p>
             </div>
 

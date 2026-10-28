@@ -1,13 +1,15 @@
 # ThousandPost platform review checklist
 
-Use this checklist only after the current frontend and backend have been deployed to `https://thousandpost.com` and the production smoke tests pass.
+Updated October 26, 2026. This is a preparation guide, not evidence that production or platform dashboard checks have passed. Submit only after deploying the matching frontend and backend and completing the live checks below.
 
-## Reviewer access
+## Reviewer access and policy acceptance
 
-- Provision the reviewer with `npm run reviewer:provision` in the backend. The command requires temporary `REVIEWER_EMAIL` and `REVIEWER_PASSWORD` environment values.
-- Submit that email and temporary password through the platform's private reviewer-instructions field. Never place credentials in source code, screenshots, public pages, or this file.
-- Confirm the account has `role=editor` and `userType=account_handler`.
-- Rotate or disable the password after review.
+- Provision a dedicated creator reviewer with `npm run reviewer:provision` in the backend, using temporary `REVIEWER_EMAIL`, `REVIEWER_PASSWORD`, and optional `REVIEWER_NAME` values.
+- The reviewer must have `role=editor` and `userType=account_handler`. Give it access only to disposable review channels and content.
+- Supply credentials through the platform's private reviewer-instructions field. Do not put passwords in recordings, source files, or public pages. Rotate or disable them after review.
+- On first sign-in, the reviewer sees the October 26 policy update. Show the Privacy Policy and Terms links, the initially unchecked acceptance box, and explicit acceptance before using the app.
+- Existing channel owners must also accept this version. Until then, comment collection, Inbox processing, queued replies, and new channel authorization are blocked. Do not pre-mark users or reviewers as accepted in the database.
+- Settings, My Channels, disconnection, deletion, and sign-out remain available without accepting. Connecting a new channel still requires acceptance.
 
 ## Public and callback URLs
 
@@ -15,66 +17,81 @@ Use this checklist only after the current frontend and backend have been deploye
 - Privacy policy: `https://thousandpost.com/privacy-policy`
 - Terms: `https://thousandpost.com/terms-and-conditions`
 - Data deletion instructions: `https://thousandpost.com/data-deletion`
-- Meta data deletion callback: `https://thousandpost.com/api/auth/meta-data-deletion`
+- Meta deletion callback: `https://thousandpost.com/api/auth/meta-data-deletion`
 - Meta deauthorization callback: `https://thousandpost.com/api/auth/meta-deauthorize`
 - Facebook redirect: `https://thousandpost.com/auth/facebook/callback`
 - Instagram redirect: `https://thousandpost.com/auth/instagram/callback`
 - YouTube redirect: `https://thousandpost.com/auth/youtube/callback`
 
-The URLs configured in Meta and Google must match these values exactly, including scheme, host, path, and trailing-slash behavior.
+Match the configured URLs exactly. Open the three legal pages while signed out and confirm they show October 26, 2026 and include comments, DMs, Inbox, retention, and deletion. Confirm Meta's crawler can access the URLs using the Sharing Debugger; a browser-only check does not establish crawler access.
 
-## Requested permissions and visible use cases
+## Permissions and visible uses
 
-### Facebook Login
+### Facebook Pages
 
-- `pages_show_list`: show the Pages the user manages and let the user choose a Page to connect.
-- `pages_read_engagement`: display Page post views, reactions/likes, and comment counts in analytics.
-- `pages_manage_posts`: publish user-selected text, photo, and video content to the selected Page.
+| Permission | Demonstration |
+| --- | --- |
+| `pages_show_list` | List and select a Facebook Page the user manages. |
+| `pages_read_engagement` | Show Page post performance in Analytics. |
+| `pages_manage_posts` | Publish the user's selected post to the selected Page. |
+| `pages_manage_metadata` | Subscribe the Page to `feed` and `messages` webhooks; show a new comment/message arriving. |
+| `pages_read_user_content` | Show comments and available commenter names in Automations → Comments. |
+| `pages_manage_engagement` | Send a manual public reply and a keyword-triggered automatic public reply. |
+| `pages_messaging` | Send an eligible private reply to a commenter, then read and answer a Messenger conversation in Inbox. |
 
-Facebook Login connects Facebook Pages only. Instagram accounts use the separate Instagram Login flow.
+For Facebook Login for Business, verify `META_LOGIN_CONFIG_ID` requests these same permissions in its dashboard configuration. A configured login flow does not use the fallback scope list in the code.
 
 ### Instagram Login
 
-- `instagram_business_basic`: identify and display the connected professional account.
-- `instagram_business_content_publish`: publish the user's selected image, reel, or carousel.
-- `instagram_business_manage_insights`: display authorized performance metrics and comment counts.
+| Permission | Demonstration |
+| --- | --- |
+| `instagram_business_basic` | Identify and show the connected Professional account. |
+| `instagram_business_content_publish` | Publish the user's selected image, Reel, or carousel. |
+| `instagram_business_manage_insights` | Show account-authorized performance metrics. |
+| `instagram_business_manage_comments` | Show comments, send a public reply, and run a keyword reply rule. |
+| `instagram_business_manage_messages` | Read a DM conversation and send a reply from Inbox; also demonstrate the private-reply use case. |
 
-### Google OAuth / YouTube Data API
+Instagram uses its separate Instagram Login flow. Do not request legacy Facebook Login Instagram permissions for this build.
 
-- `youtube.upload`: upload the selected video with the exact title, description, privacy, audience, and disclosure choices entered by the user.
-- `youtube.readonly`: identify the connected channel and retrieve the channel's videos and performance statistics.
+### Google OAuth / YouTube
 
-## End-to-end reviewer steps
+| Scope | Demonstration |
+| --- | --- |
+| `https://www.googleapis.com/auth/youtube.upload` | Upload with the user's selected title, description, visibility, audience, and disclosure choices. |
+| `https://www.googleapis.com/auth/youtube.readonly` | Identify the channel and retrieve its videos and performance. |
+| `https://www.googleapis.com/auth/youtube.force-ssl` | Read comments and send manual or authorized automatic public replies. |
 
-1. Open the homepage and sign in with the privately supplied email credentials.
-2. Open **My Channels**.
-3. Connect the reviewer-controlled Facebook Page, Instagram professional account, or YouTube channel.
-4. Review the provider consent screen and approve the requested permissions.
-5. Open **Schedule**, explicitly select one destination, and select or upload media.
-6. For YouTube, enter a title and description; choose Public, Unlisted, or Private; answer Made for Kids; set the altered/synthetic-content disclosure; and certify Community Guidelines compliance.
-7. Select **Now** to exercise publishing, or select a future time to exercise scheduling.
-8. Open **Analytics** and show the metrics associated with the connected channel.
-9. Open **My Channels** and disconnect an account to demonstrate provider revocation and local deletion.
-10. Open **Settings** and demonstrate the complete workspace-deletion path if requested by the reviewer.
+Existing YouTube channels may need to reconnect to grant comment access. Show the comment-use disclosure before Google authorization. YouTube has no DM or Inbox feature in ThousandPost.
 
-## Demonstration video
+## Review recording and instructions
 
-Record one continuous, narrated video per platform that shows:
+Record the real production flow in English using disposable accounts and real provider responses. Include full OAuth and permission-grant steps; do not use mocked data, hidden tokens, or edited-out authorization steps in the submitted recording.
 
-1. The public homepage and privacy policy.
-2. Reviewer sign-in.
-3. The full OAuth consent screen, with every requested permission visible.
-4. Channel selection and the exact feature that uses each permission.
-5. A successful publish and analytics retrieval.
-6. Disconnect/revocation and the data-deletion instructions.
+1. Open the homepage, sign in as the reviewer, review the policies, and explicitly accept.
+2. Open My Channels, connect a reviewer-controlled channel, and show the full provider consent flow.
+3. Publish a disposable post with the user's selected content and settings; show its performance.
+4. Open Automations → Comments, receive a new comment from a separate test person, and send a manual public reply.
+5. Create an enabled keyword rule for a specific disposable post, with public reply text and (Meta only) private reply text. Comment the keyword and show both results on the social platform and the delivery results in Activity.
+6. Send a DM from the separate test person. Open Inbox, read it, and reply within 24 hours of the person's message. Show YouTube is excluded from Inbox.
+7. Explain that a comment-specific private reply is a single message within the eligible period; it does not open an unrestricted follow-up conversation. Demonstrate an expired Inbox thread blocking sends, using a naturally expired test thread.
+8. Pause the rule, comment the keyword again, and verify that no further automatic reply is sent. Delete the rule if it is no longer needed.
+9. Disconnect a disposable channel. Verify its local tokens, profile, cached API data, comments, messages, rules, activity, and queued automation work are removed.
+10. Demonstrate deletion using a disposable user and confirm the associated database and object-storage records are removed. This deletes ThousandPost's copies, not messages or posts already held by social platforms.
 
-Do not use mock data, admin-only screens, hidden shortcuts, pre-authorized tokens, or edited-out consent steps in the demonstration.
+## Production acceptance checks
 
-## Final production checks
+- Run backend and frontend `npm test`, then frontend `npm run build`. Deploy the matching builds together, including rebuilt `dist` files if deployment serves the checked-in build.
+- Verify `NODE_ENV=production`, `DEMO_MODE=false`, and the intended background-sync setting. Revocation cleanup runs independently of optional background sync.
+- Verify encryption keys, HTTPS, restricted origins, and redirect allowlists. Legacy tokens are encrypted automatically during backend database connection when the encryption key is configured. Back up the key securely and do not rotate it without a migration.
+- Confirm provider credentials never appear in account or OAuth response bodies. Verify database indexes for YouTube engagement expiry and queued-job cleanup.
+- Confirm old and new users must explicitly accept the current policy; direct API calls and queued comment jobs must not bypass acceptance. A user/admin preview must not accept on another person's behalf.
+- Revoke a disposable YouTube grant through Google settings. The independent authorization check runs at startup and every 12 hours; after detection the channel is disabled, cleanup runs every minute, and failures retry. Confirm all associated Authorized Data is erased. Reconnect only after cleanup finishes.
+- Exercise a valid Meta signed deletion request in the disposable environment and verify the returned confirmation URL. Do not send fabricated or destructive requests for a real customer's account.
+- Verify Meta Business Verification, required Advanced Access, data-processing questions, Data Use Checkup, Google OAuth scope verification, domain ownership, and reviewer instructions in their dashboards. Code and local tests cannot establish these states.
 
-- `NODE_ENV=production`, `DEMO_MODE=false`, `ENABLE_BACKGROUND_SYNC=true`.
-- `SOCIAL_TOKEN_ENCRYPTION_KEY` is present and backed up securely; changing it without migrating tokens will make existing credentials unreadable.
-- `ALLOWED_ORIGINS` includes the exact production origin.
-- `META_GRAPH_API_VERSION` is set to the supported version tested in production.
-- Email login, all OAuth redirects, upload, publish-now, future scheduling, analytics, disconnect, and deletion work in a clean browser session.
-- Meta Business Verification, Advanced Access, Google branding verification, authorized domains, consent-screen contacts, and publisher-domain ownership are complete in their respective dashboards.
+## Primary platform references
+
+- [Meta privacy policy expectations](https://developers.facebook.com/documentation/development/terms-and-policies/privacy-policy)
+- [Instagram private replies](https://developers.facebook.com/documentation/instagram-platform/private-replies)
+- [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy)
+- [YouTube Developer Policies](https://developers.google.com/youtube/terms/developer-policies)
