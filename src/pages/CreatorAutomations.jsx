@@ -994,7 +994,7 @@ const CommentDmForm = ({ accountId, mediaId, comment, onDone, onSent }) => {
 
 const CommentReplyForm = ({ accountId, mediaId, comment, onDone, onSent }) => {
   const queryClient = useQueryClient();
-  const [message, setMessage] = useState(comment.username ? `@${comment.username} ` : '');
+  const [message, setMessage] = useState('');
   const replyMutation = useMutation({
     mutationFn: () => apiRequest(`/comments/${comment.id}/reply`, { method: 'POST', body: { accountId, message } }),
     onSuccess: () => {
