@@ -22,6 +22,7 @@ import { getActiveCampaignId } from '../utils/campaignScope';
 import PlatformIcon from '../components/PlatformIcon';
 import { AccountAvatar } from '../components/adminDashboard/DashboardPresentation';
 import { ActivityPanel } from '../components/automations/ActivityPanel';
+import { AdminCommentsPanel } from '../components/automations/AdminCommentsPanel';
 import { NoCampaignSelected } from '../components/automations/NoCampaignSelected';
 import { ConfirmDelete } from '../components/automations/RulesTab';
 import { adminAutomationKeys, adminRequest, toQuery } from '../components/automations/api';
@@ -483,6 +484,7 @@ export const AdminAutomations = () => {
             tabs={[
               { value: 'rules', label: 'Automations', count: rules.length },
               { value: 'activity', label: 'Activity' },
+              { value: 'comments', label: 'Comments' },
               { value: 'accounts', label: 'Accounts', count: needingSetup.length },
             ]}
           />
@@ -550,6 +552,10 @@ export const AdminAutomations = () => {
                 </button>
               )}
             </div>
+          )}
+
+          {activeTab === 'comments' && (
+            <AdminCommentsPanel campaignId={campaignId} scope={scope} accounts={scopedAccounts} accountsById={accountsById} />
           )}
 
           {activeTab === 'accounts' && <AccountsList accounts={scopedAccounts} />}

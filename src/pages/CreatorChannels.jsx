@@ -15,6 +15,7 @@ import {
   getStatusBadgeClasses,
   getStatusLabel,
 } from '../utils/channelOAuth';
+import { getChannelPermissions } from '../utils/channelPermissions';
 
 export const CreatorChannels = () => {
   const { user } = useAuth();
@@ -179,9 +180,36 @@ export const CreatorChannels = () => {
     }
   };
 
-  const channelsMissingAnalyticsPermission = normalizedChannels.filter((channel) => (
-    channel.platform === 'facebook' && channel.analyticsStatus === 'permission_missing'
-  ));
+  const isOwnChannel = (channel) => (
+    String(channel.userId?._id || channel.userId || '') === String(user?._id || '')
+  );
+
+  const reconnectChannel = (channel) => {
+    if (channel.platform === 'instagram') {
+      connectInstagramOAuth(activeConnectCampaignId);
+    } else if (channel.platform === 'youtube') {
+      setPendingYoutubeCampaignId(activeConnectCampaignId);
+      setShowYoutubeConsentModal(true);
+    } else {
+      connectMetaOAuth(activeConnectCampaignId, channel.socialAccountId || channel._id);
+    }
+  };
+
+  const channelsMissingPermissions = normalizedChannels
+    .filter(isOwnChannel)
+    .map((channel) => {
+      const missing = getChannelPermissions(channel).missing.map((feature) => feature.label);
+      // Older Facebook rows may only carry analyticsStatus without recorded scopes.
+      if (
+        channel.platform === 'facebook'
+        && channel.analyticsStatus === 'permission_missing'
+        && !missing.includes('Analytics')
+      ) {
+        missing.push('Analytics');
+      }
+      return { channel, missing };
+    })
+    .filter(({ missing }) => missing.length > 0);
 
   const loading = channelsQuery.isLoading && normalizedChannels.length === 0;
 
@@ -290,33 +318,36 @@ export const CreatorChannels = () => {
         </section>
       )}
 
-      {/* Facebook Analytics Reconnect Notice */}
-      {channelsMissingAnalyticsPermission.length > 0 && (
+      {/* Missing Permissions Reconnect Notice */}
+      {channelsMissingPermissions.length > 0 && (
         <section className="space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/[0.04] p-4 sm:p-5 shadow-sm">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-400" />
             <h3 className="m-0 text-xs font-bold uppercase tracking-[0.16em] text-amber-400">
-              Facebook Analytics Access Needed
+              Permissions Missing ({channelsMissingPermissions.length})
             </h3>
           </div>
+          <p className="text-xs text-amber-200/80 m-0">
+            Some features were not authorized. Reconnect and allow all requested permissions to enable them.
+          </p>
           <div className="grid gap-2.5 sm:grid-cols-2">
-            {channelsMissingAnalyticsPermission.map((channel) => (
+            {channelsMissingPermissions.map(({ channel, missing }) => (
               <div
-                key={`analytics-${channel._id}`}
+                key={`permissions-${channel._id}`}
                 className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-black/40 p-3"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <PlatformIcon platform={channel.platform} className="h-8 w-8 shrink-0" />
                   <div className="min-w-0">
                     <p className="m-0 truncate text-xs font-semibold text-white">
-                      {formatHandle(channel.username || channel.handle || 'facebook-page')}
+                      {formatHandle(channel.username || channel.handle || channel.name || 'channel')}
                     </p>
-                    <p className="m-0 truncate text-[10px] text-amber-400">Publishing remains connected</p>
+                    <p className="m-0 truncate text-[10px] text-amber-400">Missing: {missing.join(', ')}</p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => connectMetaOAuth(activeConnectCampaignId, channel.socialAccountId || channel._id)}
+                  onClick={() => reconnectChannel(channel)}
                   className="shrink-0 rounded-lg bg-[#7831d6] hover:bg-[#6825bc] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition active:scale-95"
                 >
                   Reconnect
@@ -352,13 +383,14 @@ export const CreatorChannels = () => {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {normalizedChannels.map((chan) => {
-              const channelOwnerId = String(chan.userId?._id || chan.userId || '');
-              const canDisconnect = channelOwnerId === String(user?._id || '');
+              const canDisconnect = isOwnChannel(chan);
+              const permissions = getChannelPermissions(chan);
               return (
               <div
                 key={chan._id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3.5 hover:bg-white/[0.04] transition shadow-sm"
+                className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3.5 hover:bg-white/[0.04] transition shadow-sm"
               >
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="relative h-10 w-10 shrink-0">
                     <AccountAvatar account={chan} className="h-10 w-10 rounded-full object-cover border border-white/10" />
@@ -401,6 +433,40 @@ export const CreatorChannels = () => {
                     </span>
                   )}
                 </div>
+              </div>
+
+              {/* Granted permissions */}
+              <div className="border-t border-white/[0.06] pt-2.5">
+                <p className="m-0 mb-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                  Permissions
+                </p>
+                {permissions.known ? (
+                  <div className="flex flex-wrap gap-1">
+                    {permissions.granted.map((feature) => (
+                      <span
+                        key={feature.key}
+                        className="inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300"
+                      >
+                        <CheckCircle2 className="h-2.5 w-2.5" />
+                        {feature.label}
+                      </span>
+                    ))}
+                    {permissions.missing.map((feature) => (
+                      <span
+                        key={feature.key}
+                        title="Not granted — reconnect to enable"
+                        className="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-600 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 line-through decoration-zinc-600"
+                      >
+                        {feature.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="m-0 text-[10px] text-zinc-500">
+                    Not recorded for this connection.{canDisconnect ? ' Reconnect to refresh.' : ''}
+                  </p>
+                )}
+              </div>
               </div>
               );
             })}

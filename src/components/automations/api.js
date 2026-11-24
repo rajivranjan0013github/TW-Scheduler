@@ -61,4 +61,5 @@ export const adminAutomationKeys = {
   rules: (campaignId, filters) => ['admin-automations', campaignId, 'rules', filters],
   rule: (campaignId, ruleId) => ['admin-automations', campaignId, 'rule', ruleId],
   events: (campaignId, filters) => ['admin-automations', campaignId, 'events', filters],
+  comments: (campaignId, filters) => ['admin-automations', campaignId, 'comments', filters],
 };

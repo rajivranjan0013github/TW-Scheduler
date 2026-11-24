@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Users } from 'lucide-react';
 import { formatHandle } from '../../utils/channelOAuth';
 import PlatformIcon from '../PlatformIcon';
 import { AccountAvatar } from '../adminDashboard/DashboardPresentation';
@@ -17,7 +17,17 @@ const AccountOption = ({ account, size = 'h-8 w-8' }) => (
   </span>
 );
 
-export const AccountSelect = ({ accounts, value, onChange, disabled, id, placeholder = 'Select an account' }) => {
+// Pass allLabel to add an "all accounts" choice at the top; picking it calls onChange('')
+const AllOption = ({ label }) => (
+  <span className="flex min-w-0 items-center gap-3">
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06]">
+      <Users className="h-4 w-4 text-zinc-400" />
+    </span>
+    <span className="truncate text-sm font-medium text-white">{label}</span>
+  </span>
+);
+
+export const AccountSelect = ({ accounts, value, onChange, disabled, id, placeholder = 'Select an account', allLabel }) => {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const selected = accounts.find((account) => String(account._id) === String(value));
@@ -54,7 +64,7 @@ export const AccountSelect = ({ accounts, value, onChange, disabled, id, placeho
           open ? 'border-[#7831d6]' : 'border-white/10 hover:border-white/20'
         }`}
       >
-        {selected ? <AccountOption account={selected} /> : <span className="py-1.5 text-sm text-zinc-500">{placeholder}</span>}
+        {selected ? <AccountOption account={selected} /> : allLabel ? <AllOption label={allLabel} /> : <span className="py-1.5 text-sm text-zinc-500">{placeholder}</span>}
         {!disabled && <ChevronDown className={`h-4 w-4 shrink-0 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`} />}
       </button>
 
@@ -64,6 +74,23 @@ export const AccountSelect = ({ accounts, value, onChange, disabled, id, placeho
           aria-labelledby={id}
           className="absolute left-0 right-0 z-20 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-white/10 bg-[#18181c] p-1.5 shadow-2xl shadow-black/60"
         >
+          {allLabel && (
+            <li role="option" aria-selected={!selected}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('');
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 transition ${
+                  !selected ? 'bg-white/[0.07]' : 'hover:bg-white/[0.05]'
+                }`}
+              >
+                <AllOption label={allLabel} />
+                {!selected && <Check className="h-4 w-4 shrink-0 text-[#c4a5f5]" />}
+              </button>
+            </li>
+          )}
           {accounts.map((account) => {
             const isSelected = String(account._id) === String(value);
             return (

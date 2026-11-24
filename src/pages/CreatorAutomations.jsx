@@ -116,7 +116,7 @@ export const CreatorAutomations = () => {
   const isLoading = accountsQuery.isLoading || rulesQuery.isLoading;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6 p-4 lg:p-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="m-0 text-2xl font-bold tracking-tight text-white">Automations</h2>
