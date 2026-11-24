@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ChevronRight, Filter, RefreshCw, Search, Shield, User, UserCog, Users, X } from 'lucide-react';
+import { AlertTriangle, Bot, ChevronRight, Filter, RefreshCw, Search, Shield, User, UserCog, Users, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getActiveCampaignId } from '../utils/campaignScope';
@@ -470,6 +470,16 @@ export const AdminUsers = () => {
 
                     {/* Action */}
                     <td className="py-3.5 px-4 text-right">
+                      <div className="inline-flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/admin/automations?handlerId=${encodeURIComponent(item._id)}`)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-[#7831d6]/40 hover:bg-[#7831d6]/15 hover:text-[#c4b5fd] shadow-xs active:scale-95"
+                        title="See this user's automations"
+                      >
+                        <Bot className="h-3 w-3" />
+                        <span>Automations</span>
+                      </button>
                       {canPreviewHandler && (
                         <button
                           type="button"
@@ -481,6 +491,7 @@ export const AdminUsers = () => {
                           <ChevronRight className="h-3 w-3" />
                         </button>
                       )}
+                      </div>
                     </td>
                   </tr>
                 );

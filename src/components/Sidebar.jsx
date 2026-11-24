@@ -157,9 +157,10 @@ export const Sidebar = ({ selectedAccounts = [], setSelectedAccounts = () => {} 
     { name: 'Campaigns', label: 'Campaigns', path: '/campaigns', icon: Megaphone },
     ...(canViewAdmin ? [{ name: 'Performance', label: 'Perf', path: '/dashboard', icon: BarChart3 }] : []),
     { name: 'Scheduled Queue', label: 'Queue', path: '/scheduler', icon: Clock },
+    ...(canViewAdmin ? [{ name: 'Automations', label: 'Auto', path: '/admin/automations', icon: Bot }] : []),
     { name: 'Media Library', label: 'Media', path: '/media', icon: FolderHeart },
-    { name: 'Timeline Editor', label: 'Editor', path: '/media/editor', icon: Film },
     { name: 'Bulk Builder', label: 'Bulk', path: '/media/bulk-builder', icon: Layers },
+    { name: 'Timeline Editor', label: 'Editor', path: '/media/editor', icon: Film },
     { name: 'Publishing Channels', label: 'Channels', path: '/channels', icon: Link2 },
     { name: 'Settings', label: 'Settings', path: '/settings', icon: SettingsIcon },
   ];

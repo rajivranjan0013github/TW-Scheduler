@@ -23,6 +23,8 @@ import CreatorAnalytics from './pages/CreatorAnalytics';
 import AdminCampaigns from './pages/AdminCampaigns';
 import AdminFolders from './pages/AdminFolders';
 import AdminFolderDetails from './pages/AdminFolderDetails';
+import AdminAutomations from './pages/AdminAutomations';
+import AdminAutomationEditor from './pages/AdminAutomationEditor';
 import FacebookCallback from './pages/FacebookCallback';
 import GoogleLoginCallback from './pages/GoogleLoginCallback';
 import InstagramCallback from './pages/InstagramCallback';
@@ -194,6 +196,9 @@ function AuthenticatedShell({ selectedAccounts, setSelectedAccounts }) {
               {canViewAdmin && <Route path="/admin/campaign" element={<AdminCampaigns />} />}
               {canViewAdmin && <Route path="/admin/folders" element={<AdminFolders />} />}
               {canViewAdmin && <Route path="/admin/folders/:id" element={<AdminFolderDetails />} />}
+              {canViewAdmin && <Route path="/admin/automations" element={<AdminAutomations />} />}
+              {canViewAdmin && <Route path="/admin/automations/new" element={<AdminAutomationEditor />} />}
+              {canViewAdmin && <Route path="/admin/automations/:ruleId/edit" element={<AdminAutomationEditor />} />}
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           )}

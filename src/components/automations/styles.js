@@ -1,0 +1,4 @@
+export const inputClass = 'w-full rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-500 outline-none transition focus:border-[#7831d6] focus:bg-white/[0.05]';
+export const primaryButton = 'inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#7831d6] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#7831d6]/20 transition hover:bg-[#6825bc] active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100';
+export const secondaryButton = 'inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.06]';
+export const iconButton = 'inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/[0.08] hover:text-white';
